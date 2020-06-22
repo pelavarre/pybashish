@@ -72,4 +72,4 @@ if __name__ == "__main__":
     main()
 
 
-# pulled from:  git clone git@github.com:pelavarre/pybashish.git
+# pulled from:  git clone https://github.com/pelavarre/pybashish.git
