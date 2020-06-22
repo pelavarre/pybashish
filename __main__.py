@@ -20,7 +20,6 @@ def main(argv):
 
     file_dir = os.path.split(os.path.realpath(__file__))[0]
     bin_dir = os.path.join(file_dir, "bin")
-    sys.path.append(bin_dir)
 
     # Call Bash Py
 
