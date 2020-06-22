@@ -6,11 +6,12 @@ import shlex
 import subprocess
 import sys
 
-import pwd
-import read
+import pwd_ as pybashish_pwd  # FIXME: group these into one package
+
+import read as pybashish_read
 
 
-def main():
+def main(argv):
 
     stderr_print()
     stderr_print("Pybashish 0.x.y for Linux and Mac OS Terminals")
@@ -21,7 +22,7 @@ def main():
     main.returncode = 0
     while True:
 
-        with read.GlassTeletype() as gt:
+        with pybashish_read.GlassTeletype() as gt:
 
             ps1 = calc_ps1()
             gt.putch(ps1)
@@ -82,8 +83,12 @@ def compile_run_py(verb):
         return how
 
     file_dir = os.path.split(os.path.realpath(__file__))[0]
-    what = f"{verb}.py"
+
+    what = f"{verb}_.py"
     wherewhat = os.path.join(file_dir, what)
+    if not os.path.exists(wherewhat):
+        what = f"{verb}.py"
+        wherewhat = os.path.join(file_dir, what)
 
     if os.path.exists(wherewhat):
 
@@ -135,7 +140,7 @@ def calc_ps1():
 
     user = calc_ps1.user
     hostname = platform.node()
-    where = os_path_homepath(os.getcwd())
+    where = pybashish_pwd.os_path_homepath(os.getcwd())
 
     nocolor = "\x1b[00m"
     green = "\x1b[00;32m"  # ANSI TTY escape codes
@@ -143,16 +148,6 @@ def calc_ps1():
 
     ps1 = f"{green}{user}@{hostname}{nocolor}:{blue}{where}{nocolor}{mark} \r\n({env}) {mark} "
     return ps1
-
-
-def os_path_homepath(path):
-
-    home = os.path.realpath(os.environ["HOME"])
-    homepath = path
-    if (path == home) or path.startswith(home + os.path.sep):
-        homepath = "~" + os.path.sep + os.path.relpath(path, start=home)
-
-    return homepath
 
 
 def stderr_print(*args):
@@ -166,4 +161,7 @@ BUILTINS["exit"] = builtin_exit
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
+
+
+# pulled from:  git clone git@github.com:pelavarre/pybashish.git

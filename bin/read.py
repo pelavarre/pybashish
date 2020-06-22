@@ -121,7 +121,9 @@ class GlassTeletype(contextlib.ContextDecorator):
         bots_by_stdin[b"\x1b[A"] = self._previous_history  # Up Arrow
         bots_by_stdin[b"\x1b[B"] = self._next_history  # Down Arrow
 
-        for codepoint in range(ord(" "), ord("~") + 1):
+        for codepoint in range(
+            ord(" "), ord("~") + 1
+        ):  # "\u0020" .. "\u007e" "us-ascii" plain text in U0000.pdf
             stdin = chr(codepoint).encode()
             bots_by_stdin[stdin] = self._take_stdin
 
@@ -207,9 +209,9 @@ class GlassTeletype(contextlib.ContextDecorator):
                 self._take_chars(shline)
                 break
 
-    def _raise_keyboard_interrupt(self, stdin):
+    def _raise_keyboard_interrupt(self, stdin):  # aka stty "intr" SIGINT
 
-        raise KeyboardInterrupt()
+        raise KeyboardInterrupt()  # FIXME: also SIGINFO, SIGUSR1, SIGSUSP, SIGQUIT
 
     def _reprint(self, stdin):
 
@@ -232,7 +234,7 @@ class GlassTeletype(contextlib.ContextDecorator):
         ch = stdin.decode()
         self._take_chars(ch)
 
-    def _unix_line_discard(self, stdin):  # aka kill_many
+    def _unix_line_discard(self, stdin):  # aka stty "kill" many
 
         while self.echoes:
             self._erase_one(stdin)
@@ -248,3 +250,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# pulled from:  git clone git@github.com:pelavarre/pybashish.git

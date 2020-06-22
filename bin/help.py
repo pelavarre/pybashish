@@ -13,8 +13,9 @@ def main():
     globbed = glob.glob("*.py")
 
     verbs = list()
-    for where in globbed:
-        verb = os.path.splitext(where)[0]
+    for what in globbed:
+        name = os.path.splitext(what)[0]
+        verb = name.rstrip("_")
         verbs.append(verb)
 
     stderr_print()
@@ -33,3 +34,6 @@ def stderr_print(*args):
 
 if __name__ == "__main__":
     main()
+
+
+# pulled from:  git clone git@github.com:pelavarre/pybashish.git
