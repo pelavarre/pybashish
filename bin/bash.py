@@ -1,10 +1,20 @@
 #!/usr/bin/env python3
 
+"""
+usage: bash.py [-h]
+
+optional arguments:
+  -h, --help      show this help message and exit
+"""
+
+
 import os
 import platform
 import shlex
 import subprocess
 import sys
+
+import argdoc
 
 import pwd_ as pybashish_pwd  # FIXME: group these into one package
 
@@ -12,6 +22,8 @@ import read as pybashish_read
 
 
 def main(argv):
+
+    args = argdoc.parse_args()
 
     stderr_print()
     stderr_print("Pybashish 0.x.y for Linux and Mac OS Terminals")

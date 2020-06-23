@@ -15,8 +15,9 @@ def main():
     verbs = list()
     for what in globbed:
         name = os.path.splitext(what)[0]
-        verb = name.rstrip("_")
-        verbs.append(verb)
+        if not name.startswith("_"):
+            verb = name.strip("_")
+            verbs.append(verb)
 
     stderr_print()
     stderr_print("For more information, try one of these:")

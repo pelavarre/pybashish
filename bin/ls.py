@@ -15,6 +15,7 @@ def main():
     # FIXME: implement ls -1, ls -C, and auto by stdin is tty
     # FIXME: implement ls -alF -rt, etc
     # FIXME: implement glob args
+    # FIXME: timestamp to like the second in an ls -l
 
 
 def os_stat_hidden(what):

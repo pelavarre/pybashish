@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 r"""
-usage: argdoc.py [-h] [--doc] FILE [-- [ARG [ARG ...]]]]
+usage: argdoc.py [-h] [--doc] FILE [-- [ARG [ARG ...]]]
 
 parse args as helped by module help doc
 
@@ -15,11 +15,11 @@ optional arguments:
 
 usage as a python import:
 
-    import argdoc
+  import argdoc
 
-    if __name__ == '__main__':
-        args = argdoc.parse_args()
-        print(args)
+  if __name__ == '__main__':
+    args = argdoc.parse_args()
+    print(args)
 
 examples:
 
@@ -81,10 +81,17 @@ def read_docstring_from(relpath):
     but ignore leading lines begun with a hash #
     """
 
+    if not os.path.exists(relpath):
+        try:
+            open(relpath, "rt")
+        except FileNotFoundError as exc:
+            stderr_print("{}: {}".format(type(exc).__name__, exc))
+            sys.exit(1)
+
     texts = []
     qqq = None
-    with open(relpath, "rt") as rt:
-        for line in rt.readlines():
+    with open(relpath, "rt") as reading:
+        for line in reading.readlines():
             text = line.rstrip()
             if texts or text:
                 if not text.startswith("#"):
@@ -167,6 +174,13 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
         parts = picker.pick_apart_doc(doc)
         self.parts = parts
 
+        if (
+            True
+        ):  # FIXME: allow free text in epilog, after these stop being bug consequences
+            assert "positional arguments:" not in parts.epilog
+            assert "optional arguments:" not in parts.epilog
+            # FIXME: explain better when people get these two backwards in the arg doc
+
         args_py_lines = self.compile_arguments()
 
         lines = []
@@ -178,15 +192,13 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
         lines.append("parser = argparse.ArgumentParser(")
         lines.append(d + "prog={prog!r},".format(prog=parts.prog))
 
-        if self.parts.usage != self.compiled_usage:
+        if self.parts.usage != self.calculated_usage:
+            stderr_print("doc'ced {}".format(self.parts.usage))
+            stderr_print("calculated {}".format(self.calculated_usage))
             # FIXME:  resolve conflicts between argdoc and parser more elegantly
-            # lines.append(d + "usage={usage!r},".format(usage=self.parts.usage))
-            # lines.append(
-            #     d
-            #     + d
-            #     + "# not default usage={usage!r},".format(usage=self.compiled_usage)
-            # )
-            pass
+
+        if "..." in self.calculated_usage:
+            lines.append(d + "usage={usage!r},".format(usage=self.calculated_usage))
 
         if parts.description:
             lines.append(
@@ -217,6 +229,8 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
 
         args_py_lines = []
 
+        # Compile the positionals of the arg doc
+
         self.usage_words = []
         if parts.positionals:  # call add_argument for each positional
             py_lines = []
@@ -228,6 +242,8 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
             args_py_lines.extend(py_lines)
 
         positional_words = self.usage_words
+
+        # Compile the optionals of the arg doc
 
         self.usage_words = []
         if (
@@ -241,7 +257,11 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
 
         optional_words = self.usage_words
 
-        self.compiled_usage = " ".join([parts.prog] + optional_words + positional_words)
+        # Calculate a usage line summing up the parsed parts
+
+        self.calculated_usage = " ".join(
+            [parts.prog] + optional_words + positional_words
+        )
 
         return args_py_lines
 
@@ -261,7 +281,12 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
             self.usage_words.append(metavar)
         else:
             assert nargs == "..."
-            self.usage_words.append("...")
+            if (
+                metavar == "ARG"
+            ):  # FIXME: stop solving only the "argdoc.py" case of this
+                self.usage_words.append("[-- [{} [{} ...]]]".format(metavar, metavar))
+            else:
+                self.usage_words.append("[{} [{} ...]]".format(metavar, metavar))
 
         dest = metavar.lower()
         if nargs != 1:
@@ -557,7 +582,7 @@ class _LineWalker(object):
         assert self.peek_eof()
 
 
-def _split_first_word(chars):
+def _split_first_word(chars):  # FIXME: promote up into the Git Log
     """Return the leading whitespace and first word, split from the remaining chars"""
 
     head_word = chars.split()[0]
@@ -568,6 +593,10 @@ def _split_first_word(chars):
         head,
         tail,
     )
+
+
+def stderr_print(*args):
+    print(*args, file=sys.stderr)
 
 
 if __name__ == "__main__":
