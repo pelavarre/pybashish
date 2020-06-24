@@ -32,7 +32,6 @@ examples:
 
 """  # FIXME: parsed args whose names begin with a '_' skid don't print here
 
-from __future__ import print_function
 
 import argparse
 import inspect
@@ -45,28 +44,43 @@ import textwrap
 def main(argv):
     """Run from the command line"""
 
+    # Fetch the arg doc
+
     args = parse_args(argv[1:])
     args.file_doc = read_docstring_from(args.file)
+
+    # Just print the arg doc
 
     args_separated = "--" in argv[1:]
     if args.doc:
 
         print(args.file_doc)
 
+    # Or compile the arg doc, but print it, don't run it
+
     elif not args_separated:
 
         source = _ArgDocCoder().compile_argdoc(args.file_doc)
         print(source)
+
+    # Or compile the arg doc and run it
 
     else:
 
         file_args = parse_args(args.args, doc=args.file_doc)
         file_parser = file_args._argument_parser
 
+        # Let the arg doc explain "--help" in its own way, but then still run it
+        # FIXME: Think some more over if this is the compromise we want
+
+        assert file_parser.add_help
+
         if not file_parser.add_help:
             if file_args.help:
                 file_parser.print_help()
                 sys.exit(0)
+
+        # Print the parsed args, but in sorted order
 
         for (k, v,) in sorted(vars(file_args).items()):
             if not k.startswith("_"):
@@ -81,38 +95,41 @@ def read_docstring_from(relpath):
     but ignore leading lines begun with a hash #
     """
 
-    if not os.path.exists(relpath):
-        try:
-            open(relpath, "rt")
-        except FileNotFoundError as exc:
-            stderr_print("{}: {}".format(type(exc).__name__, exc))
-            sys.exit(1)
+    try:
+        with open(relpath, "rt") as reading:
+            return _read_docstring_from(reading)
+    except FileNotFoundError as exc:
+        stderr_print("{}: {}".format(type(exc).__name__, exc))
+        sys.exit(1)
+
+
+def _read_docstring_from(reading):
 
     texts = []
     qqq = None
-    with open(relpath, "rt") as reading:
-        for line in reading.readlines():
-            text = line.rstrip()
-            if texts or text:
-                if not text.startswith("#"):
-                    if not qqq:
-                        if '"""' in text:
-                            texts.append(text)
-                            qqq = '"""'
-                        elif "'''" in text:
-                            texts.append(text)
-                            qqq = "'''"
-                        else:
-                            pass
-                    else:
+    for line in reading.readlines():
+        text = line.rstrip()
+
+        if texts or text:
+            if not text.startswith("#"):
+                if not qqq:
+                    if '"""' in text:
                         texts.append(text)
-                        if qqq in text:
-                            break
+                        qqq = '"""'
+                    elif "'''" in text:
+                        texts.append(text)
+                        qqq = "'''"
+                    else:
+                        pass
+                else:
+                    texts.append(text)
+                    if qqq in text:
+                        break
 
     source = "doc = " + "\n".join(texts)
 
     global_vars = {}
-    exec(source, global_vars)
+    exec(source, global_vars)  # FIXME: interpret quoted Python string without "exec"?
 
     doc = global_vars["doc"]
     return doc

@@ -1,11 +1,25 @@
 #!/usr/bin/env python3
 
+r"""
+usage: help.py [-h]
+
+print some help
+
+optional arguments:
+  -h, --help  show this help message and exit
+"""
+
+
 import glob
 import os
 import sys
 
+import argdoc
+
 
 def main():
+
+    argdoc.parse_args()
 
     file_dir = os.path.split(os.path.realpath(__file__))[0]
     os.chdir(file_dir)

@@ -1,9 +1,24 @@
 #!/usr/bin/env python3
 
+r"""
+usage: ls.py [-h]
+
+print some filenames
+
+optional arguments:
+  -h, --help  show this help message and exit
+
+"""
+
+
 import os
+
+import argdoc
 
 
 def main():
+
+    argdoc.parse_args()
 
     whats = sorted(w for w in os.listdir() if not os_stat_hidden(w))
 

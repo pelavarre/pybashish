@@ -1,0 +1,28 @@
+
+
+
+    >>>
+    >>> echo = subsh.ShVerb("echo")
+    >>>
+    >>> rc = echo("Hello", "ShVerb", "World")
+    >>> rc
+    0
+    >>> pprint.pprint(rc.vars)
+    {'args': ['echo', 'Hello', 'ShVerb', 'World'],
+     'returncode': 0,
+     'stderr': b'',
+     'stdout': b'Hello ShVerb World\n'}
+    >>>
+    >>>
+    >>> _ = echo("Hello", "ShVerb", "World")
+    >>> _ = rm("-fr", "alef/", "alef.gz")
+    >>> _ = mkdir("alef")
+    >>> _ = ls("-d", "alef/")
+    >>> _ = touch("alef/bet")
+    >>> _ = tar("vcf", "alef.gz", "alef/")
+    >>> _ = tar("vtkf", "alef.gz")
+    >>> _ = grep(*shlex.split("--exclude-dir .git -lR subsh ."))
+    >>>
+    >>>
+
+

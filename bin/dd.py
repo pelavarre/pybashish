@@ -1,11 +1,28 @@
 #!/usr/bin/env python3
 
+"""
+usage: dd.py [-h]
+
+optional arguments:
+  -h, --help      show this help message and exit
+
+bugs:
+  does forward interactive input lines immediately
+"""
+
+
 import contextlib
 import signal
 import sys
 
+import argdoc
+
 
 def main():
+
+    argdoc.parse_args()
+
+    # Print banner
 
     stderr_print()
     stderr_print(
@@ -15,15 +32,22 @@ def main():
     stderr_print(
         r"dd.py: Press ⌃C SIGINT to quit, press ⌃\ SIGQUIT if you really mean it"
     )
+    stderr_print("bug: does forward interactive input lines immediately")
     stderr_print()
+
+    # Define SIGINFO
 
     def siginfo(signum, frame):
         stderr_print("dd.py: ⌃T SIGINFO")
 
     with SigInfoHandler(siginfo):
 
+        # Serve till EOF or SIGINT
+
         drop_sigint_once = True
         while True:
+
+            # Pull one line
 
             try:
                 line = sys.stdin.readline()
@@ -42,14 +66,18 @@ def main():
 
             drop_sigint_once = True
 
+            # Exit at end-of-file
+
             if not line:
                 stderr_print("dd.py: ⌃D EOF")
                 break
 
-            print(line.rstrip())
+            print(line.rstrip())  # FIXME: call for larger buffer inside "dd"
 
 
 class SigInfoHandler(contextlib.ContextDecorator):
+    """Back up and redefined global SIGINFO at entry, restore at exit"""
+
     def __init__(self, handle_signum_frame):
         self.handle_signum_frame = handle_signum_frame
 

@@ -1,11 +1,34 @@
 #!/usr/bin/env python3
 
+r"""
+usage: read.py [-h]
+
+read a line of standard input, and print it
+
+optional arguments:
+  -h, --help  show this help message and exit
+
+"""
+
+
 import contextlib
 import os
 import select
 import sys
 import termios
 import tty
+
+import argdoc
+
+
+def main():
+
+    argdoc.parse_args()
+
+    with GlassTeletype() as gt:
+        line = gt.readline()
+
+    print(repr(line))
 
 
 class ShLineHistory:
@@ -238,14 +261,6 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         while self.echoes:
             self._erase_one(stdin)
-
-
-def main():
-
-    with GlassTeletype() as gt:
-        line = gt.readline()
-
-    print(repr(line))
 
 
 if __name__ == "__main__":
