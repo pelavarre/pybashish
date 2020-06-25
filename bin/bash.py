@@ -9,6 +9,7 @@ optional arguments:
 
 from __future__ import print_function
 
+import contextlib
 import os
 import platform
 import shlex
@@ -191,6 +192,29 @@ def calc_ps1():
 
 def stderr_print(*args):
     print(*args, file=sys.stderr)
+
+
+class BrokenPipeHandler(contextlib.ContextDecorator):
+    """Silence any unhandled BrokenPipeError down to nothing but sys.exit(1)
+
+    Yes, this is try-except-pass, but it is significantly more narrow than:
+        signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
+
+    See https://docs.python.org/3/library/signal.html#note-on-sigpipe
+    """
+
+    def __enter__(self):
+
+        return self
+
+    def __exit__(self, *exc_info):
+
+        (exc_type, exc_value, exc_traceback,) = exc_info
+        if isinstance(exc_value, BrokenPipeError):
+            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(null_fileno, sys.stdout.fileno())
+            # FIXME: add test to reliably and quickly demo needing to "dup2" the "stdout.fileno"
+            sys.exit(1)
 
 
 BUILTINS = {k: _compile_run_py(k) for k in "".split()}  # FIXME: empty

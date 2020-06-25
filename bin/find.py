@@ -26,7 +26,7 @@ import sys
 
 import argdoc
 
-import clips
+import bash
 
 import pwd_
 
@@ -66,7 +66,7 @@ def stderr_print(*args):
 
 
 if __name__ == "__main__":
-    with clips.BashPipeable():
+    with bash.BrokenPipeHandler():
         sys.exit(main(sys.argv))
 
 

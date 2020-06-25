@@ -587,7 +587,7 @@ class _LineWalker(object):
 
     def give_chars(self, chars):
         lines = chars.splitlines()
-        lines = list(fu.rstrip() for fu in lines)
+        lines = list(_.rstrip() for _ in lines)
         self.lines.extend(lines)
 
     def accept_blanklines(self):
