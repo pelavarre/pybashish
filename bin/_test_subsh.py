@@ -6,7 +6,20 @@
 import pprint
 import shlex
 
-import subsh
+
+def import_subsh():
+
+    import os
+    import sys
+
+    sys.path.append(os.path.join(os.path.split(__file__)[0], os.pardir, "bin"))
+
+    import subsh
+
+    return subsh
+
+
+subsh = import_subsh()
 
 echo = subsh.ShVerb("echo")
 

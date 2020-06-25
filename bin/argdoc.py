@@ -36,8 +36,6 @@ examples:
 from __future__ import print_function
 
 import argparse
-import inspect
-import os
 import re
 import sys
 import textwrap
@@ -100,7 +98,7 @@ def read_docstring_from(relpath):
     try:
         with open(relpath, "rt") as reading:
             return _read_docstring_from(reading)
-    except IOError:  # such as Python 3 FileNotFoundError
+    except IOError as exc:  # such as Python 3 FileNotFoundError
         stderr_print("{}: {}".format(type(exc).__name__, exc))
         sys.exit(1)
 
@@ -159,9 +157,8 @@ def argument_parser(doc=None):
         doc = main.__doc__
 
     coder = _ArgDocCoder()
-    source = coder.compile_argdoc(doc)
-
     parser = coder.run_argdoc(doc)
+
     return parser
 
 
@@ -284,7 +281,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
 
         return args_py_lines
 
-    def compile_positional(self, parts, positionals, index):
+    def compile_positional(self, parts, positionals, index):  # noqa C901
         """Compile an arg doc positional argument line into Python source lines"""
 
         positional = positionals[index]
@@ -292,7 +289,9 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
         (metavar, help_) = _split_first_word(positional.lstrip())
         help_ = help_.lstrip()
 
-        # Calculate "nargs"  # FIXME: stop solving only a few cases of this
+        # Calculate "nargs"
+        # FIXME: stop solving only a few cases of this
+        # FIXME: don't forget the noqa C901 '...' is too complex (11)
 
         nargs = 1
         if parts.uses.remains and (index == len(positionals) - 1):
@@ -588,7 +587,7 @@ class _LineWalker(object):
 
     def give_chars(self, chars):
         lines = chars.splitlines()
-        lines = [l.rstrip() for l in lines]
+        lines = list(fu.rstrip() for fu in lines)
         self.lines.extend(lines)
 
     def accept_blanklines(self):
@@ -634,8 +633,11 @@ def stderr_print(*args):
 
 
 def require_sys_version_info(*min_info):
+    """Decline to test Python older than the chosen version"""
 
-    str_min_info = ".".join(str(i) for i in min_info)
+    min_info_ = min_info if min_info else (3, 7,)  # June/2019 Python 3.7
+
+    str_min_info = ".".join(str(i) for i in min_info_)
     str_sys_info = "/ ".join(sys.version.splitlines())
 
     if sys.version_info < min_info:
@@ -649,7 +651,8 @@ def require_sys_version_info(*min_info):
         sys.exit(1)
 
 
-require_sys_version_info(3, 7)  # define 'import argdoc' to require Python >= June/2019 Python 3.7
+# call inline to define 'import argdoc' to require Python >= June/2019 Python 3.7
+require_sys_version_info()
 
 
 if __name__ == "__main__":

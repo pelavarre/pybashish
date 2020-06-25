@@ -57,12 +57,17 @@ def os_path_briefpath(path, exemplar=None):
 
 
 class OsPathBriefPath:
-
-    def __init__(self, exemplar):  # FIXME: do we ever want 'os.path.relpath(..., start='
+    def __init__(self, exemplar):
+        # FIXME: do we ever want 'os.path.relpath(..., start='
 
         abbreviator = None
 
-        abbreviators = (os.path.abspath, os.path.realpath, os.path.relpath, os_path_homepath,)
+        abbreviators = (
+            os.path.abspath,
+            os.path.realpath,
+            os.path.relpath,
+            os_path_homepath,
+        )
         for abbreviator_ in abbreviators:
             if abbreviator is None:
 

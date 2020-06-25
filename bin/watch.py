@@ -24,11 +24,8 @@ See also:  man script, man watch
 
 from __future__ import print_function
 
-import argparse
 import datetime
-import subprocess
 import sys
-import textwrap
 import time
 
 import argdoc
@@ -82,6 +79,14 @@ def main(argv):
         sleepy = (next_call - datetime.datetime.now()).total_seconds()
         assert sleepy > 0
         time.sleep(sleepy)
+
+
+def check_transcript(shline):
+    raise NotImplementedError()
+
+
+def shlex_join(argv):
+    raise NotImplementedError()
 
 
 if __name__ == "__main__":

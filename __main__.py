@@ -3,11 +3,13 @@
 from __future__ import print_function
 
 import os
-import sys
 import subprocess
+import sys
 
 import bin.argdoc  # concisely require Python >= June/2019 Python 3.7
-    # FIXME: "bin.argdoc" because broken packaging
+
+# FIXME: it's "import bin.argdoc" because broken packaging
+bin.argdoc.require_sys_version()  # duck foolish Flake8 F401 "'...' imported but unused"
 
 
 def main(argv):

@@ -25,7 +25,9 @@ import os
 import sys
 
 import argdoc
+
 import clips
+
 import pwd_
 
 
@@ -58,8 +60,9 @@ def os_walk_print_homepath(top):
 
             print(bp.briefpath(wherewhat))
 
-    top_relpath = os.path.relpath(top_realpath)
-    top_homepath = pwd_.os_path_homepath(top_realpath)
+
+def stderr_print(*args):
+    print(*args, file=sys.stderr)
 
 
 if __name__ == "__main__":
