@@ -16,6 +16,7 @@ bugs:
   doesn't forward interactive input lines immediately
 """
 
+from __future__ import print_function
 
 import os
 import sys

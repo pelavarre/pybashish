@@ -7,9 +7,9 @@ read a line of standard input, and print it
 
 optional arguments:
   -h, --help  show this help message and exit
-
 """
 
+from __future__ import print_function
 
 import contextlib
 import os
@@ -59,7 +59,7 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         return self
 
-    def __exit__(self, *exc):
+    def __exit__(self, *exc_info):
 
         when = termios.TCSADRAIN
         attributes = self.with_termios

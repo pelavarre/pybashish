@@ -14,6 +14,7 @@ optional arguments:
 Note:  Fqdn falls back to Short, if need be
 """
 
+from __future__ import print_function
 
 import collections
 import platform

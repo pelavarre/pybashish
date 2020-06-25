@@ -29,9 +29,11 @@ examples:
 ./argdoc.py argdoc.py --            # parse no arg with the file's arg doc
 ./argdoc.py argdoc.py -- --help     # parse the arg "--help" with the file's arg doc
 ./argdoc.py argdoc.py -- hi world   # parse two args with the file's arg doc
+"""
+# FIXME: add tests of does module docstring whitespace match its help precisely
+# FIXME: parsed args whose names begin with a '_' skid don't print here
 
-"""  # FIXME: parsed args whose names begin with a '_' skid don't print here
-
+from __future__ import print_function
 
 import argparse
 import inspect
@@ -98,7 +100,7 @@ def read_docstring_from(relpath):
     try:
         with open(relpath, "rt") as reading:
             return _read_docstring_from(reading)
-    except FileNotFoundError as exc:
+    except IOError:  # such as Python 3 FileNotFoundError
         stderr_print("{}: {}".format(type(exc).__name__, exc))
         sys.exit(1)
 
@@ -210,8 +212,8 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
         lines.append(d + "prog={prog!r},".format(prog=parts.prog))
 
         if self.parts.usage != self.calculated_usage:
-            stderr_print("doc'ced {}".format(self.parts.usage))
-            stderr_print("calculated {}".format(self.calculated_usage))
+            stderr_print("doc'ced ...... {}".format(self.parts.usage))
+            stderr_print("calculated ... {}".format(self.calculated_usage))
             # FIXME:  resolve conflicts between argdoc and parser more elegantly
 
         if "..." in self.calculated_usage:
@@ -290,24 +292,32 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
         (metavar, help_) = _split_first_word(positional.lstrip())
         help_ = help_.lstrip()
 
+        # Calculate "nargs"  # FIXME: stop solving only a few cases of this
+
         nargs = 1
         if parts.uses.remains and (index == len(positionals) - 1):
             nargs = "..."
 
+        if metavar == "TOP":
+            nargs = "?"
+
         if nargs == 1:
             self.usage_words.append(metavar)
-        else:
-            assert nargs == "..."
-            if (
-                metavar == "ARG"
-            ):  # FIXME: stop solving only the "argdoc.py" case of this
+        elif nargs == "?":
+            self.usage_words.append("[{}]".format(metavar))
+        elif nargs == "...":
+            if metavar == "ARG":
                 self.usage_words.append("[-- [{} [{} ...]]]".format(metavar, metavar))
             else:
                 self.usage_words.append("[{} [{} ...]]".format(metavar, metavar))
 
+        # Calculate "dest"
+
         dest = metavar.lower()
-        if nargs != 1:
+        if nargs == "...":
             dest = (metavar + "s").lower()
+
+        #
 
         if nargs == 1:
 
@@ -351,8 +361,12 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
 
         option = words[0]
         help_ = optional[optional.index(option) :][len(option) :].lstrip()
-        assert option.startswith("-") or option.startswith("--")
-        assert not option.startswith("---")
+
+        try:
+            assert option.startswith("-") or option.startswith("--")
+            assert not option.startswith("---")
+        except AssertionError:
+            raise ValueError("optional argument: {}".format(optional))
 
         if not option.endswith(","):
 
@@ -375,8 +389,11 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
 
             self.usage_words.append("[{}]".format(concise))
 
-            assert not concise.startswith("--")
-            assert mnemonic.startswith("--") and not mnemonic.startswith("---")
+            try:
+                assert concise.startswith("-") and not concise.startswith("--")
+                assert mnemonic.startswith("--") and not mnemonic.startswith("---")
+            except AssertionError:
+                raise ValueError("optional argument: {}".format(optional))
 
             _h_help = "show this help message and exit"
             if (concise == "-h") and (mnemonic == "--help") and (help_ == _h_help):
@@ -614,6 +631,25 @@ def _split_first_word(chars):  # FIXME: promote up into the Git Log
 
 def stderr_print(*args):
     print(*args, file=sys.stderr)
+
+
+def require_sys_version_info(*min_info):
+
+    str_min_info = ".".join(str(i) for i in min_info)
+    str_sys_info = "/ ".join(sys.version.splitlines())
+
+    if sys.version_info < min_info:
+
+        stderr_print()
+        stderr_print("This is Python {}".format(str_sys_info))
+        stderr_print()
+        stderr_print("Please try Python {} or newer".format(str_min_info))
+        stderr_print()
+
+        sys.exit(1)
+
+
+require_sys_version_info(3, 7)  # define 'import argdoc' to require Python >= June/2019 Python 3.7
 
 
 if __name__ == "__main__":

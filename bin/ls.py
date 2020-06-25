@@ -1,33 +1,68 @@
 #!/usr/bin/env python3
 
 r"""
-usage: ls.py [-h]
+usage: ls.py [-h] [-1] [-C]
 
 print some filenames
 
 optional arguments:
   -h, --help  show this help message and exit
-
+  -1          print one filename per line
+  -C          print filenames into multiple columns
 """
+# FIXME:  -w COLUMNS, --width COLUMNS  as if a terminal so wide
+# FIXME: count -1 -C to resolve contradictions
 
+from __future__ import print_function
 
 import os
+import sys
 
 import argdoc
 
 
 def main():
 
-    argdoc.parse_args()
+    #
+
+    stdout_isatty = os.isatty(sys.stdout.fileno())
+
+    try:
+        columns = os.get_terminal_size().columns
+    except OSError:  # such as OSError: [Errno 25] Inappropriate ioctl for device
+        columns = None
+
+    #
+
+    args = argdoc.parse_args()
+
+    args.dash_one = vars(args)["1"]
+    if args.dash_one is None:
+        if stdout_isatty:
+            args.dash_one = True
+
+    #
 
     whats = sorted(w for w in os.listdir() if not os_stat_hidden(w))
 
+    #
+
+    if args.dash_one:
+
+        for what in whats:
+            print(what)
+
+        return
+
+    #
+
+    columns_ = 89 if (columns is None) else columns
+
     sep = "  "
-    rows = spill_cells(whats, columns=os.get_terminal_size().columns, sep=sep)
+    rows = spill_cells(whats, columns=columns_, sep=sep)
     for row in rows:
         print(sep.join(row).rstrip())
 
-    # FIXME: implement ls -1, ls -C, and auto by stdin is tty
     # FIXME: implement ls -alF -rt, etc
     # FIXME: implement glob args
     # FIXME: timestamp to like the second in an ls -l

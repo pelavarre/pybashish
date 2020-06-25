@@ -8,8 +8,10 @@ optional arguments:
 
 bugs:
   does forward interactive input lines immediately
+  crashes "pybashish" shell if called from there, at ⌃C SIGINT
 """
 
+from __future__ import print_function
 
 import contextlib
 import signal
@@ -87,7 +89,7 @@ class SigInfoHandler(contextlib.ContextDecorator):
         self.with_siginfo = with_siginfo
         return self
 
-    def __exit__(self, *exc):
+    def __exit__(self, *exc_info):
         with_siginfo = self.with_siginfo
         signal.signal(signal.SIGINFO, with_siginfo)
 

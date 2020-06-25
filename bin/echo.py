@@ -11,8 +11,9 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
   -n  print just the words, don't add an end-of-line
-"""  # FIXME: check for consistent usage strings
+"""
 
+from __future__ import print_function
 
 import sys
 
