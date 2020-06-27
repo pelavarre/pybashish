@@ -3,7 +3,7 @@
 """
 usage: cat.py [-h] [-n] [FILE [FILE ...]]
 
-copy ("cat"enate) files to standard output
+copy files to standard output ("cat"enate them)
 
 positional arguments:
   FILE          a file to copy
@@ -15,6 +15,10 @@ optional arguments:
 bugs:
   doesn't forward interactive input lines immediately
 """
+# FIXME: "cat -etv" with choice of character encoding
+# FIXME: eg, show all "us-ascii" rejects
+# FIXME: eg, undo "use smart quotes and dashes"
+# FIXME: eg, convert indented line-broken plain-text to Html
 
 from __future__ import print_function
 
@@ -79,4 +83,4 @@ if __name__ == "__main__":
     main()
 
 
-# pulled from:  git clone https://github.com/pelavarre/pybashish.git
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

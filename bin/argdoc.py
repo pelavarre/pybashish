@@ -23,12 +23,12 @@ usage as a python import:
 
 examples:
 
-./argdoc.py -h                      # show this help message
-./argdoc.py argdoc.py               # translate a file's arg doc to python
-./argdoc.py --doc argdoc.py         # show a file's arg doc
-./argdoc.py argdoc.py --            # parse no arg with the file's arg doc
-./argdoc.py argdoc.py -- --help     # parse the arg "--help" with the file's arg doc
-./argdoc.py argdoc.py -- hi world   # parse two args with the file's arg doc
+  argdoc.py -h                      # show this help message
+  argdoc.py argdoc.py               # translate a file's arg doc to python
+  argdoc.py --doc argdoc.py         # show a file's arg doc
+  argdoc.py argdoc.py --            # parse no arg with the file's arg doc
+  argdoc.py argdoc.py -- --help     # parse the arg "--help" with the file's arg doc
+  argdoc.py argdoc.py -- hi world   # parse two args with the file's arg doc
 """
 # FIXME: add tests of does module docstring whitespace match its help precisely
 # FIXME: parsed args whose names begin with a '_' skid don't print here
@@ -44,33 +44,44 @@ import textwrap
 def main(argv):
     """Run from the command line"""
 
-    # Fetch the arg doc
+    # Fetch the Arg Doc
 
     args = parse_args(argv[1:])
     args.file_doc = read_docstring_from(args.file)
 
-    # Just print the arg doc
+    # Just print the Arg Doc
 
     args_separated = "--" in argv[1:]
     if args.doc:
 
         print(args.file_doc)
 
-    # Or compile the arg doc, but print it, don't run it
+    # Or compile the Arg Doc, but print it, don't run it
 
     elif not args_separated:
 
-        source = _ArgDocCoder().compile_argdoc(args.file_doc)
+        if args.args:
+            reason = "unrecognized arguments: {}".format(shlex_join(args.args))
+            stderr_print("argdoc.py: error: reason: {}".format(reason))
+            sys.exit(1)
+
+        source = _ArgDocCoder().compile_arg_doc(args.file_doc)
         print(source)
 
-    # Or compile the arg doc and run it
+    # Or compile the Arg Doc and run it
 
     else:
+
+        print(
+            "testing: shlex.split({})".format(
+                black_repr(shlex_join([args.file] + args.args))
+            )
+        )
 
         file_args = parse_args(args.args, doc=args.file_doc)
         file_parser = file_args._argument_parser
 
-        # Let the arg doc explain "--help" in its own way, but then still run it
+        # Let the Arg Doc explain "--help" in its own way, but then still run it
         # FIXME: Think some more over if this is the compromise we want
 
         assert file_parser.add_help
@@ -87,6 +98,53 @@ def main(argv):
                 print("{k}={v!r}".format(k=k, v=v))
 
 
+def black_repr(chars):
+    """Get back to the Python source string, from the printed chars, in the Black style
+
+    The Black autostyling app defaults to do this work for every source string
+
+    Quote with double-quotes if no escapes, else fallback to quoting with single-quotes,
+    is close enough for now
+    """
+
+    if '"' not in chars:
+        return '"{}"'.format(chars)
+
+    return repr(chars)
+
+
+def shlex_join(argv):  # FIXME: substitute "shlex.join" since Oct/2019 Python 3.8
+    """Undo the "shlex.split", well enough for now"""
+
+    flattened = " ".join(argv)
+
+    if "'" not in flattened:
+
+        joined = ""
+        for arg in argv:
+            assert "\\" not in arg
+            assert "'" not in arg
+            joined += " "
+            joined += "'{}'".format(arg) if (" " in arg) else arg
+
+        return joined[len(" ") :]
+
+    if '"' not in flattened:
+
+        joined = ""
+        for arg in argv:
+            assert "\\" not in arg
+            assert "$" not in arg
+            assert "`" not in arg
+            assert '"' not in arg
+            joined += " "
+            joined += '"{}"'.format(arg) if (" " in arg) else arg
+
+        return joined[len(" ") :]
+
+    return flattened  # both wrong, and good enough for now
+
+
 def read_docstring_from(relpath):
     """
     Read the docstring from a python file without importing the rest of it
@@ -99,7 +157,8 @@ def read_docstring_from(relpath):
         with open(relpath, "rt") as reading:
             return _read_docstring_from(reading)
     except IOError as exc:  # such as Python 3 FileNotFoundError
-        stderr_print("{}: {}".format(type(exc).__name__, exc))
+        reason = "{}: {}".format(type(exc).__name__, exc)
+        stderr_print("argdoc.py: error: {}".format(reason))
         sys.exit(1)
 
 
@@ -129,7 +188,7 @@ def _read_docstring_from(reading):
     source = "doc = " + "\n".join(texts)
 
     global_vars = {}
-    exec(source, global_vars)  # FIXME: interpret quoted Python string without "exec"?
+    exec(source, global_vars)  # 1st of 2 calls on "exec"
 
     doc = global_vars["doc"]
     return doc
@@ -157,13 +216,13 @@ def argument_parser(doc=None):
         doc = main.__doc__
 
     coder = _ArgDocCoder()
-    parser = coder.run_argdoc(doc)
+    parser = coder.run_arg_doc(doc)
 
     return parser
 
 
-class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
-    """Work up an ArgumentParser to match its ArgDoc"""
+class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style is
+    """Work up an ArgumentParser to match its Arg Doc"""
 
     def __init__(self):
         self.prog = None
@@ -171,31 +230,24 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
         self.positionals = None
         self.remains = None
 
-    def run_argdoc(self, doc):
-        """Return an ArgumentParser constructed from a run of its ArgDoc"""
+    def run_arg_doc(self, doc):
+        """Return an ArgumentParser constructed from a run of its Arg Doc"""
 
-        source = self.compile_argdoc(doc)
+        source = self.compile_arg_doc(doc)
         global_vars = {}
-        exec(source, global_vars)
+        exec(source, global_vars)  # 2nd of 2 calls on "exec"
 
         parser = global_vars["parser"]
         return parser
 
-    def compile_argdoc(self, doc):
-        """Compile an arg doc into Python source lines"""
+    def compile_arg_doc(self, doc):
+        """Compile an Arg Doc into Python source lines"""
 
         d = r"    "
-        picker = _ArgDocPicker()
+        taker = _ArgDocTaker()
 
-        parts = picker.pick_apart_doc(doc)
+        parts = taker.take_arg_doc(doc)
         self.parts = parts
-
-        if (
-            True
-        ):  # FIXME: allow free text in epilog, after these stop being bug consequences
-            assert "positional arguments:" not in parts.epilog
-            assert "optional arguments:" not in parts.epilog
-            # FIXME: explain better when people get these two backwards in the arg doc
 
         args_py_lines = self.compile_arguments()
 
@@ -206,19 +258,24 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
         lines.append("")
 
         lines.append("parser = argparse.ArgumentParser(")
-        lines.append(d + "prog={prog!r},".format(prog=parts.prog))
+        lines.append(d + "prog={prog},".format(prog=black_repr(parts.prog)))
 
         if self.parts.usage != self.calculated_usage:
             stderr_print("doc'ced ...... {}".format(self.parts.usage))
             stderr_print("calculated ... {}".format(self.calculated_usage))
-            # FIXME:  resolve conflicts between argdoc and parser more elegantly
+            # FIXME:  resolve conflicts between actual Usage and Arg Doc Usage more elegantly
 
         if "..." in self.calculated_usage:
-            lines.append(d + "usage={usage!r},".format(usage=self.calculated_usage))
+            lines.append(
+                d + "usage={usage},".format(usage=black_repr(self.calculated_usage))
+            )
 
         if parts.description:
             lines.append(
-                d + "description={description!r},".format(description=parts.description)
+                d
+                + "description={description},".format(
+                    description=black_repr(parts.description)
+                )
             )
 
         lines.append(d + "add_help={add_help},".format(add_help=bool(parts.add_help)))
@@ -226,10 +283,17 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
             d + "formatter_class=argparse.RawTextHelpFormatter,"
         )  # for .print_help()
 
-        lines.append(d + 'epilog=textwrap.dedent("""')
-        for line in parts.epilog.splitlines():
-            lines.append((d + d + line).rstrip())
-        lines.append(d + '""")')
+        if not parts.epilog:
+            reason = "FIX" "ME" ": no examples disclosed"
+            lines.append(d + "epilog=None,  # {}".format(reason))
+        else:
+            lines.append(d + "epilog=textwrap.dedent(")
+            lines.append(d + d + '"""')
+            for line in parts.epilog.splitlines():
+                lines.append((d + d + line).rstrip())
+            lines.append(d + d + '"""')
+            lines.append(d + "),")
+
         lines.append(")")
         lines.append("")
 
@@ -239,16 +303,16 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
         return source
 
     def compile_arguments(self):
-        """Compile the positionals and optionals of the arg doc"""
+        """Compile the Positionals and Optionals Parts of the Arg Doc"""
 
         parts = self.parts
 
         args_py_lines = []
 
-        # Compile the positionals of the arg doc
+        # Compile the Positionals of the Arg Doc
 
         self.usage_words = []
-        if parts.positionals:  # call add_argument for each positional
+        if parts.positionals:  # call "add_argument" for each Positional
             py_lines = []
             for index in range(len(parts.positionals)):
                 py_lines.extend(
@@ -259,7 +323,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
 
         positional_words = self.usage_words
 
-        # Compile the optionals of the arg doc
+        # Compile the Optionals of the Arg Doc
 
         self.usage_words = []
         if (
@@ -282,7 +346,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
         return args_py_lines
 
     def compile_positional(self, parts, positionals, index):  # noqa C901
-        """Compile an arg doc positional argument line into Python source lines"""
+        """Compile an Arg Doc Positional argument line into Python source lines"""
 
         positional = positionals[index]
 
@@ -295,10 +359,10 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
 
         nargs = 1
         if parts.uses.remains and (index == len(positionals) - 1):
-            nargs = "..."
+            nargs = "..."  # argparse.REMAINDER
 
         if metavar == "TOP":
-            nargs = "?"
+            nargs = "?"  # argparse.OPTIONAL
 
         if nargs == 1:
             self.usage_words.append(metavar)
@@ -322,38 +386,48 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
 
             if dest == metavar:
                 lines = [
-                    "parser.add_argument({dest!r},".format(dest=dest),
-                    "                    help={help_!r})".format(help_=help_),
+                    "parser.add_argument(",
+                    "    {dest},".format(dest=black_repr(dest)),
+                    "    help={help_}".format(help_=black_repr(help_)),
+                    ")",
                 ]
             else:
                 lines = [
-                    "parser.add_argument({dest!r}, metavar={metavar!r},".format(
-                        dest=dest, metavar=metavar
+                    "parser.add_argument(",
+                    "    {dest}, metavar={metavar},".format(
+                        dest=black_repr(dest), metavar=black_repr(metavar)
                     ),
-                    "                    help={help_!r})".format(help_=help_),
+                    "    help={help_}".format(help_=black_repr(help_)),
+                    ")",
                 ]
 
         else:
 
             if dest == metavar:
                 lines = [
-                    "parser.add_argument({dest!r}, nargs={nargs!r},".format(
-                        dest=dest, nargs=nargs
+                    "parser.add_argument(",
+                    "    {dest}, nargs={nargs},".format(
+                        dest=black_repr(dest), nargs=black_repr(nargs)
                     ),
-                    "                    help={help_!r})".format(help_=help_),
+                    "    help={help_}".format(help_=black_repr(help_)),
+                    ")",
                 ]
             else:
                 lines = [
-                    "parser.add_argument({dest!r}, metavar={metavar!r}, nargs={nargs!r},".format(
-                        dest=dest, metavar=metavar, nargs=nargs
+                    "parser.add_argument(",
+                    "   {dest}, metavar={metavar}, nargs={nargs},".format(
+                        dest=black_repr(dest),
+                        metavar=black_repr(metavar),
+                        nargs=black_repr(nargs),
                     ),
-                    "                    help={help_!r})".format(help_=help_),
+                    "    help={help_}".format(help_=black_repr(help_)),
+                    ")",
                 ]
 
         return lines
 
     def compile_optional(self, parts, optionals, index):
-        """Compile an arg doc positional argument line into Python source lines"""
+        """Compile an Arg doc Optional argument line into Python source lines"""
 
         optional = optionals[index]
         words = optional.split()
@@ -374,10 +448,12 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
             assert option not in ("-h", "--help",)
             action = "store_true"
             lines = [
-                "parser.add_argument({option!r}, action={action!r},".format(
-                    option=option, action=action
+                "parser.add_argument(",
+                "    {option}, action={action},".format(
+                    option=black_repr(option), action=black_repr(action)
                 ),
-                "                    help={help_!r})".format(help_=help_),
+                "    help={help_}".format(help_=black_repr(help_)),
+                ")",
             ]
 
         else:
@@ -401,17 +477,21 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: produce Black'ened style
             else:
                 action = "store_true"
                 lines = [
-                    "parser.add_argument({concise!r}, {mnemonic!r}, action={action!r},".format(
-                        concise=concise, mnemonic=mnemonic, action=action
+                    "parser.add_argument(",
+                    "    {concise}, {mnemonic}, action={action},".format(
+                        concise=black_repr(concise),
+                        mnemonic=black_repr(mnemonic),
+                        action=black_repr(action),
                     ),
-                    "                    help={help_!r})".format(help_=help_),
+                    "    help={help_}".format(help_=black_repr(help_)),
+                    ")",
                 ]
 
         return lines
 
 
 class _ArgDocParts(argparse.Namespace):
-    """Name the parts of an ArgDoc"""
+    """Name the parts of an Arg Doc"""
 
     def __init__(self):
         self.prog = None
@@ -425,7 +505,7 @@ class _ArgDocParts(argparse.Namespace):
 
 
 class _ArgUsageParts(argparse.Namespace):
-    """Name the parts of an ArgDoc Usage line"""
+    """Name the parts of an Arg Doc Usage line"""
 
     def __init__(self):
         self.prog = None
@@ -434,8 +514,8 @@ class _ArgUsageParts(argparse.Namespace):
         self.remains = None
 
 
-class _ArgDocPicker(object):
-    """Pick an ArgDoc apart, line by line"""
+class _ArgDocTaker(object):
+    """Pick an Arg Doc apart, line by line"""
 
     TAGLINE_PATTERNS = (
         r"^positional arguments:$",
@@ -443,14 +523,14 @@ class _ArgDocPicker(object):
         r"^usage:",
     )
 
-    def pick_apart_doc(self, doc):
-        """Take every source line, else raise exception"""
+    def take_arg_doc(self, doc):
+        """Take every source line"""
 
         tabsize_8 = 8
         chars = textwrap.dedent(doc.expandtabs(tabsize_8)).strip()
 
-        self.walker = _LineWalker()
-        self.walker.give_chars(chars)
+        self.taker = _LineTaker()
+        self.taker.give_chars(chars)
 
         self.parts = _ArgDocParts()
 
@@ -464,21 +544,21 @@ class _ArgDocPicker(object):
         return self.parts
 
     def take_usage(self):
-        """Take the line of usage"""
-        walker = self.walker
+        """Take the line of Usage"""
+        taker = self.taker
 
-        walker.accept_blanklines()
-        line = walker.peek_line()
+        taker.accept_blanklines()
+        line = taker.peek_line()
 
         uses = self.walk_usage(line)
         self.parts.uses = uses
         self.parts.usage = uses.usage
         self.parts.prog = uses.prog
 
-        walker.take_line()
+        taker.take_line()
 
     def walk_usage(self, line):
-        """Pick an ArgDoc Usage line apart, word by word"""
+        """Pick an Arg Doc Usage line apart, word by word"""
 
         uses = _ArgUsageParts()
         uses.optionals = []
@@ -510,77 +590,94 @@ class _ArgDocPicker(object):
 
     def take_description(self):
         """Take the line of description"""
-        walker = self.walker
-        walker.accept_blanklines()
+        taker = self.taker
+        taker.accept_blanklines()
 
         self.parts.description = None
-        line = walker.peek_line()
-        if not any(re.match(p, string=line) for p in _ArgDocPicker.TAGLINE_PATTERNS):
+        line = taker.peek_line()
+        if not any(re.match(p, string=line) for p in _ArgDocTaker.TAGLINE_PATTERNS):
             self.parts.description = line
-            walker.take_line()
+            taker.take_line()
 
     def accept_positionals(self):
-        """Take the positional arguments"""
+        """Take the Positional arguments"""
         self.parts.positionals = self.accept_argblock("positional arguments:")
 
     def accept_optional_arguments(self):
-        """Take the optional arguments"""
+        """Take the Optional arguments"""
         self.parts.optionals = self.accept_argblock("optional arguments:")
 
     def accept_argblock(self, tagline):
-        """Take the positional or optional arguments"""
+        """Take the Positional or Optional arguments"""
         arglines = None
 
-        walker = self.walker
-        walker.accept_blanklines()
+        taker = self.taker
+        taker.accept_blanklines()
 
-        line = walker.peek_line()
+        line = taker.peek_line()
         if line == tagline:
-            walker.take_line()
+            taker.take_line()
 
-            walker.accept_blanklines()
+            taker.accept_blanklines()
             arglines = self.accept_arglines(tagline=tagline)
 
         return arglines
 
     def accept_arglines(self, tagline):
-        """Take zero or more indented definitions of positional or optional arguments"""
-        walker = self.walker
-        walker.accept_blanklines()
+        """Take zero or more indented definitions of Positional or Optional arguments"""
+        taker = self.taker
+        taker.accept_blanklines()
 
         arglines = []
-        while not walker.peek_eof():
-            line = walker.peek_line()
+        while not taker.peek_eof():
+            line = taker.peek_line()
             if not line.startswith(" "):
                 break
             assert line.startswith("  ")
 
             arglines.append(line)
-            walker.take_line()
+            taker.take_line()
 
-            walker.accept_blanklines()
+            taker.accept_blanklines()
 
         return arglines
 
     def accept_epilog(self):
         """Take zero or more trailing lines"""
-        walker = self.walker
+        taker = self.taker
 
         lines = []
-        while not walker.peek_eof():
-            lines.append(walker.peek_line())  # may be blank
-            walker.take_line()
+        while not taker.peek_eof():
+            line = taker.peek_line()  # may be blank
+
+            if self.parts.optionals:
+                if "positional arguments:" in line:
+                    reason = "Optionals before Positionals in Arg Doc"
+                    stderr_print("argdoc.py: error: {}".format(reason))
+                    sys.exit(1)
+
+            if True:  # relax later
+                assert "positional arguments:" not in line
+                assert "optional arguments:" not in line
+
+            lines.append(line)
+            taker.take_line()
 
         self.parts.epilog = "\n".join(lines)
 
     def take_eof(self):
         """Do nothing if all lines consumed, else crash"""
-        walker = self.walker
-        walker.take_eof()
+        taker = self.taker
+        taker.take_eof()
 
 
-class _LineWalker(object):
-    """Walk once thru source chars split into source lines"""
+class _LineTaker(object):
+    """Walk once thru source chars split into source lines
+
+    Define "take_" to mean require and consume
+    Define "peek_" to mean look ahead
+    Define "accept_" to mean take if given, and don't take if not given
+    """
 
     def __init__(self):
         self.lines = []
@@ -590,20 +687,13 @@ class _LineWalker(object):
         lines = list(_.rstrip() for _ in lines)
         self.lines.extend(lines)
 
-    def accept_blanklines(self):
-        """Discard zero or more blank lines"""
-        while not self.peek_eof():
-            if self.peek_line().strip():
-                break
-            self.take_line()
+    def take_line(self):
+        """Consume the next line"""
+        self.lines = self.lines[1:]
 
     def peek_line(self):
         """Return a copy of the next line without consuming it"""
         return self.lines[0]
-
-    def take_line(self):
-        """Consume the next line"""
-        self.lines = self.lines[1:]
 
     def peek_eof(self):
         """Return True after consuming the last char of the last line"""
@@ -614,8 +704,15 @@ class _LineWalker(object):
         """Do nothing if all lines consumed, else crash"""
         assert self.peek_eof()
 
+    def accept_blanklines(self):
+        """Discard zero or more blank lines"""
+        while not self.peek_eof():
+            if self.peek_line().strip():
+                break
+            self.take_line()
 
-def _split_first_word(chars):  # FIXME: promote up into the Git Log
+
+def _split_first_word(chars):
     """Return the leading whitespace and first word, split from the remaining chars"""
 
     head_word = chars.split()[0]
@@ -659,4 +756,4 @@ if __name__ == "__main__":
     sys.exit(main(sys.argv))
 
 
-# pulled from:  git clone https://github.com/pelavarre/pybashish.git
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

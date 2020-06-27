@@ -74,4 +74,4 @@ tar("vtkf", "alef.gz").vars
 grep(*shlex.split("--exclude-dir .git -lR subsh .")).vars
 
 
-# pulled from:  git clone https://github.com/pelavarre/pybashish.git
+# copied from:  git clone https://github.com/pelavarre/pybashish.git
