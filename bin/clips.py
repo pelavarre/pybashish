@@ -6,7 +6,7 @@ usage: clips.py [-h] [REGEX [REGEX ...]]
 search out some texts clipped from wherever
 
 positional arguments:
-  REGEX         a regex to match
+  REGEX       a regex to match
 
 optional arguments:
   -h, --help  show this help message and exit

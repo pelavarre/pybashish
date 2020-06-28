@@ -15,4 +15,8 @@ Try it out, inside Linux or Mac OS
     python3 pybashish/bin/hostname.py --fqdn
     python3 pybashish/bin/hostname.py --help
 
-as of Monday, 22nd June 2020
+To run the self-test's of this code
+
+    time make
+
+as of Saturday, 27th June 2020

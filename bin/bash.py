@@ -4,7 +4,7 @@
 usage: bash.py [-h]
 
 optional arguments:
-  -h, --help      show this help message and exit
+  -h, --help  show this help message and exit
 """
 
 from __future__ import print_function
@@ -34,6 +34,7 @@ def main(argv):
     stderr_print('Type "help" and press Return for more information.')
     stderr_print('Type "exit" and press Return to quit, or press ⌃D EOF to quit')
     stderr_print()
+    sys.stderr.flush()
 
     # Serve till exit
 
@@ -42,16 +43,30 @@ def main(argv):
 
         # Pull one line of input
 
-        with pybashish_read.GlassTeletype() as gt:
+        if not sys.stdin.isatty():
 
             ps1 = calc_ps1()
-            gt.putch(ps1)
+            sys.stdout.write(ps1)
+            sys.stdout.flush()
 
-            try:
-                shline = gt.readline()
-            except KeyboardInterrupt:
-                gt.putch("⌃C\r\n")
-                continue
+            shline = sys.stdin.readline()
+
+            sys.stdout.write(shline.rstrip())
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+
+        else:
+
+            with pybashish_read.GlassTeletype() as gt:
+
+                ps1 = calc_ps1()
+                gt.putch(ps1)
+
+                try:
+                    shline = gt.readline()
+                except KeyboardInterrupt:
+                    gt.putch("⌃C\r\n")
+                    continue
 
         # Exit at end-of-file
 
@@ -62,55 +77,48 @@ def main(argv):
 
         # Compile and execute the line
 
-        how = compile_shline(shline)
-        returncode = how(shlex.split(shline))
+        argv = shlex.split(shline)
+        how = _compile_shline(shline, argv=argv)
+
+        returncode = how(argv)
         main.returncode = returncode
+
+
+def builtin_pass(argv):
+    pass
 
 
 def builtin_exit(argv):
     sys.exit()
 
 
-def compile_shline(shline):
+def _compile_shline(shline, argv):
 
-    words = shline.split()
+    # Plan to call a built-in verb
 
-    # Execute an empty verb
-
-    if not words:
-
-        def how(argv):
-            return 0
-
-        return how
-
-    # Execute a built-in verb
-
-    verb = words[0]
+    verb = argv[0] if argv else ""
     if verb in BUILTINS.keys():
+
         how = BUILTINS[verb]
+
         return how
-
-    # Execute an outside verb
-
-    how = _compile_run_py(verb)
-    return how
-
-
-def _compile_run_py(verb):
 
     # Plan escape to a sub-shell
 
-    if verb.startswith(":!"):
+    if shline.startswith(":!"):
+
+        escaped_shline = shline[len(":!") :].lstrip()
+        argv_ = shlex.split(escaped_shline)
 
         def how(argv):
-            ran = subprocess.run([verb[len(":1") :]] + argv[1:])
+            ran = subprocess.run(argv_)
             return ran.returncode
 
         return how
 
-    # Plan to decline to call a relpath
+    # Plan to decline to call any explicit relpath
 
+    verb = argv[0]
     if ("/" in verb) or ("." in verb):
 
         if os.path.exists(verb):
@@ -122,7 +130,7 @@ def _compile_run_py(verb):
         how = _compile_log_error("bash.py: {}: No such file or directory".format(verb))
         return how
 
-    # Map verb to Py file
+    # Map plain verb to Py file
 
     file_dir = os.path.split(os.path.realpath(__file__))[0]
 
@@ -217,7 +225,8 @@ class BrokenPipeHandler(contextlib.ContextDecorator):
             sys.exit(1)
 
 
-BUILTINS = {k: _compile_run_py(k) for k in "".split()}  # FIXME: empty
+BUILTINS = dict()
+BUILTINS[""] = builtin_pass
 BUILTINS["exit"] = builtin_exit
 # FIXME: implement BUILTINS["cd"]
 # FIXME: implement BUILTINS["bind"] for "bind -p"

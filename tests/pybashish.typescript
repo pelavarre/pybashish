@@ -1,0 +1,170 @@
+Welcome to testing PyBashIsh
+
+
+Contents
+========
+
++ 1. Welcome
+++ 1.1 ) Hello Bash Doc World
+++ 1.2 ) PyBashIsh works like Bash
++ 2 ) Man PyBashIsh All
+
+To refresh this table of contents, try:
+
+    cat tests/pybashish.typescript | grep '^#'
+
+
+
+# 1. Welcome
+
+## 1.1 ) Hello Bash Doc World
+
+This file is a Bash Doc Test file
+
+This file is like a Doc Test file of Python "import doctest",
+except this file is for testing Python inside Bash, not for testing Python apart from Bash
+
+To run this file, try:
+
+    bin/doctestbash.py tests/pybashish.typescript
+
+
+## 1.2 ) PyBashIsh works like Bash
+
+You can call PyBashIsh in place of Bash
+
+PyBashIsh is bits of Bash, rewritten in the kinder Literate programming style, as Python
+
+PyBashIsh does a few things much much better, some things just as well, and many things more poorly
+
+    $ pwd
+    .../pybashish
+    $
+
+    $ (echo; echo echo "'Hello, PyBashish World.'"; echo; echo help) | python3 ../pybashish/
+
+    Pybashish 0.x.y for Linux and Mac OS Terminals
+    Type "help" and press Return for more information.
+    Type "exit" and press Return to quit, or press ⌃D EOF to quit
+
+    ...@...:...$
+    (pybashish) $
+    (pybashish) $ echo 'Hello, PyBashish World.'
+    Hello, PyBashish World.
+    (pybashish) $
+    (pybashish) $ help
+
+    For more information, try one of these:
+
+    argdoc --help
+    bash --help
+    cat --help
+    clips --help
+    cp --help
+    date --help
+    dd --help
+    doctestbash --help
+    echo --help
+    find --help
+    grep --help
+    help --help
+    hexdump --help
+    hostname --help
+    ls --help
+    mv --help
+    pwd --help
+    read --help
+    rm --help
+    subsh --help
+    touch --help
+    watch --help
+
+    (pybashish) $
+    + exit 1
+    $
+
+We've not yet delivered much test coverage for what works inside PyBashIsh
+
+Please tell us if you see something inside that surprises you
+
+
+# 1.3 ) PyBashIsh Pwd works like Bash Pwd, but better
+
+    $ (cd bin; ./pwd_.py --briefpath)
+    .
+    $ (cd bin; ./pwd_.py --homepath)
+    ~/...pybashish/bin
+    $ (cd bin; ./pwd_.py --logical)
+    /...pybashish/bin
+    $ (cd bin; ./pwd_.py --physical)
+    /...pybashish/bin
+    $
+
+// FIXME: add coverage to distinguish "--logical" sym links from "--physical" dirs
+
+
+# 2 ) Man PyBashIsh All
+
+## 2.1 ) ArgDoc
+
+ArgDoc compiles standard Python Arg Docs into standard Python ArgParser Parsers
+
+Compiling "/dev/null" gives you an Arg Doc that works, to start with
+
+    $ bin/argdoc.py
+    usage: argdoc.py [-h] [--doc] FILE [-- [ARG [ARG ...]]]
+    argdoc.py: error: the following arguments are required: FILE, ARG
+    + exit 2
+    $
+
+    $ bin/argdoc.py /dev/null -- -h
+    testing: shlex.split("/dev/null -h")
+    usage: null [-h]
+
+    optional arguments:
+      -h, --help  show this help message and exit
+    $
+
+Drop that starter doc into your source, call it, and work it up from there
+
+    r"""
+    usage: ... [-h]
+
+    optional arguments:
+      -h, --help  show this help message and exit
+    """
+
+    import argdoc
+
+    if __name__ == '__main__':
+        args = argdoc.parse_args()
+        print(args)
+
+
+## 2.2 ) Bash
+## 2.3 ) Cat
+## 2.4 ) Clips
+## 2.5 ) Cp
+## 2.6 ) Date
+## 2.7 ) Dd
+## 2.8 ) DocTestBash
+## 2.9 ) Echo
+## 2.10 ) Find
+## 2.11 ) Grep
+## 2.12 ) Help
+## 2.13 ) HexDump
+## 2.14 ) Hostname
+## 2.15 ) Ls
+## 2.16 ) Mv
+## 2.17 ) Pwd
+## 2.18 ) Read
+## 2.19 ) Rm
+## 2.20 ) SubSh
+## 2.21 ) Touch
+## 2.22 ) Watch
+
+
+// FIXME: remake this into a ".md" Markdown file
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

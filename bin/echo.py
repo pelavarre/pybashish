@@ -6,11 +6,11 @@ usage: echo.py [-h] [-n] [WORD [WORD ...]]
 print some words
 
 positional arguments:
-  WORD         a word to print
+  WORD        a word to print
 
 optional arguments:
   -h, --help  show this help message and exit
-  -n  print just the words, don't add an end-of-line
+  -n          print just the words, don't add an end-of-line
 """
 
 from __future__ import print_function

@@ -37,9 +37,11 @@ def main():
     stderr_print()
     stderr_print("For more information, try one of these:")
     stderr_print()
+    sys.stderr.flush()
 
     for verb in sorted(verbs):
         print("{} --help".format(verb))
+    sys.stdout.flush()
 
     stderr_print()
 

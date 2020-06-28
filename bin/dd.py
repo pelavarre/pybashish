@@ -4,7 +4,7 @@
 usage: dd.py [-h]
 
 optional arguments:
-  -h, --help      show this help message and exit
+  -h, --help  show this help message and exit
 
 bugs:
   does forward interactive input lines immediately

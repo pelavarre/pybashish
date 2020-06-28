@@ -6,11 +6,11 @@ usage: watch.py [-h] [-n] ...
 repeat a Bash command every so often till Control+C, while deleting only duplicate outputs
 
 positional arguments:
-  ...                   command
+  ...         command
 
 optional arguments:
-  -h, --help            show this help message and exit
-  -n SECS, --interval SECS seconds to wait between updates
+  -h, --help  show this help message and exit
+  -n          SECS, --interval SECS seconds to wait between updates
 
 examples:
   watch.py

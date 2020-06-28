@@ -6,10 +6,32 @@ usage: subsh.py [-h] [WORD [WORD ...]]
 pass a command line through to a subshell
 
 positional arguments:
-  WORD         a word of command
+  WORD        a word of command
 
 optional arguments:
   -h, --help  show this help message and exit
+
+usage as a python import:
+
+  >>> import subsh
+  >>>
+
+  >>> echo = subsh.ShVerb("echo")
+  >>>
+  >>> rc = echo("Hello", "ShVerb", "World")
+  >>> rc
+  0
+  >>> pprint.pprint(rc.vars)
+  {'args': ['echo', 'Hello', 'ShVerb', 'World'],
+   'returncode': 0,
+   'stderr': b'',
+   'stdout': b'Hello ShVerb World\n'}
+  >>>
+
+examples:
+
+  subsh.py echo 'Hello, Subsh World!'
+  subsh.py ls
 """
 
 from __future__ import print_function
