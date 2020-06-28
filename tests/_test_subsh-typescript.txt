@@ -6,31 +6,13 @@ To run this file, try:
     python3 -m doctest -- ../tests/_test_subsh-typescript.txt
     echo "+ exit $?"
 
-Give this context
+Call "import subsh" briefly
 
-    >>> import os
     >>> import pprint
-    >>> import shlex
     >>>
     >>> import subsh
     >>>
 
-    >>> rm = subsh.ShVerb("rm")
-    >>> mkdir = subsh.ShVerb("mkdir")
-    >>> ls = subsh.ShVerb("ls")
-    >>> touch = subsh.ShVerb("touch")
-    >>> tar = subsh.ShVerb("tar")
-    >>> grep = subsh.ShVerb("grep")
-    >>>
-
-    >>> os.chdir("__pycache__")
-    >>>
-
-We can show how to call "import subsh" well
-
-
-
-    >>>
     >>> echo = subsh.ShVerb("echo")
     >>>
     >>> rc = echo("Hello", "ShVerb", "World")
@@ -42,7 +24,23 @@ We can show how to call "import subsh" well
      'stderr': b'',
      'stdout': b'Hello ShVerb World\n'}
     >>>
+
+Pile up the trash somewhere in particular
+
+    >>> import os
+    >>> os.chdir("__pycache__")
     >>>
+
+Call "import subsh" simply
+
+    >>> rm = subsh.ShVerb("rm")
+    >>> mkdir = subsh.ShVerb("mkdir")
+    >>> ls = subsh.ShVerb("ls")
+    >>> touch = subsh.ShVerb("touch")
+    >>> tar = subsh.ShVerb("tar")
+    >>> grep = subsh.ShVerb("grep")
+    >>>
+
     >>> _ = echo("Hello", "ShVerb", "World")
     >>> _ = rm("-fr", "alef/", "alef.gz")
     >>> _ = mkdir("alef")
@@ -50,9 +48,11 @@ We can show how to call "import subsh" well
     >>> _ = touch("alef/bet")
     >>> _ = tar("vcf", "alef.gz", "alef/")
     >>> _ = tar("vtkf", "alef.gz")
-    >>> _ = grep(*shlex.split("--exclude-dir .git -lR subsh ."))
+    >>>
+    >>> _ = grep("--exclude-dir", ".git", "-lR", "subsh", ".")
     >>>
 
+Empty the trash
 
     >>> _ = rm("-fr", "alef/", "alef.gz")
     >>>

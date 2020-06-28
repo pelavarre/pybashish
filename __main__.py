@@ -6,9 +6,8 @@ import os
 import subprocess
 import sys
 
-import bin.argdoc  # concisely require Python >= June/2019 Python 3.7
+import bin.argdoc  # FIXME: packaging  # concisely require Python >= June/2019 Python 3.7
 
-# FIXME: it's "import bin.argdoc" because broken packaging
 bin.argdoc.require_sys_version_info()  # duck foolish Flake8 F401 "'...' imported but unused"
 
 

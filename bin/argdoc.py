@@ -90,11 +90,15 @@ def _run_args_file(args_file, args_separated, args):
 
         if file_doc.strip() != doc.strip():
             if file_doc.strip():
-                stderr_print(
-                    "argdoc.py: warning: doc != help, at:  argdoc.py --doc {}".format(
-                        args_file
-                    )
-                )
+
+                help_shline = "bin/argdoc.py {} -- --help".format(args_file)
+                help_reason = "warning: doc != help, doc at:  {}".format(help_shline)
+                stderr_print(help_reason)
+
+                # doc_shline = "bin/argdoc.py --doc {}".format(args_file)
+                doc_shline = "vim {}".format(args_file)
+                doc_reason = "warning: doc != help, doc at:  {}".format(doc_shline)
+                stderr_print(doc_reason)
 
     # Or compile the Arg Doc and run it
 
@@ -288,7 +292,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         parts = taker.take_arg_doc(doc)
         self.parts = parts
 
-        args_py_lines = self.compile_arguments()
+        args_py_lines = self.emit_arguments()
 
         lines = []
 
@@ -353,7 +357,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         source = "\n".join(lines)
         return source
 
-    def compile_arguments(self):
+    def emit_arguments(self):
         """Compile the Positionals and Optionals Parts of the Arg Doc"""
 
         parts = self.parts
@@ -366,9 +370,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         if parts.positionals:  # call "add_argument" for each Positional
             py_lines = []
             for index in range(len(parts.positionals)):
-                py_lines.extend(
-                    self.compile_positional(parts, parts.positionals, index)
-                )
+                py_lines.extend(self.emit_positional(parts, parts.positionals, index))
             py_lines.append("")
             args_py_lines.extend(py_lines)
 
@@ -381,7 +383,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         if parts.optionals:
             py_lines = []
             for index in range(len(parts.optionals)):
-                py_lines.extend(self.compile_optional(parts, parts.optionals, index))
+                py_lines.extend(self.emit_optional(parts, parts.optionals, index))
             py_lines = (py_lines + [""]) if py_lines else []
             args_py_lines.extend(py_lines)
 
@@ -403,7 +405,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         return args_py_lines
 
-    def compile_positional(self, parts, positionals, index):  # noqa C901
+    def emit_positional(self, parts, positionals, index):
         """Compile an Arg Doc Positional argument line into Python source lines"""
 
         positional = positionals[index]
@@ -413,7 +415,6 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         # Calculate "nargs"
         # FIXME: stop solving only a few cases of this
-        # FIXME: don't forget the noqa C901 '...' is too complex (11)
 
         nargs = 1
         if parts.uses.remains and (index == len(positionals) - 1):
@@ -438,7 +439,16 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         if nargs == "...":
             dest = (metavar + "s").lower()
 
-        #
+        # Emit one positional "add_argument" call
+
+        lines = self._emit_positional_permutation(
+            dest=dest, metavar=metavar, nargs=nargs, help_=help_
+        )
+
+        return lines
+
+    def _emit_positional_permutation(self, dest, metavar, nargs, help_):
+        """Emit Dest, and Metavar if needed, and NArgs if needed, and Help if available"""
 
         if nargs == 1:
 
@@ -484,7 +494,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         return lines
 
-    def compile_optional(self, parts, optionals, index):
+    def emit_optional(self, parts, optionals, index):
         """Compile an Arg doc Optional argument line into Python source lines"""
 
         optional = optionals[index]
@@ -664,7 +674,7 @@ class _ArgDocTaker(object):
                 uses.positionals.append(use)
             elif use.startswith("[-") and use.endswith("]"):
                 uses.optionals.append(use)
-            else:  # TODO: nargs=='?', nargs > 1, etc.
+            else:  # FIXME: nargs=='?', nargs > 1, etc.
                 uses.remains = unsplit
                 chars = ""
 

@@ -5,12 +5,15 @@ default:
 	bin/doctestbash.py || (bin/doctestbash.py -vv; exit 1)
 	:
 	for F in bin/*.py; do bin/argdoc.py --doc $$F >/dev/null; done
-	: 'argdoc: tests passed'
+	: argdoc: tests passed
 	:
 	(cd bin; python3 -m doctest -- ../tests/_test_subsh-typescript.txt)
-	: 'doctest: tests passed'
+	: doctest: tests passed
 	:
-	: 'make: passed'
+	tests/_test_subsh.py >/dev/null
+	: test_subsh: tests passed
+	:
+	: make: passed
 	:
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

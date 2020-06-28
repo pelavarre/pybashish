@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 
-
-# demo briefly
-
+import os
 import pprint
-import shlex
+
+
+# Struggle to import more  # FIXME: packaging
 
 
 def import_subsh():
@@ -21,14 +21,22 @@ def import_subsh():
 
 subsh = import_subsh()
 
+
+# Call "import subsh" briefly
+
 echo = subsh.ShVerb("echo")
 
 rc = echo("Hello", "ShVerb", "World")
-rc
+print("+ exit {}".format(rc))
 pprint.pprint(rc.vars)
 
 
-# add verbs
+# Pile up the trash somewhere in particular
+
+os.chdir("__pycache__")
+
+
+# Call "import subsh" simply
 
 rm = subsh.ShVerb("rm")
 mkdir = subsh.ShVerb("mkdir")
@@ -38,7 +46,7 @@ tar = subsh.ShVerb("tar")
 grep = subsh.ShVerb("grep")
 
 
-# let each exit status return
+# Let each exit status return
 
 echo("Hello", "ShVerb", "World")
 rm("-fr", "alef/", "alef.gz")
@@ -47,10 +55,10 @@ ls("-d", "alef/")
 touch("alef/bet")
 tar("vcf", "alef.gz", "alef/")
 tar("vtkf", "alef.gz")
-grep(*shlex.split("--exclude-dir .git -lR subsh ."))
+grep("--exclude-dir", ".git", "-lR", "subsh", ".")
 
 
-# explicitly discard each exit status
+# Explicitly discard each exit status
 
 _ = echo("Hello", "ShVerb", "World")
 _ = rm("-fr", "alef/", "alef.gz")
@@ -59,10 +67,10 @@ _ = ls("-d", "alef/")
 _ = touch("alef/bet")
 _ = tar("vcf", "alef.gz", "alef/")
 _ = tar("vtkf", "alef.gz")
-_ = grep(*shlex.split("--exclude-dir .git -lR subsh ."))
+_ = grep("--exclude-dir", ".git", "-lR", "subsh", ".")
 
 
-# let args, stdout, stderr, returncode, etc return
+# Let args, stdout, stderr, returncode, etc return
 
 echo("Hello", "ShVerb", "World").vars
 rm("-fr", "alef/", "alef.gz").vars
@@ -71,7 +79,12 @@ ls("-d", "alef/").vars
 touch("alef/bet").vars
 tar("vcf", "alef.gz", "alef/").vars
 tar("vtkf", "alef.gz").vars
-grep(*shlex.split("--exclude-dir .git -lR subsh .")).vars
+grep("--exclude-dir", ".git", "-lR", "subsh", ".")
+
+
+# Empty the trash
+
+_ = rm("-fr", "alef/", "alef.gz")
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

@@ -26,7 +26,7 @@ import sys
 
 import argdoc
 
-import bash
+import cat
 
 import pwd_
 
@@ -66,7 +66,7 @@ def stderr_print(*args):
 
 
 if __name__ == "__main__":
-    with bash.BrokenPipeHandler():
+    with cat.BrokenPipeSink():
         sys.exit(main(sys.argv))
 
 

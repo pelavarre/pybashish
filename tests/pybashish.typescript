@@ -58,6 +58,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
     argdoc --help
     bash --help
+    bind --help
     cat --help
     clips --help
     cp --help
@@ -142,26 +143,27 @@ Drop that starter doc into your source, call it, and work it up from there
 
 
 ## 2.2 ) Bash
-## 2.3 ) Cat
-## 2.4 ) Clips
-## 2.5 ) Cp
-## 2.6 ) Date
-## 2.7 ) Dd
-## 2.8 ) DocTestBash
-## 2.9 ) Echo
-## 2.10 ) Find
-## 2.11 ) Grep
-## 2.12 ) Help
-## 2.13 ) HexDump
-## 2.14 ) Hostname
-## 2.15 ) Ls
-## 2.16 ) Mv
-## 2.17 ) Pwd
-## 2.18 ) Read
-## 2.19 ) Rm
-## 2.20 ) SubSh
-## 2.21 ) Touch
-## 2.22 ) Watch
+## 2.3 ) Bind
+## 2.4 ) Cat
+## 2.5 ) Clips
+## 2.6 ) Cp
+## 2.7 ) Date
+## 2.8 ) Dd
+## 2.9 ) DocTestBash
+## 2.10 ) Echo
+## 2.11 ) Find
+## 2.12 ) Grep
+## 2.13 ) Help
+## 2.14 ) HexDump
+## 2.15 ) Hostname
+## 2.16 ) Ls
+## 2.17 ) Mv
+## 2.18 ) Pwd
+## 2.19 ) Read
+## 2.20 ) Rm
+## 2.21 ) SubSh
+## 2.22 ) Touch
+## 2.23 ) Watch
 
 
 // FIXME: remake this into a ".md" Markdown file

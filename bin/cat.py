@@ -22,15 +22,16 @@ bugs:
 
 from __future__ import print_function
 
+import contextlib
 import os
 import sys
 
 import argdoc
 
 
-def main():
+def main(argv):
 
-    args = argdoc.parse_args()
+    args = argdoc.parse_args(argv[1:])
     relpaths = args.files if args.files else ["-"]
 
     if "-" in relpaths:
@@ -79,8 +80,40 @@ def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 
+class BrokenPipeSink(contextlib.ContextDecorator):
+    """Silence any unhandled BrokenPipeError down to nothing but sys.exit(1)
+
+    Yes, this is try-except-pass, but it is significantly more narrow than:
+
+        signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
+
+    Test with lots of slow Stdout suddenly cut short, such as
+
+        bin/cat.py -n bin/*.py | head
+
+        bin/find.py ~ | head
+
+    See https://docs.python.org/3/library/signal.html#note-on-sigpipe
+    """
+
+    def __enter__(self):
+
+        return self
+
+    def __exit__(self, *exc_info):
+
+        (exc_type, exc, exc_traceback,) = exc_info
+        if isinstance(exc, BrokenPipeError):  # catch this one
+
+            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
+
+            sys.exit(1)
+
+
 if __name__ == "__main__":
-    main()
+    with BrokenPipeSink():
+        sys.exit(main(sys.argv))
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

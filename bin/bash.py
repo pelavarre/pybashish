@@ -9,7 +9,6 @@ optional arguments:
 
 from __future__ import print_function
 
-import contextlib
 import os
 import platform
 import shlex
@@ -18,9 +17,9 @@ import sys
 
 import argdoc
 
-import pwd_ as pybashish_pwd  # FIXME: group these into one package
+import pwd_  # FIXME: packaging
 
-import read as pybashish_read
+import read
 
 
 def main(argv):
@@ -43,30 +42,14 @@ def main(argv):
 
         # Pull one line of input
 
-        if not sys.stdin.isatty():
+        prompt = calc_ps1()
 
-            ps1 = calc_ps1()
-            sys.stdout.write(ps1)
+        try:
+            shline = read.readline(prompt)
+        except KeyboardInterrupt:
+            sys.stdout.write("⌃C\r\n")
             sys.stdout.flush()
-
-            shline = sys.stdin.readline()
-
-            sys.stdout.write(shline.rstrip())
-            sys.stdout.write("\n")
-            sys.stdout.flush()
-
-        else:
-
-            with pybashish_read.GlassTeletype() as gt:
-
-                ps1 = calc_ps1()
-                gt.putch(ps1)
-
-                try:
-                    shline = gt.readline()
-                except KeyboardInterrupt:
-                    gt.putch("⌃C\r\n")
-                    continue
+            continue
 
         # Exit at end-of-file
 
@@ -188,7 +171,7 @@ def calc_ps1():
 
     user = calc_ps1.user
     hostname = platform.node()
-    where = pybashish_pwd.os_path_homepath(os.getcwd())
+    where = pwd_.os_path_homepath(os.getcwd())
 
     nocolor = "\x1b[00m"
     green = "\x1b[00;32m"  # Demo ANSI TTY escape codes without "01;" bolding
@@ -202,34 +185,10 @@ def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 
-class BrokenPipeHandler(contextlib.ContextDecorator):
-    """Silence any unhandled BrokenPipeError down to nothing but sys.exit(1)
-
-    Yes, this is try-except-pass, but it is significantly more narrow than:
-        signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
-
-    See https://docs.python.org/3/library/signal.html#note-on-sigpipe
-    """
-
-    def __enter__(self):
-
-        return self
-
-    def __exit__(self, *exc_info):
-
-        (exc_type, exc_value, exc_traceback,) = exc_info
-        if isinstance(exc_value, BrokenPipeError):
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
-            os.dup2(null_fileno, sys.stdout.fileno())
-            # FIXME: add test to reliably and quickly demo needing to "dup2" the "stdout.fileno"
-            sys.exit(1)
-
-
 BUILTINS = dict()
 BUILTINS[""] = builtin_pass
 BUILTINS["exit"] = builtin_exit
 # FIXME: implement BUILTINS["cd"]
-# FIXME: implement BUILTINS["bind"] for "bind -p"
 
 
 if __name__ == "__main__":
