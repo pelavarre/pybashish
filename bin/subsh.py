@@ -29,7 +29,6 @@ usage as a python import:
   >>>
 
 examples:
-
   subsh.py echo 'Hello, Subsh World!'
   subsh.py ls
 """

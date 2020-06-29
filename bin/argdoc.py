@@ -3,7 +3,7 @@
 '''
 usage: argdoc.py [-h] [--doc] FILE [-- [ARG [ARG ...]]]
 
-parse args as helped by module help doc
+parse command line args precisely as helped by module help doc
 
 positional arguments:
   FILE        where the arg doc is
@@ -11,7 +11,7 @@ positional arguments:
 
 optional arguments:
   -h, --help  show this help message and exit
-  --doc       print the arg doc without compiling it
+  --doc       print and review the arg doc, but don't run it
 
 usage as a python import:
 
@@ -29,13 +29,15 @@ usage as a python import:
     print(args)
 
 examples:
-
   argdoc.py -h                      # show this help message
   argdoc.py argdoc.py               # translate a file's arg doc to python
   argdoc.py --doc argdoc.py         # show a file's arg doc
   argdoc.py argdoc.py --            # parse no arg with the file's arg doc
   argdoc.py argdoc.py -- --help     # parse the arg "--help" with the file's arg doc
   argdoc.py argdoc.py -- hi world   # parse two args with the file's arg doc
+
+notes:
+  damage an arg doc and run this again, to see review comments pop up to work with you
 '''
 # FIXME: parsed args whose names begin with a '_' skid shouldn't print here, via argparse.SUPPRESS
 

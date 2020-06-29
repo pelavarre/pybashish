@@ -10,7 +10,7 @@ optional arguments:
   -1          print one filename per line
   -C          print filenames into multiple columns
 """
-# FIXME:  -w COLUMNS, --width COLUMNS  as if a terminal so wide
+# FIXME: -w COLUMNS, --width COLUMNS  as if a terminal so wide
 # FIXME: count -1 -C to resolve contradictions
 
 from __future__ import print_function

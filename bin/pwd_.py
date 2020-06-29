@@ -17,6 +17,7 @@ bugs:
   offers "--logical" and "--physical" like Linux, not just "-L" and "-P" like Mac
 """
 # FIXME: add "--verbose" a la "hostname"
+# FIXME: somehow remember we don't want to abbreviate down to colliding "-" the unconventional "--"
 
 from __future__ import print_function
 

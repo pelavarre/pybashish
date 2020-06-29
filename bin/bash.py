@@ -7,6 +7,9 @@ chat with people: prompt, then listen, then speak, and repeat
 
 optional arguments:
   -h, --help  show this help message and exit
+
+bugs:
+  not yet reported, please help us out
 """
 
 from __future__ import print_function
@@ -60,9 +63,17 @@ def main(argv):
                 1
             )  # same subprocess.CompletedProcess.returncode=1 as Bash exit at EOF
 
-        # Compile and execute the line
+        # Parse the line
 
         argv = shlex.split(shline)
+
+        for (index, arg,) in enumerate(argv):
+            if arg.startswith("#"):
+                argv = argv[:index]  # drop "#" hash comment till end of shline
+                break
+
+        # Compile and execute the line
+
         how = _compile_shline(shline, argv=argv)
 
         returncode = how(argv)
@@ -81,7 +92,7 @@ def _compile_shline(shline, argv):
 
     # Plan to call a built-in verb
 
-    verb = argv[0] if argv else ""
+    verb = argv[0] if argv else ":"  # take ":" as no-op, a la Bash ":" or Dos "rem"
     if verb in BUILTINS.keys():
 
         how = BUILTINS[verb]
@@ -188,7 +199,7 @@ def stderr_print(*args):
 
 
 BUILTINS = dict()
-BUILTINS[""] = builtin_pass
+BUILTINS[":"] = builtin_pass
 BUILTINS["exit"] = builtin_exit
 # FIXME: implement BUILTINS["cd"]
 

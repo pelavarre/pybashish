@@ -173,19 +173,27 @@ class GlassTeletype(contextlib.ContextDecorator):
         result = shline + quitting
         return result
 
+    def _insert_chars(self, chars):
+        """Add chars to the line"""
+
+        for ch in chars:
+            self.shline += ch
+            self.echoes.append(ch)
+            self.putch(ch)
+
     def _calc_c0_controls_stdins(self):
         """List the U0000.pdf C0 Control codepoints, encoded as bytes"""
 
-        for codepoint in range(0, 0x20):
+        for codepoint in range(0, 0x20):  # first thirty-two of the C0 Control codepoints
             yield chr(codepoint).encode()
 
-        codepoint = 0x7F
+        codepoint = 0x7f  # last of the thirty-three C0 Control codepoints
         yield chr(codepoint).encode()
 
     def _calc_basic_latin_stdins(self):
         """List the U0000.pdf Basic Latin codepoints, encoded as bytes"""
 
-        for codepoint in range(0x20, 0x7F):
+        for codepoint in range(0x20, 0x7f):  # ninety-five Basic Latin codepoints
             yield chr(codepoint).encode()
 
     def _calc_bots_by_stdin(self):
@@ -221,15 +229,15 @@ class GlassTeletype(contextlib.ContextDecorator):
         return bots_by_stdin
 
     def _can_paste_stdin(self, stdin):
-        """Say when picking paste apart one byte at a time works well enough for now"""
+        """Say when picking paste apart one char at a time works well enough for now"""
 
-        pickables = set(self.basic_latin_stdins)
-        # pickables.add(ord("\t"))  # FIXME: _complete and _dynamic_complete_history
-        pickables.add(ord("\n"))
-        pickables.add(ord("\r"))
+        ord_esc = 0x1b
 
-        if all((codepoint in pickables) for codepoint in stdin):
-            return True
+        if len(stdin) == 3:  # do not paste the Esc [ DCAB arrow keys, etc
+            if stdin[0] == ord_esc:
+                return False
+
+        return True
 
     def _do_paste_stdin(self, stdin):
         """Pick paste apart one byte at a time"""
@@ -237,13 +245,16 @@ class GlassTeletype(contextlib.ContextDecorator):
         assert self._can_paste_stdin(stdin)
 
         quitting = None
-        for codepoint in stdin:
+        for ch in stdin.decode():
+            stdin_ = ch.encode()
 
-            stdin_ = chr(codepoint).encode()
-            bot = self._bots_by_stdin[stdin_]
-            assert bot != self._do_paste_stdin
+            if stdin_ not in self.c0_control_stdins:
+                self._insert_chars(ch)
+            else:
+                bot = self._log_stdin
+                bot = self._bots_by_stdin.get(stdin, bot)
+                quitting = bot(stdin_)
 
-            quitting = bot(stdin_)
             if quitting:
                 break
 
@@ -342,18 +353,10 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         self.putch("\a")
 
-    def _insert_chars(self, chars):
-        """Add chars to the line"""
-
-        for ch in chars:
-            self.shline += ch
-            self.echoes.append(ch)
-            self.putch(ch)
-
     def _insert_stdin(self, stdin):  # aka Bash "bind -p | grep self-insert"
-        """Add the Basic Latin char of one or several Basic Latin keystrokes to the line"""
+        """Add the codepoint of the keystroke"""
 
-        assert len(stdin) == 1
+        assert len(stdin) == 1  # no tests yet of keys other than the ninety-five Basic Latin chars
         assert stdin in self.basic_latin_stdins
 
         ch = stdin.decode()
