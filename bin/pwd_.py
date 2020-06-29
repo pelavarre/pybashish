@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 
 """
-usage: pwd.py [-h] [-B] [-H] [-L] [-P]
+usage: pwd.py [-h] [--briefpath] [--homepath] [-L] [-P]
+
+show the os.environ["HOME"], by default just its "os.path.abspath"
 
 optional arguments:
-  -h, --help       show this help message and exit
-  -B, --briefpath  print the briefest equivalent abspath/ homepath/ relpath/ whatever
-  -H, --homepath   print as '~/...' relative to the 'os.environ["HOME"]', a la Bash 'dirs + 0'
-  -L, --logical    print the 'os.path.abspath' of the 'os.getcwd'
-  -P, --physical   print the 'os.path.realpath' of the 'os.getcwd'
+  -h, --help      show this help message and exit
+  --briefpath     show the briefest abspath/ homepath/ relpath/ whatever
+  --homepath      show the "os.path.relpath" as "~/...", a la Bash "dirs + 0"
+  -L, --logical   show the "os.path.abspath"
+  -P, --physical  show the "os.path.realpath", like walk through symbolic links
 
 bugs:
-  Bash Pwd doesn't define "--briefpath" and "--homepath"
-  Mac Bash Pwd defines "-L" and "-P" but not "--logical" and not "--physical"
+  offers "--briefpath" and "--homepath", unlike Bash
+  offers "--logical" and "--physical" like Linux, not just "-L" and "-P" like Mac
 """
+# FIXME: add "--verbose" a la "hostname"
 
 from __future__ import print_function
 
@@ -26,9 +29,9 @@ def main():
 
     args = argdoc.parse_args()
 
-    cwd = os.environ["PWD"]
-    abspath = os.path.abspath(cwd)
-    realpath = os.path.realpath(cwd)
+    pwd = os.environ["PWD"]
+    abspath = os.path.abspath(pwd)
+    realpath = os.path.realpath(pwd)
 
     cwd = os.getcwd()
     assert cwd == realpath

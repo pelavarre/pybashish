@@ -320,6 +320,11 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
                     d + "usage={usage},".format(usage=black_repr(self.compiled_usage))
                 )
 
+        if parts.usage and not parts.description:
+            stderr_print(
+                "argdoc.py: warning: meaning of prog not disclosed by even one line of description"
+            )
+
         if parts.description:
             lines.append(
                 d

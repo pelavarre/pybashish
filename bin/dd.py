@@ -3,13 +3,16 @@
 """
 usage: dd.py [-h]
 
+copy from input stream to output stream
+
 optional arguments:
   -h, --help  show this help message and exit
 
 bugs:
-  does forward interactive input lines immediately
+  does forward interactive input lines immediately, unlike Bash
   crashes "pybashish" shell if called from there, at ⌃C SIGINT
 """
+# FIXME: fix more bugs
 
 from __future__ import print_function
 

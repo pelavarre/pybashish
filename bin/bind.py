@@ -7,14 +7,14 @@ print what each keystroke means
 
 optional arguments:
   -h, --help  show this help message and exit
-  -p          yea, print it, like i said already
+  -p          yea, print it all, like i said already
 
 examples:
   bind -p | grep '".e.[DCAB]"'  # Ansi Terminal arrows
   bind -p | grep -v ': self-insert$'  # Control codes
 
 bugs:
-  bind with no args here is "bind -h", unlike Bash
+  "bind" with no args is "bind -h", unlike Bash
 """
 
 from __future__ import print_function

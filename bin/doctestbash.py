@@ -19,7 +19,10 @@ examples:
 
 notes:
   compare Python "import doctest"
-"""  # FIXME: make this whole vision more real
+"""
+# FIXME: make this whole vision more real
+# FIXME: plan to rip more than Bash paste
+# FIXME: rip Bash paste distinguished only by repeated prompt ending in '$' or '#'
 
 import doctest
 import os

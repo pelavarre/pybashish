@@ -10,9 +10,10 @@ optional arguments:
 
 bugs:
   prompts with " ?", unlike Bash ""
-  prints whole transcripts, unlike Bash no prompt no echo,
-    when Stdin is not a Terminal
+  prompts and echoes, even when Stdin not Terminal, unlike Bash
+  always fetches one line only, like Bash, never more like Zsh
 """
+# FIXME: fix more bugs
 
 from __future__ import print_function
 

@@ -13,11 +13,12 @@ optional arguments:
   -h, --help  show this help message and exit
 
 bugs:
-  Bash Find of "./..." starts every line with "./"
-  Bash Find of "~/..." starts every line with "$PWD/"
-  Bash Find of sym links prints the abspath, not the realpath
-  Mac Bash Find chokes if you don't give it any TOP
+  searches "./" if called with no args, unlike Mac Bash
+  leads each hit inside "./" with "" not "./", unlike Bash
+  leads each hit inside "~/" with "~/" not "$PWD", unlike Bash
+  hits the realpath of each sym link, not abspath, unlike Bash
 """
+# FIXME: rethink bugs
 
 from __future__ import print_function
 

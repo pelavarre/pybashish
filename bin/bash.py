@@ -3,6 +3,8 @@
 """
 usage: bash.py [-h]
 
+chat with people: prompt, then listen, then speak, and repeat
+
 optional arguments:
   -h, --help  show this help message and exit
 """

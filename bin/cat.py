@@ -13,12 +13,12 @@ optional arguments:
   -n, --number  number each line of output
 
 bugs:
-  doesn't forward interactive input lines immediately
+  doesn't forward interactive input lines immediately, unlike Bash
+  doesn't define "cat -etv" to show all "us-ascii" rejects
+  doesn't undo Mac "use smart quotes and dashes"
+  doesn't convert indented line-broken plain-text to Html
 """
-# FIXME: "cat -etv" with choice of character encoding
-# FIXME: eg, show all "us-ascii" rejects
-# FIXME: eg, undo "use smart quotes and dashes"
-# FIXME: eg, convert indented line-broken plain-text to Html
+# FIXME: fix more bugs
 
 from __future__ import print_function
 
