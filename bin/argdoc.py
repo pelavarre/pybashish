@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 '''
-usage: argdoc.py [-h] [--doc] FILE [-- [ARG [ARG ...]]]
+usage: argdoc.py [-h] [--doc] [FILE] [-- [ARG [ARG ...]]]
 
 parse command line args precisely as helped by module help doc
 
 positional arguments:
-  FILE        where the arg doc is
+  FILE        where the arg doc is (else it is "/dev/null")
   ARG         an arg to parse as per the arg doc
 
 optional arguments:
@@ -30,8 +30,9 @@ usage as a python import:
 
 examples:
   argdoc.py -h                      # show this help message
+  argdoc.py --doc                   # show a template arg doc to start with
   argdoc.py argdoc.py               # translate a file's arg doc to python
-  argdoc.py --doc argdoc.py         # show a file's arg doc
+  argdoc.py --doc argdoc.py         # show a file's arg doc (and test that it compiles)
   argdoc.py argdoc.py --            # parse no arg with the file's arg doc
   argdoc.py argdoc.py -- --help     # parse the arg "--help" with the file's arg doc
   argdoc.py argdoc.py -- hi world   # parse two args with the file's arg doc
@@ -50,84 +51,114 @@ import sys
 import textwrap
 
 
+DEFAULT_EPILOG = textwrap.dedent(
+    """
+examples:
+  Oh no! No examples disclosed!! 💥 💔 💥
+"""
+).strip()  # style with "Oh no! ... 💥 💔 💥" to rhyme with failures of the Black auto-styling app
+
+
 def main(argv):
     """Run from the command line"""
 
-    args = parse_args(argv[1:])
-    args_file = args.file
+    args_separator = "--" if ("--" in argv[1:]) else None
 
-    args_separated = "--" in argv[1:]
+    argv_ = list(argv)
+    if argv[1:] and (argv[1] == "--"):
+        argv_[1:1] = [os.devnull]
 
-    if args.args:
-        if args.doc or not args_separated:
-            reason = "unrecognized arguments: {}".format(shlex_join(args.args))
-            stderr_print("argdoc.py: error: reason: {}".format(reason))
-            sys.exit(1)
+    args = parse_args(argv_[1:])
 
-    _run_args_file(args_file, args_separated=args_separated, args=args)
+    _run_args_file(
+        args.file, args_separator=args_separator, args_args=args.args, args_doc=args.doc
+    )
 
 
-def _run_args_file(args_file, args_separated, args):
+def _run_args_file(args_file, args_separator, args_args, args_doc):
     """Print the Arg Doc, or compile it, or run it"""
 
-    # Fetch the Arg Doc
+    str_args_file = args_file if args_file else repr("")
+    arg_doc_file = args_file if args_file else os.devnull
 
-    file_doc = read_docstring_from(args_file)
-    args_file_prog = os.path.split(args_file)[-1]
+    # Fail fast if extra args supplied before or in place of the "--" args separator
 
-    # Print the Arg Doc (and test that it doesn't crash the compiler)
-    # Or compile the Arg Doc, but print it, don't run it
+    if not args_separator:
+        if (
+            args_args
+        ):  # fail for "args", barely distinguishable from conventional "arguments"
+            reason = "unrecognized args: {}".format(shlex_join(args_args))
+            stderr_print("argdoc.py: error: {}".format(reason))
+            sys.exit(1)
 
-    if args.doc or not args_separated:
+    # Fetch the Arg Doc, compile it, and hope it doesn't crash the compiler
 
-        (source, parser,) = _run_arg_doc(file_doc, args_file_prog=args_file_prog)
-        doc = parser.format_help()
+    file_doc = read_docstring_from(arg_doc_file)
+    file_prog = os.path.split(arg_doc_file)[-1]
 
-        if not args.doc:
-            print(source)
+    (source, parser,) = _run_arg_doc(file_doc, file_prog=file_prog)
+    helped_doc = parser.format_help()
 
+    qqq = (
+        "'''" if ('"""' in helped_doc) else '"""'
+    )  # FIXME: get this choice correct more often
+
+    # Print the Arg Parser that results
+
+    if args_file and (not args_doc) and (not args_separator):
+
+        print(source.rstrip())
+        return
+
+    # Or print the Arg Help Doc that results, and loop back to compare it with the original Arg Doc
+
+    if not args_separator:
+
+        if not file_doc:
+            print(qqq)
+            print(helped_doc.strip())
+            print(qqq)
             return
 
+        print(qqq)
         print(file_doc.strip())
+        print(qqq)
 
-        if file_doc.strip() != doc.strip():
+        if file_doc.strip() != helped_doc.strip():
             if file_doc.strip():
 
-                help_shline = "bin/argdoc.py {} -- --help".format(args_file)
+                help_shline = "bin/argdoc.py {} -- --help".format(arg_doc_file)
                 help_reason = "warning: doc != help, doc at:  {}".format(help_shline)
                 stderr_print(help_reason)
 
-                # doc_shline = "bin/argdoc.py --doc {}".format(args_file)
-                doc_shline = "vim {}".format(args_file)
-                doc_reason = "warning: doc != help, doc at:  {}".format(doc_shline)
-                stderr_print(doc_reason)
+                # file_doc_shline = "bin/argdoc.py --doc {}".format(arg_doc_file)
+                file_doc_shline = "vim {}".format(arg_doc_file)
+                file_doc_reason = "warning: doc != help, doc at:  {}".format(
+                    file_doc_shline
+                )
+                stderr_print(file_doc_reason)
 
-    # Or compile the Arg Doc and run it
+        return
 
-    else:
+    # Or race ahead to run the Arg Parser that results
 
-        print(
-            "testing: shlex.split({})".format(
-                black_repr(shlex_join([args.file] + args.args))
-            )
-        )
+    print("+ {}".format(shlex_join([str_args_file] + args_args)))
 
-        file_args = parse_args(args.args, doc=file_doc, args_file_prog=args_file_prog)
-        file_parser = file_args._argument_parser
+    file_args = parser.parse_args(args_args)
 
-        # After letting the Arg Doc explain "--help" in its own way,
-        # still print the help and exit, as part of ".parse_args", when asked for help
+    # After letting the Arg Doc explain "--help" in its own way,
+    # still print the help and exit, as part of ".parse_args", when asked for help
 
-        if not file_parser.add_help:
-            if vars(file_args).get("help"):
-                file_parser.print_help()
-                sys.exit(0)
+    if not parser.add_help:
+        if vars(file_args).get("help"):
+            parser.print_help()
+            sys.exit(0)
 
-        # Print the parsed args, but in sorted order
+    # Print the parsed args, but in sorted order
 
-        for (k, v,) in sorted(vars(file_args).items()):
-            if not k.startswith("_"):
-                print("{k}={v!r}".format(k=k, v=v))
+    for (k, v,) in sorted(vars(file_args).items()):
+        if not k.startswith("_"):
+            print("{k}={v!r}".format(k=k, v=v))
 
 
 def black_repr(chars):
@@ -227,7 +258,7 @@ def _read_docstring_from(reading):
     return doc
 
 
-def parse_args(args=None, namespace=None, doc=None, args_file_prog=None):
+def parse_args(args=None, namespace=None, doc=None, file_prog=None):
     """Parse args as helped by doc"""
 
     if args is None:
@@ -236,7 +267,7 @@ def parse_args(args=None, namespace=None, doc=None, args_file_prog=None):
     if namespace is None:
         namespace = argparse.Namespace()
 
-    (source, parser,) = _run_arg_doc(doc, args_file_prog=args_file_prog)
+    (source, parser,) = _run_arg_doc(doc, file_prog=file_prog)
 
     namespace._argument_parser_source = (
         source  # FIXME: review collisions with "import argparse"
@@ -247,7 +278,7 @@ def parse_args(args=None, namespace=None, doc=None, args_file_prog=None):
     return space
 
 
-def _run_arg_doc(doc, args_file_prog):
+def _run_arg_doc(doc, file_prog):
     """Compile the doc into a parser"""
 
     if doc is None:
@@ -255,7 +286,7 @@ def _run_arg_doc(doc, args_file_prog):
         doc = main.__doc__
 
     coder = _ArgDocCoder()
-    (source, parser,) = coder.run_arg_doc(doc, args_file_prog=args_file_prog)
+    (source, parser,) = coder.run_arg_doc(doc, file_prog=file_prog)
 
     return (
         source,
@@ -272,10 +303,10 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         self.positionals = None
         self.remains = None
 
-    def run_arg_doc(self, doc, args_file_prog):
+    def run_arg_doc(self, doc, file_prog):
         """Return an ArgumentParser constructed from a run of its Arg Doc"""
 
-        source = self.compile_arg_doc(doc, args_file_prog=args_file_prog)
+        source = self.compile_arg_doc(doc, file_prog=file_prog)
         global_vars = {}
         exec(source, global_vars)  # 2nd of 2 calls on "exec"
 
@@ -285,7 +316,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
             parser,
         )
 
-    def compile_arg_doc(self, doc, args_file_prog):
+    def compile_arg_doc(self, doc, file_prog):
         """Compile an Arg Doc into Python source lines"""
 
         d = r"    "
@@ -304,7 +335,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         lines.append("parser = argparse.ArgumentParser(")
 
-        prog = parts.prog if parts.prog else args_file_prog
+        prog = parts.prog if parts.prog else file_prog
         lines.append(d + "prog={prog},".format(prog=black_repr(prog)))
 
         if self.parts.usage != self.compiled_usage:
@@ -342,19 +373,14 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
             d + "formatter_class=argparse.RawTextHelpFormatter,"
         )  # for .print_help()
 
-        if not parts.epilog:
-            reason = "FIX" "ME" ": no examples disclosed"
-            lines.append(d + "epilog=None,  # {}".format(reason))
-        else:
-            qqq = (
-                "'''" if ('"""' in parts.epilog) else '"""'
-            )  # FIXME: breaks in corners
-            lines.append(d + "epilog=textwrap.dedent(")
-            lines.append(d + d + "r" + qqq)
-            for line in parts.epilog.splitlines():
-                lines.append((d + d + line).rstrip())
-            lines.append(d + d + qqq)
-            lines.append(d + "),")
+        epilog = DEFAULT_EPILOG if (parts.epilog is None) else parts.epilog
+        qqq = "'''" if ('"""' in epilog) else '"""'  # FIXME: breaks in corners
+        lines.append(d + "epilog=textwrap.dedent(")
+        lines.append(d + d + "r" + qqq)
+        for line in epilog.splitlines():
+            lines.append((d + d + line).rstrip())
+        lines.append(d + d + qqq)
+        lines.append(d + "),")
 
         lines.append(")")
         lines.append("")
@@ -397,6 +423,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         optional_words = self.usage_words
 
         # Calculate a usage line summing up the parsed parts
+        # Like sometimes trigger "argdoc.py: warning: doc'ced ... calculated ..."
 
         compiled_usage = None
         if parts.prog:
@@ -429,6 +456,9 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         if metavar == "TOP":
             nargs = "?"  # argparse.OPTIONAL
+        elif metavar == "FILE":
+            if parts.uses.remains == "[FILE] [-- [ARG [ARG ...]]]":
+                nargs = "?"  # argparse.OPTIONAL
 
         if nargs == 1:
             self.usage_words.append(metavar)

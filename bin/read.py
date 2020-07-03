@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
 
 r"""
-usage: read.py [-h]
+usage: read.py [-h] [--lines]
 
-read a line of standard input, and print it
+read one line of standard input, and print it
 
 optional arguments:
   -h, --help  show this help message and exit
+  --lines     keep on reading till EOF (such as Terminal Control+D)
 
 bugs:
-  prompts with " ?", unlike Bash ""
+  prompts with "? ", unlike the "" of Bash "read" with no -p PROMPT
   prompts and echoes, even when Stdin not Terminal, unlike Bash
-  always fetches one line only, like Bash, never more like Zsh
+  lets people edit input, like Bash "read -e", unlike Zsh "read"
+  prints the line as a Python Repr
+  doesn't stuff the line into a Bash Environment Variable
+  doesn't compress spaces between words down to one space
+  doesn't read another line after a line ends with \ backslash
+  doesn't delete \ backslashes
 """
-# FIXME: fix more bugs
 
 from __future__ import print_function
 
@@ -30,18 +35,33 @@ import argdoc
 def main():
     """Run from the command line"""
 
-    argdoc.parse_args()
+    args = argdoc.parse_args()
 
     prompt = "? "
 
-    shline = None
-    try:
-        shline = readline(prompt)
-    except KeyboardInterrupt:
-        sys.stdout.write("⌃C\r\n")
+    if args.lines:
+        sys.stderr.write(
+            "Press ⌃D EOF to quit\n"
+        )  # prompt even when Stdin not Terminal
+        sys.stderr.flush()
+
+    while True:
+
+        shline = None
+        try:
+            shline = readline(prompt)
+        except KeyboardInterrupt:
+            sys.stderr.write("⌃C\r\n")
+            sys.stderr.flush()
+
+        print(repr(shline))
         sys.stdout.flush()
 
-    print(repr(shline))
+        if shline == "":
+            break
+
+        if not args.lines:
+            break
 
 
 def readline(prompt):
@@ -122,7 +142,7 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         if False:  # FIXME: configure logging
             with open("trace.txt", "a") as appending:
-                appending.write("{} {}\n".format(calls, repr(stdin)))
+                appending.write("read.getch: {} {}\n".format(calls, repr(stdin)))
 
         return stdin
 
@@ -184,16 +204,18 @@ class GlassTeletype(contextlib.ContextDecorator):
     def _calc_c0_controls_stdins(self):
         """List the U0000.pdf C0 Control codepoints, encoded as bytes"""
 
-        for codepoint in range(0, 0x20):  # first thirty-two of the C0 Control codepoints
+        for codepoint in range(
+            0, 0x20
+        ):  # first thirty-two of the C0 Control codepoints
             yield chr(codepoint).encode()
 
-        codepoint = 0x7f  # last of the thirty-three C0 Control codepoints
+        codepoint = 0x7F  # last of the thirty-three C0 Control codepoints
         yield chr(codepoint).encode()
 
     def _calc_basic_latin_stdins(self):
         """List the U0000.pdf Basic Latin codepoints, encoded as bytes"""
 
-        for codepoint in range(0x20, 0x7f):  # ninety-five Basic Latin codepoints
+        for codepoint in range(0x20, 0x7F):  # ninety-five Basic Latin codepoints
             yield chr(codepoint).encode()
 
     def _calc_bots_by_stdin(self):
@@ -231,7 +253,7 @@ class GlassTeletype(contextlib.ContextDecorator):
     def _can_paste_stdin(self, stdin):
         """Say when picking paste apart one char at a time works well enough for now"""
 
-        ord_esc = 0x1b
+        ord_esc = 0x1B
 
         if len(stdin) == 3:  # do not paste the Esc [ DCAB arrow keys, etc
             if stdin[0] == ord_esc:
@@ -240,20 +262,27 @@ class GlassTeletype(contextlib.ContextDecorator):
         return True
 
     def _do_paste_stdin(self, stdin):
-        """Pick paste apart one byte at a time"""
+        """Pick paste apart one char at a time"""
 
         assert self._can_paste_stdin(stdin)
 
+        # Pull out each char of paste
+
         quitting = None
         for ch in stdin.decode():
-            stdin_ = ch.encode()
+            ch_ = ch.encode()
 
-            if stdin_ not in self.c0_control_stdins:
+            # Insert everything except C0 Control characters
+
+            if ch_ not in self.c0_control_stdins:
                 self._insert_chars(ch)
+
+            # Execute, or log & drop, each C0 Control character
+
             else:
                 bot = self._log_stdin
-                bot = self._bots_by_stdin.get(stdin, bot)
-                quitting = bot(stdin_)
+                bot = self._bots_by_stdin.get(ch_, bot)
+                quitting = bot(ch_)
 
             if quitting:
                 break
@@ -356,7 +385,9 @@ class GlassTeletype(contextlib.ContextDecorator):
     def _insert_stdin(self, stdin):  # aka Bash "bind -p | grep self-insert"
         """Add the codepoint of the keystroke"""
 
-        assert len(stdin) == 1  # no tests yet of keys other than the ninety-five Basic Latin chars
+        assert (
+            len(stdin) == 1
+        )  # no tests yet of keys other than the ninety-five Basic Latin chars
         assert stdin in self.basic_latin_stdins
 
         ch = stdin.decode()

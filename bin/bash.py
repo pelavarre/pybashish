@@ -52,8 +52,8 @@ def main(argv):
         try:
             shline = read.readline(prompt)
         except KeyboardInterrupt:
-            sys.stdout.write("⌃C\r\n")
-            sys.stdout.flush()
+            sys.stderr.write("⌃C\r\n")
+            sys.stderr.flush()
             continue
 
         # Exit at end-of-file
@@ -69,7 +69,7 @@ def main(argv):
 
         for (index, arg,) in enumerate(argv):
             if arg.startswith("#"):
-                argv = argv[:index]  # drop "#" hash comment till end of shline
+                argv = argv[:index]  # drop "#..." hash comment till end of shline
                 break
 
         # Compile and execute the line
@@ -206,6 +206,15 @@ BUILTINS["exit"] = builtin_exit
 
 if __name__ == "__main__":
     main(sys.argv)
+
+
+# See also
+#
+# POSIX.1-2017
+# https://pubs.opengroup.org/onlinepubs/9699919799/
+# https://pubs.opengroup.org/onlinepubs/9699919799/utilities/sh.html
+# https://pubs.opengroup.org/onlinepubs/9699919799/utilities/read.html
+#
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

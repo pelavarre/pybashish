@@ -1,6 +1,30 @@
 # pybashish/Makefile:  Run the self-test's
 
-default:
+default: black test-once
+	:
+	git status | grep -v '^$$'
+	:
+	: make: passed
+	:
+
+help:
+	: # usage: make {default|blacken-here|help|test-here}
+	: #
+	: # help develop this code
+	: #
+	: # make verbs:
+	: #     default         blacken and test
+	: #     black           blacken the Python style here, again
+	: #     test-once       run the tests here, just once more
+	: #
+	: # bugs:
+	: #     prompts with "? ", unlike the "" of Bash "read" with no -p PROMPT
+	: #
+
+black:
+	source ~/bin/black.source && black $$PWD/../pybashish/
+
+test-once:
 	:
 	bin/doctestbash.py || (bin/doctestbash.py -vv; exit 1)
 	:
@@ -12,8 +36,6 @@ default:
 	:
 	tests/_test_subsh.py >/dev/null
 	: test_subsh: tests passed
-	:
-	: make: passed
 	:
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

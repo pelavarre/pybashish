@@ -279,7 +279,7 @@ def require_test_passed(args_file, passes, gots, dent, wants):
                 if main.args.vq < len("vv"):
                     reasons.append("try again with -vv")
                 reasons.append(
-                    "fix the code, and/or fix the test at:  {}".format(args_file)
+                    "fix the code, and/or fix the test at:  vim {}".format(args_file)
                 )
 
                 for reason in reasons:

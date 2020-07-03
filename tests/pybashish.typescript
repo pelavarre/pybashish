@@ -67,6 +67,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
     doctestbash --help
     echo --help
     find --help
+    fmt --help
     grep --help
     help --help
     hexdump --help
@@ -112,18 +113,27 @@ ArgDoc compiles standard Python Arg Docs into standard Python ArgParser Parsers
 
 Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
-    $ bin/argdoc.py
-    usage: argdoc.py [-h] [--doc] FILE [-- [ARG [ARG ...]]]
-    argdoc.py: error: the following arguments are required: FILE, ARG
+    $ bin/argdoc.py -ijk
+    usage: argdoc.py [-h] [--doc] [FILE] [-- [ARG [ARG ...]]]
+    argdoc.py: error: unrecognized arguments: -ijk
     + exit 2
     $
 
-    $ bin/argdoc.py /dev/null -- -h
-    testing: shlex.split("/dev/null -h")
+    $ bin/argdoc.py
+    """
     usage: null [-h]
 
     optional arguments:
       -h, --help  show this help message and exit
+
+    examples:
+      Oh no! No examples disclosed!! 💥 💔 💥
+    """
+    $
+
+    $ bin/argdoc.py /dev/null xyz
+    argdoc.py: error: unrecognized args: xyz
+    + exit 1
     $
 
 Drop that starter doc into your source, call it, and work it up from there
@@ -152,18 +162,19 @@ Drop that starter doc into your source, call it, and work it up from there
 ## 2.9 ) DocTestBash
 ## 2.10 ) Echo
 ## 2.11 ) Find
-## 2.12 ) Grep
-## 2.13 ) Help
-## 2.14 ) HexDump
-## 2.15 ) Hostname
-## 2.16 ) Ls
-## 2.17 ) Mv
-## 2.18 ) Pwd
-## 2.19 ) Read
-## 2.20 ) Rm
-## 2.21 ) SubSh
-## 2.22 ) Touch
-## 2.23 ) Watch
+## 2.12 ) Fmt
+## 2.13 ) Grep
+## 2.14 ) Help
+## 2.15 ) HexDump
+## 2.16 ) Hostname
+## 2.17 ) Ls
+## 2.18 ) Mv
+## 2.19 ) Pwd
+## 2.20 ) Read
+## 2.21 ) Rm
+## 2.22 ) SubSh
+## 2.23 ) Touch
+## 2.24 ) Watch
 
 
 // FIXME: remake this into a ".md" Markdown file
