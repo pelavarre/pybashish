@@ -104,6 +104,12 @@ class GlassTeletype(contextlib.ContextDecorator):
 
     def __init__(self):
 
+        self.inputs = ""  # buffer input to process later
+
+        self.chars = list()  # take chars into a shline
+        self.echoes = list()  # echo chars of a shline
+        self.lines = list()  # keep lines of history
+
         self.c0_control_stdins = b"".join(self._calc_c0_controls_stdins())
         self.basic_latin_stdins = b"".join(self._calc_basic_latin_stdins())
         self._bots_by_stdin = self._calc_bots_by_stdin()
@@ -124,7 +130,66 @@ class GlassTeletype(contextlib.ContextDecorator):
         attributes = self.with_termios
         termios.tcsetattr(self.fdin, when, attributes)
 
+    def readline(self):  # FIXME: FIXME: too many distinct "def readline"
+        """Pull the next line of input, but let people edit the shline as it comes"""
+
+        quitting = None
+        while quitting is None:
+
+            stdin = self.getch()
+
+            bot = self._bots_by_stdin.get(stdin)
+            if bot is None:
+                bot = self._log_stdin
+                ch = stdin.decode()
+                if len(ch) == 1:
+                    if not self._is_c0_control_stdin(stdin):
+                        bot = self._insert_stdin
+
+            quitting = bot(stdin)
+
+        shline = self._join_shline()
+        ShLineHistory.shlines.append(shline)
+
+        result = shline + quitting
+        return result
+
     def getch(self):
+        """Pull next char of paste, else one slow single keystroke, else one char of paste"""
+
+        # Pull one slow single keystroke and return it, or capture a burst of paste
+
+        inputs = self.inputs
+        if not inputs:
+
+            stdin = self._get_stdin()
+
+            if len(stdin) == 1:
+
+                return stdin
+
+            inputs = stdin.decode()
+
+        # Pull an Esc [ X sequence from paste
+
+        if len(inputs) >= 3:
+            esc = "\x1B"
+            if inputs[:2] == (esc + "["):
+
+                stdin = inputs[:3].encode()
+                self.inputs = inputs[3:]
+
+                return stdin
+
+        # Pull one char of paste,
+        # such as ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑  # Control Option Alt Shift Command, Left Right Down Up Arrows
+
+        stdin = inputs[:1].encode()
+        self.inputs = inputs[1:]
+
+        return stdin
+
+    def _get_stdin(self):
         """Pull the next slow single keystroke, or a burst of paste"""
 
         stdin = os.read(sys.stdin.fileno(), 1)
@@ -142,7 +207,7 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         if False:  # FIXME: configure logging
             with open("trace.txt", "a") as appending:
-                appending.write("read.getch: {} {}\n".format(calls, repr(stdin)))
+                appending.write("read._get_stdin: {} {}\n".format(calls, repr(stdin)))
 
         return stdin
 
@@ -166,38 +231,11 @@ class GlassTeletype(contextlib.ContextDecorator):
             sys.stdout.write(ch)
             sys.stdout.flush()
 
-    def readline(self):
-        """Pull the next line of input, but let people edit the line as it comes"""
-
-        self.shline = ""
-        self.echoes = list()
-
-        self.pushes = list()
-
-        quitting = None
-        while quitting is None:
-
-            stdin = self.getch()
-
-            bot = self._bots_by_stdin.get(stdin)
-            if bot is None:
-                bot = self._log_stdin
-                if self._can_paste_stdin(stdin):
-                    bot = self._do_paste_stdin
-
-            quitting = bot(stdin)
-
-        shline = self.shline
-        ShLineHistory.shlines.append(shline)
-
-        result = shline + quitting
-        return result
-
     def _insert_chars(self, chars):
-        """Add chars to the line"""
+        """Add chars to the shline"""
 
         for ch in chars:
-            self.shline += ch
+            self.chars.append(ch)
             self.echoes.append(ch)
             self.putch(ch)
 
@@ -228,16 +266,22 @@ class GlassTeletype(contextlib.ContextDecorator):
         bots_by_stdin[b"\x07"] = self._ring_bell  # BEL, aka ⌃G, aka 7
         bots_by_stdin[b"\x08"] = self._drop_char  # BS, aka ⌃H, aka 8
         bots_by_stdin[b"\x0a"] = self._end_line  # LF, aka ⌃J, aka 10
+        # FF, aka ⌃L, aka 12
         bots_by_stdin[b"\x0d"] = self._end_line  # CR, aka ⌃M, aka 13
         bots_by_stdin[b"\x0e"] = self._next_history  # SO, aka ⌃N, aka 14
         bots_by_stdin[b"\x10"] = self._previous_history  # DLE, aka ⌃P, aka 16
+        # XON, aka ⌃Q, aka 17
         bots_by_stdin[b"\x12"] = self._reprint  # DC2, aka ⌃R, aka 18
+        # XOFF, aka ⌃S, aka 19
         bots_by_stdin[b"\x15"] = self._drop_line  # NAK, aka ⌃U, aka 21
+        bots_by_stdin[b"\x16"] = self._quoted_insert  # ACK, aka ⌃V, aka 22
         bots_by_stdin[b"\x7f"] = self._drop_char  # DEL, classically aka ⌃?, aka 127
+        # SUB, aka ⌃Z, aka 26
+        # FS, aka ⌃\, aka 28
 
         for stdin in bots_by_stdin.keys():
             assert len(stdin) == 1
-            assert stdin in self.c0_control_stdins
+            assert self._is_c0_control_stdin(stdin)
 
         for codepoint in self.basic_latin_stdins:
             stdin = chr(codepoint).encode()
@@ -250,44 +294,19 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         return bots_by_stdin
 
-    def _can_paste_stdin(self, stdin):
-        """Say when picking paste apart one char at a time works well enough for now"""
+    def _join_shline(self):
+        """Catenate the chars of the shline, on demand"""
 
-        ord_esc = 0x1B
+        shline = "".join(self.chars)
 
-        if len(stdin) == 3:  # do not paste the Esc [ DCAB arrow keys, etc
-            if stdin[0] == ord_esc:
-                return False
+        return shline
 
-        return True
+    def _is_c0_control_stdin(self, stdin):
+        """Say when to interpret stdin as a C0 Control character"""
 
-    def _do_paste_stdin(self, stdin):
-        """Pick paste apart one char at a time"""
-
-        assert self._can_paste_stdin(stdin)
-
-        # Pull out each char of paste
-
-        quitting = None
-        for ch in stdin.decode():
-            ch_ = ch.encode()
-
-            # Insert everything except C0 Control characters
-
-            if ch_ not in self.c0_control_stdins:
-                self._insert_chars(ch)
-
-            # Execute, or log & drop, each C0 Control character
-
-            else:
-                bot = self._log_stdin
-                bot = self._bots_by_stdin.get(ch_, bot)
-                quitting = bot(ch_)
-
-            if quitting:
-                break
-
-        return quitting
+        if len(stdin) == 1:
+            if stdin in self.c0_control_stdins:
+                return True
 
     def _drop_char(self, stdin):  # aka Stty "erase", aka Bind "backward-delete-char"
         """Undo the last "_insert_stdin", even if it inserted no chars"""
@@ -296,15 +315,13 @@ class GlassTeletype(contextlib.ContextDecorator):
             return
 
         echo = self.echoes[-1]
-        width = len(self.echoes[-1])
-        self.echoes = self.echoes[:-1]
 
-        if len(echo) == 1:
-            assert echo.encode() in self.basic_latin_stdins
-            self.shline = self.shline[:-1]
-
+        width = len(echo)
         backing = width * "\b"
         blanking = width * " "
+
+        self.echoes = self.echoes[:-1]
+        self.chars = self.chars[:-1]
         self.putch(f"{backing}{blanking}{backing}")
 
     def _drop_line(self, stdin):  # aka Stty "kill" many, aka Bind "unix-line-discard"
@@ -316,7 +333,7 @@ class GlassTeletype(contextlib.ContextDecorator):
     def _end_file(self, stdin):
         """End the file before starting the next line, else ring the bell"""
 
-        if self.shline:
+        if self.chars:
             self._ring_bell(stdin)
             return
 
@@ -326,9 +343,9 @@ class GlassTeletype(contextlib.ContextDecorator):
         return quitting
 
     def _end_line(self, stdin):
-        """End the line"""
+        """End the shline"""
 
-        self.putch("\r\n")  # echo ending the line
+        self.putch("\r\n")  # echo ending the shline
 
         quitting = "\n"
         return quitting
@@ -343,28 +360,55 @@ class GlassTeletype(contextlib.ContextDecorator):
     def _next_history(self, stdin):
         """Step forward in time"""
 
-        while self.pushes:
+        while self.lines:
 
-            shline = self.pushes[-1]
-            self.pushes = self.pushes[:-1]
+            shline = self.lines[-1]
+            self.lines = self.lines[:-1]
 
             self._drop_line(stdin)
-            if shline:
-                self._insert_chars(shline)
-                break
+            self._insert_chars(shline)
+
+            return
+
+        self._ring_bell(stdin)
 
     def _previous_history(self, stdin):
-        """Step backwards in time"""
+        """Step backwards in time"""  # FIXME FIXME: respect chars of line before Up/ Down
 
-        while len(self.pushes) < len(ShLineHistory.shlines):
+        while len(self.lines) < len(ShLineHistory.shlines):
 
-            self.pushes.append(self.shline)
-            shline = ShLineHistory.shlines[-len(self.pushes)]
+            shline = self._join_shline()
+            self.lines.append(shline)
+
+            previous_shline = ShLineHistory.shlines[-len(self.lines)]
 
             self._drop_line(stdin)
-            if shline:
-                self._insert_chars(shline)
-                break
+            self._insert_chars(previous_shline)
+
+            return
+
+        self._ring_bell(stdin)
+
+    def _quoted_insert(self, stdin):
+        """Add any one of the U0000.pdf characters to the shline"""
+
+        next_stdin = self.getch()
+
+        if len(next_stdin) == 1:
+            if 0x00 <= next_stdin[0] <= 0x7F:
+
+                next_ch = next_stdin.decode()
+
+                caret_echo = "^{}".format(chr(next_stdin[0] ^ 0x40))
+                echo = caret_echo if self._is_c0_control_stdin(next_stdin) else next_ch
+
+                self.chars.append(next_ch)
+                self.echoes.append(echo)
+                self.putch(echo)
+
+                return
+
+        self._ring_bell(stdin)
 
     def _raise_keyboard_interrupt(self, stdin):  # aka Stty "intr" SIGINT
         """Raise KeyboardInterrupt"""
@@ -384,11 +428,6 @@ class GlassTeletype(contextlib.ContextDecorator):
 
     def _insert_stdin(self, stdin):  # aka Bash "bind -p | grep self-insert"
         """Add the codepoint of the keystroke"""
-
-        assert (
-            len(stdin) == 1
-        )  # no tests yet of keys other than the ninety-five Basic Latin chars
-        assert stdin in self.basic_latin_stdins
 
         ch = stdin.decode()
         self._insert_chars(ch)

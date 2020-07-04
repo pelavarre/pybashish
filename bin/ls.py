@@ -10,8 +10,9 @@ optional arguments:
   -1          print one filename per line
   -C          print filenames into multiple columns
 """
-# FIXME: -w COLUMNS, --width COLUMNS  as if a terminal so wide
-# FIXME: count -1 -C to resolve contradictions
+# FIXME FIXME: -w COLUMNS, --width COLUMNS  as if a terminal so wide
+# FIXME FIXME: count -1 -C to resolve contradictions
+# FIXME FIXME: "import fmt" to reach "def spill_cells" etc
 
 from __future__ import print_function
 
@@ -65,7 +66,7 @@ def main():
 
     # FIXME: implement ls -alF -rt, etc
     # FIXME: implement glob args
-    # FIXME: timestamp to like the second in an ls -l
+    # FIXME FIXME: timestamp to like the second in an ls -l
 
 
 def os_stat_hidden(what):

@@ -13,8 +13,9 @@ help:
 	: # help develop this code
 	: #
 	: # make verbs:
-	: #     default         blacken and test
 	: #     black           blacken the Python style here, again
+	: #     default         blacken and test
+	: #     me              run:  python3 ../pybashish/
 	: #     test-once       run the tests here, just once more
 	: #
 	: # bugs:
@@ -37,5 +38,11 @@ test-once:
 	tests/_test_subsh.py >/dev/null
 	: test_subsh: tests passed
 	:
+
+grep-fixme:
+	echo && echo && echo && git grep 'F'IXME | awk -F: '{ n=$$1; if (n != o) {o=n; print ""; print $$1":"}; $$1=""; print substr($$0, 2)}' | less -FRX
+
+me:
+	python3 ../pybashish/
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

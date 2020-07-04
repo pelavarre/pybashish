@@ -108,39 +108,54 @@ def _run_args_file(args_file, args_separator, args_args, args_doc):
     if args_file and (not args_doc) and (not args_separator):
 
         print(source.rstrip())
+
         return
 
-    # Or print the Arg Help Doc that results, and loop back to compare it with the original Arg Doc
+    # Print the compiled Arg Doc, and compare it with the original Arg Doc
 
     if not args_separator:
 
-        if not file_doc:
-            print(qqq)
-            print(helped_doc.strip())
-            print(qqq)
-            return
-
-        print(qqq)
-        print(file_doc.strip())
-        print(qqq)
-
-        if file_doc.strip() != helped_doc.strip():
-            if file_doc.strip():
-
-                help_shline = "bin/argdoc.py {} -- --help".format(arg_doc_file)
-                help_reason = "warning: doc != help, doc at:  {}".format(help_shline)
-                stderr_print(help_reason)
-
-                # file_doc_shline = "bin/argdoc.py --doc {}".format(arg_doc_file)
-                file_doc_shline = "vim {}".format(arg_doc_file)
-                file_doc_reason = "warning: doc != help, doc at:  {}".format(
-                    file_doc_shline
-                )
-                stderr_print(file_doc_reason)
+        _print_arg_doc(
+            arg_doc_file=arg_doc_file, qqq=qqq, helped_doc=helped_doc, file_doc=file_doc
+        )
 
         return
 
-    # Or race ahead to run the Arg Parser that results
+    # Run Args through the Arg Parser, compiled from the Arg Doc
+
+    _parse_and_print_args(str_args_file, parser=parser, args_args=args_args)
+
+
+def _print_arg_doc(arg_doc_file, qqq, helped_doc, file_doc):
+    """Print the compiled Arg Doc, and compare it with the original Arg Doc"""
+
+    if not file_doc:
+        print(qqq)
+        print(helped_doc.strip())
+        print(qqq)
+        return
+
+    print(qqq)
+    print(file_doc.strip())
+    print(qqq)
+
+    if file_doc.strip() != helped_doc.strip():
+        if file_doc.strip():
+
+            help_shline = "bin/argdoc.py {} -- --help".format(arg_doc_file)
+            help_reason = "warning: doc != help, doc at:  {}".format(help_shline)
+            stderr_print(help_reason)
+
+            # file_doc_shline = "bin/argdoc.py --doc {}".format(arg_doc_file)
+            file_doc_shline = "vim {}".format(arg_doc_file)
+            file_doc_reason = "warning: doc != help, doc at:  {}".format(
+                file_doc_shline
+            )
+            stderr_print(file_doc_reason)
+
+
+def _parse_and_print_args(str_args_file, parser, args_args):
+    """Run Args through the Arg Parser, compiled from the Arg Doc"""
 
     print("+ {}".format(shlex_join([str_args_file] + args_args)))
 
@@ -448,7 +463,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         help_ = help_.lstrip()
 
         # Calculate "nargs"
-        # FIXME: stop solving only a few cases of this
+        # FIXME FIXME: stop solving only a few cases of "nargs"
 
         nargs = 1
         if parts.uses.remains and (index == len(positionals) - 1):

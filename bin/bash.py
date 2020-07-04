@@ -201,7 +201,7 @@ def stderr_print(*args):
 BUILTINS = dict()
 BUILTINS[":"] = builtin_pass
 BUILTINS["exit"] = builtin_exit
-# FIXME: implement BUILTINS["cd"]
+# FIXME FIXME: implement BUILTINS["cd"]
 
 
 if __name__ == "__main__":

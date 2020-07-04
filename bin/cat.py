@@ -18,7 +18,7 @@ bugs:
   doesn't undo Mac "use smart quotes and dashes"
   doesn't convert indented line-broken plain-text to Html
 """
-# FIXME: fix more bugs
+# FIXME FIXME: fix "cat" bugs: interactive, -etv, smart quotes and dashes, Html
 
 from __future__ import print_function
 
