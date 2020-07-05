@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 
 r"""
-usage: help.py [-h]
+usage: help_.py [-h]
 
 print some help
 
 optional arguments:
   -h, --help  show this help message and exit
+
+examples:
+  help_.py
+  man bash
+  man zshall
 """
 
 from __future__ import print_function

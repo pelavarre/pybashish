@@ -8,7 +8,12 @@ print some filenames
 optional arguments:
   -h, --help  show this help message and exit
   -1          print one filename per line
-  -C          print filenames into multiple columns
+  -C          print filenames into multiple columns (default: True)
+
+examples:
+  ls
+  ls -1
+  ls -C
 """
 # FIXME FIXME: -w COLUMNS, --width COLUMNS  as if a terminal so wide
 # FIXME FIXME: count -1 -C to resolve contradictions

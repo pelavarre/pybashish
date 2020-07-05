@@ -6,7 +6,7 @@ usage: find.py [-h] [TOP] [HOW [HOW ...]]
 print some words
 
 positional arguments:
-  TOP         the dir to walk
+  TOP         the dir to walk (default: .)
   HOW         a hint of how to walk
 
 optional arguments:
@@ -17,6 +17,9 @@ bugs:
   leads each hit inside "./" with "" not "./", unlike Bash
   leads each hit inside "~/" with "~/" not "$PWD", unlike Bash
   hits the realpath of each sym link, not abspath, unlike Bash
+
+examples:
+  find ~/bin/
 """
 # FIXME: rethink bugs
 
@@ -27,9 +30,9 @@ import sys
 
 import argdoc
 
-import cat
+import cat  # for cat.BrokenPipeSink
 
-import pwd_
+import pwd_  # for pwd_.OsPathBriefPath
 
 
 def main(argv):
@@ -37,7 +40,7 @@ def main(argv):
     args = argdoc.parse_args()
 
     if args.hows:
-        stderr_print("No hints yet defined, but got hints: {}".format(args.hows))
+        stderr_print("error: find.py: Got undefined hints: {}".format(args.hows))
         sys.exit(-1)
 
     os_walk_print_homepath(top=args.top)

@@ -9,7 +9,12 @@ optional arguments:
   -h, --help  show this help message and exit
 
 bugs:
-  not yet reported, please help us out
+  returns exit status 127, not 258, for ⌃D EOF pressed while ' or "" input quote open
+  zeroes exit status after next line of input, no matter if input is blank
+  lots more bugs not yet reported, please help us out
+
+examples:
+  bash.py  # chat till "exit", or ⌃D EOF pressed to quit, or Ssh drops, etc
 """
 # FIXME: add --color=never|always|auto
 
@@ -64,21 +69,16 @@ def main(argv):
                 1
             )  # same subprocess.CompletedProcess.returncode=1 as Bash exit at EOF
 
-        # Parse the line
-
-        argv = shlex.split(shline)
-
-        for (index, arg,) in enumerate(argv):
-            if arg.startswith("#"):
-                argv = argv[:index]  # drop "#..." hash comment till end of shline
-                break
-
         # Compile and execute the line
 
+        argv = _parse_shline(shline)
         how = _compile_shline(shline, argv=argv)
-
         returncode = how(argv)
+
         main.returncode = returncode
+
+        if returncode:  # trace nonzero a la Zsh "print_exit_value"
+            stderr_print("warning: bash.py:  exit {}".format(returncode))
 
 
 def builtin_pass(argv):
@@ -89,7 +89,36 @@ def builtin_exit(argv):
     sys.exit()
 
 
+def _parse_shline(shline):
+    """Split a line of input into an argv list of words"""
+
+    split_argv = None
+    try:
+        split_argv = shlex.split(shline)
+    except ValueError as exc:
+        stderr_print("warning: bash.py: {}: {}".format(type(exc).__name__, exc))
+
+    argv = None
+    if split_argv is not None:
+        argv = list(split_argv)
+        for (index, arg,) in enumerate(split_argv):
+            if arg.startswith("#"):
+                argv = split_argv[:index]  # drop "#..." hash comment till end of shline
+                break
+
+    return argv
+
+
 def _compile_shline(shline, argv):
+    """Return a callable to interpret argv"""
+
+    # Fail fast if no input line parsed
+
+    if argv is None:
+
+        how = _compile_log_error()
+
+        return how
 
     # Plan to call a built-in verb
 
@@ -120,11 +149,15 @@ def _compile_shline(shline, argv):
 
         if os.path.exists(verb):
             how = _compile_log_error(
-                "bash.py: {}: No such file or directory in bash path".format(verb)
+                "warning: bash.py: {}: No such file or directory in bash path".format(
+                    verb
+                )
             )
             return how
 
-        how = _compile_log_error("bash.py: {}: No such file or directory".format(verb))
+        how = _compile_log_error(
+            "warning: bash.py: {}: No such file or directory".format(verb)
+        )
         return how
 
     # Map plain verb to Py file
@@ -149,11 +182,11 @@ def _compile_shline(shline, argv):
 
     # Plan to rejecy a verb that maps to a Py file that doesn't exist
 
-    how = _compile_log_error("bash.py: {}: command not found".format(verb))
+    how = _compile_log_error("warning: bash.py: {}: command not found".format(verb))
     return how
 
 
-def _compile_log_error(message):
+def _compile_log_error(message=None):
     def how(argv):
         return log_error(message)
 
@@ -161,7 +194,9 @@ def _compile_log_error(message):
 
 
 def log_error(message):
-    stderr_print(message)
+    if message is not None:
+        stderr_print(message)
+        sys.stderr.flush()
     return 127
 
 

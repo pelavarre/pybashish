@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-r"""
+"""
 usage: doctestbash.py [-h] [-b] [-q] [-v] [FILE [FILE ...]]
 
 Test if Bash behaves as the transcripts say it should
@@ -14,11 +14,15 @@ optional arguments:
   -q, --quiet           say less
   -v, --verbose         say more
 
-examples:
-  cp doctestbash.py doctestbash.doctestbash && ./doctestbash.py $PWD
+bugs:
+  always test only the files at "tests/"
+  only find "tests/pybashish.typescript" when searching "tests/"
 
-notes:
-  compare Python "import doctest"
+examples:
+  mkdir -p tests/
+  cp -ip doctestbash.py tests/pybashish.typescript && ./doctestbash.py $PWD
+
+see also:  Python "import doctest"
 """
 # FIXME: walk for exts
 # FIXME: rip Bash paste distinguished only by repeated prompt ending in '$' or '#'
@@ -41,9 +45,9 @@ def main(argv):
     args.vq = (args.verbose if args.verbose else 0) - (args.quiet if args.quiet else 0)
     main.args = args
 
-    assert not args.files
-
     # Test the one well known file
+
+    assert args.files == ["tests/"]
 
     file_dir = os.path.split(__file__)[0]
     tests_dir = os.path.join(file_dir, os.pardir, "tests")
@@ -133,18 +137,17 @@ def _run_bash_test_doc(incoming, args_file):
     return passes
 
 
-def split_dent(line):
+def str_splitdent(line):  # deffed by "doctestbash.py", "fmt.py
     """Split apart the indentation of a line, from the remainder of the line"""
 
-    text = line.rstrip()
-    len_dent = len(text) - len(text.lstrip())
+    len_dent = len(line) - len(line.lstrip())
     dent = len_dent * " "
 
-    remainder = line[len(dent) :]
+    tail = line[len(dent) :]
 
     return (
         dent,
-        remainder,
+        tail,
     )
 
 
@@ -163,7 +166,7 @@ def take_one_test(incoming, line):
 
     while line:
 
-        (dent, text,) = split_dent(line.rstrip())
+        (dent, text,) = str_splitdent(line.rstrip())
         vv_print(dent + text)
 
         if not text.startswith(prompt) and text != prompt.strip():
@@ -192,7 +195,7 @@ def take_one_test(incoming, line):
     doc_lines = list()
 
     while line:
-        (dent_, text_,) = split_dent(line.rstrip())
+        (dent_, text_,) = str_splitdent(line.rstrip())
 
         wanted = False
         if not text_:
@@ -284,7 +287,7 @@ def require_test_passed(args_file, passes, gots, dent, wants):
                 )
 
                 for reason in reasons:
-                    stderr_print("doctestbash.py: error: {}".format(reason))
+                    stderr_print("error: doctestbash.py: {}".format(reason))
 
                 sys.exit(1)
 

@@ -14,7 +14,7 @@ def import_subsh():
 
     sys.path.append(os.path.join(os.path.split(__file__)[0], os.pardir, "bin"))
 
-    import subsh
+    import subsh  # FIXME: packaging
 
     return subsh
 

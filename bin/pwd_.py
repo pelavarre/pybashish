@@ -1,21 +1,27 @@
 #!/usr/bin/env python3
 
 """
-usage: pwd.py [-h] [--brief] [--home] [-L] [-P]
+usage: pwd_.py [-h] [--brief] [--home] [-P]
 
 show the os.environ["HOME"], by default just its "os.path.abspath"
 
 optional arguments:
   -h, --help      show this help message and exit
   --brief         show the briefest abspath/ homepath/ relpath/ whatever
-  --home          show the "os.path.relpath" as "~/...", like Bash "dirs +0" and Zsh "dirs -p"
-  -L, --logical   show the "os.path.abspath"
-  -P, --physical  show the "os.path.realpath", like walk through symbolic links
+  --home          show the "~/..." "relpath" if in "~/" (default: True)
+  -P, --physical  show the "realpath"s, not "abspath"s, of sym links
 
 bugs:
-  defaults to "--home", unlike Bash default to "--logical"
-  offers "--brief" and "--home", unlike Bash
-  offers "--logical" and "--physical" like Linux, not just "-L" and "-P" like Mac
+  defaults to "--home", in the spirit of Bash "dirs +0" and Zsh "dirs -p", unlike their "pwd"s
+  offers "--brief" and "--home", unlike Bash anywhere
+  offers "--physical" like Linux, not just "-P" like Mac
+  doesn't offer the explicit "--logical" of Linux, nor the "-L" of Mac and Linux
+
+examples:
+  pwd
+  pwd -P
+  pwd_.py --brief
+  pwd_.py --home
 """
 # FIXME: add "--verbose" a la "hostname"
 # FIXME: somehow remember we don't want to abbreviate down to colliding "-" the unconventional "--"

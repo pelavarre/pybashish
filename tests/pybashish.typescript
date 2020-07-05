@@ -14,6 +14,7 @@ Contents
 ++ 2.3 ) Bind
 ++ 2.4 ) Cat
 ++ 2.5 ) Clips
+++ 2.6 ) Column
 ++ 2.6 ) Cp
 ++ 2.7 ) Date
 ++ 2.8 ) Dd
@@ -87,6 +88,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
     bind --help
     cat --help
     clips --help
+    column --help
     cp --help
     date --help
     dd --help
@@ -134,33 +136,33 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
     """
     usage: null [-h]
 
+    do good stuff
+
     optional arguments:
       -h, --help  show this help message and exit
 
     examples:
       Oh no! No examples disclosed!! 💥 💔 💥
     """
-    $
-
-    $ bin/argdoc.py /dev/null xyz
-    argdoc.py: error: unrecognized args: xyz
-    + exit 1
-    $
-
-Drop that starter doc into your source, call it, and work it up from there
-
-    r"""
-    usage: ... [-h]
-
-    optional arguments:
-      -h, --help  show this help message and exit
-    """
 
     import argdoc
 
-    if __name__ == '__main__':
+
+    def main():
         args = argdoc.parse_args()
         print(args)
+
+
+    if __name__ == '__main__':
+        main()
+    $
+
+    $ bin/argdoc.py /dev/null xyz
+    error: argdoc.py: unrecognized args: xyz
+    + exit 1
+    $
+
+Drop that starter Doc and Python into your source, call it, and work it up from there
 
 
 ## 2.2 ) Bash
@@ -191,6 +193,7 @@ Lorem ipsum dolor sit amet
 ## 2.4 ) Cat
 ## 2.5 ) Clips
 ## 2.6 ) Cp
+## 2.6 ) Column
 ## 2.7 ) Date
 ## 2.8 ) Dd
 ## 2.9 ) DocTestBash

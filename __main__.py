@@ -28,10 +28,6 @@ def main(argv):
     sys.exit(ran.returncode)
 
 
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
-
-
 if __name__ == "__main__":
     main(sys.argv)
 

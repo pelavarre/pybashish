@@ -27,7 +27,7 @@ black:
 
 test-once:
 	:
-	bin/doctestbash.py || (bin/doctestbash.py -vv; exit 1)
+	bin/doctestbash.py tests/ || (bin/doctestbash.py tests/ -vv; exit 1)
 	:
 	for F in bin/*.py; do bin/argdoc.py --doc $$F >/dev/null; done
 	: argdoc: tests passed

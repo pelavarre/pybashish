@@ -10,6 +10,9 @@ positional arguments:
 
 optional arguments:
   -h, --help  show this help message and exit
+
+bugs:
+  no examples
 """
 
 from __future__ import print_function
@@ -24,10 +27,6 @@ def main(argv):
     args = argdoc.parse_args()
 
     print(args)  # FIXME: do good stuff
-
-
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
 
 
 if __name__ == "__main__":

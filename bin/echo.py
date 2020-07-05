@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: echo.py [-h] [-n] [WORD [WORD ...]]
+usage: echo.py [-h] [-n] [--verbose] [WORD [WORD ...]]
 
 print some words
 
@@ -11,6 +11,11 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
   -n          print just the words, don't add an end-of-line
+  --verbose   print the "shlex.split" to "sys.stderr"
+
+examples:
+  echo 'Hello, Echo World!'
+  echo.py --v 'Hello, Echo World!'
 """
 
 from __future__ import print_function
@@ -23,6 +28,9 @@ import argdoc
 def main(argv):
 
     args = argdoc.parse_args()
+
+    if args.verbose:
+        print(args.words, file=sys.stderr)
 
     line = " ".join(args.words)
 

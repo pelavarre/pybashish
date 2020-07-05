@@ -7,11 +7,16 @@ print name of host
 
 optional arguments:
   -h, --help     show this help message and exit
-  -s, --short    print the hostname without its domain
+  -s, --short    print the hostname without its domain (default: True)
   -f, --fqdn     print the hostname and its domain
   -v, --verbose  say more
 
-Note:  Fqdn falls back to Short, if need be
+bugs:
+  Fqdn falls back to Short, if need be, and still returns exit status zero
+
+examples:
+  hostname
+  hostname -f
 """
 
 from __future__ import print_function

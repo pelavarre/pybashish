@@ -1,24 +1,35 @@
 #!/usr/bin/env python3
 
-"""
+r"""
 usage: cat.py [-h] [-n] [FILE [FILE ...]]
 
 copy files to standard output ("cat"enate them)
 
 positional arguments:
-  FILE          a file to copy
+  FILE          a file to copy out
 
 optional arguments:
   -h, --help    show this help message and exit
   -n, --number  number each line of output
 
 bugs:
-  doesn't forward interactive input lines immediately, unlike Bash
+  doesn't accurately catenate binary files, unlike Bash
+  does prompt for more Stdin, when Stdin is a Tty, unlike Bash "cat"
+  does convert classic Mac CR "\r" end-of-line to Linux LF "\n", unlike Bash "cat"
+  does always end the last line with Linux LF "\n" end-of-line, unlike Bash "cat"
+  does print hard b"\x09" after each line number, via "{:6}\t", same as Bash "cat"
+  accepts only the "stty -a" line-editing C0-Control's, not the "bind -p" C0-Control's
   doesn't define "cat -etv" to show all "us-ascii" rejects
   doesn't undo Mac "use smart quotes and dashes"
   doesn't convert indented line-broken plain-text to Html
+
+examples:
+  cat -  # copy out each line of input
+  cat - >/dev/null  # echo and discard each line of input
+  pbpaste | cat -etv
 """
-# FIXME FIXME: fix "cat" bugs: interactive, -etv, smart quotes and dashes, Html
+# FIXME FIXME: fix "cat" bugs: -etv, smart quotes and dashes, Html
+# FIXME: dream up a good way to accurately catenate binary files
 
 from __future__ import print_function
 
@@ -35,8 +46,8 @@ def main(argv):
     relpaths = args.files if args.files else ["-"]
 
     if "-" in relpaths:
-        stderr_print("Press ⌃D EOF to quit")
-        stderr_print("bug: doesn't forward interactive input lines immediately")
+        if sys.stdin.isatty():
+            stderr_print("Press ⌃D EOF to quit")
 
     # Visit each file
 
@@ -51,29 +62,28 @@ def main(argv):
                 with open(relpath, "rt"):
                     pass
             except FileNotFoundError as exc:
-                stderr_print("{}: {}".format(type(exc).__name__, exc))
+                stderr_print("error: cat.py: {}: {}".format(type(exc).__name__, exc))
                 sys.exit(1)
 
         # Number on the right side of 6 columns, then a hard tab 2 column separator, then the line
 
-        if args.number:
+        with open(relpath, "r") as reading:
 
-            with open(relpath, "r") as reading:
-                for (
-                    line
-                ) in reading.readlines():  # FIXME: stop implying buffers of whole files
-                    print("{:6}\t{}".format(line_index, line.rstrip()))
-                    line_index += 1
+            line = "\n"
+            while True:
 
-            continue
+                line = reading.readline()
+                if not line:
+                    break
 
-        # Copy binary out without numbering the lines
+                rstripped = line.rstrip()
 
-        with open(relpath, "rb") as reading:
-            fileno = sys.stdout.fileno()
-            os.write(
-                fileno, reading.read()
-            )  # FIXME: stop asking for buffers of whole files
+                if args.number:
+                    print("{:6}\t{}".format(line_index, rstripped))
+                else:
+                    print(rstripped)
+
+                line_index += 1
 
 
 def stderr_print(*args):

@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
 
 """
-usage: watch.py [-h] [-n] ...
+usage: watch.py [-h] [WORD [WORD ...]]
 
 repeat a Bash command every so often till Control+C, while deleting only duplicate outputs
 
 positional arguments:
-  ...         command
+  WORD        word of command
 
 optional arguments:
   -h, --help  show this help message and exit
-  -n          SECS, --interval SECS seconds to wait between updates
 
 examples:
   watch.py
@@ -19,8 +18,11 @@ examples:
   watch.py -n 0.100  df -h
   watch.py -n 0.100 --  df -h
 
-See also:  man script, man watch
+see also:  man script, man watch
 """
+# FIXME: argdoc.py: optional nargs 1 should show up in the usage line
+# FIXME: -n INTERVAL, --interval INTERVAL seconds to wait between updates (default: FIXME)
+# FIXME: Arg Doc should accept -n SECS, --interval SECS
 
 from __future__ import print_function
 

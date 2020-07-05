@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""
+r"""
 usage: dd.py [-h]
 
 copy from input stream to output stream
@@ -11,6 +11,9 @@ optional arguments:
 bugs:
   does forward interactive input lines immediately, unlike Bash
   crashes "pybashish" shell if called from there, at ⌃C SIGINT
+
+examples:
+  dd  # run demo of ⌃T SIGINFO and ⌃C SIGINT, till ⌃D EOF or ⌃\ SIGQUIT
 """
 # FIXME: fix more bugs
 

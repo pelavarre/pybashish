@@ -10,7 +10,7 @@ optional arguments:
   --lines     keep on reading till EOF (such as Terminal Control+D)
 
 bugs:
-  prompts with "? ", unlike the "" of Bash "read" with no -p PROMPT
+  prompts with "? ", unlike the "" of Bash "read" with no "-p PROMPT"
   prompts and echoes, even when Stdin is not Tty, unlike Bash
   lets people edit input, like Bash "read -e", unlike Zsh "read"
   prints the line as a Python Repr
@@ -18,6 +18,12 @@ bugs:
   doesn't compress spaces between words down to one space
   doesn't read another line after a line ends with \ backslash
   doesn't delete \ backslashes
+
+examples:
+  read -e  # in Bash
+  read.py
+  read.py --lines
+  FOO=123; vared -e FOO  # in Zsh
 """
 
 from __future__ import print_function

@@ -9,16 +9,16 @@ optional arguments:
   -h, --help  show this help message and exit
   -p          print what each keystroke means
 
-examples:
-  bind -p | grep '".e[[][DCAB]"' | sort  # Ansi ↑ ↓ → ← arrows here and in Bash
-  bindkey | grep '".[[][[][ABCD]"'  # Ansi ↑ ↓ → ← arrows in Zsh
-
 bugs:
   acts like "bind -h" if called with no args, like Zsh "bindkey", unlike Bash "bind"
   prints "drop-next-char" as the binding for "⌃D", which means that only while line not empty
   prints the empty "" as the encoding for "end-input", unlike no mention in Bash / Zsh
   prints the unspecific None as the encoding for "self-insert", more accurately than Bash or Zsh
   sorts by binding like Bash, not by encoding like Zsh
+
+examples:
+  bind -p | grep '".e[[][DCAB]"' | sort  # Ansi ↑ ↓ → ← arrows here and in Bash
+  bindkey | grep '".[[][[][ABCD]"'  # Ansi ↑ ↓ → ← arrows in Zsh
 """
 # FIXME FIXME --mac       print what each means, but in Apple style
 # FIXME --zsh       print what each means, but in Zsh "bindkey" style
