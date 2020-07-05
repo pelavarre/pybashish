@@ -21,8 +21,8 @@ notes:
   compare Python "import doctest"
 """
 # FIXME: walk for exts
-# FIXME FIXME: rip Bash paste distinguished only by repeated prompt ending in '$' or '#'
-# FIXME FIXME: rip Python paste, not just Bash paste
+# FIXME: rip Bash paste distinguished only by repeated prompt ending in '$' or '#'
+# FIXME: rip Python paste, not just Bash paste
 # FIXME: rip Makefile paste, not just Bash paste
 
 import doctest

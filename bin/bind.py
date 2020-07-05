@@ -3,19 +3,28 @@
 r"""
 usage: bind.py [-h] [-p]
 
-print what each keystroke means
+look at what each keystroke means
 
 optional arguments:
   -h, --help  show this help message and exit
-  -p          yea, print it all, like i said already
+  -p          print what each keystroke means
 
 examples:
-  bind -p | grep '".e.[DCAB]"'  # Ansi Terminal arrows
-  bind -p | grep -v ': self-insert$'  # Control codes
+  bind -p | grep '".e[[][DCAB]"' | sort  # Ansi ↑ ↓ → ← arrows here and in Bash
+  bindkey | grep '".[[][[][ABCD]"'  # Ansi ↑ ↓ → ← arrows in Zsh
 
 bugs:
-  "bind" with no args is "bind -h", unlike Bash
+  acts like "bind -h" if called with no args, like Zsh "bindkey", unlike Bash "bind"
+  prints "drop-next-char" as the binding for "⌃D", which means that only while line not empty
+  prints the empty "" as the encoding for "end-input", unlike no mention in Bash / Zsh
+  prints the unspecific None as the encoding for "self-insert", more accurately than Bash or Zsh
+  sorts by binding like Bash, not by encoding like Zsh
 """
+# FIXME FIXME --mac       print what each means, but in Apple style
+# FIXME --zsh       print what each means, but in Zsh "bindkey" style
+# FIXME --vim       print what each means, but in Vim and "cat -etv" style
+# FIXME offers "--mac" and "--vim", unlike Bash
+# FIXME example: bind --mac  # ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑ ... Control Option Shift Command ...
 
 from __future__ import print_function
 
@@ -41,7 +50,7 @@ def main():
         str_bot = str_bot.strip("_")
         str_bot = str_bot.replace("_", "-")
 
-        repr_stdin = bind_repr(stdin, gt=gt)
+        repr_stdin = bind_repr(stdin)
 
         sortable = (
             str_bot,
@@ -50,56 +59,51 @@ def main():
 
         sortables.append(sortable)
 
-    for sortable in sorted(sortables):
+    for sortable in sorted(sortables):  # FIXME FIXME: column -t the "bind -p" output
         (str_bot, repr_stdin,) = sortable
-        print("{}: {}".format(repr_stdin, str_bot))
+        print("{:7} {}".format((repr_stdin + ":"), str_bot))
 
 
-def bind_repr(stdin, gt):
-    """Format as the conventional Bash "bind -p" name of a keystroke"""
+def bind_repr(stdin):
+    """Format as the name of a keystroke"""
 
-    c0_control_stdins = gt.c0_control_stdins
-    basic_latin_stdins = gt.basic_latin_stdins
+    # Spell the empty end-of-input, as input
 
-    # Spell Ansi Esc codes as:  r"\eXY"
+    if stdin == b"":
 
-    if len(stdin) == 3:
+        repr_stdin = '""'  # no precedent for "" in Bash / Zsh
+        return repr_stdin
 
-        c0 = stdin[0:][:1]
-        c1 = stdin[1:][:1]
-        c2 = stdin[2:][:1]
+    # Spell C0 Control codes
 
-        esc = b"\x1b"
+    if stdin in read.C0_CONTROL_STDINS:
 
-        if c0 == esc:
-            if c1 in basic_latin_stdins:
-                if c2 in basic_latin_stdins:
+        ord_stdin = stdin[0]  # one of C-@ C-A..C-Z C-[ C-\ C-] C-^ C-_ C-?
+        ord_latin = ord_stdin ^ read.X40_CONTROL_MASK
+        if ord("A") <= ord_latin <= ord("Z"):  # C-a..C-z is how Emacs says C-A..C-Z
+            ord_latin = ord_latin ^ read.X20_LOWER_MASK
 
-                    repr_stdin = r'"\e{}{}"'.format(c1.decode(), c2.decode())
+        repr_stdin = r'"\C-{}"'.format(chr(ord_latin))
+        return repr_stdin
+
+    # Spell Ansi Esc keystrokes
+
+    if stdin and len(stdin) == 3:
+
+        b0 = stdin[0:][:1]
+        b1 = stdin[1:][:1]
+        b2 = stdin[2:][:1]
+
+        if b0 == read.ESC_STDIN:
+            if b1 in read.BASIC_LATIN_STDINS:
+                if b2 in read.BASIC_LATIN_STDINS:
+
+                    repr_stdin = r'"\e{}{}"'.format(b1.decode(), b2.decode())
                     return repr_stdin
 
-    # Spell Basic Latin codes as their characters
+    # Settle for Python Repr
 
-    if len(stdin) == 1:
-
-        if stdin in basic_latin_stdins:
-
-            repr_stdin = r'"{}"'.format(stdin.decode())
-            return repr_stdin
-
-        # Spell C0 Control codes as:  r"\C-x"
-
-        if stdin in c0_control_stdins:
-
-            control = ord(stdin)  # one of C-@ C-A..C-Z C-[ C-\ C-] C-^ C-_ C-?
-            latin = control ^ 0x40
-            if ord("A") <= latin <= ord("Z"):  # C-a..C-z is how Emacs says C-A..C-Z
-                latin = latin ^ 0x20
-
-            repr_stdin = r'"\C-{}"'.format(chr(latin))
-            return repr_stdin
-
-    repr_stdin = repr(stdin)
+    repr_stdin = repr(stdin)  # no precedent for "None" in Bash / Zsh
     return repr_stdin
 
 

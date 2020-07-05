@@ -1,4 +1,4 @@
-Welcome to testing PyBashIsh
+pathWelcome to testing PyBashIsh
 
 
 Contents
@@ -7,7 +7,33 @@ Contents
 + 1. Welcome
 ++ 1.1 ) Hello Bash Doc World
 ++ 1.2 ) PyBashIsh works like Bash
++ 1.3 ) PyBashIsh Pwd works like Bash Pwd, but better
 + 2 ) Man PyBashIsh All
+++ 2.1 ) ArgDoc
+++ 2.2 ) Bash
+++ 2.3 ) Bind
+++ 2.4 ) Cat
+++ 2.5 ) Clips
+++ 2.6 ) Cp
+++ 2.7 ) Date
+++ 2.8 ) Dd
+++ 2.9 ) DocTestBash
+++ 2.10 ) Echo
+++ 2.11 ) Find
+++ 2.12 ) Fmt
+++ 2.13 ) Grep
+++ 2.14 ) Help
+++ 2.15 ) HexDump
+++ 2.16 ) Hostname
+++ 2.17 ) Ls
+++ 2.18 ) Mv
+++ 2.19 ) Pwd
+++ 2.20 ) Read
+++ 2.21 ) Rm
+++ 2.22 ) SubSh
+++ 2.23 ) Touch
+++ 2.24 ) Watch
+++ 2.25 ) Wc
 
 To refresh this table of contents, try:
 
@@ -80,6 +106,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
     subsh --help
     touch --help
     watch --help
+    wc --help
 
     (pybashish) $
     + exit 1
@@ -87,23 +114,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
 We've not yet delivered much test coverage for what works inside PyBashIsh
 
-Please tell us if you see something inside that surprises you
-
-
-# 1.3 ) PyBashIsh Pwd works like Bash Pwd, but better
-
-    $ (cd bin; ./pwd_.py --briefpath)
-    .
-    $ (cd bin; ./pwd_.py --homepath)
-    ~/...pybashish/bin
-    $ (cd bin; ./pwd_.py --logical)
-    /...pybashish/bin
-    $ (cd bin; ./pwd_.py --physical)
-    /...pybashish/bin
-    $
-
-// FIXME: add coverage to distinguish "--logical" sym links from "--physical" dirs
-
+It's a bug if it surprises you, please tell us about it
 
 # 2 ) Man PyBashIsh All
 
@@ -153,7 +164,30 @@ Drop that starter doc into your source, call it, and work it up from there
 
 
 ## 2.2 ) Bash
+
 ## 2.3 ) Bind
+
+Lorem ipsum dolor sit amet
+
+    $ bin/bind.py -p
+    "\C-?": drop-char
+    "\C-h": drop-char
+    "\C-u": drop-line
+    "\C-d": drop-next-char
+    "":     end-input
+    "\C-j": end-line
+    "\C-m": end-line
+    "\C-n": next-history
+    "\e[B": next-history
+    "\C-p": previous-history
+    "\e[A": previous-history
+    "\C-v": quoted-insert
+    "\C-c": raise-keyboard-interrupt
+    "\C-r": reprint
+    "\C-g": ring-bell
+    None:   self-insert
+    $
+
 ## 2.4 ) Cat
 ## 2.5 ) Clips
 ## 2.6 ) Cp
@@ -171,10 +205,22 @@ Drop that starter doc into your source, call it, and work it up from there
 ## 2.18 ) Mv
 ## 2.19 ) Pwd
 ## 2.20 ) Read
+
+    % echo 'Hello, Line Editor' | bin/read.py
+    ? Hello, Line Editor
+    'Hello, Line Editor\n'
+    %
+
+    % echo $'Hello, \x15Line Editor' | bin/read.py
+    ? Line Editor
+    'Line Editor\n'
+    %
+
 ## 2.21 ) Rm
 ## 2.22 ) SubSh
 ## 2.23 ) Touch
 ## 2.24 ) Watch
+## 2.25 ) Wc
 
 
 // FIXME: remake this into a ".md" Markdown file

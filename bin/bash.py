@@ -11,6 +11,7 @@ optional arguments:
 bugs:
   not yet reported, please help us out
 """
+# FIXME: add --color=never|always|auto
 
 from __future__ import print_function
 
@@ -186,9 +187,11 @@ def calc_ps1():
     hostname = platform.node()
     where = pwd_.os_path_homepath(os.getcwd())
 
-    nocolor = "\x1b[00m"
-    green = "\x1b[00;32m"  # Demo ANSI TTY escape codes without "01;" bolding
-    blue = "\x1b[00;34m"
+    assert read.ESC_CHAR == "\x1B"
+
+    nocolor = "\x1B[00m"
+    green = "\x1B[00;32m"  # Demo ANSI TTY escape codes without "01;" bolding
+    blue = "\x1B[00;34m"
 
     ps1 = f"{green}{user}@{hostname}{nocolor}:{blue}{where}{nocolor}{mark} \r\n({env}) {mark} "
     return ps1
