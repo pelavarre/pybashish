@@ -13,29 +13,38 @@ optional arguments:
 bugs:
   doesn't default to prefer 65 within max 75 in the way of Bash
   does count columns up from 1, not up from 0, same as Bash
+  prints '_' skids in the ruler to mark only the tabsize=8 tab stops:  1, 9, 17, ...
 
 examples:
   echo {0..99} | fmt  # split to fit inside Terminal
   echo {0..39} | fmt -w42  # split to fit inside width
   echo {0..39} | tr -d ' ' | fmt -w42  # no split at width
-  echo su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | fmt.py -w42  # no split at "-" dashes
-  fmt --ruler -w73  # ends in column 72
+  echo su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | fmt -w42  # no split at "-" dashes
+  fmt --ruler -w72  # ends in column 72
 """
 
 import os
 import sys
+import textwrap
 
 import argdoc
 
 
 def main():
+
     args = argdoc.parse_args()
+    width = calc_width(args.width)
+    if args.ruler:
+        print_ruler(width)
+    else:
+        print_textwrap_fill_stdin(width, break_on_hyphens=False, break_long_words=False)
 
-    #
 
-    if args.width is not None:
+def calc_width(args_width):
 
-        width = int(args.width)
+    if args_width is not None:
+
+        width = int(args_width)
 
     else:
 
@@ -48,24 +57,24 @@ def main():
 
     assert width > 0
 
-    #
+    return width
 
-    if args.ruler:
 
-        dupes = (width + 10 - 1) // 10
-        chars = dupes * "1234567890"  # one-based, not zero-based
-        assert len(chars) >= width
+def print_ruler(width):
 
-        ruler = chars[:width]
-        for tabstop in range(0, width, 8):
-            ruler = ruler[:tabstop] + "_" + ruler[(tabstop + 1) :]
+    dupes = (width + 10 - 1) // 10
+    chars = dupes * "1234567890"  # one-based, not zero-based
+    assert len(chars) >= width
 
-        assert len(ruler) == width
-        print(ruler)
+    ruler = chars[:width]
+    for tabstop in range(0, width, 8):
+        ruler = ruler[:tabstop] + "_" + ruler[(tabstop + 1) :]
 
-        return
+    assert len(ruler) == width
+    print(ruler)
 
-    #
+
+def print_textwrap_fill_stdin(width, **kwargs):
 
     para = list()
     dent = ""
@@ -75,24 +84,13 @@ def main():
         line = sys.stdin.readline()  # "" at end-of-input
 
         line_dent = str_splitdent(line)[0]
-        if (not para) or (line_dent == dent):
+        if line and ((not para) or (line_dent == dent)):
             para.append(line)
         else:
             text = "\n".join(para)
-            textwrap.fill(
-                text, width=width, break_on_hyphens=False, break_long_words=False
-            )
-            print(text)
-
-
-"""
-
-    print(args)
-
-12345678_0123456_8901234_6789012_4567890_2345678_0123456_8901234_6789012_4567890_2345678_0123456789_
-        x       x       x       x       x       x       x       x       x       x       x       x
-x       x       x       x       x       x
-"""
+            filled = textwrap.fill(text, width=width, **kwargs)
+            print(filled)
+            para = list()
 
 
 def str_splitdent(line):  # deffed by "doctestbash.py", "fmt.py
