@@ -29,7 +29,7 @@ test-once:
 	:
 	bin/doctestbash.py tests/ || (bin/doctestbash.py -vv tests/; exit 1)
 	:
-	for F in bin/*.py; do bin/argdoc.py --doc $$F >/dev/null; done
+	for F in bin/*.py; do bin/argdoc.py $$F >/dev/null; done
 	: argdoc: tests passed
 	:
 	(cd bin; python3 -m doctest -- ../tests/_test_subsh-typescript.txt)

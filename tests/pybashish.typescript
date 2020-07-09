@@ -129,7 +129,7 @@ ArgDoc compiles standard Python Arg Docs into standard Python ArgParser Parsers
 Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     $ bin/argdoc.py -ijk
-    usage: argdoc.py [-h] [--doc] [FILE] [-- [ARG [ARG ...]]]
+    usage: argdoc.py [-h] [--compile] [FILE] [-- [ARG [ARG ...]]]
     argdoc.py: error: unrecognized arguments: -ijk
     + exit 2
     $
@@ -289,7 +289,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
     $ bin/fmt.py --ruler -w72  # ends in column 72
-    _2345678_0123456_8901234_6789012_4567890_2345678_0123456_8901234_6789012
+    _2345678_0123456_8901234_6789012_4567890 2345678_0123456_8901234_6789012
     $
 
 

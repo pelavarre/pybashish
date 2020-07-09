@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 '''
-usage: argdoc.py [-h] [--doc] [FILE] [-- [ARG [ARG ...]]]
+usage: argdoc.py [-h] [--compile] [FILE] [-- [ARG [ARG ...]]]
 
 parse command line args precisely as helped by module help doc
 
@@ -11,7 +11,7 @@ positional arguments:
 
 optional arguments:
   -h, --help  show this help message and exit
-  --doc       print and review the arg doc, but don't run it
+  --compile   still translate the file to python, but show it, don't run it
 
 usage as a python import:
 
@@ -34,9 +34,9 @@ bugs:
 
 examples:
   argdoc.py -h                      # show this help message
-  argdoc.py                         # show an arg doc template (including import) to start with
-  argdoc.py argdoc.py               # translate a file's arg doc to python
-  argdoc.py --doc argdoc.py         # show a file's arg doc (and test that it compiles)
+  argdoc.py                         # show a template arg doc (including import) to start with
+  argdoc.py --compile argdoc.py     # still translate the file to python, but show it, don't run it
+  argdoc.py argdoc.py               # show a file's help doc (as printed by its arg doc)
   argdoc.py argdoc.py --            # parse no arg with the file's arg doc
   argdoc.py argdoc.py -- --help     # parse the arg "--help" with the file's arg doc
   argdoc.py argdoc.py -- hi world   # parse two args with the file's arg doc
@@ -89,11 +89,14 @@ def main_(argv):
     args = parse_args(argv_[1:])
 
     _run_args_file(
-        args.file, args_separator=args_separator, args_args=args.args, args_doc=args.doc
+        args.file,
+        args_separator=args_separator,
+        args_args=args.args,
+        args_compile=args.compile,
     )
 
 
-def _run_args_file(args_file, args_separator, args_args, args_doc):
+def _run_args_file(args_file, args_separator, args_args, args_compile):
     """Print the Arg Doc, or compile it, or run it"""
 
     str_args_file = args_file if args_file else repr("")
@@ -122,23 +125,27 @@ def _run_args_file(args_file, args_separator, args_args, args_doc):
     (source, parser,) = _run_arg_doc(file_doc, doc_filename=doc_filename)
     help_doc = parser.format_help()
 
-    # Print the Arg Parser that results
+    # Print the Arg Parser compiled from the Arg Doc, but don't run it
 
-    if args_file and (not args_doc) and (not args_separator):
-
+    if args_compile:
         _print_arg_parser_source(file_doc, source=source)
-
         return
 
-    # Print the compiled Arg Doc, and compare it with the original Arg Doc
+    # Print the compiled Arg Doc, if there was no original Arg Doc
+    # Fill it out to become a whole Python source file
 
     if not args_separator:
 
-        _print_arg_doc(doc_filename=doc_filename, help_doc=help_doc, file_doc=file_doc)
+        if not file_doc:
+            _print_py_file(help_doc)
+            return
 
+        # Print the compiled Arg Doc, and compare it with the original Arg Doc
+
+        _print_help_doc(doc_filename=doc_filename, help_doc=help_doc, file_doc=file_doc)
         return
 
-    # Run Args through the Arg Parser, compiled from the Arg Doc
+    # Run Args through the Arg Parser compiled from the Arg Doc
 
     _parse_and_print_args(str_args_file, parser=parser, args_args=args_args)
 
@@ -152,51 +159,51 @@ def _print_arg_parser_source(file_doc, source):
         print("args = parser.parse_args()")
 
 
-def _print_arg_doc(doc_filename, help_doc, file_doc):
-    """Print the compiled Arg Doc, and compare it with the original Arg Doc"""
+def _print_py_file(help_doc):
+    """Show a Py file containing the file's help doc (as printed by its arg doc)"""
 
-    if not file_doc:
-
-        print(
-            textwrap.dedent(
-                """
-                #!/usr/bin/env python3
-                """
-            ).strip()
-        )
-        print()
-        print(black_triple_quote_repr(help_doc.strip()))
-        print()
-        print(
-            textwrap.dedent(
-                """
-                import argdoc
+    print(
+        textwrap.dedent(
+            """
+            #!/usr/bin/env python3
+            """
+        ).strip()
+    )
+    print()
+    print(black_triple_quote_repr(help_doc.strip()))
+    print()
+    print(
+        textwrap.dedent(
+            """
+            import argdoc
 
 
-                def main():
-                    args = argdoc.parse_args()
-                    print(args)
+            def main():
+                args = argdoc.parse_args()
+                print(args)
 
 
-                if __name__ == '__main__':
-                    main()
-                """
-            ).strip()
-        )
+            if __name__ == '__main__':
+                main()
+            """
+        ).strip()
+    )
 
-        return
 
-    print(black_triple_quote_repr(file_doc.strip()))
+def _print_help_doc(doc_filename, help_doc, file_doc):
+    """Show a file's help doc, as compiled from its arg doc, and diff'ed with its arg doc"""
+
+    print(black_triple_quote_repr(help_doc.strip()))
 
     if file_doc.strip() != help_doc.strip():
 
-        if False:  # FIXME: configure logging
-            with open("a", "w") as outgoing:
-                outgoing.write(file_doc.strip())
-            with open("b", "w") as outgoing:
-                outgoing.write(help_doc.strip())
-
         if file_doc.strip():
+
+            if False:  # FIXME: configure logging
+                with open("a", "w") as outgoing:
+                    outgoing.write(file_doc.strip())
+                with open("b", "w") as outgoing:
+                    outgoing.write(help_doc.strip())
 
             help_shline = "bin/argdoc.py --doc {}".format(doc_filename)
             help_message = "warning: argdoc.py: doc != help, help at:  {}".format(
