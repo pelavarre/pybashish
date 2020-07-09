@@ -56,13 +56,13 @@ import textwrap
 
 DEFAULT_EPILOG = textwrap.dedent(
     """
-examples:
-  Oh no! No examples disclosed!! 💥 💔 💥
-"""
+    examples:
+      Oh no! No examples disclosed!! 💥 💔 💥
+    """
 ).strip()  # style with "Oh no! ... 💥 💔 💥" to rhyme with failures of the Black auto-styling app
 
 
-class ArgDocParseError(Exception):
+class ArgDocError(Exception):
     pass
 
 
@@ -103,11 +103,10 @@ def _run_args_file(args_file, args_separator, args_args, args_compile):
     doc_filename = args_file if args_file else os.devnull
 
     # Fail fast if extra args supplied before or in place of the "--" args separator
+    # Speak of "unrecognized args", almost equal to conventional "unrecognized arguments"
 
     if not args_separator:
-        if (
-            args_args
-        ):  # fail for "args", barely distinguishable from conventional "arguments"
+        if args_args:
             stderr_print(
                 "error: argdoc.py: unrecognized args: {}".format(shlex_join(args_args))
             )
@@ -226,11 +225,11 @@ def _parse_and_print_args(str_args_file, parser, args_args):
     file_args = parser.parse_args(args_args)
 
     # After letting the Arg Doc explain "--help" in its own way,
-    # still print the help and exit, as part of ".parse_args", when asked for help
+    # still print the help and exit 0, as part of ".parse_args", when asked for help
 
     if not parser.add_help:
         if vars(file_args).get("help"):
-            parser.print_help()
+            parser.print_help()  # exit 0 the same as "argparse.parse_args" for "--help"
             sys.exit(0)
 
     # Print the parsed args, but in sorted order
@@ -240,10 +239,9 @@ def _parse_and_print_args(str_args_file, parser, args_args):
             print("{k}={v!r}".format(k=k, v=v))
 
 
-def black_triple_quote_repr(
-    chars,
-):  # FIXME:  Fix leading trailing whitespace, other corner cases
+def black_triple_quote_repr(chars):
     '''Quote the chars like Black, with triple quotes, preferring triple '"""' double quotes'''
+    # FIXME:  Fix leading trailing whitespace, other corner cases
 
     qqq = "'''" if ('"""' in chars) else '"""'
 
@@ -262,10 +260,9 @@ def black_triple_quote_repr(
     return source
 
 
-def black_repr(
-    chars,
-):  # FIXME: does this agree with the Black autostyling app? Agrees always?
+def black_repr(chars):
     """Quote the chars like Black, preferring an opening and closing pair of '"' double quotes"""
+    # FIXME: does this agree with the Black autostyling app? Agrees always?
 
     source = repr(chars)
     if '"' not in chars:
@@ -412,12 +409,6 @@ def _run_arg_doc(doc, doc_filename):
 class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style is
     """Work up an ArgumentParser to match its Arg Doc"""
 
-    def __init__(self):
-        self.prog = None
-        self.optionals = None
-        self.positionals = None
-        self.remains = None
-
     def run_arg_doc(self, doc, doc_filename):
         """Return an ArgumentParser constructed from a run of its Arg Doc"""
 
@@ -436,7 +427,8 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         # Parse the Arg Doc
 
-        parts = _ArgDocParts(doc)
+        parts = _ArgDocSyntax()
+        _ = _ArgDocTaker(parts, doc=doc)  # FIXME: think this through some more
 
         self.parts = parts
 
@@ -464,7 +456,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
             prog = os.path.split(doc_filename)[-1]
 
         assert prog  # ArgParse guesses the calling prog name, if none chosen
-        lines.append(d + "prog={prog},".format(prog=black_repr(prog)))
+        lines.append(d + "prog={repr_prog},".format(repr_prog=black_repr(prog)))
 
         # Improve on the conventional usage line, when desperate
 
@@ -483,24 +475,24 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         # Explain the App up front in one line, if possible
 
-        description = parts.description
+        description_line = parts.description_line
         if not doc:
             assert not parts.usage
-            assert not parts.description
-            description = "do good stuff"
+            assert not parts.description_line
+            description_line = "do good stuff"
 
-        if parts.usage and not parts.description:
+        if parts.usage and not parts.description_line:
             stderr_print(
                 "warning: argdoc.py: no one line description explains prog {!r}".format(
                     prog
                 )
             )
 
-        if description:
+        if description_line:
             lines.append(
                 d
-                + "description={description},".format(
-                    description=black_repr(description)
+                + "description={repr_description},".format(
+                    repr_description=black_repr(description_line)
                 )
             )
 
@@ -519,7 +511,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         # Nudge people to give examples to explain how to call the App well
 
-        epilog = DEFAULT_EPILOG if (parts.epilog is None) else parts.epilog
+        epilog = DEFAULT_EPILOG if (parts.epilog_chars is None) else parts.epilog_chars
         lines.append(d + "epilog=textwrap.dedent(")
         for line in black_triple_quote_repr(epilog).splitlines():
             lines.append(d + d + line)
@@ -545,10 +537,12 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         # Emit one call to "add_argument" for each Positional argument
 
         self.usage_words = []
-        if parts.positionals:
+        if parts.positionals_lines:
             py_lines = []
-            for index in range(len(parts.positionals)):
-                py_lines.extend(self.emit_positional(parts, parts.positionals, index))
+            for index in range(len(parts.positionals_lines)):
+                py_lines.extend(
+                    self.emit_positional(parts, parts.positionals_lines, index)
+                )
             py_lines.append("")
             args_py_lines.extend(py_lines)
 
@@ -558,10 +552,10 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         # except emit the call for the Optional "-h, --help" argument only if "add_help=False,"
 
         self.usage_words = []
-        if parts.optionals:
+        if parts.optionals_lines:
             py_lines = []
-            for index in range(len(parts.optionals)):
-                py_lines.extend(self.emit_optional(parts, parts.optionals, index))
+            for index in range(len(parts.optionals_lines)):
+                py_lines.extend(self.emit_optional(parts, parts.optionals_lines, index))
             py_lines = (py_lines + [""]) if py_lines else []
             args_py_lines.extend(py_lines)
 
@@ -579,10 +573,10 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         return args_py_lines
 
-    def emit_positional(self, parts, positionals, index):  # FIXME FIXME  # noqa C901
+    def emit_positional(self, parts, positionals_lines, index):  # noqa C901
         """Compile an Arg Doc Positional argument line into Python source lines"""
 
-        positional = positionals[index]
+        positional = positionals_lines[index]
 
         (metavar, help_) = str_splitword(positional.lstrip())
         help_ = help_.lstrip()
@@ -591,7 +585,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         # FIXME FIXME: nargs
 
         nargs = 1
-        if parts.uses.remains and (index == len(positionals) - 1):
+        if parts.uses.remains and (index == len(positionals_lines) - 1):
             nargs = "..."  # argparse.REMAINDER  # FIXME FIXME: nargs "*" e.g. allow FILE -v / -v FILE
 
         if metavar == "FILE":
@@ -681,10 +675,10 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         return lines
 
-    def emit_optional(self, parts, optionals, index):  # FIXME FIXME  # noqa C901
+    def emit_optional(self, parts, optionals_lines, index):  # FIXME FIXME  # noqa C901
         """Compile an Arg doc Optional argument line into Python source lines"""
 
-        optional = optionals[index]
+        optional = optionals_lines[index]
         words = optional.split()
 
         option = words[0]
@@ -818,29 +812,27 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         return lines
 
 
-class _ArgDocParts(argparse.Namespace):
-    """Name the parts of an Arg Doc"""
+class _ArgDocSyntax(argparse.Namespace):
+    """Pick an Arg Doc apart into named fragments"""
 
-    def __init__(self, doc):
+    def __init__(self):
 
-        self.prog = None
+        self.prog = None  # the name of the app
 
-        self.usage = None
-        self.description = None
-        self.add_help = None
+        self.usage = None  # the "usage:" line of arg doc, without its "usage: " prefix
+        self.uses = None  # the parse of the "usage:" line of arg doc
 
-        self.positionals = None
-        self.optionals = None
+        self.description_line = None  # the one-line description of the app
 
-        self.epilog = None
-        self.uses = None
+        self.positionals_lines = None  # one line per positional argument declared
+        self.optionals_lines = None  # one line per optional argument declared
+        self.add_help = None  # True/False as in ArgParse, else None if not doc'ced
 
-        taker = _ArgDocTaker(doc=doc)
-        taker.take_arg_doc_into(parts=self)
+        self.epilog_chars = None  # the trailing lines of the arg doc
 
 
 class _ArgDocTaker:
-    """Pick an Arg Doc apart, line by line"""
+    """Walk through an Arg Doc line by line and pick out fragments along the way"""
 
     TAGLINE_PATTERNS = (
         r"^positional arguments:$",
@@ -848,15 +840,17 @@ class _ArgDocTaker:
         r"^usage:",
     )
 
-    def __init__(self, doc):
+    def __init__(self, parts, doc):
 
-        self.parts = None
+        self.parts = None  # the fragments of source matched by this parser
 
         tabsize_8 = 8
         doc_chars = textwrap.dedent(doc.expandtabs(tabsize_8)).strip()
 
-        self.taker = ShardTaker()
+        self.taker = ShardsTaker()
         self.taker.give_sourcelines(doc_chars)
+
+        self.take_arg_doc_into(parts=parts)
 
     def take_arg_doc_into(self, parts):
         """Take every source line"""
@@ -866,160 +860,311 @@ class _ArgDocTaker:
         taker = self.taker
 
         if taker.peek_more():
-            self.take_usage()
+
+            self.take_usage_line()
             self.accept_description()
-            self.accept_positionals()
-            self.accept_optional_arguments()
-            self.accept_epilog()
 
-        self.take_end()
+            self.accept_positionals_lines()  # Positionals before Optionals in lines of Arg Doc
+            self.accept_optionals_lines()
 
-    def take_usage(self):
-        """Take the line of Usage"""
+            self.accept_doc_remains()
+
+        self.take_end_doc()
+
+    def take_usage_line(self):
+        """Take the line of Usage to get started"""
 
         taker = self.taker
 
-        line = taker.peek_shard()
-
-        uses = _ArgUsageParts(line)
+        usage_line = taker.peek_one_shard()
+        uses = _UsageLineSyntax()  # FIXME: think this through some more
+        _ = _UsageLineTaker(uses, usage_line=usage_line)
 
         self.parts.uses = uses
-        self.parts.usage = uses.usage
-        self.parts.prog = uses.prog
+        self.parts.usage = uses.usage_tail
+        self.parts.prog = uses.prog_phrase
 
-        taker.take_shard()
+        taker.take_one_shard()
 
     def accept_description(self):
         """Take the line of description"""
 
         taker = self.taker
-        taker.accept_empty_shards()
+        taker.accept_blank_shards()
 
-        self.parts.description = None
+        self.parts.description_line = None
         if taker.peek_more():
-            line = taker.peek_shard()
+            line = taker.peek_one_shard()
 
             if not any(re.match(p, string=line) for p in _ArgDocTaker.TAGLINE_PATTERNS):
-                self.parts.description = line
-                taker.take_shard()
+                self.parts.description_line = line
+                taker.take_one_shard()
 
-    def accept_positionals(self):
+    def accept_positionals_lines(self):
         """Take the Positional arguments"""
 
-        self.parts.positionals = self.accept_argblock("positional arguments:")
+        self.parts.positionals_lines = self.accept_tabulated_arguments(
+            "positional arguments:"
+        )
 
-    def accept_optional_arguments(self):
+    def accept_optionals_lines(self):
         """Take the Optional arguments"""
 
-        self.parts.optionals = self.accept_argblock("optional arguments:")
+        self.parts.optionals_lines = self.accept_tabulated_arguments(
+            "optional arguments:"
+        )
 
-    def accept_argblock(self, tagline):
-        """Take the Positional or Optional arguments"""
+    def accept_tabulated_arguments(self, tagline):
+        """Take the Positional or Optional arguments led by a tagline followed by dented lines"""
 
-        arglines = None
+        argument_lines = None
 
         taker = self.taker
-        taker.accept_empty_shards()
+        taker.accept_blank_shards()
 
         if taker.peek_more():
-            line = taker.peek_shard()
+            line = taker.peek_one_shard()
 
             if line == tagline:
-                taker.take_shard()
-                taker.accept_empty_shards()
-                arglines = self.accept_arglines(tagline=tagline)
+                taker.take_one_shard()
+                taker.accept_blank_shards()
 
-        return arglines
+                argument_lines = self.accept_argument_lines(tagline=tagline)
+                # FIXME: more test of empty tables of Positionals or Optionals
 
-    def accept_arglines(self, tagline):
-        """Take zero or more indented definitions of Positional or Optional arguments"""
+        return argument_lines
+
+    def accept_argument_lines(self, tagline):
+        """Take zero or more dented lines as defining Positional or Optional arguments"""
 
         taker = self.taker
-        taker.accept_empty_shards()
+        taker.accept_blank_shards()
 
-        arglines = []
+        argument_lines = []
         while taker.peek_more():
-            line = taker.peek_shard()
+            line = taker.peek_one_shard()
             if not line.startswith(" "):
                 break
             assert line.startswith("  ")
 
-            arglines.append(line)
-            taker.take_shard()
+            argument_lines.append(line)
+            taker.take_one_shard()
 
-            taker.accept_empty_shards()
+            taker.accept_blank_shards()
 
-        return arglines
+        return argument_lines
 
-    def accept_epilog(self):
-        """Take zero or more trailing lines"""
+    def accept_doc_remains(self):
+        """Take zero or more trailing lines, as if they must be the Epilog"""
 
         taker = self.taker
 
         lines = []
         while taker.peek_more():
-            line = taker.peek_shard()  # may be blank
+            line = taker.peek_one_shard()  # may be blank
 
             # FIXME: rethink these practical defenses
 
-            if (not self.parts.positionals) and (not self.parts.optionals):
-                if ("positional arg" in line) or ("optional arg" in line):
-                    reason = "Arg Doc declares Arg @ {!r}".format(line)
-                    raise ArgDocParseError("error: argdoc.py: {}".format(reason))
-
-            if self.parts.optionals:
+            if self.parts.optionals_lines:
                 if "positional arguments:" in line:
                     reason = "Optionals before Positionals in Arg Doc"
-                    raise ArgDocParseError("error: argdoc.py: {}".format(reason))
+                    raise ArgDocError("error: argdoc.py: {}".format(reason))
+
+            if (not self.parts.positionals_lines) and (not self.parts.optionals_lines):
+                if ("positional arg" in line) or ("optional arg" in line):
+                    reason = "Arg Doc came too late with Arg Declaration @ {!r}".format(
+                        line
+                    )
+                    raise ArgDocError("error: argdoc.py: {}".format(reason))
 
             lines.append(line)
-            taker.take_shard()
+            taker.take_one_shard()
 
-        self.parts.epilog = "\n".join(lines)
+        self.parts.epilog_chars = "\n".join(lines)
 
-    def take_end(self):
+    def take_end_doc(self):
         """Do nothing if all lines consumed, else crash"""
 
         taker = self.taker
-        taker.take_end()
+        taker.take_end_shard()
 
 
-class _ArgUsageParts(argparse.Namespace):
-    """Name the parts of an Arg Doc Usage line"""
+class _UsageLineSyntax(argparse.Namespace):
+    """Name the uses spelled out by an Arg Doc Usage line"""
 
-    def __init__(self, usage):
+    def __init__(self):
 
-        self.prog = None
+        self.usage_line = None  # the whole Usage line
+        self.usage_tail = None  # the line without its "usage:" leading chars
+        self.prog_phrase = None  # the 2nd word of the Usage line
 
-        self.optionals = None
-        self.positionals = None
+        self.optionals_phrases = None  # the [-h] or [--help] or [-w WIDTH] and such
+        self.positionals_phrases = None  # the FILE or [FILE] or [FILE [FILE ...]] or [-- [ARG [ARG ...]] and such
 
         self.remains = None
-
-        taker = _UsageLineTaker(usage=usage)
-        taker.take_usage_line_into(uses=self)
 
 
 class _UsageLineTaker:
     """Pick an Arg Doc Usage Line apart, char by char"""
 
-    def __init__(self, usage):
+    def __init__(self, uses, usage_line):
 
-        self.usage = usage
-        self.taker = ShardTaker(shards=usage)
+        self.uses = None  # the fragments of source matched by this parser
+        self.taker = ShardsTaker(shards=usage_line)
+
+        self.take_usage_line_into(uses)
 
     def take_usage_line_into(self, uses):
         """Pick an Arg Doc Usage line apart, word by word"""
 
         self.uses = uses
 
-        usage = self.usage
+        taker = self.taker
 
-        uses.optionals = []
-        uses.positionals = []
+        remains = taker.peek_strung_remains()
+        uses.usage_line = remains.strip()
 
-        chars = usage.lstrip()
-        (use, chars,) = str_splitword(chars)
+        self._test_parse()  # FIXME FIXME FIXME
+        uses.usage_tail = None
+        uses.prog_phrase = None
+        uses.optionals_phrases = None
+        uses.positionals_phrases = None
+        assert uses.remains is None
+
+        self._fake_parse_into()
+
+    def _test_parse(self):
+
+        taker = self.taker
+
+        if taker.peek_more():
+
+            self.take_usage_word()
+            self.take_prog()
+
+            self.accept_optionals_phrases()
+            self.accept_positionals_phrases()
+
+            self.accept_usage_remains()
+
+        taker.take_end_shard()
+
+    def take_usage_word(self):
+        """Take the chars of "usage:" to get started"""
+
+        taker = self.taker
+        uses = self.uses
+
+        hopes = "usage:"
+        many = taker.peek_some_shards(hopes)
+        if many != hopes:
+
+            word = taker.peek_one_strung_word()
+            reason = "{!r} is here, but the first word of an Arg Doc is{!r}".format(
+                word, hopes
+            )
+
+            raise ArgDocError(reason)
+
+        taker.take_counted_shards(len(hopes))
+        taker.accept_blank_shards()
+
+        usage_tail = taker.peek_strung_remains()
+        uses.usage_tail = usage_tail
+
+    def take_prog(self):
+        """Take the second word of "usage: {verb}" as the name of the app"""
+
+        taker = self.taker
+        uses = self.uses
+
+        taker.accept_blank_shards()
+
+        if not taker.peek_more():
+            reason = "second word of Arg Doc must exist, to name the app"
+
+            raise ArgDocError(reason)
+
+        prog_phrase = taker.peek_one_strung_word()
+        taker.take_counted_shards(len(prog_phrase))
+        taker.accept_blank_shards()
+
+        uses.prog_phrase = prog_phrase
+
+    def accept_optionals_phrases(self):
+        """Accept zero or more of [-h] or [--help] or [-w WIDTH] and such"""
+
+        taker = self.taker
+        uses = self.uses
+
+        uses.optionals_phrases = list()
+        while taker.peek_some_shards("[-") == "[-":
+            argument_phrase = self.accept_argument_phrase()
+
+            kwarg_declaration = KwargSyntax(argument_phrase)
+            uses.optionals_phrases.append(kwarg_declaration)
+
+    def accept_positionals_phrases(self):
+        """Accept zero or more of FILE or [FILE] or [FILE [FILE ...]] and such"""
+
+        taker = self.taker
+        uses = self.uses
+
+        uses.positionals_phrases = list()
+        while taker.peek_more():
+            argument_phrase = self.accept_argument_phrase()
+            uses.positionals_phrases.append(argument_phrase)
+
+            arg_declaration = ArgSyntax(argument_phrase)
+            uses.positionals_phrases.append(arg_declaration)
+
+    def accept_argument_phrase(self):
+        """Take one word, or more, but require the [...] brackets to balance"""
+
+        taker = self.taker
+
+        words = list()
+
+        argument_phrase = ""
+        openings = 0
+        closings = 0
+
+        while taker.peek_more():
+
+            word = taker.peek_one_strung_word()
+            assert word
+
+            taker.take_counted_shards(len(word))
+            taker.accept_blank_shards()
+
+            words.append(word)
+            argument_phrase = " ".join(words)
+            openings = argument_phrase.count("[")
+            closings = argument_phrase.count("]")
+
+            if openings == closings:
+                break
+
+            if not taker.peek_more():
+                reason = "{} of [ not balanced by {} of ]".format(openings, closings)
+                raise ArgDocError(reason)
+
+        return argument_phrase
+
+    def accept_usage_remains(self):
+
+        taker = self.taker
+
+        remains = taker.peek_strung_remains()
+        taker.take_counted_shards(len(remains))
+
+    def _fake_parse_into(self):
+
+        uses = self.uses
+        usage_line = uses.usage_line
+
+        chars_ = usage_line
+        (use, chars_,) = str_splitword(chars_)
         if use != "usage:":
             stderr_print(
                 "error: argdoc.py: first word of Arg Doc must be 'usage:' not {!r}".format(
@@ -1028,26 +1173,151 @@ class _UsageLineTaker:
             )
             sys.exit(1)
 
-        usage = chars.lstrip()
-        uses.usage = usage
+        uses.usage_tail = chars_.lstrip()
 
-        chars = usage
+        uses.optionals_phrases = []
+        uses.positionals_phrases = []
+
+        chars = uses.usage_tail
         while chars:
             unsplit = chars.lstrip()
             (use, chars,) = str_splitword(unsplit)
 
-            if not uses.prog:
-                uses.prog = use
+            if not uses.prog_phrase:
+                uses.prog_phrase = use
             elif not use.startswith("["):
-                uses.positionals.append(use)
+                uses.positionals_phrases.append(use)
             elif use.startswith("[-") and use.endswith("]"):
-                uses.optionals.append(use)
+                uses.optionals_phrases.append(use)
             else:  # FIXME: nargs=='?', nargs > 1, etc.
                 uses.remains = unsplit
                 chars = ""
 
 
-class ShardTaker:
+class KwargSyntax:
+    """Parse one of the [-h] or [--help] or [-w WIDTH] and such"""
+
+    def __init__(self, argument_phrase):
+
+        # Pick out the ArgParse "concise", "mnemonic", and/or "metavar
+
+        shards = argument_phrase.replace("[", " ").replace("]", " ").split()
+        dashdash = "--" in shards
+
+        words = list(_ for _ in shards if _ not in "-- ...".split())
+        if not words:
+            raise ArgDocError("no metavars in optional {}".format(argument_phrase))
+
+        if len(words) > 2:
+            raise ArgDocError(
+                "too many concise or mnemonic in optional usage {}".format(
+                    argument_phrase
+                )
+            )
+
+        concise = words[0] if not words[0].startswith("--") else None
+        mnemonic = words[0] if words[0].startswith("--") else None
+        metavar = words[1] if words[1:] else None
+        nargs = 1 if metavar else None
+
+        # Emit usage comparable to source
+
+        if not nargs:
+            if concise:
+                emitted_usage = "[{}]".format(concise)
+            if mnemonic:
+                emitted_usage = "[{}]".format(mnemonic)
+        if nargs:
+            if concise:
+                emitted_usage = "[{} {}]".format(concise, metavar)
+            if mnemonic:
+                emitted_usage = "[{} {}]".format(mnemonic, metavar)
+
+        # Require emitted usage equals usage source
+
+        if argument_phrase != emitted_usage:
+            stderr_print(
+                "error: argdoc: optional argument_phrase:  {}".format(argument_phrase)
+            )
+            stderr_print(
+                "error: argdoc: optional emitted_usage:  {}".format(emitted_usage)
+            )
+            raise ArgDocError(
+                "meaningless optional usage phrase {}".format(argument_phrase)
+            )
+
+        # Be happy
+
+        self.concise = concise
+        self.mnemonic = mnemonic
+        self.dashdash = dashdash
+        self.metavar = metavar
+        self.nargs = nargs
+
+
+class ArgSyntax:
+    """Parse one of FILE or [FILE] or [FILE [FILE ...]] or [-- [ARG [ARG ...]] and such"""
+
+    def __init__(self, argument_phrase):
+
+        # Pick out the one ArgParse "metavar"
+
+        shards = argument_phrase.replace("[", " ").replace("]", " ").split()
+        dashdash = "--" in shards
+
+        words = list(_ for _ in shards if _ not in "-- ...".split())
+        if not words:
+            raise ArgDocError("no metavars in positional {}".format(argument_phrase))
+
+        if list(set(words)) != [words[0]]:
+            raise ArgDocError(
+                "too many metavars in positional {}".format(argument_phrase)
+            )
+
+        metavar = words[0]
+
+        # Pick out the one ArgParse "nargs"
+        # FIXME: sometimes prefer nargs="*" argparse.ZERO_OR_MORE, or nargs > 1
+
+        nargs = 1
+        if "..." in argument_phrase:
+            nargs = "..."  # "..." argparse.REMAINDER
+        elif "[" in argument_phrase:
+            nargs = "?"  # # "?" argparse.OPTIONAL
+
+        # Emit usage comparable to source
+
+        emitted_usage = "{}".format(metavar)
+        if nargs == "...":
+            emitted_usage = "[{} [{} ...]]".format(metavar, metavar)
+            if dashdash:
+                emitted_usage = "[-- [{} [{} ...]]]".format(metavar, metavar)
+        elif nargs == "?":
+            emitted_usage = "[{}]".format(metavar)
+
+        # Require emitted usage equals usage source
+
+        if argument_phrase != emitted_usage:
+            stderr_print(
+                "error: argdoc: positional argument_phrase:  {}".format(argument_phrase)
+            )
+            stderr_print(
+                "error: argdoc: positional emitted_usage:  {}".format(emitted_usage)
+            )
+            raise ArgDocError(
+                "meaningless positional usage phrase {}".format(argument_phrase)
+            )
+
+        # Be happy
+
+        self.concise = None
+        self.mnemonic = None
+        self.dashdash = dashdash
+        self.metavar = metavar
+        self.nargs = nargs
+
+
+class ShardsTaker:
     """Walk once thru source chars, as split
 
     Define "take" to mean require and consume
@@ -1056,7 +1326,7 @@ class ShardTaker:
     """
 
     def __init__(self, shards=()):
-        self.shards = list(shards)
+        self.shards = list(shards)  # the shards being peeked, taken, and accepted
 
     def give_sourcelines(self, chars):
         """Give chars, split into lines, but drop the trailing whitespace from each line"""
@@ -1071,12 +1341,12 @@ class ShardTaker:
 
         self.shards.extend(shards)
 
-    def take_shard(self):
+    def take_one_shard(self):
         """Consume the next shard, without returning it"""
 
         self.shards = self.shards[1:]
 
-    def peek_shard(self):
+    def peek_one_shard(self):
         """Return the next shard, without consuming it"""
 
         return self.shards[0]
@@ -1087,19 +1357,59 @@ class ShardTaker:
         more = bool(self.shards)
         return more
 
-    def take_end(self):
+    def take_end_shard(self):
         """Do nothing if all shards consumed, else crash"""
 
         assert not self.peek_more()
 
-    def accept_empty_shards(self):
+    def accept_blank_shards(self):
         """Discard zero or more blank shards"""
 
         while self.peek_more():
-            shard = self.peek_shard()
+            shard = self.peek_one_shard()
             if shard.strip():
                 break
-            self.take_shard()
+            self.take_one_shard()
+
+    def peek_strung_remains(self):
+        """Return the remaining shards strung together """
+
+        strung_remains = "".join(self.shards)
+        return strung_remains
+
+    def peek_one_strung_word(self):
+        """Return the first word of the remaining shards strung together"""
+
+        strung_remains = "".join(self.shards)
+
+        words = strung_remains.split()
+        if not words:
+            raise ArgDocError("precondition violated: no words available")
+
+        word = words[0]
+
+        return word
+
+    def peek_some_shards(self, hopes):
+        """Return a copy of the hopes strung together, if and only if available to be taken now"""
+
+        shards = self.shards
+
+        if len(shards) < len(hopes):
+            return None
+
+        for (shard, hope,) in zip(shards, hopes):
+            if shard != hope:
+                return None
+
+        strung = "".join(hopes)
+        return strung
+
+    def take_counted_shards(self, count):
+        """Take a number of shards"""
+
+        if count:
+            self.shards = self.shards[count:]
 
 
 def str_splitword(chars, count=1):
