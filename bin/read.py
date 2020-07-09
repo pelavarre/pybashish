@@ -20,11 +20,13 @@ bugs:
   doesn't delete \ backslashes
 
 examples:
+  echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | read.py  # Control Option Shift Command Arrows
   read -e  # in Bash
   read.py
   read.py --lines
   FOO=123; vared -e FOO  # in Zsh
 """
+# FIXME FIXME: stop flooding history with a copy of every empty line entered
 
 from __future__ import print_function
 

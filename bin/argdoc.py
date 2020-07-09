@@ -42,6 +42,8 @@ examples:
   argdoc.py argdoc.py -- hi world   # parse two args with the file's arg doc
 '''
 # FIXME: parsed args whose names begin with a '_' skid shouldn't print here, via argparse.SUPPRESS
+# FIXME: consider looping over a list of [FILE [FILE ...]]
+# FIXME: autocorrect wrong Arg Docs
 
 from __future__ import print_function
 
@@ -58,6 +60,10 @@ examples:
   Oh no! No examples disclosed!! 💥 💔 💥
 """
 ).strip()  # style with "Oh no! ... 💥 💔 💥" to rhyme with failures of the Black auto-styling app
+
+
+class ArgDocParseError(Exception):
+    pass
 
 
 def main(argv):
@@ -106,7 +112,12 @@ def _run_args_file(args_file, args_separator, args_args, args_doc):
 
     # Fetch the Arg Doc, compile it, and hope it doesn't crash the compiler
 
-    file_doc = read_docstring_from(doc_filename).strip()
+    filename = doc_filename
+    if doc_filename == "-":
+        filename = "/dev/stdin"
+        prompt_tty_stdin()
+
+    file_doc = read_docstring_from(filename).strip()
 
     (source, parser,) = _run_arg_doc(file_doc, doc_filename=doc_filename)
     help_doc = parser.format_help()
@@ -146,15 +157,19 @@ def _print_arg_doc(doc_filename, help_doc, file_doc):
 
     if not file_doc:
 
-        print(black_triple_quote_repr(help_doc.strip()))
-
-        print()
-
         print(
             textwrap.dedent(
                 """
-
-
+                #!/usr/bin/env python3
+                """
+            ).strip()
+        )
+        print()
+        print(black_triple_quote_repr(help_doc.strip()))
+        print()
+        print(
+            textwrap.dedent(
+                """
                 import argdoc
 
 
@@ -165,8 +180,6 @@ def _print_arg_doc(doc_filename, help_doc, file_doc):
 
                 if __name__ == '__main__':
                     main()
-
-
                 """
             ).strip()
         )
@@ -296,19 +309,23 @@ def read_docstring_from(relpath):
 
     try:
         with open(relpath, "rt") as reading:
-            return _read_docstring_from(reading)
+            return _read_docstring_from_stream(reading)
     except IOError as exc:  # such as Python 3 FileNotFoundError
         stderr_print("error: argdoc.py: {}: {}".format(type(exc).__name__, exc))
         sys.exit(1)
 
 
-def _read_docstring_from(reading,):
+def _read_docstring_from_stream(reading):
     # FIXME: see the quoted text as r""" only when explicitly marked as "r"
     # FIXME: correctly forward the leading and trailing whitespace
 
     texts = []
     qqq = None
+    lines = 0
+
     for line in reading.readlines():
+        lines += 1
+
         text = line.rstrip()
 
         if texts or text:
@@ -325,6 +342,15 @@ def _read_docstring_from(reading,):
                 else:
                     texts.append(text)
 
+    if lines and (qqq is None):
+        qqq1 = '"""'
+        qqq2 = "'''"
+        stderr_print(
+            "warning: argdoc.py: no {} found and no {} found in {}".format(
+                qqq1, qqq2, reading.name
+            )
+        )
+
     repr_doc = black_triple_quote_repr("\n".join(texts))
     source = "doc = " + repr_doc
 
@@ -340,7 +366,6 @@ def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
 
     if args is None:
         args = sys.argv[1:]
-
     if namespace is None:
         namespace = argparse.Namespace()
 
@@ -349,6 +374,16 @@ def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
     space = parser.parse_args(args, namespace=namespace)
 
     return space
+
+
+def format_help(doc=None, doc_filename=None):  # FIXME: what about ".print_help()" etc
+    """Format help as helped by doc"""
+
+    (source, parser,) = _run_arg_doc(doc, doc_filename=doc_filename)
+
+    help_doc = parser.format_help()
+
+    return help_doc
 
 
 def _run_arg_doc(doc, doc_filename):
@@ -538,7 +573,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         return args_py_lines
 
-    def emit_positional(self, parts, positionals, index):
+    def emit_positional(self, parts, positionals, index):  # FIXME FIXME  # noqa C901
         """Compile an Arg Doc Positional argument line into Python source lines"""
 
         positional = positionals[index]
@@ -551,13 +586,23 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         nargs = 1
         if parts.uses.remains and (index == len(positionals) - 1):
-            nargs = "..."  # argparse.REMAINDER
+            nargs = "..."  # argparse.REMAINDER  # FIXME FIXME: nargs "*" e.g. allow FILE -v / -v FILE
 
-        if metavar == "TOP":
-            nargs = "?"  # argparse.OPTIONAL
-        elif metavar == "FILE":
-            if parts.uses.remains == "[FILE] [-- [ARG [ARG ...]]]":
-                nargs = "?"  # argparse.OPTIONAL
+        if metavar == "FILE":
+            if parts.uses.remains is None:
+                if not parts.usage.endswith(" FILE"):  # for "cp.py", "mv.py"
+                    nargs = "?"  # for "touch.py"
+            elif parts.uses.remains == "[FILE] [-- [ARG [ARG ...]]]":
+                nargs = "?"  # for "argdoc.py"
+            elif parts.uses.remains == "[FILE]":
+                nargs = "?"  # for "touch.py"
+        elif metavar == "TOP":
+            nargs = "?"  # argparse.OPTIONAL  # for "find.py"
+        elif metavar == "VERB":
+            if parts.uses.remains == "[VERB]":
+                nargs = "?"  # for "help_.py"
+
+        # Calculate "usage:"
 
         if nargs == 1:
             self.usage_words.append(metavar)
@@ -630,7 +675,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         return lines
 
-    def emit_optional(self, parts, optionals, index):  # noqa C901
+    def emit_optional(self, parts, optionals, index):  # FIXME FIXME  # noqa C901
         """Compile an Arg doc Optional argument line into Python source lines"""
 
         optional = optionals[index]
@@ -852,7 +897,13 @@ class _ArgDocTaker(object):
 
         chars = line.lstrip()
         (use, chars,) = str_splitword(chars)
-        assert use == "usage:"
+        if use != "usage:":
+            stderr_print(
+                "error: argdoc.py: first word of Arg Doc must be 'usage:' not {!r}".format(
+                    use
+                )
+            )
+            sys.exit(1)
 
         usage = chars.lstrip()
         uses.usage = usage
@@ -945,11 +996,17 @@ class _ArgDocTaker(object):
         while not taker.peek_eof():
             line = taker.peek_line()  # may be blank
 
+            # FIXME: rethink these practical defenses
+
+            if (not self.parts.positionals) and (not self.parts.optionals):
+                if ("positional arg" in line) or ("optional arg" in line):
+                    reason = "Arg Doc declares Arg @ {!r}".format(line)
+                    raise ArgDocParseError("error: argdoc.py: {}".format(reason))
+
             if self.parts.optionals:
                 if "positional arguments:" in line:
                     reason = "Optionals before Positionals in Arg Doc"
-                    stderr_print("error: argdoc.py: {}".format(reason))
-                    sys.exit(1)
+                    raise ArgDocParseError("error: argdoc.py: {}".format(reason))
 
             lines.append(line)
             taker.take_line()
@@ -1018,6 +1075,12 @@ def str_splitword(chars, count=1):
         for word in counted_words:
             tail = tail[tail.index(word) :][len(word) :]
 
+    if not tail:
+        return (
+            chars,
+            "",
+        )
+
     head = chars[: -len(tail)]
 
     return (
@@ -1026,7 +1089,12 @@ def str_splitword(chars, count=1):
     )
 
 
-def stderr_print(*args):
+def prompt_tty_stdin():  # deffed in many files
+    if sys.stdin.isatty():
+        stderr_print("Press ⌃D EOF to quit")
+
+
+def stderr_print(*args):  # deffed in many files
     print(*args, file=sys.stderr)
 
 

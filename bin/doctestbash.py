@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# FIXME FIXME: why so always just 6 @ doctestbash.py: 6 tests passed
+# FIXME FIXME: bin/doctestbash.py -v tests/
+
 """
 usage: doctestbash.py [-h] [-b] [-q] [-v] [FILE [FILE ...]]
 
@@ -26,8 +29,7 @@ see also:  Python "import doctest"
 """
 # FIXME: walk for exts
 # FIXME: rip Bash paste distinguished only by repeated prompt ending in '$' or '#'
-# FIXME: rip Python paste, not just Bash paste
-# FIXME: rip Makefile paste, not just Bash paste
+# FIXME: rip Python '>>>' paste, and Makefile paste, and Zsh '%' paste, not just Bash paste
 
 import doctest
 import os
@@ -317,7 +319,7 @@ def vv_print(*args):
         stderr_print(*args)
 
 
-def stderr_print(*args):
+def stderr_print(*args):  # deffed in many files
     print(*args, file=sys.stderr)
 
 

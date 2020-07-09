@@ -20,6 +20,7 @@ bugs:
 
 examples:
   find ~/bin/
+  find /dev/null
 """
 # FIXME: rethink bugs
 
@@ -65,7 +66,7 @@ def os_walk_print_homepath(top):
             print(bp.briefpath(wherewhat))
 
 
-def stderr_print(*args):
+def stderr_print(*args):  # deffed in many files
     print(*args, file=sys.stderr)
 
 

@@ -40,7 +40,7 @@ def main():
     stderr_print(
         r"dd.py: Press ⌃C SIGINT to quit, press ⌃\ SIGQUIT if you really mean it"
     )
-    stderr_print("bug: does forward interactive input lines immediately")
+    stderr_print("Press ⌃D EOF to quit")
     stderr_print()
 
     # Define SIGINFO
@@ -100,7 +100,7 @@ class SigInfoHandler(contextlib.ContextDecorator):
         signal.signal(signal.SIGINFO, with_siginfo)
 
 
-def stderr_print(*args):
+def stderr_print(*args):  # deffed in many files
     print(*args, file=sys.stderr)
 
 

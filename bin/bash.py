@@ -232,7 +232,7 @@ def calc_ps1():
     return ps1
 
 
-def stderr_print(*args):
+def stderr_print(*args):  # deffed in many files
     print(*args, file=sys.stderr)
 
 

@@ -13,8 +13,8 @@ optional arguments:
   -n, --number  number each line of output
 
 bugs:
+  does prompt once for Stdin, when Stdin chosen as FILE "-" or by no FILE args, unlike Bash "cat"
   doesn't accurately catenate binary files, unlike Bash
-  does prompt for more Stdin, when Stdin is a Tty, unlike Bash "cat"
   does convert classic Mac CR "\r" end-of-line to Linux LF "\n", unlike Bash "cat"
   does always end the last line with Linux LF "\n" end-of-line, unlike Bash "cat"
   does print hard b"\x09" after each line number, via "{:6}\t", same as Bash "cat"
@@ -46,8 +46,7 @@ def main(argv):
     relpaths = args.files if args.files else ["-"]
 
     if "-" in relpaths:
-        if sys.stdin.isatty():
-            stderr_print("Press ⌃D EOF to quit")
+        prompt_tty_stdin()
 
     # Visit each file
 
@@ -86,7 +85,12 @@ def main(argv):
                 line_index += 1
 
 
-def stderr_print(*args):
+def prompt_tty_stdin():  # deffed in many files
+    if sys.stdin.isatty():
+        stderr_print("Press ⌃D EOF to quit")
+
+
+def stderr_print(*args):  # deffed in many files
     print(*args, file=sys.stderr)
 
 

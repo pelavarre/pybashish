@@ -32,10 +32,13 @@ examples:
   subsh.py echo 'Hello, Subsh World!'
   subsh.py ls
 """
+# FIXME: block no args:  subsh
+# FIXME: test:  subsh --
 
 from __future__ import print_function
 
 import json
+import pprint
 import shlex
 import subprocess
 import sys
@@ -50,16 +53,16 @@ def main(argv):
 
     verb = ShVerb()
     if words:
-        verb.args = words
+        verb = ShVerb(words[0])
 
-    verbed = verb()
+    verbed = verb(*words[1:])
 
     dumpable = verbed.vars
     dumpable = {
         k: (v.decode() if isinstance(v, bytes) else v) for (k, v,) in dumpable.items()
     }
 
-    print(json.dumps(dumpable))
+    pprint.pprint(json.dumps(dumpable))
 
     exit_status = verbed
     sys.exit(exit_status)
