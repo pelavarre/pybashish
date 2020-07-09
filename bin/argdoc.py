@@ -436,9 +436,8 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         # Parse the Arg Doc
 
-        taker = _ArgDocTaker()
+        parts = _ArgDocParts(doc)
 
-        parts = taker.take_arg_doc(doc)
         self.parts = parts
 
         # Compile the arguments, and construct a one line summary of usage
@@ -819,23 +818,10 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         return lines
 
 
-class _ArgUsageParts(argparse.Namespace):
-    """Name the parts of an Arg Doc Usage line"""
-
-    def __init__(self):
-
-        self.prog = None
-
-        self.optionals = None
-        self.positionals = None
-
-        self.remains = None
-
-
 class _ArgDocParts(argparse.Namespace):
     """Name the parts of an Arg Doc"""
 
-    def __init__(self):
+    def __init__(self, doc):
 
         self.prog = None
 
@@ -849,8 +835,11 @@ class _ArgDocParts(argparse.Namespace):
         self.epilog = None
         self.uses = None
 
+        taker = _ArgDocTaker(doc=doc)
+        taker.take_arg_doc_into(parts=self)
 
-class _ArgDocTaker(object):
+
+class _ArgDocTaker:
     """Pick an Arg Doc apart, line by line"""
 
     TAGLINE_PATTERNS = (
@@ -859,50 +848,177 @@ class _ArgDocTaker(object):
         r"^usage:",
     )
 
-    def take_arg_doc(self, doc):
-        """Take every source line"""
+    def __init__(self, doc):
+
+        self.parts = None
 
         tabsize_8 = 8
-        chars = textwrap.dedent(doc.expandtabs(tabsize_8)).strip()
+        doc_chars = textwrap.dedent(doc.expandtabs(tabsize_8)).strip()
 
-        self.taker = _LineTaker()
-        self.taker.give_chars(chars)
+        self.taker = ShardTaker()
+        self.taker.give_sourcelines(doc_chars)
 
-        self.parts = _ArgDocParts()
+    def take_arg_doc_into(self, parts):
+        """Take every source line"""
 
-        if chars:
+        self.parts = parts
+
+        taker = self.taker
+
+        if taker.peek_more():
             self.take_usage()
             self.accept_description()
             self.accept_positionals()
             self.accept_optional_arguments()
             self.accept_epilog()
 
-        self.take_eof()
-
-        return self.parts
+        self.take_end()
 
     def take_usage(self):
         """Take the line of Usage"""
 
         taker = self.taker
 
-        line = taker.peek_line()
+        line = taker.peek_shard()
 
-        uses = self.walk_usage(line)
+        uses = _ArgUsageParts(line)
+
         self.parts.uses = uses
         self.parts.usage = uses.usage
         self.parts.prog = uses.prog
 
-        taker.take_line()
+        taker.take_shard()
 
-    def walk_usage(self, line):
+    def accept_description(self):
+        """Take the line of description"""
+
+        taker = self.taker
+        taker.accept_empty_shards()
+
+        self.parts.description = None
+        if taker.peek_more():
+            line = taker.peek_shard()
+
+            if not any(re.match(p, string=line) for p in _ArgDocTaker.TAGLINE_PATTERNS):
+                self.parts.description = line
+                taker.take_shard()
+
+    def accept_positionals(self):
+        """Take the Positional arguments"""
+
+        self.parts.positionals = self.accept_argblock("positional arguments:")
+
+    def accept_optional_arguments(self):
+        """Take the Optional arguments"""
+
+        self.parts.optionals = self.accept_argblock("optional arguments:")
+
+    def accept_argblock(self, tagline):
+        """Take the Positional or Optional arguments"""
+
+        arglines = None
+
+        taker = self.taker
+        taker.accept_empty_shards()
+
+        if taker.peek_more():
+            line = taker.peek_shard()
+
+            if line == tagline:
+                taker.take_shard()
+                taker.accept_empty_shards()
+                arglines = self.accept_arglines(tagline=tagline)
+
+        return arglines
+
+    def accept_arglines(self, tagline):
+        """Take zero or more indented definitions of Positional or Optional arguments"""
+
+        taker = self.taker
+        taker.accept_empty_shards()
+
+        arglines = []
+        while taker.peek_more():
+            line = taker.peek_shard()
+            if not line.startswith(" "):
+                break
+            assert line.startswith("  ")
+
+            arglines.append(line)
+            taker.take_shard()
+
+            taker.accept_empty_shards()
+
+        return arglines
+
+    def accept_epilog(self):
+        """Take zero or more trailing lines"""
+
+        taker = self.taker
+
+        lines = []
+        while taker.peek_more():
+            line = taker.peek_shard()  # may be blank
+
+            # FIXME: rethink these practical defenses
+
+            if (not self.parts.positionals) and (not self.parts.optionals):
+                if ("positional arg" in line) or ("optional arg" in line):
+                    reason = "Arg Doc declares Arg @ {!r}".format(line)
+                    raise ArgDocParseError("error: argdoc.py: {}".format(reason))
+
+            if self.parts.optionals:
+                if "positional arguments:" in line:
+                    reason = "Optionals before Positionals in Arg Doc"
+                    raise ArgDocParseError("error: argdoc.py: {}".format(reason))
+
+            lines.append(line)
+            taker.take_shard()
+
+        self.parts.epilog = "\n".join(lines)
+
+    def take_end(self):
+        """Do nothing if all lines consumed, else crash"""
+
+        taker = self.taker
+        taker.take_end()
+
+
+class _ArgUsageParts(argparse.Namespace):
+    """Name the parts of an Arg Doc Usage line"""
+
+    def __init__(self, usage):
+
+        self.prog = None
+
+        self.optionals = None
+        self.positionals = None
+
+        self.remains = None
+
+        taker = _UsageLineTaker(usage=usage)
+        taker.take_usage_line_into(uses=self)
+
+
+class _UsageLineTaker:
+    """Pick an Arg Doc Usage Line apart, char by char"""
+
+    def __init__(self, usage):
+
+        self.usage = usage
+        self.taker = ShardTaker(shards=usage)
+
+    def take_usage_line_into(self, uses):
         """Pick an Arg Doc Usage line apart, word by word"""
 
-        uses = _ArgUsageParts()
+        self.uses = uses
+
+        usage = self.usage
+
         uses.optionals = []
         uses.positionals = []
 
-        chars = line.lstrip()
+        chars = usage.lstrip()
         (use, chars,) = str_splitword(chars)
         if use != "usage:":
             stderr_print(
@@ -930,147 +1046,60 @@ class _ArgDocTaker(object):
                 uses.remains = unsplit
                 chars = ""
 
-        return uses
 
-    def accept_description(self):
-        """Take the line of description"""
+class ShardTaker:
+    """Walk once thru source chars, as split
 
-        taker = self.taker
-        taker.accept_blanklines()
-
-        self.parts.description = None
-        if not taker.peek_eof():
-            line = taker.peek_line()
-            if not any(re.match(p, string=line) for p in _ArgDocTaker.TAGLINE_PATTERNS):
-                self.parts.description = line
-                taker.take_line()
-
-    def accept_positionals(self):
-        """Take the Positional arguments"""
-
-        self.parts.positionals = self.accept_argblock("positional arguments:")
-
-    def accept_optional_arguments(self):
-        """Take the Optional arguments"""
-
-        self.parts.optionals = self.accept_argblock("optional arguments:")
-
-    def accept_argblock(self, tagline):
-        """Take the Positional or Optional arguments"""
-
-        arglines = None
-
-        taker = self.taker
-        taker.accept_blanklines()
-
-        if not taker.peek_eof():
-
-            line = taker.peek_line()
-            if line == tagline:
-                taker.take_line()
-
-                taker.accept_blanklines()
-                arglines = self.accept_arglines(tagline=tagline)
-
-        return arglines
-
-    def accept_arglines(self, tagline):
-        """Take zero or more indented definitions of Positional or Optional arguments"""
-
-        taker = self.taker
-        taker.accept_blanklines()
-
-        arglines = []
-        while not taker.peek_eof():
-            line = taker.peek_line()
-            if not line.startswith(" "):
-                break
-            assert line.startswith("  ")
-
-            arglines.append(line)
-            taker.take_line()
-
-            taker.accept_blanklines()
-
-        return arglines
-
-    def accept_epilog(self):
-        """Take zero or more trailing lines"""
-
-        taker = self.taker
-
-        lines = []
-        while not taker.peek_eof():
-            line = taker.peek_line()  # may be blank
-
-            # FIXME: rethink these practical defenses
-
-            if (not self.parts.positionals) and (not self.parts.optionals):
-                if ("positional arg" in line) or ("optional arg" in line):
-                    reason = "Arg Doc declares Arg @ {!r}".format(line)
-                    raise ArgDocParseError("error: argdoc.py: {}".format(reason))
-
-            if self.parts.optionals:
-                if "positional arguments:" in line:
-                    reason = "Optionals before Positionals in Arg Doc"
-                    raise ArgDocParseError("error: argdoc.py: {}".format(reason))
-
-            lines.append(line)
-            taker.take_line()
-
-        self.parts.epilog = "\n".join(lines)
-
-    def take_eof(self):
-        """Do nothing if all lines consumed, else crash"""
-
-        taker = self.taker
-        taker.take_eof()
-
-
-class _LineTaker(object):
-    """Walk once thru source chars split into source lines
-
-    Define "take_" to mean require and consume
-    Define "peek_" to mean look ahead
-    Define "accept_" to mean take if given, and don't take if not given
+    Define "take" to mean require and consume
+    Define "peek" to mean look ahead
+    Define "accept" to mean take if given, and don't take if not given
     """
 
-    def __init__(self):
-        self.lines = []
+    def __init__(self, shards=()):
+        self.shards = list(shards)
 
-    def give_chars(self, chars):
+    def give_sourcelines(self, chars):
+        """Give chars, split into lines, but drop the trailing whitespace from each line"""
+
         lines = chars.splitlines()
         lines = list(_.rstrip() for _ in lines)
-        self.lines.extend(lines)
 
-    def take_line(self):
-        """Consume the next line"""
+        self.give_shards(shards=lines)
 
-        self.lines = self.lines[1:]
+    def give_shards(self, shards):
+        """Give shards"""
 
-    def peek_line(self):
-        """Return a copy of the next line without consuming it"""
+        self.shards.extend(shards)
 
-        return self.lines[0]
+    def take_shard(self):
+        """Consume the next shard, without returning it"""
 
-    def peek_eof(self):
-        """Return True after consuming the last char of the last line"""
+        self.shards = self.shards[1:]
 
-        eof = not self.lines
-        return eof
+    def peek_shard(self):
+        """Return the next shard, without consuming it"""
 
-    def take_eof(self):
-        """Do nothing if all lines consumed, else crash"""
+        return self.shards[0]
 
-        assert self.peek_eof()
+    def peek_more(self):
+        """Return True while shards remain"""
 
-    def accept_blanklines(self):
-        """Discard zero or more blank lines"""
+        more = bool(self.shards)
+        return more
 
-        while not self.peek_eof():
-            if self.peek_line().strip():
+    def take_end(self):
+        """Do nothing if all shards consumed, else crash"""
+
+        assert not self.peek_more()
+
+    def accept_empty_shards(self):
+        """Discard zero or more blank shards"""
+
+        while self.peek_more():
+            shard = self.peek_shard()
+            if shard.strip():
                 break
-            self.take_line()
+            self.take_shard()
 
 
 def str_splitword(chars, count=1):
@@ -1130,6 +1159,14 @@ require_sys_version_info()
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
+
+
+#
+# See also
+#
+# "Parsing: a timeline" JKegler 2019, via @CompSciFact
+# https://jeffreykegler.github.io/personal/timeline_v3
+#
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git
