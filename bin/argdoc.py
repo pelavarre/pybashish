@@ -1479,4 +1479,7 @@ if __name__ == "__main__":
 #
 
 
+# pushed again with a more complete Git Log Message
+
+
 # copied from:  git clone https://github.com/pelavarre/pybashish.git
