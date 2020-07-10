@@ -154,6 +154,7 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     def main():
         args = argdoc.parse_args()
+        main.args = args
         print(args)
 
 
