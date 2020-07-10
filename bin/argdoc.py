@@ -138,7 +138,7 @@ def _run_args_file(args_file, args_separator, args_args, args_compile):
 
     if not args_separator:
 
-        if not file_doc:
+        if True:  # not file_doc:  # FIXME FIXME FIXME
             _print_py_file(help_doc)
 
             return
