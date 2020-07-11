@@ -29,10 +29,10 @@ function demo-i () { (set -xe; bin/argdoc.py --rip argparse bin/hostname.py); }
 function demo-j () { local x="cd bin/"; echo "+ $x" >&2; $x; }
 function demo-k () { (set -xe; argdoc.py --rip argdoc hostname.py >p.py); }
 function demo-l () { (set -xe; chmod +x p.py); }
-function demo-m () { (set -xe; vim p.py); cp -p ~/p.py p.py; }
+function demo-m () { (set -xe; vim p.py); cp -p ../tests/demo-steps-p.py p.py; }
 function demo-n () { (set -xe; p.py); }
 function demo-o () { (set -xe; p.py 42); }
-function demo-p () { (set -xe; diff -burp ~/p.py p.py); }
+function demo-p () { (set -xe; diff -burp ../tests/demo-steps-p.py p.py); }
 function demo-q () { (set -xe; rm -fr ~/Desktop/pybashish/); }
 function demo-r () { local x="exit"; echo "+ logout" >&2; $x; }
 
