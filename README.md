@@ -8,15 +8,14 @@ Try it out, inside Linux or Mac OS
     git clone https://github.com/pelavarre/pybashish.git
     cat pybashish/README.md
 
-    python3 pybashish/
-    exit
-
-    python3 pybashish/bin/pwd_.py --homepath
     python3 pybashish/bin/hostname.py --fqdn
     python3 pybashish/bin/hostname.py --help
+
+    python3 pybashish/
+    exit
 
 To run the self-test's of this code
 
     time make
 
-as of Saturday, 27th June 2020
+As of Friday, 10th July 2020

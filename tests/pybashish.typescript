@@ -129,7 +129,7 @@ ArgDoc compiles standard Python Arg Docs into standard Python ArgParser Parsers
 Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     $ bin/argdoc.py -ijk
-    usage: argdoc.py [-h] [--compile] [FILE] [-- [ARG [ARG ...]]]
+    usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- [ARG [ARG ...]]]
     argdoc.py: error: unrecognized arguments: -ijk
     + exit 2
     $
@@ -275,13 +275,13 @@ Call a column numeric when two-thirds of its cells contain decimal digits
 
 ## 2.12 ) Fmt
 
-    $ echo {0..39} | bin/fmt.py -w42  # split to fit inside width
+    $ echo $(seq 0 39) | bin/fmt.py -w42  # split to fit inside width
     0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
     17 18 19 20 21 22 23 24 25 26 27 28 29 30
     31 32 33 34 35 36 37 38 39
     $
 
-    $ echo {0..39} | tr -d ' ' | bin/fmt.py -w42  # no split at width
+    $ echo $(seq 0 39) | tr -d ' ' | bin/fmt.py -w42  # no split at width
     0123456789101112131415161718192021222324252627282930313233343536373839
     $
 
@@ -340,7 +340,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     'Hello, Line Editor\n'
     $
 
-    $ echo $'Hello, \x15Line Editor' | bin/read.py
+    $ echo 'Hello, ^ULine Editor' | sed 's,\^U,@,g' | tr '@' '\25' | bin/read.py
     ? Line Editor
     'Line Editor\n'
     $

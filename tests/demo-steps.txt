@@ -1,0 +1,55 @@
+# Let's say we need you to start speaking Python as fluently as I do
+
+# How do I set you up?
+# Well you be you, we'll have to tune this for you ... but many of you already know Bash
+# Not all of Bash, just enough Bash to get your job done
+
+# I can rewrite just those bits into Python, set you up to copy-edit
+# Like our own Stack Overflow for Python, but executable, small, focused on us
+
+mosh jqdoe@dev-jqdoe.dev.purestorage.com
+
+[a]  export PS1='\$ '
+
+[b]  git clone https://github.com/pelavarre/pybashish.git
+[c]  cd pybashish/
+
+[d]  cat README.md
+[e]  git branch -a
+[f]  git checkout pelavarre-patch-1
+
+# Want to know how we print hostnames? Fully qualified and not? Take a look
+
+[g]  less bin/hostname.py
+
+# If you know some Python already, then you know it's not ordinarily this simple
+# It can only be this simple if we bring in bots to spell out the boring parts of the Python for us
+# Let's show you the bots
+
+q
+
+# You saw how that source file began with little more than its own help lines
+
+[h]  bin/argdoc.py --rip argdoc bin/hostname.py
+
+# That's all you really need ... Here's the code they wrote for you
+
+[i]  bin/argdoc.py --rip argparse bin/hostname.py
+
+# These bots make it affordable for you to make more of these bots ... that's the win
+
+[j]  cd bin/
+[k]  argdoc.py --rip argdoc hostname.py >p.py
+[l]  chmod +x p.py
+[m]  vim p.py
+[n]  p.py
+[o]  p.py 42
+
+Give it a try?  Call me?
+
+[p]  rm -fr ~/Desktop/pybashish/
+[q]  logout
+
+⌘W iOS Blink > Close Window
+
+As of Friday, 10th July 2020

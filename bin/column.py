@@ -34,7 +34,7 @@ def main():
 
     args = argdoc.parse_args()
     if not args.t:
-        print(argdoc.format_help())
+        print(argdoc.make_parser().format_help())
         sys.exit()
 
     # Fetch all of Stdin

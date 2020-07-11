@@ -17,9 +17,9 @@ bugs:
   prints '_' skids in the ruler to mark only the tabsize=8 tab stops:  1, 9, 17, ...
 
 examples:
-  echo {0..99} | fmt  # split to fit inside Terminal
-  echo {0..39} | fmt -w42  # split to fit inside width
-  echo {0..39} | tr -d ' ' | fmt -w42  # no split at width
+  echo $(seq 0 99) | fmt  # split to fit inside Terminal
+  echo $(seq 0 39) | fmt -w42  # split to fit inside width
+  echo $(seq 0 39) | tr -d ' ' | fmt -w42  # no split at width
   echo su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | fmt -w42  # no split at "-" dashes
   fmt.py --ruler -w72  # ends in column 72
   : # 5678_0123456_8901234_6789012_4567890 2345678_0123456_8901234_6789012  # 72-column ruler
