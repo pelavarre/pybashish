@@ -23,16 +23,16 @@ mosh jqdoe@dev-jqdoe.dev.purestorage.com
 [g]  less bin/hostname.py
 
 # If you know some Python already, then you know it's not ordinarily this simple
-# It can only be this simple if we bring in bots to spell out the boring parts of the Python for us
+# It can only be this simple if we bring in bots to spell out the boring parts of Python for us
 # Let's show you the bots
 
 q
 
-# You saw how that source file began with little more than its own help lines
-
 [h]  bin/argdoc.py --rip argdoc bin/hostname.py
 
-# That's all you really need ... Here's the code they wrote for you
+# You saw how that source file began with little more than its own help lines
+
+# That's all you really need ... we can tell them to show us the code they write for you
 
 [i]  bin/argdoc.py --rip argparse bin/hostname.py
 

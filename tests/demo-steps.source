@@ -17,21 +17,23 @@ alias p=demo-p
 alias q=demo-q
 alias r=demo-r
 
-function demo-a () { echo "++ export PS1='\\\$ '" >&2; export PS1='\$ '; rm -fr pybashish/; }
+function demo-a () { local x="export PS1='\\\$ '"; echo "+ $x" >&2; export PS1='\$ '; }
 function demo-b () { (set -xe; git clone https://github.com/pelavarre/pybashish.git); }
-function demo-c () { echo "++ cd pybashish/" >&2; cd pybashish/; }
+function demo-c () { local x="cd pybashish/"; echo "+ $x" >&2; $x; }
 function demo-d () { (set -xe; cat README.md); }
 function demo-e () { (set -xe; git branch -a); }
 function demo-f () { (set -xe; git checkout pelavarre-patch-1); }
 function demo-g () { (set -xe; less bin/hostname.py); }
 function demo-h () { (set -xe; bin/argdoc.py --rip argdoc bin/hostname.py); }
 function demo-i () { (set -xe; bin/argdoc.py --rip argparse bin/hostname.py); }
-function demo-j () { echo "++ cd bin/" >&2; cd bin/; }
+function demo-j () { local x="cd bin/"; echo "+ $x" >&2; $x; }
 function demo-k () { (set -xe; argdoc.py --rip argdoc hostname.py >p.py); }
 function demo-l () { (set -xe; chmod +x p.py); }
 function demo-m () { (set -xe; vim p.py); cp -p ~/p.py p.py; }
 function demo-n () { (set -xe; p.py); }
 function demo-o () { (set -xe; p.py 42); }
 function demo-p () { (set -xe; diff -burp ~/p.py p.py); }
-function demo-r () { (set -xe; rm -fr ~/Desktop/pybashish/); }
-function demo-q () { (set -xe; logout); }
+function demo-q () { (set -xe; rm -fr ~/Desktop/pybashish/); }
+function demo-r () { local x="exit"; echo "+ logout" >&2; $x; }
+
+export PS1='(public) \$ '
