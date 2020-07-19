@@ -42,14 +42,16 @@ q
 [k]  argdoc.py --rip argdoc hostname.py >p.py
 [l]  chmod +x p.py
 [m]  vim p.py
-[n]  p.py
-[o]  p.py 42
+[n]  cat p.py
+[o]  p.py
+[p]  p.py 42
 
 Give it a try?  Call me?
 
-[p]  rm -fr ~/Desktop/pybashish/
-[q]  logout
+[q]  diff -burp ../tests/demo-steps-p.py p.py
+[r]  rm -fr ~/Desktop/pybashish/
+[s]  logout
 
 ⌘W iOS Blink > Close Window
 
-As of Friday, 10th July 2020
+As of Saturday, 18th July 2020

@@ -12,7 +12,7 @@ optional arguments:
   -h, --help     show this help message and exit
 
 examples:
-  p.py yah
+  p.py 42
 """
 
 import argdoc
