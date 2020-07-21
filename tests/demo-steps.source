@@ -17,6 +17,7 @@ alias -- 'p'=demo-p
 alias -- 'q'=demo-q
 alias -- 'r'=demo-r
 alias -- 's'=demo-s
+alias -- 't'=demo-t
 
 function demo-a () { local x="export PS1='\\\$ '"; echo "+ $x" >&2; eval "$x"; }
 function demo-b () { rm -fr ~/Desktop/pybashish; (set -xe; git clone https://github.com/pelavarre/pybashish.git); }
@@ -24,19 +25,22 @@ function demo-c () { local x="cd pybashish/"; echo "+ $x" >&2; $x; }
 function demo-d () { (set -xe; cat README.md); }
 function demo-e () { (set -xe; git branch -a); }
 function demo-f () { (set -xe; git checkout pelavarre-patch-1); }
-function demo-g () { (set -xe; less bin/hostname.py); }
-function demo-h () { (set -xe; bin/argdoc.py --rip argdoc bin/hostname.py); }
-function demo-i () { (set -xe; bin/argdoc.py --rip argparse bin/hostname.py); }
-function demo-j () { local x="cd bin/"; echo "+ $x" >&2; $x; }
-function demo-k () { (set -xe; argdoc.py --rip argdoc hostname.py >p.py); }
-function demo-l () { (set -xe; chmod +x p.py); }
-function demo-m () { (set -xe; vim p.py); }
-function demo-n () { cp -p ../tests/demo-steps-p.py p.py; (set -xe; cat p.py); }
-function demo-o () { (set -xe; p.py); }
-function demo-p () { (set -xe; p.py 42); }
-function demo-q () { (set -xe; diff -burp ../tests/demo-steps-p.py p.py); }
-function demo-r () { (set -xe; rm -fr ~/Desktop/pybashish/); }
-function demo-s () { local x="exit"; echo "+ logout" >&2; $x; }
+function demo-g () { (set -xe; git ls-files | column); }
+function demo-h () { (set -xe; less bin/hostname.py); }
+function demo-i () { (set -xe; bin/argdoc.py --rip argdoc bin/hostname.py); }
+function demo-j () { (set -xe; bin/argdoc.py --rip argparse bin/hostname.py); }
+function demo-k () { local x="cd bin/"; echo "+ $x" >&2; $x; }
+function demo-l () { local x="argdoc.py --rip argdoc hostname.py >p.py";  echo "+ $x" >&2; bash -c "$x"; }
+function demo-m () { (set -xe; chmod +x p.py); }
+function demo-n () { (set -xe; vim p.py); }
+function demo-o () { cp -p ../tests/demo-steps-p.py p.py; (set -xe; cat p.py); }
+function demo-p () { (set -xe; p.py); }
+function demo-q () { (set -xe; p.py 42); }
+function demo-r () { (set -xe; diff -burp ../tests/demo-steps-p.py p.py); }
+function demo-s () { (set -xe; rm -fr ~/Desktop/pybashish/); }
+function demo-t () { local x="exit"; echo "+ logout" >&2; $x; }
 
 pushd ~/Desktop >/dev/null
+dirs +0  # aka:  dirs | awk '{print $1}'
+
 export PS1='(public) \$ '

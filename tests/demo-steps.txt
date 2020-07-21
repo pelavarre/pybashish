@@ -7,8 +7,6 @@
 # I can rewrite just those bits into Python, set you up to copy-edit
 # Like our own Stack Overflow for Python, but executable, small, focused on us
 
-mosh jqdoe@dev-jqdoe.dev.purestorage.com
-
 [a]  export PS1='\$ '
 
 [b]  git clone https://github.com/pelavarre/pybashish.git
@@ -17,41 +15,43 @@ mosh jqdoe@dev-jqdoe.dev.purestorage.com
 [d]  cat README.md
 [e]  git branch -a
 [f]  git checkout pelavarre-patch-1
+[g]  git ls-files | column
 
 # Want to know how we print hostnames? Fully qualified and not? Take a look
 
-[g]  less bin/hostname.py
+[h]  less bin/hostname.py
 
 # If you know some Python already, then you know it's not ordinarily this simple
 # It can only be this simple if we bring in bots to spell out the boring parts of Python for us
 # Let's show you the bots
 
-q
+:q
 
-[h]  bin/argdoc.py --rip argdoc bin/hostname.py
+[i]  bin/argdoc.py --rip argdoc bin/hostname.py
 
 # You saw how that source file began with little more than its own help lines
 
-# That's all you really need ... we can tell them to show us the code they write for you
+# That's all you really need ... we can tell the bots to show us the code they write for you
 
-[i]  bin/argdoc.py --rip argparse bin/hostname.py
+[j]  bin/argdoc.py --rip argparse bin/hostname.py
 
 # These bots make it affordable for you to make more of these bots ... that's the win
 
-[j]  cd bin/
-[k]  argdoc.py --rip argdoc hostname.py >p.py
-[l]  chmod +x p.py
-[m]  vim p.py
-[n]  cat p.py
-[o]  p.py
-[p]  p.py 42
+[k]  cd bin/
+[l]  argdoc.py --rip argdoc hostname.py >p.py
+[m]  chmod +x p.py
+[n]  vim p.py
+
+[o]  cat p.py
+[p]  p.py
+[q]  p.py 42
 
 Give it a try?  Call me?
 
-[q]  diff -burp ../tests/demo-steps-p.py p.py
-[r]  rm -fr ~/Desktop/pybashish/
-[s]  logout
+[r]  diff -burp ../tests/demo-steps-p.py p.py
+[s]  rm -fr ~/Desktop/pybashish/
+[t]  logout
 
 ⌘W iOS Blink > Close Window
 
-As of Saturday, 18th July 2020
+As of Tuesday, July 21st, 2020
