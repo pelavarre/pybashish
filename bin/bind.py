@@ -20,7 +20,7 @@ examples:
   bind -p | grep '".e[[][DCAB]"' | sort  # Ansi ↑ ↓ → ← arrows here and in Bash
   bindkey | grep '".[[][[][ABCD]"'  # Ansi ↑ ↓ → ← arrows in Zsh
 """
-# FIXME FIXME --mac       print what each means, but in Apple style
+# FIXME --mac       print what each means, but in Apple style
 # FIXME --zsh       print what each means, but in Zsh "bindkey" style
 # FIXME --vim       print what each means, but in Vim and "cat -etv" style
 # FIXME offers "--mac" and "--vim", unlike Bash
@@ -59,7 +59,7 @@ def main():
 
         sortables.append(sortable)
 
-    for sortable in sorted(sortables):  # FIXME FIXME: column -t the "bind -p" output
+    for sortable in sorted(sortables):  # FIXME: column -t the "bind -p" output
         (str_bot, repr_stdin,) = sortable
         print("{:7} {}".format((repr_stdin + ":"), str_bot))
 

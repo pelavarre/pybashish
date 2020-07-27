@@ -112,9 +112,7 @@ def print_one_paragraph(dent, para, width):
     if para:
 
         width_ = width - len(dent)
-        assert (
-            width_ >= 1
-        )  # FIXME: think through dents about as large and larger than widths
+        assert width_ >= 1  # FIXME: test when this fails
 
         text = "\n".join(para)
         filled = textwrap.fill(

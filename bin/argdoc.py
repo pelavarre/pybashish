@@ -173,9 +173,9 @@ class _ArgDocApp:
         if args.rip:
 
             shreds = "argdoc argparse doc".split()
-            for shred in shreds:  # FIXME: invent how to say this in Arg Doc
-                if shred.startswith(args.rip):
-                    shred = shred
+            for shred_ in shreds:  # FIXME: invent how to say this in Arg Doc
+                if shred_.startswith(args.rip):
+                    shred = shred_
                     break
 
             if not shred:
@@ -248,11 +248,10 @@ class _ArgDocApp:
 
             return
 
-        # Run the parser, and rip the args that result (unless it prints help and exits zero)
+        # Run the parser, and rip the args that result (except when printing help and exiting zero)
+        # Trace the args prefaced by "+ ", as if prefaced by Bash PS4
 
-        print(
-            "+ {}".format(shlex_join([doc_filename] + doc_args))
-        )  # trace like Bash PS4
+        print("+ {}".format(shlex_join([doc_filename] + doc_args)))
 
         args = parser.parse_args(doc_args)
 
@@ -275,6 +274,7 @@ class _ArgDocApp:
 
         print()
         print("args = parser.parse_args()")
+        print("print(args)")
 
     def compare_file_to_help_doc(self, file_doc, doc_filename, help_doc):
         """Show the Help Doc printed by an Arg Doc file calling Arg Parse"""
@@ -524,6 +524,8 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         # Emit Python source
 
+        d = r"    "  # choose indentation
+
         repr_dest = black_repr(dest)
         repr_metavar = black_repr(metavar)
         repr_nargs = black_repr(nargs)
@@ -537,11 +539,11 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
             if dest == metavar:
                 mid_lines = [
-                    f"    {repr_dest},",
+                    d + f"{repr_dest},",
                 ]
             else:
                 mid_lines = [
-                    f"    {repr_dest}, metavar={repr_metavar},",
+                    d + f"{repr_dest}, metavar={repr_metavar},",
                 ]
 
         else:
@@ -549,15 +551,15 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
             if dest == metavar:
                 mid_lines = [
-                    f"    {repr_dest}, nargs={repr_nargs},",
+                    d + f"{repr_dest}, nargs={repr_nargs},",
                 ]
             else:
                 mid_lines = [
-                    f"   {repr_dest}, metavar={repr_metavar}, nargs={repr_nargs},",
+                    d + f"{repr_dest}, metavar={repr_metavar}, nargs={repr_nargs},",
                 ]
 
         tail_lines = [
-            f"    help={repr_help}" ")",
+            d + f"help={repr_help}" ")",
         ]
 
         lines = head_lines + mid_lines + tail_lines
@@ -633,6 +635,8 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         # Emit Python source
 
+        d = r"    "  # choose indentation
+
         repr_option = black_repr(option)
         repr_alt = black_repr(alt_option)
         repr_var = black_repr(metavar)
@@ -649,27 +653,27 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
             if not alt_option:
                 assert dest == option.lower()
-                mid_lines = [f"    {repr_option}, action={repr_action},"]
+                mid_lines = [d + f"{repr_option}, action={repr_action},"]
             else:
                 assert dest == mnemonic.lower()
-                mid_lines = [f"    {repr_option}, {repr_alt}, action={repr_action},"]
+                mid_lines = [d + f"{repr_option}, {repr_alt}, action={repr_action},"]
 
-        else:  # FIXME: "argparse" "add_argument" expresses our nargs=1 as "action=None"?
+        else:  # FIXME FIXME: "argparse" "add_argument" expresses our nargs=1 as "action=None"?
             assert nargs == 1
 
             if not alt_option:
                 if dest == option.lower():
-                    mid_lines = [f"    {repr_option}, metavar={repr_var},"]
+                    mid_lines = [d + f"{repr_option}, metavar={repr_var},"]
                 else:
                     mid_lines = [
-                        f"    {repr_option}, metavar={repr_var}, dest={repr_dest},"
+                        d + f"{repr_option}, metavar={repr_var}, dest={repr_dest},"
                     ]
             else:
                 assert dest == mnemonic.lower()
-                mid_lines = [f"    {repr_option}, {repr_alt}, metavar={repr_var},"]
+                mid_lines = [d + f"{repr_option}, {repr_alt}, metavar={repr_var},"]
 
         tail_lines = [
-            "    help={repr_help}".format(repr_help=black_repr(arg_help_line)),
+            d + "help={repr_help}".format(repr_help=black_repr(arg_help_line)),
             ")",
         ]
 

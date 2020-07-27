@@ -10,12 +10,13 @@ optional arguments:
   -C          show hex and us-ascii
 
 bugs:
-  show UTF-8 emoji where they appear, unlike Bash "hexdump" holding to 1967 us-ascii
+  show UTF-8 emoji where they appear, unlike Bash "hexdump" holding to "us-ascii" from 1967
   acts like "hexdump -h" if called with no args, unlike Bash "hexdump"
 
 examples:
   Oh no! No examples disclosed!! 💥 💔 💥
 """
+# FIXME FIXME: fix "hexdump" bugs: show UTF-8 emoji where they appear
 
 import argdoc
 

@@ -13,8 +13,12 @@ optional arguments:
   -n          print just the words, don't add an end-of-line
   --verbose   print the "shlex.split" to "sys.stderr"
 
+bugs:
+  understand "-n" like Bash or Zsh Echo, unlike Sh Echo
+
 examples:
   echo 'Hello, Echo World!'
+  echo -n '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑ ' | hexdump -C
   echo.py --v 'Hello, Echo World!'
 """
 

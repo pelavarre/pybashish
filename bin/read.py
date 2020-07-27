@@ -12,10 +12,11 @@ optional arguments:
 bugs:
   prompts with "? ", unlike the "" of Bash "read" with no "-p PROMPT"
   prompts and echoes, even when Stdin is not Tty, unlike Bash
-  lets people edit input, like Bash "read -e", unlike Zsh "read"
-  prints the line as a Python Repr
+  lets people edit input, like Bash "read -e" or Zsh "vared"
+  keeps blank lines in history, like Bash for non-empty blank lines
+  defines ↑ ↓ up/down history review to skip over blank lines, like Zsh
+  prints the received line as a Python Repr
   doesn't stuff the line into a Bash Environment Variable
-  doesn't compress spaces between words down to one space
   doesn't read another line after a line ends with \ backslash
   doesn't delete \ backslashes
 
@@ -26,7 +27,6 @@ examples:
   read.py --lines
   FOO=123; vared -e FOO  # in Zsh
 """
-# FIXME FIXME: stop flooding history with a copy of every empty line entered
 
 from __future__ import print_function
 
@@ -107,28 +107,28 @@ class TerminalShadow:
 
     def __init__(self):
 
-        self.echoes = list()
-        self.lines = list()
+        self.tty_echoes = list()
+        self.tty_lines = list()
 
     def putch(self, chars):
 
         for ch in chars:
             stdin = ch.encode()
             if stdin not in C0_CONTROL_STDINS:
-                self.echoes.append(ch)
+                self.tty_echoes.append(ch)
             elif stdin == b"\a":
                 pass
             elif stdin == b"\b":
-                self.echoes = self.echoes[:-1]
+                self.tty_echoes = self.tty_echoes[:-1]
             elif stdin == b"\r":
                 pass
             elif stdin == b"\n":
-                line = "".join(self.echoes)
-                self.lines.append(line)
-                self.echoes = list()
+                line = "".join(self.tty_echoes)
+                self.tty_lines.append(line)
+                self.tty_echoes = list()
             else:
                 assert stdin == ESC_STDIN
-                self.echoes.append(ch)
+                self.tty_echoes.append(ch)
 
 
 class GlassTeletype(contextlib.ContextDecorator):
@@ -210,7 +210,7 @@ class GlassTeletype(contextlib.ContextDecorator):
         # Forward the shadow prompt and line only after the lines closes, if Stdin is not a Tty
 
         if not sys.stdin.isatty():
-            for echo in self.shadow.lines:  # may include Ansi color codes
+            for echo in self.shadow.tty_lines:  # may include Ansi color codes
                 sys.stderr.write(echo + "\n")
                 sys.stderr.flush()
 
@@ -265,23 +265,28 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         stdin = os.read(sys.stdin.fileno(), 1)
 
-        # Call for more, while available, while line not closed, if Stdin is Tty
+        # Call for more, while available, while line not closed, if Stdin is or is not Tty
+        # Trust no multibyte character encoding contains b"\r" or b"\n", as is true for UTF-8
+        # (Solving the case of this trust violated will never be worthwhile?)
 
-        if sys.stdin.isatty():
+        stdin_isatty = sys.stdin.isatty()
 
-            calls = 1
-            while (b"\r" not in stdin) and (b"\n" not in stdin):
+        calls = 1
+        while (b"\r" not in stdin) and (b"\n" not in stdin):
 
+            if stdin_isatty:
                 if not self.kbhit():
                     break
 
-                more = os.read(sys.stdin.fileno(), 1)
-                assert more  # because not sys.stdin.isatty()
+            more = os.read(sys.stdin.fileno(), 1)
+            if not more:
+                assert not stdin_isatty
+                break
 
-                stdin += more
-                calls += 1
+            stdin += more
+            calls += 1
 
-            assert calls <= len(stdin)
+        assert calls <= len(stdin) if stdin_isatty else (len(stdin) + 1)
 
         if False:  # FIXME: configure logging
             with open("trace.txt", "a") as appending:
@@ -427,38 +432,50 @@ class GlassTeletype(contextlib.ContextDecorator):
         self.putch(echoable)
 
     def _next_history(self, stdin):
-        """Step forward in time"""
+        """Step forward in time, but skip over blank lines, except at ends of history"""
 
+        stepped = False
         while self.lines:
 
-            shline = self.lines[-1]
+            new_shline = self.lines[-1]
             self.lines = self.lines[:-1]
 
             self._drop_line(stdin)
-            self._insert_chars(shline)
+            self._insert_chars(new_shline)  # FIXME: insert only last next choice
+            stepped = True
 
-            return
+            if new_shline.strip():
+                return
 
-        self._ring_bell(stdin)
+        if not stepped:
+            self._ring_bell(stdin)
 
     def _previous_history(self, stdin):
-        """Step backwards in time"""
-        # FIXME: stop warping cursor to Eol
-        # FIXME: step back to matching lines only, a la Bash history-search-backward/forward
+        """Step backwards in time, but skip over blank lines, except at ends of history"""
+        # FIXME: stop warping cursor to Eol, here and in _next_history
+        # FIXME: step back to match left-of-cursor only, a la Bash history-search-backward/forward
 
+        stepped = False
         while len(self.lines) < len(ShLineHistory.shlines):
+
+            index = len(ShLineHistory.shlines) - len(self.lines)
+            if not any(_.strip() for _ in ShLineHistory.shlines[:index]):
+                break
 
             shline = self._join_shline()
             self.lines.append(shline)
 
-            previous_shline = ShLineHistory.shlines[-len(self.lines)]
+            old_shline = ShLineHistory.shlines[-len(self.lines)]
 
             self._drop_line(stdin)
-            self._insert_chars(previous_shline)
+            self._insert_chars(old_shline)  # FIXME: insert only last previous choice
+            stepped = True
 
-            return
+            if old_shline.strip():
+                return
 
-        self._ring_bell(stdin)
+        if not stepped:
+            self._ring_bell(stdin)
 
     def _quoted_insert(self, stdin):
         """Add any one keystroke to the shline"""

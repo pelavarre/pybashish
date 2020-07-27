@@ -63,7 +63,10 @@ def main():
     stderr_print()
     sys.stderr.flush()
 
-    for verb in sorted(whats_by_verb.keys()):
+    verbs = list(whats_by_verb.keys())
+    verbs.append("history")  # FIXME: collect all the BUILTINS of "bin/bash.py"
+
+    for verb in sorted(verbs):
         shline = "{} --help".format(verb)
         print(shline)
     sys.stdout.flush()

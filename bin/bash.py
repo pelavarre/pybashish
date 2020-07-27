@@ -63,11 +63,10 @@ def main(argv):
             continue
 
         # Exit at end-of-file
+        # Exit with same subprocess.CompletedProcess.returncode=1 as Bash exit at EOF
 
         if not shline:
-            sys.exit(
-                1
-            )  # same subprocess.CompletedProcess.returncode=1 as Bash exit at EOF
+            sys.exit(1)
 
         # Compile and execute the line
 
@@ -79,14 +78,57 @@ def main(argv):
 
         if returncode:  # trace nonzero a la Zsh "print_exit_value"
             stderr_print("warning: bash.py:  exit {}".format(returncode))
+            # FIXME: think into trace "shline" of nonzero "returncode", a la Zsh
 
 
-def builtin_pass(argv):
-    pass
+def builtin_pass(argv):  # FIXME FIXME FIXME: build in "-h" and "--help" without a verb
+    pass  # FIXME: stop zeroing last exit status "$?" at each blank input line
 
 
 def builtin_exit(argv):
-    sys.exit()
+    """Inject a choice of process returncode"""
+
+    file_dir = _calc_file_dir()
+    wherewhat = os.path.join(file_dir, "exit.py")
+
+    ran = subprocess.run(
+        [wherewhat] + argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+    )
+    os.write(sys.stdout.fileno(), ran.stdout)
+    assert ran.returncode is not None
+    assert not ran.stderr  # because stderr=subprocess.STDOUT
+
+    returncode = ran.returncode
+    if not ran.stdout:
+        sys.exit(returncode)
+
+    return returncode
+
+
+def builtin_history(argv):
+    """
+    usage: history [-h]
+
+    review command line input history
+
+    optional arguments:
+      -h, --help  show this help message and exit
+
+    examples:
+      history
+    """
+
+    doc = builtin_history.__doc__
+    try:
+        _ = argdoc.parse_args(args=argv[1:], doc=doc)
+    except SystemExit as exc:
+        returncode = exc.code
+        return returncode
+
+    shlines = read.ShLineHistory.shlines  # couple less tightly  # add date/time-stamp's
+    for (index, shline,) in enumerate(shlines):
+        lineno = 1 + index
+        print("{:5d}  {}".format(lineno, shline))
 
 
 def _parse_shline(shline):
@@ -162,7 +204,7 @@ def _compile_shline(shline, argv):
 
     # Map plain verb to Py file
 
-    file_dir = os.path.split(os.path.realpath(__file__))[0]
+    file_dir = _calc_file_dir()
 
     what = f"{verb}_.py"
     wherewhat = os.path.join(file_dir, what)
@@ -184,6 +226,11 @@ def _compile_shline(shline, argv):
 
     how = _compile_log_error("warning: bash.py: {}: command not found".format(verb))
     return how
+
+
+def _calc_file_dir():
+    file_dir = os.path.split(os.path.realpath(__file__))[0]
+    return file_dir
 
 
 def _compile_log_error(message=None):
@@ -239,6 +286,7 @@ def stderr_print(*args):  # deffed in many files
 BUILTINS = dict()
 BUILTINS[":"] = builtin_pass
 BUILTINS["exit"] = builtin_exit
+BUILTINS["history"] = builtin_history
 # FIXME FIXME: implement BUILTINS["cd"]
 
 

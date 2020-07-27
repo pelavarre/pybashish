@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-# FIXME FIXME: why so always just 6 @ doctestbash.py: 6 tests passed
-# FIXME FIXME: bin/doctestbash.py -v tests/
-
 """
 usage: doctestbash.py [-h] [-b] [-q] [-v] [FILE [FILE ...]]
 
@@ -95,10 +92,9 @@ def _run_bash_test_doc(incoming, args_file):
     while line:
 
         # Take one more test, else break
+        # FIXME: collections.namedtuple for (line_, dent, shline, doc_lines, wants,)
 
-        (line_, dent, shline, doc_lines, wants,) = take_one_test(
-            incoming, line
-        )  # FIXME: collections.namedtuple
+        (line_, dent, shline, doc_lines, wants,) = take_one_test(incoming, line)
 
         line = line_  # FIXME: don't so much hack up a stream with one line of lookahead
 
@@ -228,14 +224,13 @@ def take_one_test(incoming, line):
 
 
 def run_one_shline(shline):
+    """Shell out"""
 
     ran = subprocess.run(
         shline, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
     )
-
-    assert (
-        not ran.stderr
-    )  # because Stderr all folded into Stdout by "subprocess.STDOUT"
+    assert not ran.stderr  # because stderr=subprocess.STDOUT
+    assert ran.returncode is not None
 
     gots = ran.stdout.decode().strip().replace("\r\n", "\n").splitlines()
     if ran.returncode:
