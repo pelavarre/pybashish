@@ -23,7 +23,7 @@ help:
 	: #
 
 black:
-	source ~/bin/black.source && black $$PWD/../pybashish/
+	. ~/bin/black.source && black $$PWD/../pybashish/
 
 test-once:
 	:

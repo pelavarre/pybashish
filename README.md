@@ -2,20 +2,26 @@
 
 Come here to read the Python source code inside Bash
 
-Try it out, inside Linux or Mac OS
+Try it out, inside Linux or Mac OS, any time since Jun/2018 Python 3.7
 
     ssh-add -l
     git clone https://github.com/pelavarre/pybashish.git
-    cat pybashish/README.md
 
-    python3 pybashish/bin/hostname.py --fqdn
-    python3 pybashish/bin/hostname.py --help
+    cd pybashish/
+    git branch -a
+    git checkout pelavarre-patch-1
 
-    python3 pybashish/
+    cat README.md
+    python3 bin/hostname.py --fqdn
+    python3 bin/hostname.py --help
+
+    python3 ../pybashish/
     exit
 
 To run the self-test's of this code
 
+    source ~/bin/black.source
+    pip freeze | grep black
     time make
 
-As of Friday, 10th July 2020
+As of Sunday, 26th July 2020
