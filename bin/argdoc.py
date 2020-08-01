@@ -33,7 +33,7 @@ bugs:
   cutting out all "optional arguments" declarations leaves you with no "-h, --help" option
 
 examples:
-  argdoc.py -h                          # show this help message
+  argdoc.py -h                          # show this help message and exit
   argdoc.py                             # show a template doc and how to call arg doc
   argdoc.py argdoc.py                   # show the file doc and how to call (same as --rip argdoc)
 
@@ -45,6 +45,7 @@ examples:
   argdoc.py argdoc.py -- --help         # parse the arg "--help" with the file's arg doc
   argdoc.py argdoc.py -- hi world       # parse the two args "hi world" with the file's arg doc
 '''
+# FIXME FIXME: complain, as often as run, of Arg Docs wrong only in whitespace
 # FIXME: parsed args whose names begin with a '_' skid shouldn't print here, via argparse.SUPPRESS
 # FIXME: consider looping over a list of [FILE [FILE ...]]
 # FIXME: autocorrect wrong Arg Docs
@@ -80,6 +81,10 @@ def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
     parser = make_parser(doc, doc_filename=doc_filename)
     space = parser.parse_args(args, namespace=namespace)
 
+    if parser_said_print_help(parser, namespace=space):
+        parser.print_help()
+        sys.exit(0)  # exit zero as per convention for ArgParse "--help"
+
     return space
 
 
@@ -97,6 +102,34 @@ def make_parser(doc=None, doc_filename=None):
     parser = coder.exec_parser_source(parser_source)
 
     return parser
+
+
+def parser_said_print_help(parser, namespace):
+    """Print help and exit zero, if an option parsed is doc'ced as print help"""
+
+    help_lines = parser.format_help().splitlines()
+
+    help_options = list()
+    while help_lines and (help_lines[0] != "optional arguments:"):
+        help_lines = help_lines[1:]
+    if help_lines and (help_lines[0] == "optional arguments:"):
+        help_lines = help_lines[1:]
+        while help_lines and (
+            help_lines[0].startswith("  " or not help_lines[0].strip())
+        ):
+            words = help_lines[0].split()
+            if "show this help message and exit" == " ".join(words[1:]):
+                help_options.extend(_.lstrip("-") for _ in words[0].split(","))
+                # FIXME: this would read "---help" as a help option, maybe we don't like that
+            help_lines = help_lines[1:]
+
+    options_by_name = vars(namespace)
+    for help_option in help_options:
+        if help_option in options_by_name.keys():
+            if options_by_name[help_option]:
+                return True
+
+    return False
 
 
 #
@@ -118,10 +151,10 @@ def main(argv):
         app.run_main_argv(argv)
     except ArgDocError as exc:
         shline = shlex_join(argv)
-        stderr_print("error: argdoc.py: ArgDocError: {}".format(exc))
+        stderr_print("argdoc.py: error: ArgDocError: {}".format(exc))
         sys.exit(1)
     except Exception:
-        stderr_print("error: argdoc.py: unhandled exception at:  {}".format(shline))
+        stderr_print("argdoc.py: error: unhandled exception at:  {}".format(shline))
         raise
 
 
@@ -180,7 +213,7 @@ class _ArgDocApp:
 
             if not shred:
                 stderr_print(
-                    "error: argdoc.py: choose --rip from {}, do not choose {!r}".format(
+                    "argdoc.py: error: choose --rip from {}, do not choose {!r}".format(
                         shreds, args.rip
                     )
                 )
@@ -194,7 +227,7 @@ class _ArgDocApp:
         if args.args:
             if (not args.argv_separator) or (shred and (shred != "argdoc")):
                 stderr_print(
-                    "error: argdoc.py: unrecognized args: {}".format(
+                    "argdoc.py: error: unrecognized args: {}".format(
                         shlex_join(args.args)
                     )
                 )
@@ -255,10 +288,9 @@ class _ArgDocApp:
 
         args = parser.parse_args(doc_args)
 
-        if not parser.add_help:
-            if vars(args).get("help"):
-                parser.print_help()
-                sys.exit(0)
+        if parser_said_print_help(parser, namespace=args):
+            parser.print_help()
+            sys.exit(0)  # exit zero as per convention for ArgParse "--help"
 
         self.rip_args(args)
 
@@ -620,18 +652,20 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         # Emit no Python here to tell "argparse.parse_args" to "add_help" for us elsewhere
 
         if (concise == "-h") or (mnemonic == "--help"):
-            assert parts.add_help is None
-            parts.add_help = False
-            addable_help = "show this help message and exit"
-            if (
-                (concise == "-h")
-                and (mnemonic == "--help")
-                and (arg_help_line == addable_help)
-            ):
-                parts.add_help = True
-                no_lines = list()
+            if not parts.add_help:
 
-                return no_lines
+                parts.add_help = False
+
+                addable_help = "show this help message and exit"
+                if (
+                    (concise == "-h")
+                    and (mnemonic == "--help")
+                    and (arg_help_line == addable_help)
+                ):
+                    parts.add_help = True
+
+                    no_lines = list()
+                    return no_lines
 
         # Emit Python source
 
@@ -1349,10 +1383,12 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
         emitted_usage = self.format_usage_phrase()
         if argument_phrase != emitted_usage:
             stderr_print(
-                "error: argdoc: optional argument_phrase:  {}".format(argument_phrase)
+                "error: argdoc.py: optional argument_phrase:  {}".format(
+                    argument_phrase
+                )
             )
             stderr_print(
-                "error: argdoc: optional emitted_usage:  {}".format(emitted_usage)
+                "error: argdoc.py: optional emitted_usage:  {}".format(emitted_usage)
             )
             raise ArgDocError(
                 "meaningless optional usage phrase {}".format(argument_phrase)
@@ -1435,10 +1471,12 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
         emitted_usage = self.format_usage_phrase()
         if argument_phrase != emitted_usage:
             stderr_print(
-                "error: argdoc: positional argument_phrase:  {}".format(argument_phrase)
+                "error: argdoc.py: positional argument_phrase:  {}".format(
+                    argument_phrase
+                )
             )
             stderr_print(
-                "error: argdoc: positional emitted_usage:  {}".format(emitted_usage)
+                "error: argdoc.py: positional emitted_usage:  {}".format(emitted_usage)
             )
             raise ArgDocError(
                 "meaningless positional usage phrase {}".format(argument_phrase)

@@ -41,7 +41,7 @@ def main(argv):
     args = argdoc.parse_args()
 
     if args.hows:
-        stderr_print("error: find.py: Got undefined hints: {}".format(args.hows))
+        stderr_print("find.py: error: Got undefined hints: {}".format(args.hows))
         sys.exit(-1)
 
     os_walk_print_homepath(top=args.top)

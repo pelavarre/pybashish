@@ -284,7 +284,7 @@ def require_test_passed(args_file, passes, gots, dent, wants):
                 )
 
                 for reason in reasons:
-                    stderr_print("error: doctestbash.py: {}".format(reason))
+                    stderr_print("doctestbash.py: error: {}".format(reason))
 
                 sys.exit(1)
 

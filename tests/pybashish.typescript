@@ -172,7 +172,7 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
     $
 
     $ bin/argdoc.py /dev/null xyz
-    error: argdoc.py: unrecognized args: xyz
+    argdoc.py: error: unrecognized args: xyz
     + exit 1
     $
 
@@ -295,7 +295,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
     $ bin/exit.py 256  # alias of zero
-    error: exit.py: returning 256 as 0
+    exit.py: error: returning 256 as 0
     $
 
 

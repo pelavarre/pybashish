@@ -12,7 +12,8 @@ optional arguments:
 bugs:
   prompts with "? ", unlike the "" of Bash "read" with no "-p PROMPT"
   prompts and echoes, even when Stdin is not Tty, unlike Bash
-  lets people edit input, like Bash "read -e" or Zsh "vared"
+  lets people edit input and history, like Bash "read -e" or Zsh "vared"
+  undoes edits of input and history at Return or ⌃C, like Zsh
   keeps blank lines in history, like Bash for non-empty blank lines
   defines ↑ ↓ up/down history review to skip over blank lines, like Zsh
   prints the received line as a Python Repr
@@ -27,6 +28,7 @@ examples:
   read.py --lines
   FOO=123; vared -e FOO  # in Zsh
 """
+# FIXME FIXME:  stop discarding history edits at ⌃N "_next_history"
 
 from __future__ import print_function
 

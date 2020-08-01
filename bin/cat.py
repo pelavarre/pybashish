@@ -61,7 +61,7 @@ def main(argv):
                 with open(relpath, "rt"):
                     pass
             except FileNotFoundError as exc:
-                stderr_print("error: cat.py: {}: {}".format(type(exc).__name__, exc))
+                stderr_print("cat.py: error: {}: {}".format(type(exc).__name__, exc))
                 sys.exit(1)
 
         # Number on the right side of 6 columns, then a hard tab 2 column separator, then the line
