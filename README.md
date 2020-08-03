@@ -2,26 +2,12 @@
 
 Come here to read the Python source code inside Bash
 
-Try it out, inside Linux or Mac OS, any time since Jun/2018 Python 3.7
+Take one source file and fork it, to meet your need instead
 
-    ssh-add -l
-    git clone https://github.com/pelavarre/pybashish.git
+Tell us if "bin/echo.py" is most like what you expected
 
-    cd pybashish/
-    git branch -a
-    git checkout pelavarre-patch-1
+Tell us if "bin/grep.py" is least like what you expected
 
-    cat README.md
-    python3 bin/hostname.py --fqdn
-    python3 bin/hostname.py --help
+Stop settling for the points-of-view that Bash shoves on you, taken from the century before this one
 
-    python3 ../pybashish/
-    exit
-
-To run the self-test's of this code
-
-    source ~/bin/black.source
-    pip freeze | grep black
-    time make
-
-As of Sunday, 26th July 2020
+As of Sunday, 2nd August, 2020

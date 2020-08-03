@@ -88,6 +88,14 @@ def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
     return space
 
 
+def print_help(file=None):
+    """Print the help lines to the file, else to Stdout"""
+
+    file_ = file if file else sys.stdout
+    parser = make_parser()
+    parser.print_help(file=file_)
+
+
 def make_parser(doc=None, doc_filename=None):
     """Compile the Doc into Parser Source, and exec that source to build the Parser"""
 

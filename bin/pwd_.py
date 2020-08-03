@@ -7,8 +7,8 @@ show the os.environ["HOME"], by default just its "os.path.abspath"
 
 optional arguments:
   -h, --help      show this help message and exit
-  --brief         show the briefest abspath/ homepath/ relpath/ whatever
-  --home          show the "~/..." "relpath" if in "~/" (default: True)
+  --brief         show the briefest abspath/ homepath/ realpath
+  --home          show the ~/... relpath in place of abspath or realpath
   -P, --physical  show the "realpath"s, not "abspath"s, of sym links
 
 bugs:
@@ -47,7 +47,8 @@ def main(argv):
     assert cwd == realpath
 
     path = realpath if args.physical else abspath  # FIXME: count -L -P contradictions
-    briefpath = os_path_briefpath(path)
+    formatter = min_path_formatter_not_relpath(path)
+    briefpath = formatter(path)
     homepath = os_path_homepath(path)
 
     printable = path
@@ -59,51 +60,36 @@ def main(argv):
     print(printable)
 
 
-def os_path_briefpath(path, exemplar=None):
-
-    exemplar = path if (exemplar is None) else exemplar
-
-    bp = OsPathBriefPath(exemplar)
-    briefpath = bp.briefpath(path)
-
-    return briefpath
-
-
-class OsPathBriefPath:
-    def __init__(self, exemplar):
-        # FIXME: do we ever want 'os.path.relpath(..., start='
-
-        abbreviator = None
-
-        abbreviators = (
-            os.path.abspath,
-            os.path.realpath,
-            os.path.relpath,
-            os_path_homepath,
-        )
-        for abbreviator_ in abbreviators:
-            if abbreviator is None:
-
-                abbreviator = abbreviator_
-
-            elif len(abbreviator_(exemplar)) < len(abbreviator(exemplar)):
-
-                abbreviator = abbreviator_
-
-        self.abbreviator = abbreviator
-
-    def briefpath(self, path):
-        return self.abbreviator(path)
-
-
-def os_path_homepath(path):
+def os_path_homepath(path):  # deffed in many files
+    """Return the ~/... relpath of a file or dir inside the Home, else the realpath"""
 
     home = os.path.realpath(os.environ["HOME"])
+
     homepath = path
-    if (path == home) or path.startswith(home + os.path.sep):
+    if path == home:
+        homepath = "~"
+    elif path.startswith(home + os.path.sep):
         homepath = "~" + os.path.sep + os.path.relpath(path, start=home)
 
     return homepath
+
+
+def min_path_formatter_not_relpath(exemplar):  # deffed in many files
+    """Choose the def that abbreviates this path most sharply: abs, real, rel, or home"""
+
+    formatters = (
+        os.path.abspath,
+        os.path.realpath,
+        # os.path.relpath,
+        os_path_homepath,
+    )
+
+    formatter = formatters[0]
+    for formatter_ in formatters[1:]:
+        if len(formatter_(exemplar)) < len(formatter(exemplar)):
+            formatter = formatter_
+
+    return formatter
 
 
 if __name__ == "__main__":

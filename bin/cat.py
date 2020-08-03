@@ -94,28 +94,19 @@ def stderr_print(*args):  # deffed in many files
     print(*args, file=sys.stderr)
 
 
-class BrokenPipeSink(contextlib.ContextDecorator):
-    """Silence any unhandled BrokenPipeError down to nothing but sys.exit(1)
+class BrokenPipeErrorSink(contextlib.ContextDecorator):  # deffed in many files
+    """Cut unhandled BrokenPipeError down to sys.exit(1)
 
-    Yes, this is try-except-pass, but it is significantly more narrow than:
-
-        signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
-
-    Test with lots of slow Stdout suddenly cut short, such as
-
-        bin/cat.py -n bin/*.py | head
-
-        bin/find.py ~ | head
-
-    See https://docs.python.org/3/library/signal.html#note-on-sigpipe
+    More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
+    As per https://docs.python.org/3/library/signal.html#note-on-sigpipe
     """
 
-    def __enter__(self):
-
+    def __enter__(
+        self,
+    ):  # test with large Stdout cut sharply, such as:  find.py ~ | head
         return self
 
     def __exit__(self, *exc_info):
-
         (exc_type, exc, exc_traceback,) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
@@ -126,7 +117,7 @@ class BrokenPipeSink(contextlib.ContextDecorator):
 
 
 if __name__ == "__main__":
-    with BrokenPipeSink():
+    with BrokenPipeErrorSink():
         sys.exit(main(sys.argv))
 
 
