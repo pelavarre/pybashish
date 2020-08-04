@@ -37,9 +37,10 @@ Contents
 ++ 2.23 ) Read
 ++ 2.24 ) Rm
 ++ 2.25 ) SubSh
-++ 2.26 ) Touch
-++ 2.27 ) Watch
-++ 2.28 ) Wc
+++ 2.26 ) Tar
+++ 2.27 ) Touch
+++ 2.28 ) Watch
+++ 2.29 ) Wc
 
 
 To refresh this table of contents, try:
@@ -115,6 +116,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
     read --help
     rm --help
     subsh --help
+    tar --help
     touch --help
     watch --help
     wc --help
@@ -400,13 +402,16 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.26 ) Touch
+## 2.26 ) Tar
 
 
-## 2.27 ) Watch
+## 2.27 ) Touch
 
 
-## 2.28 ) Wc
+## 2.28 ) Watch
+
+
+## 2.29 ) Wc
 
 
 // FIXME: remake this into a ".md" Markdown file

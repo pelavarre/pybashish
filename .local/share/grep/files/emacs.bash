@@ -35,7 +35,7 @@ emacs -nw ~/.emacs
 #
 # emacs  ⌃Xc ⌥~  => quit emacs, without saving
 #
-# emacs  ⌃Hk... ⌃Ha...  => help with key chord squence, help with word
+# emacs  ⌃Hk... ⌃Ha...  => help with key chord sequence, help with word
 #
 # emacs  ⌃Z  => as per terminal or no-op
 #

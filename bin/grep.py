@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: grep.py [--help] [-h] [PATTERN [PATTERN ...]]
+usage: grep.py [--help] [-h] [-v] [PATTERN [PATTERN ...]]
 
 search a curated Terminal input history for a paragraph or line of input to repeat now
 
@@ -11,13 +11,14 @@ positional arguments:
 optional arguments:
   --help             show this help message and exit
   -h, --no-filename  just print the hits, not the filenames they came from (default: True)
+  -v, --verbose      think more out loud
 
 usage as a ~/.bashrc (or ~/.zshrc) history-recall extension:
-  alias -- '~'=source_grep_py  # execute hit
+  alias -- '~'=search-me-while-feeling-lucky  # execute hit
   alias -- '~~'=grep.py  # print hit
   alias -- '~!'='vim +$ $(cat ~/.local/share/grep/hitfiles)'
 
-  function source_grep_py () {
+  function search-me-while-feeling-lucky () {
     local sourceable=$(mktemp)
     grep.py "$@" >"$sourceable"
     local xs="$?"
@@ -75,11 +76,16 @@ examples:
   ~ quit vim  # remind us how to quit Vim
   ~ vim quit  # same hit, just found by another order
 """
+#
+# FIXME: call it one hit when only one hit has more copies of some or of all the patterns, eg, ~ gs
+#
+# FIXME: quit after ten hits
+#
 # FIXME: populate the cat ~/.local/share/grep/hitfiles with the files hit
 # FIXME: example ignore case, example respect case
 # FIXME: example duplicate patterns must show up more than once
-# FIXME: call it one hit when only one hit has more copies of some or of all the patterns
 # FIXME: match trailing N patterns to 1 or more "..." as args, not just to themselves
+#
 
 import os
 import re
@@ -95,18 +101,29 @@ FILES_DIR = os.path.join(GREP_DIR, "files")
 
 
 def main():
+    """Interpret the command line"""
+
+    # Parse the command line, per the top-of-file docstring
 
     args = argdoc.parse_args()
+    args.verbose = args.verbose if args.verbose else 0
+
+    main.args = args
+
     if args.no_filename:  # print help because "-h" is short for "--filename"
         argdoc.print_help()
         sys.exit(0)  # exit zero as per convention for ArgParse "--help"
+
+    if main.args.verbose >= 2:
+        stderr_print(f"grep.py: args={args}")
 
     # Publish default files individually, apart from this source file
 
     file_dir = os.path.split(os.path.realpath(__file__))[0]
 
-    source_files_dir = os.path.join(file_dir, "../{}".format(FILES_DIR))
-    # stderr_print("grep.py: testing dir {}/".format(source_files_dir))
+    source_files_dir = os.path.realpath(
+        os.path.join(file_dir, "../{}".format(FILES_DIR))
+    )
     if not os.path.exists(source_files_dir):
         stderr_print("grep.py: creating dir {}/".format(minpath(source_files_dir)))
         _export_files(FILES_CHARS, from_dir="files/", to_dir=source_files_dir)
@@ -114,15 +131,21 @@ def main():
     # Share default files out across this localhost, apart from this source file
 
     home_files_dir = "~/{}".format(FILES_DIR)
-    home_files_dir_ = home_files_dir.replace("~", os.environ["HOME"])
-    # stderr_print("grep.py: testing dir {}/".format(home_files_dir_))
-    if not os.path.exists(home_files_dir_):
+
+    main.home_files_dir = home_files_dir
+
+    home_files_envpath = home_files_dir.replace("~", os.environ["HOME"])
+    home_files_envpath = os.path.realpath(home_files_envpath)
+
+    main.home_files_envpath = home_files_envpath
+
+    if not os.path.exists(home_files_envpath):
         stderr_print("grep.py: creating dir {}/".format(minpath(home_files_dir)))
-        _export_files(FILES_CHARS, from_dir="files/", to_dir=home_files_dir_)
+        _export_files(FILES_CHARS, from_dir="files/", to_dir=home_files_envpath)
 
     # Choose files to search
 
-    top = home_files_dir_
+    top = home_files_envpath
     many_relpaths = list(os_walk_sorted_relfiles(top))
     few_relpaths = list(_ for _ in many_relpaths if "~" not in _)
     realpaths = list(os.path.realpath(os.path.join(top, _)) for _ in few_relpaths)
@@ -134,6 +157,7 @@ def main():
     # Search through lines
 
     exit_status = grep_lines(args, lines=files_lines, chosen_lines=chosen_lines)
+    verbose_print("grep.py: + exit {}".format(exit_status if exit_status else 0))
     sys.exit(exit_status)
 
 
@@ -173,7 +197,6 @@ def _export_files(tarrish_chars, from_dir, to_dir):
         if lines:
 
             if (not was_stripped) and (not stripped):
-                # stderr_print(what_key + what)  # option to trace like:  tar xvkf tarred.gz
 
                 assert what
                 wherewhat = os.path.join(to_dir, what)
@@ -219,11 +242,17 @@ def _export_files(tarrish_chars, from_dir, to_dir):
 def _ext_files_readlines(ext, files):
     """Collect the lines of some files, but if not .ext then preface with # {filename}: """
 
+    verbose_print(
+        "grep.py: collecting, from the {}/ dir, the relpaths:  {}".format(
+            main.home_files_dir,
+            " ".join(os.path.relpath(_, start=main.home_files_envpath) for _ in files),
+        )
+    )
+
     chosen_lines = None
 
     files_lines = list()
     for file_ in files:
-        # stderr_print(file_)
 
         (where, what,) = os.path.split(file_)
         (name, ext_,) = os.path.splitext(what)
@@ -305,13 +334,26 @@ def grep_lines(args, lines, chosen_lines):  # FIXME  # noqa C901
 
         if para_hits:
             if not para_comments:
+                verbose_print(
+                    "grep.py: {} lines hit in para without comments".format(
+                        len(para_hits)
+                    )
+                )
                 file_hits.extend([_] for _ in para_hits)
             elif para_comments == para:
+                verbose_print(
+                    "grep.py: {} lines hit in para of comments".format(len(para_hits))
+                )
                 if len(para_hits) == 1:
                     file_hits.extend([_] for _ in para_hits)
                 else:
                     file_hits.append(para)
             else:
+                verbose_print(
+                    "grep.py: {} lines hit in para of input and comments".format(
+                        len(para_hits)
+                    )
+                )
                 assert 0 < len(para_comments) < len(para)
                 file_hits.append(para)
                 separating_hits = True
@@ -370,8 +412,11 @@ def grep_lines(args, lines, chosen_lines):  # FIXME  # noqa C901
                 dedenting = True
 
         if not dedenting:
+            verbose_print("grep.py: hitting {} lines".format(len(hit_lines)))
             print("\n".join(hit_lines))
         else:
+            verbose_print("grep.py: dedenting {} lines".format(len(dedents)))
+            verbose_print("grep.py: hit {!r}".format(hit_lines))
             print("\n".join(dedents))
             exit_status = exit_status if exit_status else 1
 
@@ -383,7 +428,6 @@ def grep_lines(args, lines, chosen_lines):  # FIXME  # noqa C901
     hitfiles = [os.path.join(FILES_DIR, "b.bash")]  # FIXME: less brittle
 
     hitfiles_file = os.path.join(os.environ["HOME"], GREP_DIR, "hitfiles")
-    # stderr_print(hitfiles_file)
     with open(hitfiles_file, "w") as outgoing:
         outgoing.write("\n".join(hitfiles))
 
@@ -485,6 +529,11 @@ def split_paragraphs(lines, keepends=False):  # deffed in many files
 
 def stderr_print(*args):  # deffed in many files
     print(*args, file=sys.stderr)
+
+
+def verbose_print(*args):  # deffed in many files
+    if main.args.verbose:
+        print(*args, file=sys.stderr)
 
 
 FILES_CHARS = r"""
@@ -649,7 +698,7 @@ FILES_CHARS = r"""
     #
     # emacs  ⌃Xc ⌥~  => quit emacs, without saving
     #
-    # emacs  ⌃Hk... ⌃Ha...  => help with key chord squence, help with word
+    # emacs  ⌃Hk... ⌃Ha...  => help with key chord sequence, help with word
     #
     # emacs  ⌃Z  => as per terminal or no-op
     #
@@ -702,8 +751,8 @@ FILES_CHARS = r"""
 
     git --version
 
-    # git clean -ffxdq  # destroy everything not added, without backup
-    # git reset --hard @{upstream}  # shove all my comments into the "git reflog", take theirs instead
+    echo 'git clean -ffxdq'  # destroy everything not added, without backup
+    echo 'git reset --hard @{upstream}'  # shove all my comments into the "git reflog", take theirs instead
 
     git branch | grep '^[*]'
     git branch --all

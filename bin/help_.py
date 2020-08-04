@@ -29,6 +29,11 @@ import sys
 import argdoc
 
 
+HIDDENS = (
+    "pyish subsh2 tar2".split()
+)  # FIXME: learn to show just "rwx" by way of hiding "rw-"
+
+
 def main():
 
     args = argdoc.parse_args()
@@ -43,7 +48,7 @@ def main():
     whats_by_verb = dict()
     for what in globbed:
         name = os.path.splitext(what)[0]
-        if not name.startswith("_"):
+        if not name.startswith("_") and (not name in HIDDENS):
             verb = name.strip("_")
 
             whats_by_verb[verb] = what

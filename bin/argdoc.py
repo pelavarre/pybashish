@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 '''
 usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- [ARG [ARG ...]]]
@@ -49,12 +50,16 @@ examples:
 # FIXME: parsed args whose names begin with a '_' skid shouldn't print here, via argparse.SUPPRESS
 # FIXME: consider looping over a list of [FILE [FILE ...]]
 # FIXME: autocorrect wrong Arg Docs
+# FIXME: complain of prog != file name, eg, "tar.py" help inside "tar2.py"
 
 from __future__ import print_function
 
 import argparse
+import collections
+import inspect
 import os
 import re
+import shlex
 import sys
 import textwrap
 
@@ -152,13 +157,12 @@ class ArgDocError(Exception):
 def main(argv):
     """Run from the command line"""
 
-    shline = shlex_join(argv)
+    shline = pyish_shlex_join(argv)
     app = _ArgDocApp()
 
     try:
         app.run_main_argv(argv)
     except ArgDocError as exc:
-        shline = shlex_join(argv)
         stderr_print("argdoc.py: error: ArgDocError: {}".format(exc))
         sys.exit(1)
     except Exception:
@@ -180,7 +184,7 @@ class _ArgDocApp:
             doc_filename=args.file,
             shred=args.shred,
             argv_separator=args.argv_separator,
-            doc_args=args.args,
+            tail_argv=args.args,
         )
 
     def parse_main_argv(self, argv):
@@ -236,14 +240,14 @@ class _ArgDocApp:
             if (not args.argv_separator) or (shred and (shred != "argdoc")):
                 stderr_print(
                     "argdoc.py: error: unrecognized args: {}".format(
-                        shlex_join(args.args)
+                        pyish_shlex_join(args.args)
                     )
                 )
                 sys.exit(1)
 
         return args
 
-    def run_parsed_main_args(self, doc_filename, shred, argv_separator, doc_args):
+    def run_parsed_main_args(self, doc_filename, shred, argv_separator, tail_argv):
         """Print the Arg Doc, or compile it, or run it"""
 
         coder = _ArgDocCoder()
@@ -292,9 +296,9 @@ class _ArgDocApp:
         # Run the parser, and rip the args that result (except when printing help and exiting zero)
         # Trace the args prefaced by "+ ", as if prefaced by Bash PS4
 
-        print("+ {}".format(shlex_join([doc_filename] + doc_args)))
+        print("+ {}".format(pyish_shlex_join([doc_filename] + tail_argv)))
 
-        args = parser.parse_args(doc_args)
+        args = parser.parse_args(tail_argv)
 
         if parser_said_print_help(parser, namespace=args):
             parser.print_help()
@@ -579,11 +583,11 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
             if dest == metavar:
                 mid_lines = [
-                    d + f"{repr_dest},",
+                    d + pyish_f("{repr_dest},"),
                 ]
             else:
                 mid_lines = [
-                    d + f"{repr_dest}, metavar={repr_metavar},",
+                    d + pyish_f("{repr_dest}, metavar={repr_metavar},"),
                 ]
 
         else:
@@ -591,15 +595,18 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
             if dest == metavar:
                 mid_lines = [
-                    d + f"{repr_dest}, nargs={repr_nargs},",
+                    d + pyish_f("{repr_dest}, nargs={repr_nargs},"),
                 ]
             else:
                 mid_lines = [
-                    d + f"{repr_dest}, metavar={repr_metavar}, nargs={repr_nargs},",
+                    d
+                    + pyish_f(
+                        "{repr_dest}, metavar={repr_metavar}, nargs={repr_nargs},"
+                    ),
                 ]
 
         tail_lines = [
-            d + f"help={repr_help}" ")",
+            d + pyish_f("help={repr_help}") + ")",
         ]
 
         lines = head_lines + mid_lines + tail_lines
@@ -695,24 +702,31 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
             if not alt_option:
                 assert dest == option.lower()
-                mid_lines = [d + f"{repr_option}, action={repr_action},"]
+                mid_lines = [d + pyish_f("{repr_option}, action={repr_action},")]
             else:
                 assert dest == mnemonic.lower()
-                mid_lines = [d + f"{repr_option}, {repr_alt}, action={repr_action},"]
+                mid_lines = [
+                    d + pyish_f("{repr_option}, {repr_alt}, action={repr_action},")
+                ]
 
         else:  # FIXME FIXME: "argparse" "add_argument" expresses our nargs=1 as "action=None"?
             assert nargs == 1
 
             if not alt_option:
                 if dest == option.lower():
-                    mid_lines = [d + f"{repr_option}, metavar={repr_var},"]
+                    mid_lines = [d + pyish_f("{repr_option}, metavar={repr_var},")]
                 else:
                     mid_lines = [
-                        d + f"{repr_option}, metavar={repr_var}, dest={repr_dest},"
+                        d
+                        + pyish_f(
+                            "{repr_option}, metavar={repr_var}, dest={repr_dest},"
+                        )
                     ]
             else:
                 assert dest == mnemonic.lower()
-                mid_lines = [d + f"{repr_option}, {repr_alt}, metavar={repr_var},"]
+                mid_lines = [
+                    d + pyish_f("{repr_option}, {repr_alt}, metavar={repr_var},")
+                ]
 
         tail_lines = [
             d + "help={repr_help}".format(repr_help=black_repr(arg_help_line)),
@@ -879,7 +893,7 @@ class _ArgDocTaker(argparse.Namespace):
         # Calculate words comparable between Usage Phrases and Argument Declaration Lines
         # FIXME: detect multiple phrase declarations earlier
 
-        phrases_by_words = dict()
+        phrases_by_words = collections.OrderedDict()  # could be "dict" in Python 3
         for phrase in phrases:
             words = phrase._tuple_comparable_words()
 
@@ -905,7 +919,7 @@ class _ArgDocTaker(argparse.Namespace):
 
         # Calculate words comparable between Argument Declaration Lines and Usage Phrase
 
-        lines_by_words = dict()
+        lines_by_words = collections.OrderedDict()  # could be "dict" in Python 3
         for argument_line in argument_lines:
             line = ArgumentLineSyntaxTaker(argument_line)
             words = line._tuple_comparable_words()
@@ -1746,6 +1760,37 @@ def _read_docstring_from_stream(reading):
     return doc
 
 
+def pyish_f(formattable):  # deffed in many files  # since Oct/2019 Python 3.7
+    """Emulate f"string"s"""
+
+    f = inspect.currentframe()
+    f = f.f_back
+
+    values_by_key = dict(f.f_globals)
+    values_by_key.update(f.f_locals)
+
+    formatted = formattable.format(**values_by_key)
+
+    return formatted
+
+
+# deffed in many files  # since Oct/2019 Python 3.8
+def pyish_shlex_join(argv):
+    """Undo enough of the "shlex.split" to log its work reasonably well"""
+
+    rep = " ".join((repr(_) if (" " in _) else _) for _ in argv)
+
+    if '"' not in rep:  # like don't guess what "'$foo'" means
+        try:
+            if shlex.split(rep) == argv:
+                return rep
+        except ValueError:
+            pass
+
+    rep = repr(argv)
+    return rep
+
+
 def require_sys_version_info(*min_info):  # deffed in many files
     """Decline to test Python older than the chosen version"""
 
@@ -1763,38 +1808,6 @@ def require_sys_version_info(*min_info):  # deffed in many files
         stderr_print()
 
         sys.exit(1)
-
-
-def shlex_join(argv):  # FIXME: substitute "shlex.join" since Oct/2019 Python 3.8
-    """Undo the "shlex.split", well enough for now"""
-
-    flattened = " ".join(argv)
-
-    if "'" not in flattened:
-
-        joined = ""
-        for arg in argv:
-            assert "\\" not in arg
-            assert "'" not in arg
-            joined += " "
-            joined += "'{}'".format(arg) if (" " in arg) else arg
-
-        return joined[len(" ") :]
-
-    if '"' not in flattened:
-
-        joined = ""
-        for arg in argv:
-            assert "\\" not in arg
-            assert "$" not in arg
-            assert "`" not in arg
-            assert '"' not in arg
-            joined += " "
-            joined += '"{}"'.format(arg) if (" " in arg) else arg
-
-        return joined[len(" ") :]
-
-    return flattened  # both wrong, and good enough for now
 
 
 def stderr_print(*args):  # deffed in many files

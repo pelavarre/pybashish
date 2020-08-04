@@ -4,8 +4,8 @@
 
 git --version
 
-# git clean -ffxdq  # destroy everything not added, without backup
-# git reset --hard @{upstream}  # shove all my comments into the "git reflog", take theirs instead
+echo 'git clean -ffxdq'  # destroy everything not added, without backup
+echo 'git reset --hard @{upstream}'  # shove all my comments into the "git reflog", take theirs instead
 
 git branch | grep '^[*]'
 git branch --all
