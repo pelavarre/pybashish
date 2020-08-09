@@ -314,7 +314,8 @@ def vv_print(*args):
         stderr_print(*args)
 
 
-def stderr_print(*args):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 

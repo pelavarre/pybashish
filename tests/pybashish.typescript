@@ -14,33 +14,35 @@ Contents
 ++ 2.1 ) ArgDoc
 ++ 2.2 ) Bash
 ++ 2.3 ) Bind
-++ 2.4 ) Cat
-++ 2.5 ) Clips
-++ 2.6 ) Column
-++ 2.6 ) Cp
-++ 2.7 ) Date
-++ 2.8 ) Dd
-++ 2.9 ) DocTestBash
-++ 2.10 ) Echo
-++ 2.11 ) Exit
-++ 2.12 ) Find
-++ 2.13 ) Fmt
-++ 2.14 ) Grep
-++ 2.15 ) Help
-++ 2.16 ) HexDump
-++ 2.17 ) History
-++ 2.18 ) Hostname
-++ 2.19 ) Ls
-++ 2.20 ) Make
-++ 2.21 ) Mv
-++ 2.22 ) Pwd
-++ 2.23 ) Read
-++ 2.24 ) Rm
-++ 2.25 ) SubSh
-++ 2.26 ) Tar
-++ 2.27 ) Touch
-++ 2.28 ) Watch
-++ 2.29 ) Wc
+++ 2.4 ) Cal
+++ 2.5 ) Cat
+++ 2.6 ) Clips
+++ 2.7 ) Cp
+++ 2.9 ) Column
+++ 2.10 ) Date
+++ 2.11 ) Dd
+++ 2.12 ) DocTestBash
+++ 2.13 ) Echo
+++ 2.14 ) Exit
+++ 2.15 ) Find
+++ 2.16 ) Fmt
+++ 2.17 ) Grep
+++ 2.18 ) Help
+++ 2.19 ) HexDump
+++ 2.20 ) History
+++ 2.21 ) Hostname
+++ 2.22 ) Jq
+++ 2.21 ) Ls
+++ 2.22 ) Make
+++ 2.23 ) Mv
+++ 2.24 ) Pwd
+++ 2.25 ) Read
+++ 2.26 ) Rm
+++ 2.27 ) SubSh
+++ 2.28 ) Tar
+++ 2.29 ) Touch
+++ 2.30 ) Watch
+++ 2.31 ) Wc
 
 
 To refresh this table of contents, try:
@@ -93,6 +95,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
     argdoc --help
     bash --help
     bind --help
+    cal --help
     cat --help
     clips --help
     column --help
@@ -109,6 +112,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
     hexdump --help
     history --help
     hostname --help
+    jq --help
     ls --help
     make --help
     mv --help
@@ -208,7 +212,10 @@ Lorem ipsum dolor sit amet
     $
 
 
-## 2.4 ) Cat
+## 2.4 ) Cal
+
+
+## 2.5 ) Cat
 
     $ echo a b c | tr ' ' '\n' | bin/cat.py -
     a
@@ -217,13 +224,13 @@ Lorem ipsum dolor sit amet
     $
 
 
-## 2.5 ) Clips
+## 2.6 ) Clips
 
 
-## 2.6 ) Cp
+## 2.7 ) Cp
 
 
-## 2.6 ) Column
+## 2.9 ) Column
 
 Left-justify columns of words
 
@@ -256,16 +263,16 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.7 ) Date
+## 2.10 ) Date
 
 
-## 2.8 ) Dd
+## 2.11 ) Dd
 
 
-## 2.9 ) DocTestBash
+## 2.12 ) DocTestBash
 
 
-## 2.10 ) Echo
+## 2.13 ) Echo
 
     $ bin/echo.py 'Hello, Echo World!'
     Hello, Echo World!
@@ -277,7 +284,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.11 ) Exit
+## 2.14 ) Exit
 
     $ bin/exit.py
     $
@@ -301,14 +308,14 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.12 ) Find
+## 2.15 ) Find
 
     $ bin/find.py /dev/null
     /dev/null
     $
 
 
-## 2.13 ) Fmt
+## 2.16 ) Fmt
 
     $ echo $(seq 0 39) | bin/fmt.py -w42  # split to fit inside width
     0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
@@ -329,10 +336,10 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.14 ) Grep
+## 2.17 ) Grep
 
 
-## 2.15 ) Help
+## 2.18 ) Help
 
     $ bin/help_.py help
     usage: help_.py [-h] [VERB]
@@ -353,28 +360,31 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.16 ) HexDump
+## 2.19 ) HexDump
 
 
-## 2.17 ) History
+## 2.20 ) History
 
 
-## 2.18 ) Hostname
+## 2.21 ) Hostname
 
 
-## 2.19 ) Ls
+## 2.22 ) Jq
 
 
-## 2.20 ) Make
+## 2.21 ) Ls
 
 
-## 2.21 ) Mv
+## 2.22 ) Make
 
 
-## 2.22 ) Pwd
+## 2.23 ) Mv
 
 
-## 2.23 ) Read
+## 2.24 ) Pwd
+
+
+## 2.25 ) Read
 
     $ echo 'Hello, Line Editor' | bin/read.py
     ? Hello, Line Editor
@@ -391,10 +401,10 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑'
     $
 
-## 2.24 ) Rm
+## 2.26 ) Rm
 
 
-## 2.25 ) SubSh
+## 2.27 ) SubSh
 
     $ bin/subsh.py echo 'Hello, Subsh World!'
     ('{"args": ["echo", "Hello, Subsh World!"], "returncode": 0, "stdout": "Hello, '
@@ -402,16 +412,42 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.26 ) Tar
+## 2.28 ) Tar
+
+    $ rm -fr dir/ dir.tgz
+    $ mkdir -p dir/a/b/c dir/p/q/r
+    $ echo hello >dir/a/b/d
+    $ echo goodbye > dir/a/b/e
+    $ tar czf dir.tgz dir/  # ordered differently at Mac, at Linux
+    $
+
+    $ bin/tar.py tvf /dev/null/child -tvf dir.tgz 2>&1 | sort
+    dir/
+    dir/a/
+    dir/a/b/
+    dir/a/b/c/
+    dir/a/b/d
+    dir/a/b/e
+    dir/p/
+    dir/p/q/
+    dir/p/q/r/
+    $
+
+    $ bin/tar.py xvkf dir.tgz 2>&1 | grep -v '^dir/' | wc
+           2       2      14
+    $
+
+    $ bin/tar2.py tvf /dev/null/child -tvf dir.tgz 2>/dev/null
+    $ bin/tar2.py xvkf dir.tgz >/dev/null 2>&1
+    $
+
+## 2.29 ) Touch
 
 
-## 2.27 ) Touch
+## 2.30 ) Watch
 
 
-## 2.28 ) Watch
-
-
-## 2.29 ) Wc
+## 2.31 ) Wc
 
 
 // FIXME: remake this into a ".md" Markdown file

@@ -60,7 +60,8 @@ def main(argv):
     print(printable)
 
 
-def os_path_homepath(path):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def os_path_homepath(path):
     """Return the ~/... relpath of a file or dir inside the Home, else the realpath"""
 
     home = os.path.realpath(os.environ["HOME"])
@@ -74,7 +75,8 @@ def os_path_homepath(path):  # deffed in many files
     return homepath
 
 
-def min_path_formatter_not_relpath(exemplar):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def min_path_formatter_not_relpath(exemplar):
     """Choose the def that abbreviates this path most sharply: abs, real, rel, or home"""
 
     formatters = (

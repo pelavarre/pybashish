@@ -14,12 +14,14 @@ from __future__ import print_function
 
 import argparse
 import collections
-import contextlib
 import inspect
+import io
 import shlex
+import subprocess
+import sys
 
 
-# deffed in many files  # since Oct/2019 Python 3.7
+# deffed in many files  # since Oct/2019 Python 3.7  # much too meta to pass Flake8 review
 def f(formattable):
     """Emulate f"string"s"""
 
@@ -81,4 +83,5 @@ def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 
+# deffed in many files  # since Oct/2019 Python 3.7  # since Dec/2016 CPython 3.6
 dict = collections.OrderedDict

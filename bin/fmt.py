@@ -122,16 +122,19 @@ def print_one_paragraph(dent, para, width):
             print((dent + line).rstrip())
 
 
-def prompt_tty_stdin():  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def prompt_tty_stdin():
     if sys.stdin.isatty():
         stderr_print("Press ⌃D EOF to quit")
 
 
-def stderr_print(*args):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 
-def str_splitdent(line):  # deffed by "doctestbash.py", "fmt.py
+# deffed in many files  # missing from docs.python.org
+def str_splitdent(line):
     """Split apart the indentation of a line, from the remainder of the line"""
 
     len_dent = len(line) - len(line.lstrip())

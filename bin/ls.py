@@ -323,7 +323,8 @@ def spill_cells(cells, columns, sep):  # FIXME  # noqa C901
     return rows
 
 
-def stderr_print(*args):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 

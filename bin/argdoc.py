@@ -56,7 +56,6 @@ from __future__ import print_function
 
 import argparse
 import collections
-import inspect
 import os
 import re
 import shlex
@@ -88,7 +87,7 @@ def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
 
     if parser_said_print_help(parser, namespace=space):
         parser.print_help()
-        sys.exit(0)  # exit zero as per convention for ArgParse "--help"
+        sys.exit(0)  # exit zero from printing help
 
     return space
 
@@ -302,7 +301,7 @@ class _ArgDocApp:
 
         if parser_said_print_help(parser, namespace=args):
             parser.print_help()
-            sys.exit(0)  # exit zero as per convention for ArgParse "--help"
+            sys.exit(0)  # exit zero from printing help
 
         self.rip_args(args)
 
@@ -332,13 +331,13 @@ class _ArgDocApp:
             with open("b", "w") as outgoing:
                 outgoing.write(help_doc.strip())
 
-        help_shline = "bin/argdoc.py --doc {}".format(doc_filename)
-        help_message = "warning: argdoc.py: doc != help, help at:  {}".format(
+        help_shline = "bin/argdoc.py --rip argdoc {}".format(doc_filename)
+        help_message = "warning: argdoc.py: help != doc, help at:  {}".format(
             help_shline
         )
         stderr_print(help_message)
 
-        file_doc_shline = "vim {}".format(doc_filename)
+        file_doc_shline = "bin/argdoc.py --rip doc {}".format(doc_filename)
         file_doc_message = "warning: argdoc.py: doc != help, doc at:  {}".format(
             file_doc_shline
         )
@@ -583,11 +582,14 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
             if dest == metavar:
                 mid_lines = [
-                    d + pyish_f("{repr_dest},"),
+                    d + "{repr_dest},".format(repr_dest=repr_dest),
                 ]
             else:
                 mid_lines = [
-                    d + pyish_f("{repr_dest}, metavar={repr_metavar},"),
+                    d
+                    + "{repr_dest}, metavar={repr_metavar},".format(
+                        repr_dest=repr_dest, repr_metavar=repr_metavar
+                    ),
                 ]
 
         else:
@@ -595,18 +597,24 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
             if dest == metavar:
                 mid_lines = [
-                    d + pyish_f("{repr_dest}, nargs={repr_nargs},"),
+                    d
+                    + "{repr_dest}, nargs={repr_nargs},".format(
+                        repr_dest=repr_dest, repr_nargs=repr_nargs
+                    ),
                 ]
             else:
                 mid_lines = [
                     d
-                    + pyish_f(
-                        "{repr_dest}, metavar={repr_metavar}, nargs={repr_nargs},"
+                    + "{repr_dest}, metavar={repr_metavar}, nargs={repr_nargs},".format(
+                        repr_dest=repr_dest,
+                        repr_metavar=repr_metavar,
+                        repr_nargs=repr_nargs,
                     ),
                 ]
 
         tail_lines = [
-            d + pyish_f("help={repr_help}") + ")",
+            d + "help={repr_help}".format(repr_help=repr_help),
+            d + ")",
         ]
 
         lines = head_lines + mid_lines + tail_lines
@@ -702,11 +710,21 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
             if not alt_option:
                 assert dest == option.lower()
-                mid_lines = [d + pyish_f("{repr_option}, action={repr_action},")]
+                mid_lines = [
+                    d
+                    + "{repr_option}, action={repr_action},".format(
+                        repr_option=repr_option, repr_action=repr_action
+                    )
+                ]
             else:
                 assert dest == mnemonic.lower()
                 mid_lines = [
-                    d + pyish_f("{repr_option}, {repr_alt}, action={repr_action},")
+                    d
+                    + "{repr_option}, {repr_alt}, action={repr_action},".format(
+                        repr_option=repr_option,
+                        repr_alt=repr_alt,
+                        repr_action=repr_action,
+                    )
                 ]
 
         else:  # FIXME FIXME: "argparse" "add_argument" expresses our nargs=1 as "action=None"?
@@ -714,18 +732,28 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
             if not alt_option:
                 if dest == option.lower():
-                    mid_lines = [d + pyish_f("{repr_option}, metavar={repr_var},")]
+                    mid_lines = [
+                        d
+                        + "{repr_option}, metavar={repr_var},".format(
+                            repr_option=repr_option, repr_var=repr_var
+                        )
+                    ]
                 else:
                     mid_lines = [
                         d
-                        + pyish_f(
-                            "{repr_option}, metavar={repr_var}, dest={repr_dest},"
+                        + "{repr_option}, metavar={repr_var}, dest={repr_dest},".format(
+                            repr_option=repr_option,
+                            repr_var=repr_var,
+                            repr_dest=repr_dest,
                         )
                     ]
             else:
                 assert dest == mnemonic.lower()
                 mid_lines = [
-                    d + pyish_f("{repr_option}, {repr_alt}, metavar={repr_var},")
+                    d
+                    + "{repr_option}, {repr_alt}, metavar={repr_var},".format(
+                        repr_option=repr_option, repr_alt=repr_alt, repr_var=repr_var
+                    )
                 ]
 
         tail_lines = [
@@ -1693,11 +1721,6 @@ def _plural_en_test():
     assert guesses == plurals
 
 
-def prompt_tty_stdin():  # deffed in many files
-    if sys.stdin.isatty():
-        stderr_print("Press ⌃D EOF to quit")
-
-
 def read_docstring_from(relpath):
     """
     Read the docstring from a python file without importing the rest of it
@@ -1760,18 +1783,10 @@ def _read_docstring_from_stream(reading):
     return doc
 
 
-def pyish_f(formattable):  # deffed in many files  # since Oct/2019 Python 3.7
-    """Emulate f"string"s"""
-
-    f = inspect.currentframe()
-    f = f.f_back
-
-    values_by_key = dict(f.f_globals)
-    values_by_key.update(f.f_locals)
-
-    formatted = formattable.format(**values_by_key)
-
-    return formatted
+# deffed in many files  # missing from docs.python.org
+def prompt_tty_stdin():
+    if sys.stdin.isatty():
+        stderr_print("Press ⌃D EOF to quit")
 
 
 # deffed in many files  # since Oct/2019 Python 3.8
@@ -1791,7 +1806,8 @@ def pyish_shlex_join(argv):
     return rep
 
 
-def require_sys_version_info(*min_info):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def require_sys_version_info(*min_info):
     """Decline to test Python older than the chosen version"""
 
     min_info_ = min_info if min_info else (3, 7,)  # June/2019 Python 3.7
@@ -1810,11 +1826,13 @@ def require_sys_version_info(*min_info):  # deffed in many files
         sys.exit(1)
 
 
-def stderr_print(*args):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 
-def str_splitword(chars, count=1):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def str_splitword(chars, count=1):
     """Return the leading whitespace and words, split from the remaining chars"""
 
     tail = chars

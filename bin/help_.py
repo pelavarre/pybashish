@@ -48,7 +48,7 @@ def main():
     whats_by_verb = dict()
     for what in globbed:
         name = os.path.splitext(what)[0]
-        if not name.startswith("_") and (not name in HIDDENS):
+        if (not name.startswith("_")) and (name not in HIDDENS):
             verb = name.strip("_")
 
             whats_by_verb[verb] = what
@@ -79,7 +79,8 @@ def main():
     stderr_print()
 
 
-def stderr_print(*args):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 

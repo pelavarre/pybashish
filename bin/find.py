@@ -66,7 +66,8 @@ def print_os_walk_minpaths(top):
         print(formatter(realpath))
 
 
-class BrokenPipeErrorSink(contextlib.ContextDecorator):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+class BrokenPipeErrorSink(contextlib.ContextDecorator):
     """Cut unhandled BrokenPipeError down to sys.exit(1)
 
     More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
@@ -88,7 +89,8 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):  # deffed in many files
             sys.exit(1)
 
 
-def os_path_homepath(path):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def os_path_homepath(path):
     """Return the ~/... relpath of a file or dir inside the Home, else the realpath"""
 
     home = os.path.realpath(os.environ["HOME"])
@@ -102,7 +104,8 @@ def os_path_homepath(path):  # deffed in many files
     return homepath
 
 
-def os_walk_sorted_relpaths(top):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def os_walk_sorted_relpaths(top):
     """Walk the dirs and files in a top dir, in alphabetical order, returning their relpath's"""
 
     top_ = "." if (top is None) else top
@@ -126,7 +129,8 @@ def os_walk_sorted_relpaths(top):  # deffed in many files
             yield wherewhere  # FIXME: delay these till the walk starts into them
 
 
-def min_path_formatter(exemplar):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def min_path_formatter(exemplar):
     """Choose the def that abbreviates this path most sharply: abs, real, rel, or home"""
 
     formatters = (
@@ -144,7 +148,8 @@ def min_path_formatter(exemplar):  # deffed in many files
     return formatter
 
 
-def stderr_print(*args):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 

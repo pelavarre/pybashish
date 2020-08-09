@@ -140,12 +140,14 @@ def pick_some_digits():
     return digits  # '2773543517856402339162146190028809' in my Mar/2019 Python 3.7.3
 
 
-def prompt_tty_stdin():  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def prompt_tty_stdin():
     if sys.stdin.isatty():
         stderr_print("Press ⌃D EOF to quit")
 
 
-def stderr_print(*args):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 

@@ -85,25 +85,28 @@ def main(argv):
                 line_index += 1
 
 
-def prompt_tty_stdin():  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def prompt_tty_stdin():
     if sys.stdin.isatty():
         stderr_print("Press ⌃D EOF to quit")
 
 
-def stderr_print(*args):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 
-class BrokenPipeErrorSink(contextlib.ContextDecorator):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+class BrokenPipeErrorSink(contextlib.ContextDecorator):
     """Cut unhandled BrokenPipeError down to sys.exit(1)
+
+    Test with large Stdout cut sharply, such as:  find.py ~ | head
 
     More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
     As per https://docs.python.org/3/library/signal.html#note-on-sigpipe
     """
 
-    def __enter__(
-        self,
-    ):  # test with large Stdout cut sharply, such as:  find.py ~ | head
+    def __enter__(self):
         return self
 
     def __exit__(self, *exc_info):

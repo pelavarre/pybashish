@@ -112,7 +112,7 @@ def main():
 
     if args.no_filename:  # print help because "-h" is short for "--filename"
         argdoc.print_help()
-        sys.exit(0)  # exit zero as per convention for ArgParse "--help"
+        sys.exit(0)  # exit zero from printing help
 
     if main.args.verbose >= 2:
         stderr_print(f"grep.py: args={args}")
@@ -436,7 +436,8 @@ def grep_lines(args, lines, chosen_lines):  # FIXME  # noqa C901
     return exit_status
 
 
-def min_path_formatter(exemplar):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def min_path_formatter(exemplar):
     """Choose the def that abbreviates this path most sharply: abs, real, rel, or home"""
 
     formatters = (
@@ -454,6 +455,7 @@ def min_path_formatter(exemplar):  # deffed in many files
     return formatter
 
 
+# deffed in many files  # missing from docs.python.org
 def minpath(path):
     "Abbreviate this path most sharply: abs, real, rel, or home" ""
 
@@ -463,7 +465,8 @@ def minpath(path):
     return min_path
 
 
-def os_path_homepath(path):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def os_path_homepath(path):
     """Return the ~/... relpath of a file or dir inside the Home, else the realpath"""
 
     home = os.path.realpath(os.environ["HOME"])
@@ -477,7 +480,8 @@ def os_path_homepath(path):  # deffed in many files
     return homepath
 
 
-def os_walk_sorted_relfiles(top):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def os_walk_sorted_relfiles(top):
     """Walk the files in a top dir and its dirs, in alphabetical order, returning their relpath's"""
 
     top_ = "." if (top is None) else top
@@ -496,7 +500,8 @@ def os_walk_sorted_relfiles(top):  # deffed in many files
             yield relpath
 
 
-def lstrip_lines(lines):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def lstrip_lines(lines):
     """Strip the blank lines that begin a list"""
 
     lstrips = list(lines)
@@ -506,7 +511,8 @@ def lstrip_lines(lines):  # deffed in many files
     return lstrips
 
 
-def split_paragraphs(lines, keepends=False):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def split_paragraphs(lines, keepends=False):
     """Split the lines into paragraphs"""
 
     paras = list()
@@ -527,11 +533,13 @@ def split_paragraphs(lines, keepends=False):  # deffed in many files
     return paras
 
 
-def stderr_print(*args):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 
-def verbose_print(*args):  # deffed in many files
+# deffed in many files  # missing from docs.python.org
+def verbose_print(*args):
     if main.args.verbose:
         print(*args, file=sys.stderr)
 
@@ -681,13 +689,14 @@ FILES_CHARS = r"""
     # emacs  fixme => move balance
     #
     # emacs  ⌃D ⌥D ⌥Z  => delete char, word, to char
+    # emacs  ⌃@⌃@ ⌃@ ⌃X⌃X ⌃U⌃@  => mark: begin, place, bounce, goto
     # emacs  ⌃K ⌃W ⌥W ⌃Y ⌥Y ⌥T  => cut, copy, paste, paste-next-instead, join, transpose
     # emacs  ⌥H ⌥Q  => paragraph: mark, reflow
     #
-    # emacs  ⌃U1234567890 ⌃- ⌃_ ⌃Xu ⌥L ⌥U ⌥C  => repeat, undo, undo, lower, upper, title
+    # emacs  ⌃U1234567890 ⌃- ⌃_ ⌃Xu  => repeat, undo, undo
+    # emacs  ⌥L ⌥U ⌥C ⌃U1⌃Xrni⌃Xr+i⌃Xrii  => lower, upper, title, increment
     # emacs  ⌃S ⌃R ⌥% => find, replace
     #
-    # emacs  ⌃@⌃@ ⌃@ ⌃X⌃X ⌃U⌃@  => mark: begin, place, bounce, goto
     # emacs  ⌃X( ⌃X) ⌃Xe  => record replay
     # emacs  fixme => vertical delete copy paste insert
     # emacs  fixme => dent/dedent
@@ -855,7 +864,8 @@ FILES_CHARS = r"""
     # vim  a cx i o s Esc A C O S  => enter/ exit insert mode
     # vim  R Esc  => enter/ exit overlay mode
     #
-    # vim  123456789 u UU ~ . ⌃G ⌃R => repeat, undo, revisit, toggle-case, redo
+    # vim  123456789 u UU ~ . ⌃G ⌃R  => repeat, undo, revisit, redo
+    # vim  ~ ^A  => toggle-case, increment
     # vim  n N / ? => find
     # vim  %s/pattern/repl/g  => find and replace
     #
@@ -874,8 +884,8 @@ FILES_CHARS = r"""
     # vim  ⌃C ⌃Q ⌃S ⌃Z ⌃[  => as per terminal or no-op
     #
     # vim  Q # & * = [ ] "  => obscure
-    # vim  ⌃A ⌃H ⌃I ⌃O ⌃T ⌃X ⌃\ ⌃_  => obscure
-    # vim  ⌃@ g v V \ ⌃?  => not classic
+    # vim  ⌃H ⌃I ⌃O ⌃T ⌃X ⌃\ ⌃_  => obscure
+    # vim  ⌃@ ⌃A g v V \ ⌃?  => not classic
     #
 
     # vim  :help ⌃V...  # help with key chord sequence
