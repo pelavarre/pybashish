@@ -76,13 +76,27 @@ DEFAULT_EPILOG = textwrap.dedent(
 #
 
 
+def format_usage():
+    """Sum the usage into a line of text closed by an end-of-line char"""
+
+    parser = ArgumentParser()
+    usage_line = parser.format_usage()
+
+    return usage_line
+
+
 def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
     """Parse args as helped by Module Doc"""
 
     if args is None:
         args = sys.argv[1:]
 
-    parser = make_parser(doc, doc_filename=doc_filename)
+    try:
+        parser = ArgumentParser(doc, doc_filename=doc_filename)
+    except ArgDocError as exc:
+        stderr_print("argdoc.py: error: ArgDocError: {}".format(exc))
+        sys.exit(1)
+
     space = parser.parse_args(args, namespace=namespace)
 
     if parser_said_print_help(parser, namespace=space):
@@ -96,11 +110,19 @@ def print_help(file=None):
     """Print the help lines to the file, else to Stdout"""
 
     file_ = file if file else sys.stdout
-    parser = make_parser()
+    parser = ArgumentParser()
     parser.print_help(file=file_)
 
 
-def make_parser(doc=None, doc_filename=None):
+def print_usage(file=None):
+    """Print the usage line to the file, else to Stdout"""
+
+    file_ = file if file else sys.stdout
+    parser = ArgumentParser()
+    parser.print_usage(file=file_)
+
+
+def ArgumentParser(doc=None, doc_filename=None):  # FIXME: class ArgumentParser
     """Compile the Doc into Parser Source, and exec that source to build the Parser"""
 
     main_module = sys.modules["__main__"]
@@ -332,13 +354,13 @@ class _ArgDocApp:
                 outgoing.write(help_doc.strip())
 
         help_shline = "bin/argdoc.py --rip argdoc {}".format(doc_filename)
-        help_message = "warning: argdoc.py: help != doc, help at:  {}".format(
+        help_message = "argdoc.py: warning: help != doc, help at:  {}".format(
             help_shline
         )
         stderr_print(help_message)
 
         file_doc_shline = "bin/argdoc.py --rip doc {}".format(doc_filename)
-        file_doc_message = "warning: argdoc.py: doc != help, doc at:  {}".format(
+        file_doc_message = "argdoc.py: warning: doc != help, doc at:  {}".format(
             file_doc_shline
         )
         stderr_print(file_doc_message)
@@ -431,8 +453,8 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         emitted_usage = prog if (args_emitted_usage is None) else args_emitted_usage
 
         if parts_usage != emitted_usage:
-            stderr_print("warning: argdoc.py: doc'ced usage: {}".format(parts_usage))
-            stderr_print("warning: argdoc.py: emitted usage: {}".format(emitted_usage))
+            stderr_print("argdoc.py: warning: doc'ced usage: {}".format(parts_usage))
+            stderr_print("argdoc.py: warning: emitted usage: {}".format(emitted_usage))
 
         if emitted_usage:
             if "..." in emitted_usage:
@@ -450,7 +472,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         if parts.usage and not parts.description_line:
             stderr_print(
-                "warning: argdoc.py: no one line description explains prog {!r}".format(
+                "argdoc.py: warning: no one line description explains prog {!r}".format(
                     prog
                 )
             )
@@ -961,12 +983,7 @@ class _ArgDocTaker(argparse.Namespace):
 
         via_phrases = list(phrases_by_words.keys())
         via_lines = list(lines_by_words.keys())
-        if via_phrases != via_lines:
-            stderr_print("warning: argdoc.py: via_phrases:  {}".format(via_phrases))
-            stderr_print("warning: argdoc.py: via_lines:  {}".format(via_lines))
-            raise ArgDocError(
-                "different lists of words declared as usage and as arguments"
-            )
+        self._require_matching_argument_declarations(via_phrases, via_lines)
 
         # Group together the Usage Line for NArg with the Argument Line for Alt Option and Help
 
@@ -993,6 +1010,20 @@ class _ArgDocTaker(argparse.Namespace):
             arg_declarations.append(arg_declaration)
 
         return arg_declarations
+
+    def _require_matching_argument_declarations(self, via_phrases, via_lines):
+        """Raise ArgDocError unless same args declared line by line and in usage line"""
+
+        if via_phrases != via_lines:
+            stderr_print("argdoc.py: warning: via_phrases:  {}".format(via_phrases))
+            stderr_print("argdoc.py: warning: via_lines:  {}".format(via_lines))
+            if set(via_phrases) == set(via_lines):
+                raise ArgDocError(
+                    "same sets, different orders, declared as usage and as arguments"
+                )
+            raise ArgDocError(
+                "different sets of words declared as usage and as arguments"
+            )
 
     def accept_argument_lines(self, tagline):
         """Take zero or more dented lines as defining Positional or Optional arguments"""
@@ -1028,7 +1059,7 @@ class _ArgDocTaker(argparse.Namespace):
             if self.parts.optionals_declarations:
                 if "positional arguments:" in line:
                     reason = "Optionals before Positionals in Arg Doc"
-                    raise ArgDocError("error: argdoc.py: {}".format(reason))
+                    raise ArgDocError("argdoc.py: error: {}".format(reason))
 
             if (not self.parts.positionals_declarations) and (
                 not self.parts.optionals_declarations
@@ -1037,7 +1068,7 @@ class _ArgDocTaker(argparse.Namespace):
                     reason = "Arg Doc came too late with Arg Line Declaration @ {!r}".format(
                         line
                     )
-                    raise ArgDocError("error: argdoc.py: {}".format(reason))
+                    raise ArgDocError("argdoc.py: error: {}".format(reason))
 
             lines.append(line)
             taker.take_one_shard()
@@ -1433,12 +1464,12 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
         emitted_usage = self.format_usage_phrase()
         if argument_phrase != emitted_usage:
             stderr_print(
-                "error: argdoc.py: optional argument_phrase:  {}".format(
+                "argdoc.py: error: optional argument_phrase:  {}".format(
                     argument_phrase
                 )
             )
             stderr_print(
-                "error: argdoc.py: optional emitted_usage:  {}".format(emitted_usage)
+                "argdoc.py: error: optional emitted_usage:  {}".format(emitted_usage)
             )
             raise ArgDocError(
                 "meaningless optional usage phrase {}".format(argument_phrase)
@@ -1521,12 +1552,12 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
         emitted_usage = self.format_usage_phrase()
         if argument_phrase != emitted_usage:
             stderr_print(
-                "error: argdoc.py: positional argument_phrase:  {}".format(
+                "argdoc.py: error: positional argument_phrase:  {}".format(
                     argument_phrase
                 )
             )
             stderr_print(
-                "error: argdoc.py: positional emitted_usage:  {}".format(emitted_usage)
+                "argdoc.py: error: positional emitted_usage:  {}".format(emitted_usage)
             )
             raise ArgDocError(
                 "meaningless positional usage phrase {}".format(argument_phrase)
@@ -1731,32 +1762,38 @@ def read_docstring_from(relpath):
 
     try:
         with open(relpath, "rt") as reading:
-            return _read_docstring_from_stream(reading)
+            (texts, raw, qqq, len_lines,) = _scrape_docstring_from(reading)
     except IOError as exc:  # such as Python 3 FileNotFoundError
-        stderr_print("error: argdoc.py: {}: {}".format(type(exc).__name__, exc))
+        stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
         sys.exit(1)
 
+    doc = _eval_scraped_docstring(texts, raw, qqq, len_lines, relpath)
+    return doc
 
-def _read_docstring_from_stream(reading):
-    # FIXME: see the quoted text as r""" only when explicitly marked as "r"
+
+def _scrape_docstring_from(reading):
+    """Scrap sourcelines of docstring from source of module"""
     # FIXME: correctly forward the leading and trailing whitespace
 
     texts = list()
+    raw = None
     qqq = None
-    lines = 0
+    len_lines = 0
 
     for line in reading.readlines():
-        lines += 1
+        len_lines += 1
 
         text = line.rstrip()
 
         if texts or text:
-            if not text.startswith("#"):
+            if not text.strip().startswith("#"):
                 if not qqq:
                     if '"""' in text:
                         qqq = '"""'
+                        raw = 'r"""' in text
                     elif "'''" in text:
                         qqq = "'''"
+                        raw = "r'''" in text
                     else:
                         pass
                 elif qqq in text:
@@ -1764,16 +1801,38 @@ def _read_docstring_from_stream(reading):
                 else:
                     texts.append(text)
 
-    if lines and (qqq is None):
+    return (
+        texts,
+        raw,
+        qqq,
+        len_lines,
+    )
+
+
+def _eval_scraped_docstring(texts, raw, qqq, len_lines, relpath):
+    """Convert to string from sourcelines of module docstring"""
+    # FIXME: see the quoted text as r""" only when explicitly marked as "r"
+
+    if len_lines and (qqq is None):
         qqq1 = '"""'
         qqq2 = "'''"
         stderr_print(
-            "warning: argdoc.py: no {} found and no {} found in {}".format(
-                qqq1, qqq2, reading.name
+            "argdoc.py: warning: no {} found and no {} found in {}".format(
+                qqq1, qqq2, relpath
             )
         )
 
+    if not raw:
+        fuzzes = list(_ for _ in texts if "\\" in _)
+        if fuzzes:
+            stderr_print(
+                "argdoc.py: warning: docstring of backslash led by {} not by r{} in {}".format(
+                    qqq, qqq, relpath
+                )
+            )
+
     repr_doc = black_triple_quote_repr("\n".join(texts))
+
     doc_source = "doc = " + repr_doc
 
     global_vars = {}

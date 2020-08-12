@@ -23,6 +23,7 @@ bugs:
 
 examples:
   echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | read.py  # Control Option Shift Command Arrows
+  echo 'å é î ø ü' | read.py  # the accented vowels prominent in Mac ⌥ Option
   read -e  # in Bash
   read.py
   read.py --lines

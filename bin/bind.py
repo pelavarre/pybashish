@@ -10,7 +10,7 @@ optional arguments:
   -p          print what each keystroke means
 
 bugs:
-  acts like "bind -h" if called with no args, like Zsh "bindkey", unlike Bash "bind"
+  discloses usage when called with no args, unlike Bash "bind" no-op or Zsh "bindkey" flood
   prints "drop-next-char" as the binding for "⌃D", which means that only while line not empty
   prints the empty "" as the encoding for "end-input", unlike no mention in Bash / Zsh
   prints the unspecific None as the encoding for "self-insert", more accurately than Bash or Zsh
@@ -28,6 +28,8 @@ examples:
 
 from __future__ import print_function
 
+import sys
+
 import argdoc
 
 import read
@@ -36,8 +38,11 @@ import read
 def main():
 
     args = argdoc.parse_args()
+
     if not args.p:
-        argdoc.parse_args("--help".split())
+        stderr_print(argdoc.format_usage().rstrip())
+        stderr_print("bind.py: error: no arguments")
+        sys.exit(2)  # exit 2 from rejecting usage
 
     gt = read.GlassTeletype()
     bots_by_stdin = gt._bots_by_stdin  # peek inside
@@ -105,6 +110,11 @@ def bind_repr(stdin):
 
     repr_stdin = repr(stdin)  # no precedent for "None" in Bash / Zsh
     return repr_stdin
+
+
+# deffed in many files  # but not in docs.python.org
+def stderr_print(*args):
+    print(*args, file=sys.stderr)
 
 
 if __name__ == "__main__":

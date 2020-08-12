@@ -41,8 +41,9 @@ Contents
 ++ 2.27 ) SubSh
 ++ 2.28 ) Tar
 ++ 2.29 ) Touch
-++ 2.30 ) Watch
-++ 2.31 ) Wc
+++ 2.30 ) Tr
+++ 2.31 ) Watch
+++ 2.32 ) Wc
 
 
 To refresh this table of contents, try:
@@ -97,7 +98,6 @@ PyBashIsh does a few things much much better, some things just as well, and many
     bind --help
     cal --help
     cat --help
-    clips --help
     column --help
     cp --help
     date --help
@@ -122,6 +122,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
     subsh --help
     tar --help
     touch --help
+    tr --help
     watch --help
     wc --help
 
@@ -419,6 +420,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $ echo hello >dir/a/b/d
     $ echo goodbye > dir/a/b/e
     $ tar czf dir.tgz dir/  # ordered differently at Mac, at Linux
+    $ rm -fr dir/
     $
 
     $ bin/tar.py tvf /dev/null/child -tvf dir.tgz 2>&1 | sort
@@ -444,10 +446,13 @@ Call a column numeric when two-thirds of its cells contain decimal digits
 ## 2.29 ) Touch
 
 
-## 2.30 ) Watch
+## 2.30 ) Tr
 
 
-## 2.31 ) Wc
+## 2.31 ) Watch
+
+
+## 2.32 ) Wc
 
 
 // FIXME: remake this into a ".md" Markdown file

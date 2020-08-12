@@ -27,6 +27,7 @@ see also:  Python "import doctest"
 # FIXME: walk for exts
 # FIXME: rip Bash paste distinguished only by repeated prompt ending in '$' or '#'
 # FIXME: rip Python '>>>' paste, and Makefile paste, and Zsh '%' paste, not just Bash paste
+# FIXME: think harder when no files chosen
 
 import doctest
 import os
@@ -42,6 +43,11 @@ def main(argv):
 
     args = argdoc.parse_args()
     args.vq = (args.verbose if args.verbose else 0) - (args.quiet if args.quiet else 0)
+
+    if args.files != ["tests/"]:
+        stderr_print("usage: doctestbash.py [-h] [-b] [-q] [-v] tests/")
+        sys.exit(2)  # exit 2 from rejecting usage
+
     main.args = args
 
     # Test the one well known file

@@ -33,9 +33,11 @@ def main():
     """Run from the command line"""
 
     args = argdoc.parse_args()
+
     if not args.t:
-        print(argdoc.make_parser().format_help())
-        sys.exit()
+        stderr_print(argdoc.format_usage().rstrip())
+        stderr_print("column.py: error: no arguments")
+        sys.exit(2)  # exit 2 from rejecting usage
 
     # Fetch all of Stdin
 

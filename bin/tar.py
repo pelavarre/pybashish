@@ -27,6 +27,7 @@ bash script to compress a top dir as Tgz for test:
   echo hello >dir/a/b/d
   echo goodbye > dir/a/b/e
   tar czf dir.tgz dir/
+  rm -fr dir/
 
 examples:
   tar.py tvf dir.tgz
@@ -41,7 +42,7 @@ import tarfile
 import argdoc
 
 
-LIMITED_USAGE = "usage: tar.py: [-h] (-tvf|xvkf) FILE"
+LIMITED_USAGE = "usage: tar.py [-h] (-tvf|xvkf) FILE"
 
 
 def main(argv):
@@ -60,7 +61,7 @@ def main(argv):
     tvf = args.t and args.v and args.file
     xvkf = args.x and args.v and args.k and args.file
     if not (tvf or xvkf):
-        print_limited_usage(args)
+        stderr_print_usage_error(args)
         sys.exit(2)  # exit 2 from rejecting usage
 
     # Interpret -tvf or -xvkf
@@ -68,7 +69,7 @@ def main(argv):
     tar_file_tvf_xvkf(args.file, args_x=args.x)
 
 
-def print_limited_usage(args):
+def stderr_print_usage_error(args):
     """Limit to usage: [-h] (-tvf|xvkf) FILE"""
 
     # List how much of -tvf and -xvkf supplied
@@ -83,7 +84,7 @@ def print_limited_usage(args):
 
     # Demand more
 
-    stderr_print("usage: tar.py: [-h] (-tvf|xvkf) FILE")
+    stderr_print(LIMITED_USAGE)
     if not str_args:
         stderr_print("tar.py: error: too few arguments")
     else:
@@ -112,7 +113,7 @@ def tar_file_tvf_xvkf(args_file, args_x):
 
                 if args_x:
 
-                    # with untarring.extractfile(name) as incoming:
+                    # Python 2:  with contextlib.closing(untarring.extractfile(name)) as incoming:
                     with untarring.extractfile(name) as incoming:
                         file_bytes = incoming.read()
 

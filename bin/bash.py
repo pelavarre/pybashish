@@ -77,7 +77,7 @@ def main(argv):
         main.returncode = returncode
 
         if returncode:  # trace nonzero a la Zsh "print_exit_value"
-            stderr_print("warning: bash.py:  exit {}".format(returncode))
+            stderr_print("bash.py: warning:  exit {}".format(returncode))
             # FIXME: think into trace "shline" of nonzero "returncode", a la Zsh
 
 
@@ -138,7 +138,7 @@ def _parse_shline(shline):
     try:
         split_argv = shlex.split(shline)
     except ValueError as exc:
-        stderr_print("warning: bash.py: {}: {}".format(type(exc).__name__, exc))
+        stderr_print("bash.py: warning: {}: {}".format(type(exc).__name__, exc))
 
     argv = None
     if split_argv is not None:
@@ -191,14 +191,14 @@ def _compile_shline(shline, argv):
 
         if os.path.exists(verb):
             how = _compile_log_error(
-                "warning: bash.py: {}: No such file or directory in bash path".format(
+                "bash.py: warning: {}: No such file or directory in bash path".format(
                     verb
                 )
             )
             return how
 
         how = _compile_log_error(
-            "warning: bash.py: {}: No such file or directory".format(verb)
+            "bash.py: warning: {}: No such file or directory".format(verb)
         )
         return how
 
@@ -224,7 +224,7 @@ def _compile_shline(shline, argv):
 
     # Plan to rejecy a verb that maps to a Py file that doesn't exist
 
-    how = _compile_log_error("warning: bash.py: {}: command not found".format(verb))
+    how = _compile_log_error("bash.py: warning: {}: command not found".format(verb))
     return how
 
 
