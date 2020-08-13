@@ -1,25 +1,40 @@
 #!/usr/bin/env python3
 
 r"""
-usage: ls.py [-h] [-1] [-C] [-F] [-a] [-l] [-t]
+usage: ls.py [-h] [-1] [-C] [-l] [--headings] [-a] [--full-time] [-F]
+             [--sort FIELD] [-S] [-X] [-f] [-t] [-v] [--ascending]
+             [--descending] [-r]
 
 list the files and dirs inside a dir
 
 optional arguments:
   -h, --help      show this help message and exit
-  -1              print one filename per line
-  -C              print filenames into multiple columns (default: True)
-  -F, --classify  mark names as "/*@" for dirs, "chmod +x", and "ln -s"
-  -a, --all       show, don't drop, names starting with a "." dot
-  -l              list more, such as also the date-time modified
-  -t              sort by time descending
+  -1              print as column: one filename per line
+  -C              print as zig-zag: filenames across one line, and more if need be (default: True)
+  -l              print as rows of permissions, links, owner, group, size, date/time-stamp, name
+  --headings      print as rows (a la -l), but start with one row of column headings
+  -a, --all       list more rows: add the names starting with a "." dot
+  --full-time     list more details: add the %a weekday and %f microseconds into date/time-stamps
+  -F, --classify  lits more details: mark names as "/*@" for dirs, "chmod +x", and "ln -s"
+  --sort FIELD    choose sort field by name: ext, name, none, time, or size
+  -S              sort by size descending (or -r ascending)
+  -X              sort by ext ascending (or -r descending)
+  -f              sort by none and imply --all (like classic -f, distinct from Linux -U)
+  -t              sort by time descending (or -r ascending)
+  -v              sort by version ascending (or -r descending) (such as 3.2.1 before 3.10)
+  --ascending     sort ascending:  newest to oldest, largest to smallest, etc
+  --descending    sort descending:  newest to oldest, largest to smallest, etc
+  -r              reverse the default sorts by size ascending, time ascending, name descending, etc
 
 bugs:
-  defaults to --fulltime inside any -l
-  chokes over -1 -C -l contradictions
-  marks names as "/*@" on request, but doesn't yet notice "=%|"
-  marks lines as "dl-" on request, but doesn't yet notice "bcsp"
+  chokes over contradictions in args of how to print as or how to sort (last option doesn't win)
+  doesn't show owner and group
   doesn't show size for dirs, and doesn't show size for links
+  lists --full-time as to the microsecond not to the nanosecond, and without timezone
+  marks names as r"[*/@]" on request, but doesn't yet notice r"[%=|]"
+  marks lines as r"[-dl]" on request, but doesn't yet notice r"[bcps]"
+  accepts --all, --classify, and --full-time to mean -a, -F, and --full-time (beyond Mac options)
+  defines --headings, --ascending, --descending, and --sort=name (beyond the classic options)
   sees files as hidden if and only if name starts with "."
 
 examples:
@@ -30,9 +45,11 @@ examples:
   bin/ls.py -alFt | tac  # at Linux
   bin/ls.py -alFt | tail -r  # at Mac
 """
-# FIXME FIXME: add --fulltime toggle, conform --fulltime output to Linux
-# FIXME FIXME: add -rt
-# FIXME: add -R
+# FIXME: add timezone to conform to --full-time output of Linux
+# FIXME: add nanoseconds to conform to --full-time output of Linux
+# FIXME: closer match at "ls.py -C" to classic line splits of "ls -C"
+# FIXME argdoc: somehow separate -h / -1-C-l--h / -a--fu-F / -f-r--a--d-t-S-X--s=F
+# FIXME: add -R recursive walk
 # FIXME: add glob args
 # FIXME: -w COLUMNS, --width COLUMNS  as if a terminal so wide
 # FIXME: "import column" "import fmt" (or vice versa) to reach "def spill_cells" etc
@@ -41,6 +58,7 @@ from __future__ import print_function
 
 import argparse
 import datetime as dt
+import distutils.version
 import os
 import stat
 import sys
@@ -49,107 +67,245 @@ import argdoc
 
 
 def main():
+    """Interpret a command line"""
 
     tty = sketch_tty(sys.stdout)
-    args = parse_main_args(tty)
-    main.args = args
-    run_main_tty_args(tty, args=args)
+    args = argdoc.parse_args()
+    correct_args(args, tty=tty)
+    print_each_top_walk(tops=[os.curdir], args=args, tty=tty)
 
 
-def sketch_tty(stdout):
+def sketch_tty(stdio):
+    """Mark this Terminal apart from others"""
 
-    isatty = os.isatty(stdout.fileno())
+    fd = stdio.fileno()
+    isatty = os.isatty(fd)
 
     try:
         columns = os.get_terminal_size().columns
     except OSError:  # such as OSError: [Errno 25] Inappropriate ioctl for device
         columns = None
 
-    space = argparse.Namespace(columns=columns, isatty=isatty)
+    tty = argparse.Namespace(columns=columns, isatty=isatty)
 
-    return space
+    return tty
 
 
-def parse_main_args(tty):
+def correct_args(args, tty):
+    """Auto-correct else reject contradictions among the command line args"""
 
-    args = argdoc.parse_args()
+    _decide_print_as_args(args, tty=tty)
+    _decide_sort_field_args(args)
+    _decide_sort_order_args(args)
 
-    #
 
-    dash_el = vars(args)["l"]
-    dash_cee = vars(args)["C"]
-    dash_one = vars(args)["1"]
+def _decide_print_as_args(args, tty):
+    """Auto-correct else reject contradictions among which style to print finds as"""
 
-    lc1 = "-"
-    lc1 += "l" if dash_el else ""
-    lc1 += "C" if dash_cee else ""
-    lc1 += "1" if dash_one else ""
+    vote_cee = "-C" if args.C else ""
+    vote_el = "-l" if args.l else ""
+    vote_one = "-1" if vars(args)["1"] else ""
+    vote_full_time = "--full-time" if args.full_time else ""
+    vote_headings = "--headings" if args.headings else ""
 
-    if len(lc1) > 2:
-        dash_opts = list(("-" + _) for _ in "lC1")
+    vote_args = (
+        vote_cee,
+        vote_el,
+        vote_one,
+        vote_full_time,
+        vote_headings,
+    )
+
+    votes = (
+        vote_cee,
+        vote_el,
+        vote_one or vote_full_time or vote_headings,
+    )
+    votes = tuple(_ for _ in votes if _)
+
+    if len(votes) > 1:
+        ballot = (
+            "-1 -l -C --headings".split()
+        )  # -1 simple, -l messy, -C classic, else --headings
         stderr_print(
-            "ls.py: error: choose one of {!r}, do not choose {!r}".format(
-                dash_opts, lc1
+            "ls.py: error: choose just one of {!r}, not the contradiction {!r}".format(
+                " ".join(ballot), " ".join(vote_args)
             )
         )
-        sys.exit(1)
+        sys.exit(2)  # exit 2 from rejecting usage
 
-    if len(lc1) < 2:
+    if not votes:
         if tty.isatty:
-            dash_cee = True
+            vote_cee = True
+        else:
+            vote_one = True
 
-    args.dash_el = dash_el
-    args.dash_cee = dash_cee
-    args.dash_one = dash_one
-
-    #
-
-    return args
-
-
-def run_main_tty_args(tty, args):
-
-    listed = os.listdir()  # FIXME: implement options to do no sorting
-    if args.all:
-        whats = sorted(listed + [os.curdir, os.pardir])
+    if vote_one:
+        args._print_as = "column"
+    elif vote_cee:
+        args._print_as = "zigzag"
     else:
-        whats = sorted(_ for _ in listed if not _.startswith("."))
+        args._print_as = "rows"
+
+
+def _decide_sort_field_args(args):
+    """Auto-correct else reject contradictions among which sort column to sort"""
+
+    # Reject contradictions
+    # FIXME: sort by multiple columns
+
+    vote_ext = "-X" if args.X else ""
+    vote_none = "-f" if args.f else ""
+    vote_size = "-S" if args.S else ""
+    vote_sort = "--sort={}".format(args.sort) if args.sort else ""
+    vote_time = "-t" if args.t else ""
+    vote_version = "-v" if args.v else ""
+
+    votes = (
+        vote_ext,
+        vote_none,
+        vote_size,
+        vote_sort,
+        vote_time,
+        vote_version,
+    )
+    votes = tuple(_ for _ in votes if _)
+
+    ballot = "-X -S -f -t --sort=ext|name|none|size|sort|time|version".split()
+    if len(votes) > 1:
+        stderr_print(
+            "ls.py: error: choose just one of {!r}, not the contradiction {!r}".format(
+                " ".join(ballot), " ".join(votes)
+            )
+        )
+        sys.exit(2)  # exit 2 from rejecting usage
+
+    # Expand abbreviations
+
+    sortables = (
+        "extension name none size time version".split()
+    )  # allow "extension", not just Python "ext"
+
+    args._sort_by = "name"
+    if args.S:
+        args._sort_by = "size"
+    elif args.X:
+        args._sort_by = "extension"
+    elif args.f:
+        args._sort_by = "none"  # distinct from Python str(None)
+    elif args.t:
+        args._sort_by = "time"
+    elif args.v:
+        args._sort_by = "version"
+    elif args.sort:
+        fields = list(_.startswith(args.sort) for _ in sortables)
+        if len(fields) == 1:
+            args._sort_by = fields[-1]
+        else:
+
+            # Reject unknown field names
+
+            stderr_print(
+                "ls.py: error: choose just one of {!r}, not the contradiction {!r}".format(
+                    " ".join(ballot), " ".join(votes)
+                )
+            )
+            sys.exit(2)  # exit 2 from rejecting usage
+
+    assert args._sort_by in sortables
+
+
+def _decide_sort_order_args(args):
+    """Auto-correct else reject contradictions among which sort order to print as"""
+
+    by = args._sort_by
+
+    vote_ascending = "--ascending" if args.ascending else ""
+    vote_descending = "--descending" if args.ascending else ""
+    vote_reverse = "-r" if args.r else ""
+
+    votes = (vote_ascending, vote_descending, vote_reverse)
+    votes = tuple(_ for _ in votes if _)
+
+    if len(votes) > 1:
+        ballot = "-r --ascending --descending".split()
+        stderr_print(
+            "ls.py: error: choose just one of {!r}, not the contradiction {!r}".format(
+                " ".join(ballot), " ".join(votes)
+            )
+        )
+        sys.exit(2)  # exit 2 from rejecting usage
+
+    if by == "none":
+        args._sort_order = None
+    elif by in "size time".split():
+        args._sort_order = "ascending" if args.r else "descending"
+    else:
+        assert by in "extension name none version".split()
+        args._sort_order = "descending" if args.r else "ascending"
+
+
+def print_each_top_walk(tops, args, tty):
+    """Print files and dirs found, as zigzag, column, or rows"""
+
+    # Choose files and dirs
+
+    assert len(tops) == 1
+    top0 = tops[0]
+
+    listed = [os.curdir, os.pardir] + os.listdir(top0)
+    # FIXME: conform to Linux listing CurDir and ParDir in other places, unlike Mac Bash
+
+    names = listed
+    if not args.all:
+        names = list(_ for _ in names if not _.startswith("."))
         # hidden file names start with "." at Mac and Linux, where:  os.name == "posix"
 
-    stats_by_what = dict()
-    for what in whats:
-        stats_by_what[what] = os.stat(what)
+    # Collect stats for each
 
-    marked_names_by_what = dict()
-    for what in whats:
-        stats = stats_by_what[what]
-        marked_name = mark_name(what, stats=stats)
-        marked_names_by_what[what] = marked_name
+    stats_by_name = dict()
+    for name in names:
+        stats_by_name[name] = os.stat(name)
 
-    if args.dash_one:
-        run_dash_one(marked_names_by_what.values() if args.classify else whats)
-    elif args.dash_el:
-        run_dash_el(
-            tty,
-            stats_by_what=stats_by_what,
-            marked_names_by_what=(marked_names_by_what if args.classify else None),
-        )
+    # Mark each with r"[*/@]" for executable-not-dir, dir, or symbolic link
+
+    names_by_name = {_: _ for _ in names}
+
+    markeds_by_name = dict()
+    for name in names:
+        rep = mark_name(name, stats=stats_by_name[name])
+        markeds_by_name[name] = rep
+
+    reps_by_name = markeds_by_name if args.classify else names_by_name
+
+    # Sort finds
+
+    items = stats_items_sorted(stats_by_name, by=args._sort_by, order=args._sort_order)
+    reps = list(reps_by_name[_[0]] for _ in items)
+
+    # Print as one column of cells, as one zigzag of cells, or as one or more rows of columns
+
+    now = dt.datetime.now()
+
+    if args._print_as == "column":
+        print_as_column(reps)
+    elif args._print_as == "zigzag":
+        print_as_zigzag(reps, tty=tty)
     else:
-        assert args.dash_cee
-        run_dash_cee(
-            tty, cells=(marked_names_by_what.values() if args.classify else whats)
-        )
+        assert args._print_as == "rows"
+        print_as_rows(items, reps_by_name=reps_by_name, args=args, tty=tty, now=now)
 
 
-def mark_name(what, stats):
+def mark_name(name, stats):
+    """Mark name with r"[*/@]" for executable-not-dir, dir, or symbolic link, else no mark"""
 
-    isdir = os.path.isdir(what)
+    isdir = os.path.isdir(name)
     stats_isdir = bool(stats.st_mode & stat.S_IFDIR)
     assert stats_isdir == isdir
 
     isx = bool(stats.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXGRP))
 
-    islink = os.path.islink(what)
+    islink = os.path.islink(name)
 
     mark = ""
     if isdir:
@@ -159,19 +315,56 @@ def mark_name(what, stats):
     elif islink:
         mark = "@"
 
-    marked_name = what + mark
-    return marked_name
+    rep = name + mark
+    return rep
 
 
-def run_dash_one(cells):
+def stats_items_sorted(stats_by_name, by, order):
+    """Return list of (key, value,) but sorted as requested"""
+
+    items = list(stats_by_name.items())
+
+    if by == "none":
+        return items
+
+    assert order in "ascending descending".split()
+    py_sort_reverse = order == "descending"
+
+    items.sort(key=lambda sw: sw[0])
+    if by == "extension":
+        items.sort(key=lambda sw: os.path.splitext(sw[0])[-1], reverse=py_sort_reverse)
+    elif by == "name":  # sort by "name" here meaning sort by name+ext
+        items.sort(key=lambda sw: sw[0], reverse=py_sort_reverse)
+    elif by == "size":
+        items.sort(key=lambda sw: sw[-1].st_size, reverse=py_sort_reverse)
+    elif by == "time":
+        items.sort(key=lambda sw: sw[-1].st_mtime, reverse=py_sort_reverse)
+    elif by == "version":
+        items.sort(
+            key=lambda sw: distutils.version.LooseVersion(sw[0]),
+            reverse=py_sort_reverse,
+        )
+    else:
+        assert False
+
+    return items
+
+
+def print_as_column(cells):
+    """Print as one column of names, marked or not"""
 
     for cell in cells:
         print(cell)
 
 
-def run_dash_el(tty, stats_by_what, marked_names_by_what):
+def print_as_rows(items, reps_by_name, args, tty, now):
+    """Print as many rows of columns"""
 
-    nil = "."
+    # Choose how to print None
+
+    str_none = "."
+
+    # Style chmod permissions
 
     chmod_chars = "drwxrwxrwx"
     chmod_masks = [stat.S_IFDIR]
@@ -180,43 +373,46 @@ def run_dash_el(tty, stats_by_what, marked_names_by_what):
     chmod_masks.extend([stat.S_IROTH, stat.S_IWOTH, stat.S_IXOTH])
     assert len(chmod_chars) == len(chmod_masks)
 
-    items = list(stats_by_what.items())
-    if main.args.t:
-        items.sort(key=lambda sw: (sw[1].st_mtime, sw,), reverse=True)
+    # Form rows
 
     rows = list()
-    for (what, stats,) in items:
+
+    if args.headings:  # chmod-perm's, links, owner, group, size, date/time-stamp, name
+        row = "chmods links owner group size stamp name".split()
+        rows.append(row)
+
+    for (name, stats,) in items:
 
         chmods = ""
         for (char, mask,) in zip(chmod_chars, chmod_masks):
             chmods += char if (stats.st_mode & mask) else "-"
 
-        links = nil
-        owner = nil
-        group = nil
+        links = str_none
+        owner = str_none
+        group = str_none
 
         stamp = dt.datetime.fromtimestamp(stats.st_mtime)
-        str_stamp = stamp.strftime("%a %Y-%m-%d %H:%M:%S.%f")
+        if args.full_time:
+            str_stamp = stamp.strftime("%a %Y-%m-%d %H:%M:%S.%f")
+        else:  # FIXME: emulate the original over-packing date/time-stamp heuristics more closely
+            if stamp.year == now.year:
+                str_stamp = stamp.strftime("%b {:2d} %H:%M".format(stamp.day))
+            else:
+                str_stamp = stamp.strftime("%b {:2d}  %Y".format(stamp.day))
 
-        size = nil
+        size = str_none
         if chmods.startswith("-"):
             size = stats.st_size
 
-        name = marked_names_by_what[what] if marked_names_by_what else what
+        rep = reps_by_name[name]
 
-        row = (
-            chmods,
-            links,
-            owner,
-            group,
-            size,
-            str_stamp,
-            name,
-        )
+        row = (chmods, links, owner, group, size, str_stamp, rep)
         rows.append(row)
 
+    # Print rows
+
     if tty.isatty:
-        print("total {}".format(nil))  # not a count of 512-byte data blocks
+        print("total {}".format(str_none))  # not a count of 512-byte data blocks
 
     justifieds = left_justify_cells_in_rows(rows)
     for justified in justifieds:
@@ -231,6 +427,7 @@ def left_justify_cells_in_rows(rows):
     strung_rows = list(list(str(cell) for cell in row) for row in rows)
 
     # Add empty cells till every row is as wide as the widest row
+
     # completed_rows = complete_rows(strung_rows, cell="")  # FIXME
     completed_rows = strung_rows
 
@@ -259,7 +456,7 @@ def left_justify_cells_in_rows(rows):
     return justified_rows
 
 
-def run_dash_cee(tty, cells):
+def print_as_zigzag(cells, tty):
 
     columns_ = 89 if (tty.columns is None) else tty.columns
 
@@ -298,9 +495,8 @@ def spill_cells(cells, columns, sep):  # FIXME  # noqa C901
                     floor.append(str_cell)
             floors.append(floor)
 
-        widths = len(floors[0]) * [
-            0
-        ]  # FIXME: stop requiring first row to be 1 of the longest
+        # FIXME: stop requiring first row to be 1 of the longest
+        widths = len(floors[0]) * [0]
         for floor in floors:
             for (shaft_index, str_cell,) in enumerate(floor):
                 widths[shaft_index] = max(widths[shaft_index], len(str_cell))

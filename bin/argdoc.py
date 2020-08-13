@@ -80,9 +80,9 @@ def format_usage():
     """Sum the usage into a line of text closed by an end-of-line char"""
 
     parser = ArgumentParser()
-    usage_line = parser.format_usage()
+    usage_chars = parser.format_usage()
 
-    return usage_line
+    return usage_chars
 
 
 def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
@@ -452,7 +452,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         parts_usage = prog if (self.parts.usage is None) else self.parts.usage
         emitted_usage = prog if (args_emitted_usage is None) else args_emitted_usage
 
-        if parts_usage != emitted_usage:
+        if parts_usage.split() != emitted_usage.split():
             stderr_print("argdoc.py: warning: doc'ced usage: {}".format(parts_usage))
             stderr_print("argdoc.py: warning: emitted usage: {}".format(emitted_usage))
 
@@ -594,7 +594,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         repr_dest = black_repr(dest)
         repr_metavar = black_repr(metavar)
         repr_nargs = black_repr(nargs)
-        repr_help = black_repr(arg_help_line)
+        repr_help = black_repr(arg_help_line).replace("%", "%%")
 
         head_lines = [
             "parser.add_argument(",
@@ -659,6 +659,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         usage_phrase = optionals_declaration.phrase.format_usage_phrase()
 
         arg_help_line = optionals_declaration.line.arg_help_line
+        repr_help = black_repr(arg_help_line).replace("%", "%%")
 
         assert option
         assert (not metavar) or (nargs == 1)
@@ -779,7 +780,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
                 ]
 
         tail_lines = [
-            d + "help={repr_help}".format(repr_help=black_repr(arg_help_line)),
+            d + "help={repr_help}".format(repr_help=repr_help),
             ")",
         ]
 
@@ -852,7 +853,7 @@ class _ArgDocTaker(argparse.Namespace):
 
         if taker.peek_more():
 
-            self.take_usage_line()
+            self.take_usage_chars()
             self.accept_description()
 
             self.accept_positionals_declarations()  # Positionals before Optionals in Arg Doc lines
@@ -862,22 +863,32 @@ class _ArgDocTaker(argparse.Namespace):
 
         self.take_end_doc()
 
-    def take_usage_line(self):
-        """Take the line of Usage to get started"""
+    def take_usage_chars(self):
+        """Take one line or some lines of Usage to get started"""
 
         taker = self.taker
 
-        usage_line = taker.peek_one_shard()
+        usage_lines = list()
+        line = taker.peek_one_shard()
+        while True:
+            usage_lines.append(line)
+            taker.take_one_shard()
+            if taker.peek_more():
+                line = taker.peek_one_shard()
+                if line.strip():
+                    if line.startswith(" "):
+                        continue
+            break
+
+        usage_chars = "\n".join(usage_lines)
 
         uses = _UsagePhrasesSyntax()
-        uses_taker = _UsagePhrasesTaker(usage_line)
-        uses_taker.take_usage_line_into(uses)
+        uses_taker = _UsagePhrasesTaker(usage_chars)
+        uses_taker.take_usage_chars_into(uses)
 
         self.parts.uses = uses
         self.parts.usage = uses.usage_tail
         self.parts.prog = uses.prog_phrase
-
-        taker.take_one_shard()
 
     def accept_description(self):
         """Take the line of description"""
@@ -984,6 +995,7 @@ class _ArgDocTaker(argparse.Namespace):
         via_phrases = list(phrases_by_words.keys())
         via_lines = list(lines_by_words.keys())
         self._require_matching_argument_declarations(via_phrases, via_lines)
+        # FIXME: assert these are keyed by (-r',) or ('--sort', 'FIELD',) etc
 
         # Group together the Usage Line for NArg with the Argument Line for Alt Option and Help
 
@@ -1014,9 +1026,17 @@ class _ArgDocTaker(argparse.Namespace):
     def _require_matching_argument_declarations(self, via_phrases, via_lines):
         """Raise ArgDocError unless same args declared line by line and in usage line"""
 
+        usage_via_phrases = " ".join("[{}]".format(" ".join(_)) for _ in via_phrases)
+        usage_via_lines = " ".join("[{}]".format(" ".join(_)) for _ in via_lines)
+
         if via_phrases != via_lines:
-            stderr_print("argdoc.py: warning: via_phrases:  {}".format(via_phrases))
-            stderr_print("argdoc.py: warning: via_lines:  {}".format(via_lines))
+
+            stderr_print(
+                "argdoc.py: warning: via phrases:  {}".format(usage_via_phrases)
+            )
+            stderr_print("argdoc.py: warning: via lines:::  {}".format(usage_via_lines))
+            # FIXME: suggest multiple usage lines when too wide for one usage line
+
             if set(via_phrases) == set(via_lines):
                 raise ArgDocError(
                     "same sets, different orders, declared as usage and as arguments"
@@ -1087,7 +1107,7 @@ class _UsagePhrasesSyntax(argparse.Namespace):
 
     def __init__(self):
 
-        self.usage_line = None  # the whole Usage line
+        self.usage_chars = None  # the usage lines catenated with "\n" marks in between
         self.usage_tail = None  # the line without its "usage:" leading chars
         self.prog_phrase = None  # the 2nd word of the Usage line
 
@@ -1098,25 +1118,25 @@ class _UsagePhrasesSyntax(argparse.Namespace):
 class _UsagePhrasesTaker(argparse.Namespace):
     """Pick an Arg Doc Usage Line apart, char by char"""
 
-    def __init__(self, usage_line):
+    def __init__(self, usage_chars):
 
         self.uses = None  # the fragments of source matched by this parser
-        self.taker = ShardsTaker(shards=usage_line)
+        self.taker = ShardsTaker(shards=usage_chars)
 
-    def take_usage_line_into(self, uses):
+    def take_usage_chars_into(self, uses):
         """Parse an Arg Doc Usage Line into its Uses"""
 
         self.uses = uses
-        self.take_usage_line()
+        self.take_usage_chars()
 
-    def take_usage_line(self):
+    def take_usage_chars(self):
         """Take each Use of an Arg Doc Usage Line"""
 
         taker = self.taker
 
         if taker.peek_more():
 
-            self.accept_peeked_usage_line()
+            self.accept_peeked_usage_chars()
 
             self.take_usage_word()
             self.take_prog()
@@ -1128,7 +1148,7 @@ class _UsagePhrasesTaker(argparse.Namespace):
 
         taker.take_end_shard()
 
-    def accept_peeked_usage_line(self):
+    def accept_peeked_usage_chars(self):
         """Name a copy of the entire Usage Line, including its "usage:" prefix"""
 
         taker = self.taker
@@ -1136,8 +1156,8 @@ class _UsagePhrasesTaker(argparse.Namespace):
 
         strung_remains = taker.peek_strung_remains()
 
-        usage_line = strung_remains.strip()
-        uses.usage_line = usage_line
+        usage_chars = strung_remains.strip()
+        uses.usage_chars = usage_chars
 
     def take_usage_word(self):
         """Take the chars of "usage:" to get started"""
@@ -1696,22 +1716,22 @@ def black_triple_quote_repr(chars):
         lines.append(chars)
     lines.append(qqq)
 
-    source = "\n".join(lines)
+    rep = "\n".join(lines)
 
-    return source
+    return rep
 
 
 def black_repr(chars):
     """Quote chars or None like Black, preferring " double quotes over ' single quotes"""
     # FIXME: does this agree with the Black autostyling app? Agrees always?
 
-    source = repr(chars)
+    rep = repr(chars)
 
     if chars == str(chars):  # not None, and not int, etc
         if '"' not in chars:
-            source = '"{}"'.format(chars)
+            rep = '"{}"'.format(chars)
 
-    return source
+    return rep
 
 
 def plural_en(word):  # FIXME FIXME: make this easy to override

@@ -439,8 +439,8 @@ Call a column numeric when two-thirds of its cells contain decimal digits
            2       2      14
     $
 
-    $ bin/tar2.py tvf /dev/null/child -tvf dir.tgz 2>/dev/null
-    $ bin/tar2.py xvkf dir.tgz >/dev/null 2>&1
+    $ python2 bin/tar2.py tvf /dev/null/child -tvf dir.tgz 2>/dev/null
+    $ python2 bin/tar2.py xvkf dir.tgz >/dev/null 2>&1
     $
 
 ## 2.29 ) Touch

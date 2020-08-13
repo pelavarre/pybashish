@@ -23,15 +23,11 @@ from __future__ import print_function
 import glob
 import os
 import shlex
+import stat
 import subprocess
 import sys
 
 import argdoc
-
-
-HIDDENS = (
-    "pyish subsh2 tar2".split()
-)  # FIXME: learn to show just "rwx" by way of hiding "rw-"
 
 
 def main():
@@ -45,10 +41,16 @@ def main():
     os.chdir(file_dir)
     globbed = glob.glob("*.py")
 
-    whats_by_verb = dict()
+    executable_whats = list()
     for what in globbed:
+        stats = os.stat(what)
+        if stats.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH):
+            executable_whats.append(what)
+
+    whats_by_verb = dict()
+    for what in executable_whats:
         name = os.path.splitext(what)[0]
-        if (not name.startswith("_")) and (name not in HIDDENS):
+        if not name.startswith("_"):
             verb = name.strip("_")
 
             whats_by_verb[verb] = what
