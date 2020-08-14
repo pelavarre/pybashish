@@ -53,7 +53,7 @@ def main():
     uniques = str_unique_everseen(takes)
 
     stdouts = uniques
-    if args.sort:
+    if args.sort:  # sorted(str_unique_everseen.charset) could be faster
         stdouts = "".join(sorted(uniques))
 
     sys.stdout.write("".join(stdouts))

@@ -97,13 +97,17 @@ def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
         stderr_print("argdoc.py: error: ArgDocError: {}".format(exc))
         sys.exit(1)
 
-    space = parser.parse_args(args, namespace=namespace)
+    args_ = parser.parse_args(args, namespace=namespace)
+    help_options = scrape_help_options(doc=parser.format_help())
 
-    if parser_said_print_help(parser, namespace=space):
+    joined_help_options = " ".join(help_options)
+    assert joined_help_options.split() == help_options
+
+    if any(vars(args_).get(_) for _ in help_options):
         parser.print_help()
         sys.exit(0)  # exit zero from printing help
 
-    return space
+    return args_
 
 
 def print_help(file=None):
@@ -138,32 +142,35 @@ def ArgumentParser(doc=None, doc_filename=None):  # FIXME: class ArgumentParser
     return parser
 
 
-def parser_said_print_help(parser, namespace):
+def scrape_help_options(doc):
     """Print help and exit zero, if an option parsed is doc'ced as print help"""
 
-    help_lines = parser.format_help().splitlines()
+    help_lines = doc.splitlines()
 
     help_options = list()
     while help_lines and (help_lines[0] != "optional arguments:"):
         help_lines = help_lines[1:]
     if help_lines and (help_lines[0] == "optional arguments:"):
         help_lines = help_lines[1:]
+
         while help_lines and (
-            help_lines[0].startswith("  " or not help_lines[0].strip())
+            help_lines[0].startswith(" ") or not help_lines[0].strip()
         ):
             words = help_lines[0].split()
-            if "show this help message and exit" == " ".join(words[1:]):
-                help_options.extend(_.lstrip("-") for _ in words[0].split(","))
-                # FIXME: this would read "---help" as a help option, maybe we don't like that
             help_lines = help_lines[1:]
 
-    options_by_name = vars(namespace)
-    for help_option in help_options:
-        if help_option in options_by_name.keys():
-            if options_by_name[help_option]:
-                return True
+            if words and words[0].startswith("-"):
+                options = words[:1]
+                help_words = words[1:]
+                if words[0].endswith(","):
+                    options = words[:2]
+                    help_words = words[2:]
 
-    return False
+                if "show this help message and exit" == " ".join(help_words):
+                    help_options.extend(_.lstrip("-").rstrip(",") for _ in options)
+                    # FIXME: this would read "---help" as a help option, maybe we don't like that
+
+    return help_options
 
 
 #
@@ -295,8 +302,20 @@ class _ArgDocApp:
             file_doc, doc_filename=doc_filename
         )
 
+        help_options = list()
+        if file_doc:
+            help_options = scrape_help_options(file_doc)
+            if coder.coder_added_help:
+                assert "help" in help_options
+                assert "h" in help_options
+                del help_options[help_options.index("help")]
+                del help_options[help_options.index("h")]
+
+        joined_help_options = " ".join(help_options)
+        assert joined_help_options.split() == help_options
+
         if shred == "argparse":
-            self.rip_argparse(parser_source)
+            self.rip_argparse(parser_source, joined_help_options)
 
             return
 
@@ -321,7 +340,7 @@ class _ArgDocApp:
 
         args = parser.parse_args(tail_argv)
 
-        if parser_said_print_help(parser, namespace=args):
+        if any(vars(args).get(_) for _ in help_options):
             parser.print_help()
             sys.exit(0)  # exit zero from printing help
 
@@ -332,13 +351,26 @@ class _ArgDocApp:
 
         print(black_triple_quote_repr(file_doc.strip()))
 
-    def rip_argparse(self, parser_source):
+    def rip_argparse(self, parser_source, joined_help_options):
         """Show how the file calls Arg Parse"""
 
         print(parser_source.rstrip())
-
         print()
+
+        d = r"    "  # choose indentation
         print("args = parser.parse_args()")
+        if joined_help_options:
+            # FIXME: reduce this down to:  if args.help or args.h or ...:
+            # FIXME: by way of choosing the "add_argument" "dest" correctly, eg, at --x -y
+            print(
+                "if any(vars(args_).get(_) for _ in {}.split()):".format(
+                    black_repr(joined_help_options)
+                )
+            )
+            print(d + "parser.print_help()")
+            print(d + "sys.exit(0)  # exit zero from printing help")
+        print()
+
         print("print(args)")
 
     def compare_file_to_help_doc(self, file_doc, doc_filename, help_doc):
@@ -491,6 +523,8 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         if not doc:
             assert parts.add_help is None
             add_help = True
+
+        self.coder_added_help = add_help
 
         lines.append(d + "add_help={add_help},".format(add_help=add_help))
 
@@ -1056,7 +1090,7 @@ class _ArgDocTaker(argparse.Namespace):
             line = taker.peek_one_shard()
             if not line.startswith(" "):
                 break
-            assert line.startswith("  ")
+            assert line.startswith(" ")
 
             argument_lines.append(line)
             taker.take_one_shard()
