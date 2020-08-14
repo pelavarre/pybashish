@@ -30,8 +30,15 @@ usage as a python import:
     print(args)
 
 bugs:
+  the top line usage summary names the metavars even when written to accept more than one
   to see review comments pop up to work with you, you must damage an arg doc and run this again
   cutting out all "optional arguments" declarations leaves you with no "-h, --help" option
+  long option names always splits the option declaration line from its help line
+  usage longer than one line gets stuck with a meaningless warning till you patch "argdoc.py"
+
+popular bugs:
+  does prompt once for stdin when called as "argdoc -", like bash "grep -R", unlike bash "cat -"
+  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
 examples:
   argdoc.py -h                          # show this help message and exit
@@ -51,6 +58,7 @@ examples:
 # FIXME: consider looping over a list of [FILE [FILE ...]]
 # FIXME: autocorrect wrong Arg Docs
 # FIXME: complain of prog != file name, eg, "tar.py" help inside "tar2.py"
+
 
 from __future__ import print_function
 
@@ -94,7 +102,7 @@ def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
     try:
         parser = ArgumentParser(doc, doc_filename=doc_filename)
     except ArgDocError as exc:
-        stderr_print("argdoc.py: error: ArgDocError: {}".format(exc))
+        stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
         sys.exit(1)
 
     args_ = parser.parse_args(args, namespace=namespace)
@@ -191,7 +199,7 @@ def main(argv):
     try:
         app.run_main_argv(argv)
     except ArgDocError as exc:
-        stderr_print("argdoc.py: error: ArgDocError: {}".format(exc))
+        stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
         sys.exit(1)
     except Exception:
         stderr_print("argdoc.py: error: unhandled exception at:  {}".format(shline))
@@ -329,7 +337,7 @@ class _ArgDocApp:
             )
 
         if (shred == "argdoc") or not argv_separator:
-            self.rip_argdoc(help_doc)
+            self.rip_argdoc(help_doc, doc_filename=doc_filename)
 
             return
 
@@ -385,19 +393,23 @@ class _ArgDocApp:
             with open("b", "w") as outgoing:
                 outgoing.write(help_doc.strip())
 
-        help_shline = "bin/argdoc.py --rip argdoc {}".format(doc_filename)
-        help_message = "argdoc.py: warning: help != doc, help at:  {}".format(
-            help_shline
+        stderr_print(
+            "argdoc.py: warning: doc vs help diffs at:  bin/argdoc.py {} >/dev/null".format(
+                doc_filename
+            )
         )
-        stderr_print(help_message)
 
-        file_doc_shline = "bin/argdoc.py --rip doc {}".format(doc_filename)
-        file_doc_message = "argdoc.py: warning: doc != help, doc at:  {}".format(
-            file_doc_shline
+        doc_help_shline = "bin/argdoc.py --rip argdoc {} >a".format(doc_filename)
+        file_doc_shline = "bin/argdoc.py --rip doc {} >b".format(doc_filename)
+        diff_urp_hline = "diff -urp a b"
+
+        stderr_print(
+            "argdoc.py: warning: doc vs help diffs at:  {} && {} && {}".format(
+                doc_help_shline, file_doc_shline, diff_urp_hline
+            )
         )
-        stderr_print(file_doc_message)
 
-    def rip_argdoc(self, help_doc):
+    def rip_argdoc(self, help_doc, doc_filename):
         """Show how the file could call Arg Doc"""
 
         print(
@@ -411,22 +423,30 @@ class _ArgDocApp:
 
         print(black_triple_quote_repr(help_doc.strip()))
         print()
+        print()  # suggest two blank lines between docstring and first import
 
         print(
             textwrap.dedent(
-                """
+                r"""
+                import sys
+
                 import argdoc
 
 
                 def main():
                     args = argdoc.parse_args()
                     main.args = args
-                    print(args)
+                    sys.stderr.write("{}\n".format(args))
+                    sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
+                    sys.stderr.write("$prog: error: not implemented\n")
+                    sys.exit(2)  # exit 2 from rejecting usage
 
 
                 if __name__ == '__main__':
                     main()
-                """
+                """.replace(
+                    "$prog", doc_filename  # "$prog" a la "string.Template"s
+                )
             ).strip()
         )
 
@@ -472,17 +492,26 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         # Name the app
 
-        prog = parts.prog
-        if not prog:
-            prog = os.path.split(doc_filename)[-1]
+        prog = parts.prog if parts.prog else os.path.split(doc_filename)[-1]
 
         assert prog  # ArgParse guesses the calling prog name, if none chosen
+
         lines.append(d + "prog={repr_prog},".format(repr_prog=black_repr(prog)))
 
         # Improve on the conventional Usage Line, when desperate
 
         parts_usage = prog if (self.parts.usage is None) else self.parts.usage
+
         emitted_usage = prog if (args_emitted_usage is None) else args_emitted_usage
+        if prog == "ls.py":  # FIXME: teach "argdoc.py" to emit multiline usage
+            ls_split = "\n{}".format(13 * (" "))
+            emitted_usage = emitted_usage.replace(
+                "[-F] ", "[-F]{}".format(ls_split)
+            )  # old, new
+            emitted_usage = emitted_usage.replace(
+                "[--ascending] ", "[--ascending]{}".format(ls_split)
+            )
+            emitted_usage = emitted_usage.replace("[-r] ", "[-r]{}".format(ls_split))
 
         if parts_usage.split() != emitted_usage.split():
             stderr_print("argdoc.py: warning: doc'ced usage: {}".format(parts_usage))
@@ -1028,7 +1057,9 @@ class _ArgDocTaker(argparse.Namespace):
 
         via_phrases = list(phrases_by_words.keys())
         via_lines = list(lines_by_words.keys())
-        self._require_matching_argument_declarations(via_phrases, via_lines)
+        self._require_matching_argument_declarations(
+            tagline, via_phrases=via_phrases, via_lines=via_lines
+        )
         # FIXME: assert these are keyed by (-r',) or ('--sort', 'FIELD',) etc
 
         # Group together the Usage Line for NArg with the Argument Line for Alt Option and Help
@@ -1057,7 +1088,7 @@ class _ArgDocTaker(argparse.Namespace):
 
         return arg_declarations
 
-    def _require_matching_argument_declarations(self, via_phrases, via_lines):
+    def _require_matching_argument_declarations(self, tagline, via_phrases, via_lines):
         """Raise ArgDocError unless same args declared line by line and in usage line"""
 
         usage_via_phrases = " ".join("[{}]".format(" ".join(_)) for _ in via_phrases)
@@ -1073,10 +1104,14 @@ class _ArgDocTaker(argparse.Namespace):
 
             if set(via_phrases) == set(via_lines):
                 raise ArgDocError(
-                    "same sets, different orders, declared as usage and as arguments"
+                    "same sets, different orders, declared as usage and as {}".format(
+                        tagline.rstrip(":")
+                    )
                 )
             raise ArgDocError(
-                "different sets of words declared as usage and as arguments"
+                "different sets of words declared as usage and as {}".format(
+                    tagline.rstrip(":")
+                )
             )
 
     def accept_argument_lines(self, tagline):
@@ -1086,13 +1121,20 @@ class _ArgDocTaker(argparse.Namespace):
         taker.accept_blank_shards()
 
         argument_lines = list()
+        dent = None
         while taker.peek_more():
             line = taker.peek_one_shard()
             if not line.startswith(" "):
                 break
             assert line.startswith(" ")
 
-            argument_lines.append(line)
+            denting = dent
+            dent = str_splitdent(line)
+            if denting and (denting[0] < dent[0]):
+                argument_lines[-1] += "\n" + line  # FIXME: mutation
+            else:
+                argument_lines.append(line)
+
             taker.take_one_shard()
 
             taker.accept_blank_shards()
@@ -1332,6 +1374,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
         """Pick attributes out of the argument line"""
 
         # Split off the help words
+        # found past "  " in the first line, or found past the indentation of later lines
 
         stripped = argument_line.strip()
         index = stripped.find("  ")
@@ -1347,9 +1390,14 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
         if len_words not in (1, 2, 4,):
             return
 
-        # Take the 1 word of -c, --mnemonic, or METAVAR
+        self._take_1_2_4_argument_words(words)
 
-        (word0, metavar0, concise0, mnemonic0,) = self._take_argument_word(words)
+    def _take_1_2_4_argument_words(self, words):
+        """Return the possible parses of one or two [-c|--mnemonic] [METAVAR] argument syntax"""
+
+        # Take the 1 word of --mnemonic, -c, or METAVAR
+
+        (word0, metavar0, concise0, mnemonic0,) = self._take_argument_word(words[0])
 
         if word0.startswith("--"):
             self.option = mnemonic0
@@ -1358,12 +1406,11 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
         else:
             self.metavar = metavar0
 
-        # Take the 2 words of -c METAVAR, or --mnemonic METAVAR, or -c, --mnemonic
-        # Or even take the 2 words of --mnemonic, -c out of order like that
+        # Take the 2 words of -c, --mnemonic, --mnemonic, -c, or -c|--mnemonic METAVAR
 
-        if words:
+        if words[1:]:
 
-            (word1, metavar1, concise1, mnemonic1,) = self._take_argument_word(words)
+            (word1, metavar1, concise1, mnemonic1,) = self._take_argument_word(words[1])
 
             if word1.startswith("--"):
                 self.alt_option = mnemonic1
@@ -1372,26 +1419,23 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
             else:
                 self.metavar = metavar1
 
-            # Take the 4 words of -c METAVAR, --mnemonic METAVAR
-            # Or even take the 4 words of --mnemonic METAVAR, -c METAVAR out of order like that
+            # Take the 4 words of -c METAVAR, --mnemonic METAVAR,
+            # Or reversed as --mnemonic METAVAR, -c METAVAR
 
-            if words:
+            if words[2:]:
 
-                (word2, metavar2, concise2, mnemonic2,) = self._take_argument_word(
-                    words
-                )
-                (word3, metavar3, concise3, mnemonic3,) = self._take_argument_word(
-                    words
-                )
+                (word2, _, concise2, mnemonic2,) = self._take_argument_word(words[2])
+                (word3, metavar3, _, _,) = self._take_argument_word(words[3])
 
-                self.alt_option = mnemonic2
-                self.metavar = metavar3
+                if word2.startswith("--"):
+                    self.alt_option = mnemonic2
+                    self.alt_metavar = metavar3
+                elif word2.startswith("-"):
+                    self.alt_option = concise2
+                    self.alt_metavar = metavar3
 
-    def _take_argument_word(self, words):
-        """Take the next word and return its potential -c, --mnemonic, METAVAR parses"""
-
-        word = words[0]
-        words[:] = words[1:]
+    def _take_argument_word(self, word):
+        """Return the possible -c, --mnemonic, METAVAR parses of a word"""
 
         name = word.strip("-").strip(",")
         metavar = name
@@ -1763,7 +1807,9 @@ def black_repr(chars):
 
     if chars == str(chars):  # not None, and not int, etc
         if '"' not in chars:
-            rep = '"{}"'.format(chars)
+            # FIXME: these chars can be simply quoted, and how many more?
+            if all((ord(" ") <= ord(_) <= ord("~")) for _ in chars):
+                rep = '"{}"'.format(chars)
 
     return rep
 
@@ -1942,6 +1988,21 @@ def require_sys_version_info(*min_info):
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
     print(*args, file=sys.stderr)
+
+
+# deffed in many files  # missing from docs.python.org
+def str_splitdent(line):
+    """Split apart the indentation of a line, from the remainder of the line"""
+
+    len_dent = len(line) - len(line.lstrip())
+    dent = len_dent * " "
+
+    tail = line[len(dent) :]
+
+    return (
+        dent,
+        tail,
+    )
 
 
 # deffed in many files  # missing from docs.python.org

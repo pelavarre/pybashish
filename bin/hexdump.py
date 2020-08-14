@@ -18,12 +18,18 @@ examples:
 """
 # FIXME FIXME: fix "hexdump" bugs: show UTF-8 emoji where they appear
 
+
+import sys
+
 import argdoc
 
 
 def main():
     args = argdoc.parse_args()
-    print(args)
+    sys.stderr.write("{}\n".format(args))
+    sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
+    sys.stderr.write("hexdump.py: error: not implemented\n")
+    sys.exit(2)  # exit 2 from rejecting usage
 
 
 if __name__ == "__main__":

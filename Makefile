@@ -27,10 +27,10 @@ black:
 
 test-once:
 	:
-	bin/doctestbash.py tests/ || (bin/doctestbash.py -vv tests/; exit 1)
-	:
 	rm -fr ../pybashish/.local/share/grep/files/
 	bin/grep.py >/dev/null
+	:
+	bin/doctestbash.py tests/ || (bin/doctestbash.py -vv tests/; exit 1)
 	:
 	for F in bin/*.py; do bin/argdoc.py $$F >/dev/null && continue; echo "make: error:  python3 -m pdb bin/argdoc.py $$F" >&2; exit 1; done
 	: argdoc: tests passed
@@ -40,6 +40,8 @@ test-once:
 	:
 	tests/_test_subsh.py >/dev/null
 	: test_subsh: tests passed
+	:
+	rm -fr ../pybashish/bin/pyish.pyc
 	:
 
 grep-fixme:

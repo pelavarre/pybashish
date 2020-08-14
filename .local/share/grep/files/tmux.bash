@@ -16,3 +16,5 @@ chmod ugo+r ~/t.tmux        # 3 of 3
 # TMux ⌃B C  => new-window
 # TMux ⌃B D  => detach-client
 #
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

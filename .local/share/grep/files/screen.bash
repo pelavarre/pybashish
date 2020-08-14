@@ -11,3 +11,5 @@ screen -ls  # list sessions
 screen -r  # attach back to any session suspended by ⌃A D detach
 screen -r ...  # attach back to a choice of session suspended by ⌃A D detach
 screen -r ...  # attach back to a choice of session suspended by ⌃A D detach
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

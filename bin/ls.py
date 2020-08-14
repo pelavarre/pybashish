@@ -4,8 +4,12 @@ r"""
 usage: ls.py [-h] [-1] [-C] [-l] [--headings] [-a] [--full-time] [-F]
              [--sort FIELD] [-S] [-X] [-f] [-t] [-v] [--ascending]
              [--descending] [-r]
+             [TOP [TOP ...]]
 
-list the files and dirs inside a dir
+show the files and dirs inside a dir
+
+positional arguments:
+  TOP             the name of a dir or file to show
 
 optional arguments:
   -h, --help      show this help message and exit
@@ -27,36 +31,36 @@ optional arguments:
   -r              reverse the default sorts by size ascending, time ascending, name descending, etc
 
 bugs:
-  chokes over contradictions in args of how to print as or how to sort (last option doesn't win)
   doesn't show owner and group
-  doesn't show size for dirs, and doesn't show size for links
-  lists --full-time as to the microsecond not to the nanosecond, and without timezone
-  marks names as r"[*/@]" on request, but doesn't yet notice r"[%=|]"
-  marks lines as r"[-dl]" on request, but doesn't yet notice r"[bcps]"
+  doesn't show size for dirs, nor for links
+  lists --full-time as to the microsecond, not to the nanosecond, and without timezone
+  marks names as r"[*/@]" on request, but misses out on r"[%=|]"
+  marks lines as r"[-dl]" on request, but misses out on r"[bcps]"
   accepts --all, --classify, and --full-time to mean -a, -F, and --full-time (beyond Mac options)
-  defines --headings, --ascending, --descending, and --sort=name (beyond the classic options)
-  sees files as hidden if and only if name starts with "."
+  defines --headings, --ascending, --descending, and --sort=name (beyond Mac and Linux)
+  falls back to "/dev/tty" for "ls -C" width when stdout is not a tty (beyond Mac and Linux)
+  doesn't show dirs to pipe like to terminal, doesn't show one dir like one of more
+  shows dirs in just one way, sorts by just one field, chokes when args call for more
+  sees files as hidden if and only if name starts with ".", as if just for Mac and Linux
 
 examples:
   ls
   ls -1
   ls -l
   ls -C
-  bin/ls.py -alFt | tac  # at Linux
-  bin/ls.py -alFt | tail -r  # at Mac
+  ls -alFt | tac  # reverse sort without ls -r at Linux
+  ls -alFt | tail -r  # reverse sort without ls -r at Mac
+  bin/ls.py --headings
+  COLUMNS=101 ls -C | tee as-wide-as-you-say.txt
+  bin/ls.py -C | tee as-wide-as-tty.txt
 """
-# FIXME: add timezone to conform to --full-time output of Linux
-# FIXME: add nanoseconds to conform to --full-time output of Linux
-# FIXME: closer match at "ls.py -C" to classic line splits of "ls -C"
-# FIXME argdoc: somehow separate -h / -1-C-l--h / -a--fu-F / -f-r--a--d-t-S-X--s=F
 # FIXME: add -R recursive walk
-# FIXME: add glob args
-# FIXME: -w COLUMNS, --width COLUMNS  as if a terminal so wide
+# FIXME: closer match at "ls.py -C" to classic line splits of "ls -C"
+# FIXME argdoc: somehow separate help lines for -1 -C -l --hea / -a --fu -F / --sort ...
 # FIXME: "import column" "import fmt" (or vice versa) to reach "def spill_cells" etc
 
 from __future__ import print_function
 
-import argparse
 import datetime as dt
 import distutils.version
 import os
@@ -69,37 +73,44 @@ import argdoc
 def main():
     """Interpret a command line"""
 
-    tty = sketch_tty(sys.stdout)
+    stdout_isatty = sys.stdout.isatty()
+    stdout_columns = guess_stdout_columns()
+    # FIXME: port to "/dev/tty" outside of Mac and Linux
+
     args = argdoc.parse_args()
-    correct_args(args, tty=tty)
-    print_each_top_walk(tops=[os.curdir], args=args, tty=tty)
+    correct_args(args, stdout_isatty=stdout_isatty, stdout_columns=stdout_columns)
+
+    tops = args.tops if args.tops else [os.curdir]
+    for index in range(len(tops)):
+        print_one_top_walk(tops=tops, index=index, args=args)
 
 
-def sketch_tty(stdio):
-    """Mark this Terminal apart from others"""
-
-    fd = stdio.fileno()
-    isatty = os.isatty(fd)
-
-    try:
-        columns = os.get_terminal_size().columns
-    except OSError:  # such as OSError: [Errno 25] Inappropriate ioctl for device
-        columns = None
-
-    tty = argparse.Namespace(columns=columns, isatty=isatty)
-
-    return tty
-
-
-def correct_args(args, tty):
+def correct_args(args, stdout_isatty, stdout_columns):
     """Auto-correct else reject contradictions among the command line args"""
 
-    _decide_print_as_args(args, tty=tty)
-    _decide_sort_field_args(args)
-    _decide_sort_order_args(args)
+    print_as = _decide_print_as_args(args)
+
+    args._print_as = print_as
+    if not print_as:
+        if stdout_isatty:
+            args._print_as = "zigzag"
+        else:
+            args._print_as = "column"
+
+    args._zigzag_columns = None
+    if args._print_as == "zigzag":
+        args._zigzag_columns = stdout_columns
+
+    args._print_total_row = None
+    if args._print_as == "rows":
+        if stdout_isatty:
+            args._print_total_row = True
+
+    args._sort_by = _decide_sort_field_args(args)
+    args._sort_order = _decide_sort_order_args(args)
 
 
-def _decide_print_as_args(args, tty):
+def _decide_print_as_args(args):
     """Auto-correct else reject contradictions among which style to print finds as"""
 
     vote_cee = "-C" if args.C else ""
@@ -128,24 +139,22 @@ def _decide_print_as_args(args, tty):
             "-1 -l -C --headings".split()
         )  # -1 simple, -l messy, -C classic, else --headings
         stderr_print(
-            "ls.py: error: choose just one of {!r}, not the contradiction {!r}".format(
+            "ls.py: error: choose just one of {!r}, not the style contradiction {!r}".format(
                 " ".join(ballot), " ".join(vote_args)
             )
         )
         sys.exit(2)  # exit 2 from rejecting usage
 
-    if not votes:
-        if tty.isatty:
-            vote_cee = True
+    args_print_as = None
+    if votes:
+        if vote_one:
+            args_print_as = "column"
+        elif vote_cee:
+            args_print_as = "zigzag"
         else:
-            vote_one = True
+            args_print_as = "rows"
 
-    if vote_one:
-        args._print_as = "column"
-    elif vote_cee:
-        args._print_as = "zigzag"
-    else:
-        args._print_as = "rows"
+    return args_print_as
 
 
 def _decide_sort_field_args(args):
@@ -174,7 +183,7 @@ def _decide_sort_field_args(args):
     ballot = "-X -S -f -t --sort=ext|name|none|size|sort|time|version".split()
     if len(votes) > 1:
         stderr_print(
-            "ls.py: error: choose just one of {!r}, not the contradiction {!r}".format(
+            "ls.py: error: choose just one of {!r}, not the sort contradiction {!r}".format(
                 " ".join(ballot), " ".join(votes)
             )
         )
@@ -186,33 +195,35 @@ def _decide_sort_field_args(args):
         "extension name none size time version".split()
     )  # allow "extension", not just Python "ext"
 
-    args._sort_by = "name"
+    args_sort_by = "name"
     if args.S:
-        args._sort_by = "size"
+        args_sort_by = "size"
     elif args.X:
-        args._sort_by = "extension"
+        args_sort_by = "extension"
     elif args.f:
-        args._sort_by = "none"  # distinct from Python str(None)
+        args_sort_by = "none"  # distinct from Python str(None)
     elif args.t:
-        args._sort_by = "time"
+        args_sort_by = "time"
     elif args.v:
-        args._sort_by = "version"
+        args_sort_by = "version"
     elif args.sort:
-        fields = list(_.startswith(args.sort) for _ in sortables)
+        fields = list(_ for _ in sortables if _.startswith(args.sort))
         if len(fields) == 1:
-            args._sort_by = fields[-1]
+            args_sort_by = fields[-1]
         else:
 
             # Reject unknown field names
 
             stderr_print(
-                "ls.py: error: choose just one of {!r}, not the contradiction {!r}".format(
+                "ls.py: error: choose just one of {!r}, not the field contradiction {!r}".format(
                     " ".join(ballot), " ".join(votes)
                 )
             )
             sys.exit(2)  # exit 2 from rejecting usage
 
-    assert args._sort_by in sortables
+    assert args_sort_by in sortables
+
+    return args_sort_by
 
 
 def _decide_sort_order_args(args):
@@ -221,7 +232,7 @@ def _decide_sort_order_args(args):
     by = args._sort_by
 
     vote_ascending = "--ascending" if args.ascending else ""
-    vote_descending = "--descending" if args.ascending else ""
+    vote_descending = "--descending" if args.descending else ""
     vote_reverse = "-r" if args.r else ""
 
     votes = (vote_ascending, vote_descending, vote_reverse)
@@ -230,42 +241,55 @@ def _decide_sort_order_args(args):
     if len(votes) > 1:
         ballot = "-r --ascending --descending".split()
         stderr_print(
-            "ls.py: error: choose just one of {!r}, not the contradiction {!r}".format(
+            "ls.py: error: choose just one of {!r}, not the order contradiction {!r}".format(
                 " ".join(ballot), " ".join(votes)
             )
         )
         sys.exit(2)  # exit 2 from rejecting usage
 
     if by == "none":
-        args._sort_order = None
+        default_sort_order = None
     elif by in "size time".split():
-        args._sort_order = "ascending" if args.r else "descending"
+        default_sort_order = "ascending" if args.r else "descending"
     else:
         assert by in "extension name none version".split()
-        args._sort_order = "descending" if args.r else "ascending"
+        default_sort_order = "descending" if args.r else "ascending"
+
+    args_sort_order = default_sort_order
+    if args.ascending:
+        assert not args.descending
+        args_sort_order = "ascending"
+    elif args.descending:
+        assert not args.ascending
+        args_sort_order = "descending"
+
+    return args_sort_order
 
 
-def print_each_top_walk(tops, args, tty):
+def print_one_top_walk(tops, index, args):
     """Print files and dirs found, as zigzag, column, or rows"""
 
-    # Choose files and dirs
+    # Trace the top and separate by blank line, if more than one top
 
-    assert len(tops) == 1
-    top0 = tops[0]
+    print_as_plural_if_plural(tops, index)
 
-    listed = [os.curdir, os.pardir] + os.listdir(top0)
+    # Find dirs and files inside this one top dir
     # FIXME: conform to Linux listing CurDir and ParDir in other places, unlike Mac Bash
+
+    top = tops[index]
+    listed = [os.curdir, os.pardir] + os.listdir(top)
 
     names = listed
     if not args.all:
         names = list(_ for _ in names if not _.startswith("."))
-        # hidden file names start with "." at Mac and Linux, where:  os.name == "posix"
+        # hidden file names start with "." at Mac and Linux, per:  os.name == "posix"
 
     # Collect stats for each
 
     stats_by_name = dict()
     for name in names:
-        stats_by_name[name] = os.stat(name)
+        wherewhat = os.path.join(top, name)
+        stats_by_name[name] = os.stat(wherewhat)
 
     # Mark each with r"[*/@]" for executable-not-dir, dir, or symbolic link
 
@@ -290,10 +314,17 @@ def print_each_top_walk(tops, args, tty):
     if args._print_as == "column":
         print_as_column(reps)
     elif args._print_as == "zigzag":
-        print_as_zigzag(reps, tty=tty)
+        print_as_zigzag(reps, stdout_columns=args._zigzag_columns)
     else:
         assert args._print_as == "rows"
-        print_as_rows(items, reps_by_name=reps_by_name, args=args, tty=tty, now=now)
+        print_as_rows(
+            tops,
+            index=index,
+            args=args,
+            items=items,
+            reps_by_name=reps_by_name,
+            now_year=now.year,
+        )
 
 
 def mark_name(name, stats):
@@ -328,7 +359,7 @@ def stats_items_sorted(stats_by_name, by, order):
         return items
 
     assert order in "ascending descending".split()
-    py_sort_reverse = order == "descending"
+    py_sort_reverse = True if (order == "descending") else False
 
     items.sort(key=lambda sw: sw[0])
     if by == "extension":
@@ -341,13 +372,54 @@ def stats_items_sorted(stats_by_name, by, order):
         items.sort(key=lambda sw: sw[-1].st_mtime, reverse=py_sort_reverse)
     elif by == "version":
         items.sort(
-            key=lambda sw: distutils.version.LooseVersion(sw[0]),
-            reverse=py_sort_reverse,
+            key=lambda sw: looser_comparable_version(sw[0]), reverse=py_sort_reverse,
         )
     else:
         assert False
 
     return items
+
+
+# deffed in many files  # missing from docs.python.org
+def looser_comparable_version(vstring):
+    """Workaround TypeError in LooseVersion comparisons between int and str"""
+
+    diffables = list()
+
+    words = distutils.version.LooseVersion(vstring).version
+
+    ints = list()
+    strs = list()
+    for word in words:
+        if isinstance(word, int):
+            if strs:
+                diffables.extend([ints, strs])
+                strs = list()
+            ints.append(word)
+        elif (
+            type(word).__mro__[-2] is str.__mro__[-2]
+        ):  # aka Python 3 isinstance(_, str)
+            if ints:
+                diffables.extend([ints, strs])
+                ints = list()
+            strs.append(word)
+        else:
+            assert False
+
+    if ints or strs:
+        diffables.extend([ints, strs])
+
+    return diffables
+
+
+def print_as_plural_if_plural(tops, index):
+    """Trace the top and separate by blank line, if more than one top"""
+
+    top = tops[index]
+    if len(tops) > 1:
+        if 0 < index < len(tops):
+            print()
+        print("{}:".format(top))
 
 
 def print_as_column(cells):
@@ -357,7 +429,16 @@ def print_as_column(cells):
         print(cell)
 
 
-def print_as_rows(items, reps_by_name, args, tty, now):
+def print_as_zigzag(cells, stdout_columns):
+    """Print as lines of words"""
+
+    sep = "  "
+    rows = spill_cells(cells, columns=stdout_columns, sep=sep)
+    for row in rows:
+        print(sep.join(row).rstrip())
+
+
+def print_as_rows(tops, index, args, items, reps_by_name, now_year):
     """Print as many rows of columns"""
 
     # Choose how to print None
@@ -378,8 +459,9 @@ def print_as_rows(items, reps_by_name, args, tty, now):
     rows = list()
 
     if args.headings:  # chmod-perm's, links, owner, group, size, date/time-stamp, name
-        row = "chmods links owner group size stamp name".split()
-        rows.append(row)
+        if index == 0:
+            row = "chmods links owner group size stamp name".split()
+            rows.append(row)
 
     for (name, stats,) in items:
 
@@ -395,7 +477,7 @@ def print_as_rows(items, reps_by_name, args, tty, now):
         if args.full_time:
             str_stamp = stamp.strftime("%a %Y-%m-%d %H:%M:%S.%f")
         else:  # FIXME: emulate the original over-packing date/time-stamp heuristics more closely
-            if stamp.year == now.year:
+            if stamp.year == now_year:
                 str_stamp = stamp.strftime("%b {:2d} %H:%M".format(stamp.day))
             else:
                 str_stamp = stamp.strftime("%b {:2d}  %Y".format(stamp.day))
@@ -411,7 +493,7 @@ def print_as_rows(items, reps_by_name, args, tty, now):
 
     # Print rows
 
-    if tty.isatty:
+    if args._print_total_row:
         print("total {}".format(str_none))  # not a count of 512-byte data blocks
 
     justifieds = left_justify_cells_in_rows(rows)
@@ -449,21 +531,14 @@ def left_justify_cells_in_rows(rows):
                 justified_cell = cell.ljust(max_column_widths[index])
             justified_row.append(justified_cell)
 
+        if len(row):
+            justified_row[-1] = row[-1]  # no padding past right column
+
         justified_rows.append(justified_row)
 
     # Succeed
 
     return justified_rows
-
-
-def print_as_zigzag(cells, tty):
-
-    columns_ = 89 if (tty.columns is None) else tty.columns
-
-    sep = "  "
-    rows = spill_cells(cells, columns=columns_, sep=sep)
-    for row in rows:
-        print(sep.join(row).rstrip())
 
 
 def spill_cells(cells, columns, sep):  # FIXME  # noqa C901
@@ -517,6 +592,89 @@ def spill_cells(cells, columns, sep):  # FIXME  # noqa C901
         rows.append(row)
 
     return rows
+
+
+# deffed in many files  # missing from docs.python.org
+def guess_stdout_columns(*hints):
+    """
+    Run all the searches offered, accept the first result found if any, else assert False
+
+    Default to search:  "COLUMNS", sys.stdout, "/dev/tty", 80
+
+    To fail fast, call for all the guesses always, but still just return the first that works
+    """
+
+    chosen_hints = hints if hints else ("COLUMNS", sys.stdout, "/dev/tty", 80,)
+
+    terminal_widths = list()
+    for hint in chosen_hints:
+
+        terminal_width = guess_stdout_columns_os(hint)
+        if terminal_width is not None:
+            _ = guess_stdout_columns_os_environ_int(hint)
+        else:
+            terminal_width = guess_stdout_columns_os_environ_int(hint)
+
+        if terminal_width is not None:
+            terminal_widths.append(terminal_width)
+
+    if terminal_widths:
+        terminal_width = terminal_widths[0]
+
+        return terminal_width
+
+    assert False
+
+
+# deffed in many files  # missing from docs.python.org
+def guess_stdout_columns_os(hint):
+    """Try "os.get_terminal_size", and slap back "shutil.get_terminal_size" pushing (80, 24,)"""
+
+    showing = None
+    fd = None
+    if hasattr(hint, "fileno"):
+        streaming = hint
+        fd = streaming.fileno()
+    elif hasattr(hint, "startswith"):
+        if hint.startswith(os.sep):
+            devname = hint
+            showing = open(devname)
+            fd = showing.fileno()
+
+    terminal_width = None
+    if fd is not None:
+        try:
+            terminal_size = os.get_terminal_size(fd)
+            terminal_width = terminal_size.columns
+        except OSError:  # such as OSError: [Errno 25] Inappropriate ioctl for device
+            pass
+
+    if showing:
+        showing.close()
+
+    return terminal_width
+
+
+# deffed in many files  # missing from docs.python.org
+def guess_stdout_columns_os_environ_int(hint):
+    """Pull digits from "os.environ" via the hint as key, else from the hint itself"""
+
+    digits = hint
+    if hasattr(hint, "startswith"):
+        envname = hint
+        try:
+            digits = os.environ[envname]
+        except KeyError:  # such as KeyError: 'COLUMN'
+            pass
+
+    try:
+        terminal_width = int(digits)
+    except TypeError:  # such as TypeError: must be ... not 'list'
+        terminal_width = None
+    except ValueError:  # such as ValueError: invalid literal ... with base 10
+        terminal_width = None
+
+    return terminal_width
 
 
 # deffed in many files  # missing from docs.python.org

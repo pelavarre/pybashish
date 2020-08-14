@@ -15,8 +15,8 @@ optional arguments:
   -R          copy the dirs and files inside a dir too, don't just give up on it
 
 bugs:
-  acts like "cp -h" if called without the "-i" and "-p" args, unlike Bash "cp"
-  runs ahead and works with me, without mandating that I name the duplicate, unlike Bash "cp"
+  acts like "cp -h" if called without the "-i" and "-p" args, unlike bash "cp"
+  runs ahead and work, without mandating that you name the duplicate, unlike bash "cp"
 
 examples:
   cp -  # creates copy of Stdin named "stdin~1", then "stdin~2", etc
@@ -26,12 +26,18 @@ examples:
 # FIXME: also copy from (FILE | HOSTNAME:FILE) to here, like Bash "scp" would
 # FIXME: think about "cp SOURCE TARGET" vs "cp TARGET SOURCE" vs line-editor's
 
+
+import sys
+
 import argdoc
 
 
 def main():
     args = argdoc.parse_args()
-    print(args)
+    sys.stderr.write("{}\n".format(args))
+    sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
+    sys.stderr.write("cp.py: error: not implemented\n")
+    sys.exit(2)  # exit 2 from rejecting usage
 
 
 if __name__ == "__main__":

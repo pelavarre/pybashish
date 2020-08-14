@@ -14,3 +14,5 @@ fmt.py --ruler  # Terminal column ruler
 #
 # ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑  # Apple key order:  Control/Ctrl Option/Alt Shift Command Left/Right/Down/Up
 #
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

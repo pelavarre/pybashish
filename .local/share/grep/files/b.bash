@@ -8,7 +8,8 @@ awk '{print ...}'
 
 bash --version
 
-cat /dev/null/child  # always fails
+cat /dev/null/child  # always fails, often outside the shell
+cd /dev/null  # always fails inside the shell
 
 cat - | grep . | grep .  # free-text glass-terminal till ⌃C
 
@@ -32,7 +33,7 @@ ls | LC_ALL=C sort | cat -n
 
 pylint --rcfile=/dev/null --reports=n --disable=locally-disabled ...
 pylint --list-msgs
-pylint --help-msg E0012  # bad-option-value  # not yet adopted above
+pylint --help-msg E0012  # bad-option-value  # not adopted above
 
 python2 p.py
 python2 -m pdb p.py
@@ -52,3 +53,5 @@ stat ...
 
 tar kxf ...  # FIXME: test CACHEDIR.TAG
 tar zcf ... ...
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

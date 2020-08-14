@@ -10,3 +10,5 @@ lsb_release -a  # lsb_release
 : date; : time sudo -n apt-get -y update
 : date; : time sudo -n apt-get -y upgrade
 : date; : time sudo -n apt-get -y dist-upgrade
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

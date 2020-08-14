@@ -18,6 +18,7 @@ examples:
   man zshall
 """
 
+
 from __future__ import print_function
 
 import glob
@@ -26,6 +27,7 @@ import shlex
 import stat
 import subprocess
 import sys
+import textwrap
 
 import argdoc
 
@@ -66,19 +68,67 @@ def main():
     #
 
     stderr_print()
-    stderr_print("For more information, try one of these:")
+    stderr_print(
+        textwrap.dedent(
+            """
+            Python apps should introduce themselves well
+
+            Try typing the name of the app, and add ' --h'
+            For instance, to learn more of 'bin/echo.py', try:
+
+                echo --h
+
+            Many apps will say hello well if you type just one dash
+            For instance, try:
+
+                grep -h | head
+            """
+        ).strip()
+    )
+    stderr_print()
+    stderr_print("Next try any of:")
     stderr_print()
     sys.stderr.flush()
 
+    #
+
     verbs = list(whats_by_verb.keys())
     verbs.append("history")  # FIXME: collect all the BUILTINS of "bin/bash.py"
+    verbs.sort()
 
-    for verb in sorted(verbs):
-        shline = "{} --help".format(verb)
-        print(shline)
+    print_cells(verbs, width=89)  # 89 columns is a 2020 Black terminal
     sys.stdout.flush()
 
     stderr_print()
+    sys.stderr.flush()
+
+
+# deffed in many files  # missing from docs.python.org
+def print_cells(cells, dent="    ", sep="  ", width=None):
+    """
+    Print cells to fit inside a terminal width
+
+    See also: textwrap.fill break_on_hyphens=False break_long_words=False
+    """
+
+    dent = "    "
+    sep = "  "
+
+    joined = None
+    for cell in cells:
+        if not joined:
+            joined = dent + cell
+        else:
+
+            printable = joined
+            joined = "{}{}{}".format(joined, sep, cell)
+
+            if len(joined) >= width:
+                print(printable)
+                joined = dent + cell
+
+    if joined:
+        print(joined)
 
 
 # deffed in many files  # missing from docs.python.org

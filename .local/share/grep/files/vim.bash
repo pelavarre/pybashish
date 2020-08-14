@@ -15,7 +15,7 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 # vim  0 ^ fx h l tx Fx Tx | ; , _  => move column
 # vim  b e w B E W ( ) { }  => move small word, large word, sentence, paragraph
 # vim  j k G 1G !G H L M $ - + ⌃J ⌃N ⌃P  => move row
-# vim  %  => move balance
+# vim  %  => move match balance pair
 #
 # vim  dx x D X p yx P Y J  => cut, copy, paste, join
 # vim  a cx i o s Esc A C O S  => enter/ exit insert mode
@@ -52,3 +52,5 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 # vim  :syntax on
 # vim  :set syntax=whitespace
 #
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

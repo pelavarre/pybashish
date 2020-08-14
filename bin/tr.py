@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: tr.py [-h] [-d] [--sort] [--unique-everseen] CHARSET
+usage: tr.py [-h] [-d] [--sort] [--unique-everseen] [CHARSET]
 
 count lines and words and characters and bytes
 
@@ -16,10 +16,12 @@ optional arguments:
 
 bugs:
   chokes except when called for -d '[^ -~]\t\r\n'
+  runs as "--unique-everseen --sort" when called with no args, unlike Mac and Linux "tr" choking
 
 examples:
   cat $(git ls-files) | tr.py --unique-everseen -d '[^ -~]\t\r\n' && echo
-  cat $(git ls-files) | tr.py --unique-everseen --sort -d '⌃⌥⇧⌘←→↓↑💥💔😊😢😠åéîøü' && echo
+  cat $(git ls-files) | tr.py --unique-everseen --sort -d 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' && echo
+  cat $(git ls-files) | tr.py; echo
 """
 # FIXME: get argdoc to require --delete, while usage is limited
 # FIXME: add -s, --squeeze-repeats
@@ -27,29 +29,36 @@ examples:
 # FIXME: add -t, --truncate-set1
 # FIXME: add the interpretation of charset's, or mix it with Python regex
 
+
 import sys
 
 import argdoc
 
 
-def main():
-    args = argdoc.parse_args()
+def main(argv):
+
+    argv_tail = argv[1:] if argv[1:] else ["--unique-everseen", "--sort", ""]
+    args = argdoc.parse_args(argv_tail)
+
+    args_charset = args.charset if args.charset else ""
 
     charset = None
-    if args.charset == r"[^ -~]\t\r\n":
+    if args_charset == r"[^ -~]\t\r\n":
         codes = list(range(ord(" "), (ord("~") + 1)))
         codes.extend([ord("\t"), ord("\r"), ord("\n")])
         charset = "".join(chr(_) for _ in codes)
-    elif args.charset == "⌃⌥⇧⌘←→↓↑💥💔😊😢😠åéîøü":
-        charset = args.charset
+    elif not any(_ in args_charset for _ in r"\[]"):
+        charset = args_charset
 
-    if (not args.delete) or (not charset):
-        stderr_print(r"usage: tr.py -d '[^ -~]\t\r\n'")
-        stderr_print("tr.py: error: unrecognized arguments")  # FIXME: shlex.join
+    if charset is None:
+        stderr_print("usage: tr.py [-h] [-d] [--sort] [--unique-everseen] [CHARSET]")
+        stderr_print("tr.py: error: not much usage implemented")  # FIXME: shlex.join
         sys.exit(2)  # exit 2 from rejecting usage
 
     stdins = sys.stdin.read()  # FIXME: "utf-8", errors="surrogateescape"
-    takes = list(_ for _ in stdins if _ not in charset)
+    takes = stdins
+    if args.delete:
+        takes = list(_ for _ in stdins if _ not in charset)
     uniques = str_unique_everseen(takes)
 
     stdouts = uniques
@@ -80,7 +89,7 @@ def stderr_print(*args):
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

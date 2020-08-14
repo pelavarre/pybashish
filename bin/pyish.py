@@ -10,6 +10,7 @@ bugs:
   cd pybashish/ && make  # foolishly insists this docstring should be an argdoc
 """
 
+
 from __future__ import print_function
 
 import argparse
@@ -51,6 +52,9 @@ def shlex_join(argv):
 
     rep = repr(argv)
     return rep
+
+
+# FIXME: def str_removesuffix
 
 
 # deffed in many files  # since Sep/2015 Python 3.5

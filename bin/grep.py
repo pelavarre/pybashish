@@ -47,7 +47,7 @@ bugs in the defaults:
   searches every line of input, not just the text lines, a la classic -a aka --text
   takes first word of the first line of input as defining how to begin an end-of-line comment
   picks out paragraphs split by blank lines, a la classic -z, not only the classic single lines
-  prints just what's found, not also the classic -H filename, nor the classic --color=isatty
+  prints just what's found, not also the classic -H filename and --color=auto for stdout isatty
   picks out the entire last file, when no patterns chosen
   requires every pattern in any order, not just the one or more patterns of classic -e p1 -e p2 ...
   understands patterns as python "import re" defines them, not as classic grep -G/-E/-P defines them
@@ -87,6 +87,8 @@ examples:
 # FIXME: match trailing N patterns to 1 or more "..." as args, not just to themselves
 #
 
+
+import contextlib
 import os
 import re
 import sys
@@ -100,12 +102,12 @@ GREP_DIR = ".local/share/grep"
 FILES_DIR = os.path.join(GREP_DIR, "files")
 
 
-def main():
+def main(argv):
     """Interpret the command line"""
 
     # Parse the command line, per the top-of-file docstring
 
-    args = argdoc.parse_args()
+    args = argdoc.parse_args(argv[1:])
     args.verbose = args.verbose if args.verbose else 0
 
     main.args = args
@@ -126,7 +128,7 @@ def main():
     )
     if not os.path.exists(source_files_dir):
         stderr_print("grep.py: creating dir {}/".format(minpath(source_files_dir)))
-        _export_files(FILES_CHARS, from_dir="files/", to_dir=source_files_dir)
+        _export_many_files(FILES_CHARS, from_dir="files/", to_dir=source_files_dir)
 
     # Share default files out across this localhost, apart from this source file
 
@@ -141,7 +143,7 @@ def main():
 
     if not os.path.exists(home_files_envpath):
         stderr_print("grep.py: creating dir {}/".format(minpath(home_files_dir)))
-        _export_files(FILES_CHARS, from_dir="files/", to_dir=home_files_envpath)
+        _export_many_files(FILES_CHARS, from_dir="files/", to_dir=home_files_envpath)
 
     # Choose files to search
 
@@ -157,11 +159,14 @@ def main():
     # Search through lines
 
     exit_status = grep_lines(args, lines=files_lines, chosen_lines=chosen_lines)
+    sys.stdout.flush()
+
     verbose_print("grep.py: + exit {}".format(exit_status if exit_status else 0))
+
     sys.exit(exit_status)
 
 
-def _export_files(tarrish_chars, from_dir, to_dir):
+def _export_many_files(tarrish_chars, from_dir, to_dir):
     """Export lines as files and dirs into a dir, a la Bash "tar xkf tarred.gz" """
 
     files_chars = textwrap.dedent(tarrish_chars).strip() + "\n\n\n"
@@ -199,30 +204,19 @@ def _export_files(tarrish_chars, from_dir, to_dir):
             if (not was_stripped) and (not stripped):
 
                 assert what
+                assert lines[-1].strip() == was_stripped == ""
+
                 wherewhat = os.path.join(to_dir, what)
 
-                # Mark each file with its own provenance
+                file_word_0 = None
+                ext = os.path.splitext(wherewhat)[-1]
+                if not ext.endswith("sh"):  # such as .bash, .zsh
+                    file_word_0 = _pick_export_lines_word_zero(lines)
 
-                assert lines[-1].strip() == was_stripped == ""
-                writes = lines[:-1]
-                writes.append("")
-                writes.append(
-                    "# copied from:  git clone https://github.com/pelavarre/pybashish.git"
+                chars = _format_one_file(
+                    wherewhat, lines=lines[:-1], file_word_0=file_word_0
                 )
-
-                # Write the file
-
-                where = os.path.split(wherewhat)[0]
-                if not os.path.isdir(where):
-                    os.makedirs(where)
-
-                if os.path.exists(wherewhat):  # create, no replace, as in "tar xvkf"
-                    stderr_print(
-                        "grep.py: {}: Cannot open: File exists".format(wherewhat)
-                    )
-                else:
-                    with open(wherewhat, "w") as outgoing:
-                        outgoing.write("\n".join(lines[:-1]))
+                _export_one_file(wherewhat, chars=chars)
 
                 # Begin again to collect the next file
 
@@ -237,6 +231,69 @@ def _export_files(tarrish_chars, from_dir, to_dir):
         was_stripped = stripped
 
     assert not "\n".join(lines).strip()  # silently discard trailing blank lines
+
+
+def _pick_export_lines_word_zero(lines):
+    """Choose the first word of the first line past the "#" header as an end-of-line comment mark"""
+
+    for line in lines:
+        words = line.split()
+        if words:
+            word0 = words[0]
+            if word0 != "#":
+
+                return word0
+
+
+def _format_one_file(wherewhat, lines, file_word_0):
+    """Format one file for export"""
+
+    writes = list(lines)
+
+    # End each file with a mark of its own provenance
+
+    writes.append("")
+    writes.append(
+        "# copied from:  git clone https://github.com/pelavarre/pybashish.git"
+    )
+
+    # Convert the comments
+
+    if file_word_0:
+
+        for (index, write,) in enumerate(writes):
+            if write:
+                word0 = write.split()[0]
+                if word0 != "#":
+                    break
+
+                writes[index] = file_word_0 + write[len("#") :]
+
+        for (index, write,) in reversed(list(enumerate(writes))):
+            if write:
+                word0 = write.split()[0]
+                if word0 != "#":
+                    break
+
+                writes[index] = file_word_0 + write[len("#") :]
+
+    chars = "\n".join(writes) + "\n"
+
+    return chars
+
+
+def _export_one_file(wherewhat, chars):
+    """Export one file"""
+
+    where = os.path.split(wherewhat)[0]
+    if not os.path.isdir(where):
+        os.makedirs(where)
+
+    if os.path.exists(wherewhat):  # create, no replace, as in "tar xvkf"
+        stderr_print("grep.py: {}: Cannot open: File exists".format(wherewhat))
+    else:
+        with open(wherewhat, "w") as outgoing:
+            outgoing.write(chars)
 
 
 def _ext_files_readlines(ext, files):
@@ -556,7 +613,8 @@ FILES_CHARS = r"""
 
     bash --version
 
-    cat /dev/null/child  # always fails
+    cat /dev/null/child  # always fails, often outside the shell
+    cd /dev/null  # always fails inside the shell
 
     cat - | grep . | grep .  # free-text glass-terminal till ⌃C
 
@@ -580,7 +638,7 @@ FILES_CHARS = r"""
 
     pylint --rcfile=/dev/null --reports=n --disable=locally-disabled ...
     pylint --list-msgs
-    pylint --help-msg E0012  # bad-option-value  # not yet adopted above
+    pylint --help-msg E0012  # bad-option-value  # not adopted above
 
     python2 p.py
     python2 -m pdb p.py
@@ -686,7 +744,7 @@ FILES_CHARS = r"""
     # emacs  ⌃A ⌃B ⌃E ⌃F ⌥M  => move column
     # emacs  ⌥B ⌥F ⌥A ⌥E  => move small word, sentence
     # emacs  ⌃P ⌃N ⌥G⌥G  => move row, goto line
-    # emacs  fixme => move balance
+    # emacs  fixme => move match balance pair
     #
     # emacs  ⌃D ⌥D ⌥Z  => delete char, word, to char
     # emacs  ⌃@⌃@ ⌃@ ⌃X⌃X ⌃U⌃@  => mark: begin, place, bounce, goto
@@ -860,7 +918,7 @@ FILES_CHARS = r"""
     # vim  0 ^ fx h l tx Fx Tx | ; , _  => move column
     # vim  b e w B E W ( ) { }  => move small word, large word, sentence, paragraph
     # vim  j k G 1G !G H L M $ - + ⌃J ⌃N ⌃P  => move row
-    # vim  %  => move balance
+    # vim  %  => move match balance pair
     #
     # vim  dx x D X p yx P Y J  => cut, copy, paste, join
     # vim  a cx i o s Esc A C O S  => enter/ exit insert mode
@@ -930,7 +988,7 @@ FILES_CHARS = r"""
         %s/\s\+$//e
         call cursor(with_line, with_col)
     endfun
-    " RStripEachLine = delete the trailing whitespace from each line (not yet from file)
+    " RStripEachLine = delete the trailing whitespace from each line (not from file)
 
 
     #
@@ -952,8 +1010,32 @@ FILES_CHARS = r"""
 """
 
 
+# deffed in many files  # missing from docs.python.org
+class BrokenPipeErrorSink(contextlib.ContextDecorator):
+    """Cut unhandled BrokenPipeError down to sys.exit(1)
+
+    More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
+    As per https://docs.python.org/3/library/signal.html#note-on-sigpipe
+    """
+
+    def __enter__(
+        self,
+    ):  # test with large Stdout cut sharply, such as:  find.py ~ | head
+        return self
+
+    def __exit__(self, *exc_info):
+        (exc_type, exc, exc_traceback,) = exc_info
+        if isinstance(exc, BrokenPipeError):  # catch this one
+
+            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
+
+            sys.exit(1)
+
+
 if __name__ == "__main__":
-    main()
+    with BrokenPipeErrorSink():
+        sys.exit(main(sys.argv))
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

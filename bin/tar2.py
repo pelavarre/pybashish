@@ -22,6 +22,10 @@ bugs:
   prints names found inside to stderr, not to classic stdout
   extracts always to stdout, never to the name found inside
 
+popular bugs:
+  does prompt once for stdin, like bash "grep -R", a la linux "tar ztvf -", unlike mac "tar tvf -"
+  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+
 bash script to compress a top dir as Tgz for test:
   rm -fr dir/ dir.tgz
   mkdir -p dir/a/b/c dir/p/q/r
@@ -36,6 +40,7 @@ examples:
   tar2.py -tvf /dev/null/child -tvf dir.tgz  # first args discarded, last args obeyed
 """
 
+
 from __future__ import print_function
 
 import contextlib
@@ -46,7 +51,7 @@ import tarfile
 import argdoc
 
 
-LIMITED_USAGE = "usage: tar.py [-h] (-tvf|xvkf) FILE"
+LIMITED_USAGE = "usage: tar.py [-h] (-tvf|-xvkf) FILE"
 
 
 def main(argv):
@@ -70,7 +75,12 @@ def main(argv):
 
     # Interpret -tvf or -xvkf
 
-    tar_file_tvf_xvkf(args.file, args_x=args.x)
+    args_file = args.file
+    if args.file == "-":
+        args_file = "/dev/stdin"
+        prompt_tty_stdin()
+
+    tar_file_tvf_xvkf(args_file, args_x=args.x)
 
 
 def stderr_print_usage_error(args):
@@ -122,6 +132,12 @@ def tar_file_tvf_xvkf(args_file, args_x):
                         file_bytes = incoming.read()
 
                     os.write(sys.stdout.fileno(), file_bytes)
+
+
+# deffed in many files  # missing from docs.python.org
+def prompt_tty_stdin():
+    if sys.stdin.isatty():
+        stderr_print("Press ⌃D EOF to quit")
 
 
 # deffed in many files  # but not in docs.python.org

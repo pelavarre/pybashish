@@ -24,7 +24,7 @@ def main(argv):
     # Call Bash Py
 
     bin_bash_py = os.path.join(bin_dir, "bash.py")
-    ran = subprocess.run([bin_bash_py] + argv[1:])
+    ran = subprocess.run([bin_bash_py] + ["-i"] + argv[1:])
     sys.exit(ran.returncode)
 
 

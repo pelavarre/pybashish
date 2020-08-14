@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-usage: jq.py [-h] FILTER [FILE [FILE ...]]
+usage: jq.py [-h] [FILTER] [FILE [FILE ...]]
 
 walk the json at standard input
 
@@ -13,12 +13,21 @@ optional arguments:
   -h, --help  show this help message and exit
 
 bugs:
-  give the available precision, don't floor to the last second like Bash
+  does nothing except test python json.loads and json.dumps
+
+popular bugs:
+  does prompt once for stdin, when stdin chosen as file "-" or by no file args, unlike bash "cat"
+  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+
+see also:
+  https://stedolan.github.io/jq/tutorial/
+  https://stedolan.github.io/jq/manual/
 
 examples:
   echo '["aa", "cc", "bb"]' | jq .
-  jq . <(echo '["aa", "cc", "bb"]')
+  jq . <(echo '[12, 345, 6789]')
 """
+
 
 import json
 import sys
@@ -34,7 +43,7 @@ def main():
     files = args.files if args.files else "-".split()
     for file_ in files:
 
-        if file_ in ("-", "/dev/stdin",):
+        if file_ == "-":
             prompt_tty_stdin()
             chars = sys.stdin.read()
         else:
@@ -43,8 +52,10 @@ def main():
 
         # Munge
 
-        bits = json.loads(chars)
-        stdout = json.dumps(bits) + "\n"
+        stdout = "\n"
+        if chars:
+            bits = json.loads(chars)
+            stdout = json.dumps(bits) + "\n"
 
         # Store
 

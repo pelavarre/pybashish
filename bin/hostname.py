@@ -19,6 +19,7 @@ examples:
   hostname -f
 """
 
+
 from __future__ import print_function
 
 import collections

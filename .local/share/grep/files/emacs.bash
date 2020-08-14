@@ -15,7 +15,7 @@ emacs -nw ~/.emacs
 # emacs  ⌃A ⌃B ⌃E ⌃F ⌥M  => move column
 # emacs  ⌥B ⌥F ⌥A ⌥E  => move small word, sentence
 # emacs  ⌃P ⌃N ⌥G⌥G  => move row, goto line
-# emacs  fixme => move balance
+# emacs  fixme => move match balance pair
 #
 # emacs  ⌃D ⌥D ⌥Z  => delete char, word, to char
 # emacs  ⌃@⌃@ ⌃@ ⌃X⌃X ⌃U⌃@  => mark: begin, place, bounce, goto
@@ -47,3 +47,5 @@ emacs -nw ~/.emacs
 #
 # emacs ⌥X describe-bindings Return  => help with lots of key chord sequences
 #
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

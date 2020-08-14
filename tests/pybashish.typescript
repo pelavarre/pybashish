@@ -1,4 +1,4 @@
-pathWelcome to testing PyBashIsh
+Welcome to testing PyBashIsh
 
 
 Contents
@@ -16,34 +16,36 @@ Contents
 ++ 2.3 ) Bind
 ++ 2.4 ) Cal
 ++ 2.5 ) Cat
-++ 2.6 ) Clips
-++ 2.7 ) Cp
-++ 2.9 ) Column
-++ 2.10 ) Date
-++ 2.11 ) Dd
-++ 2.12 ) DocTestBash
-++ 2.13 ) Echo
-++ 2.14 ) Exit
-++ 2.15 ) Find
-++ 2.16 ) Fmt
-++ 2.17 ) Grep
-++ 2.18 ) Help
-++ 2.19 ) HexDump
-++ 2.20 ) History
-++ 2.21 ) Hostname
-++ 2.22 ) Jq
-++ 2.21 ) Ls
-++ 2.22 ) Make
-++ 2.23 ) Mv
-++ 2.24 ) Pwd
-++ 2.25 ) Read
-++ 2.26 ) Rm
-++ 2.27 ) SubSh
-++ 2.28 ) Tar
-++ 2.29 ) Touch
-++ 2.30 ) Tr
-++ 2.31 ) Watch
-++ 2.32 ) Wc
+++ 2.6 ) Cp
+++ 2.7 ) Column
+++ 2.8 ) Date
+++ 2.9 ) Dd
+++ 2.10 ) DocTestBash
+++ 2.11 ) Echo
+++ 2.12 ) Exit
+++ 2.13 ) Expand
+++ 2.14 ) Find
+++ 2.15 ) Fmt
+++ 2.16 ) Grep
+++ 2.17 ) Help
+++ 2.18 ) HexDump
+++ 2.19 ) History
+++ 2.20 ) Hostname
+++ 2.21 ) Jq
+++ 2.22 ) Ls
+++ 2.23 ) Make
+++ 2.24 ) Mv
+++ 2.25 ) Pwd
+++ 2.26 ) Read
+++ 2.27 ) Rm
+++ 2.28 ) SubSh
+++ 2.29 ) Tar
+++ 2.30 ) Touch
+++ 2.31 ) Tr
+++ 2.32 ) Watch
+++ 2.33 ) Wc
+
++ 3 ) Additional tests
 
 
 To refresh this table of contents, try:
@@ -60,6 +62,8 @@ This file is a Bash Doc Test file
 
 This file is like a Doc Test file of Python "import doctest",
 except this file is for testing Python inside Bash, not for testing Python apart from Bash
+
+    https://docs.python.org/library/doctest.html
 
 To run this file, try:
 
@@ -91,48 +95,32 @@ PyBashIsh does a few things much much better, some things just as well, and many
     (pybashish) $
     (pybashish) $ help
 
-    For more information, try one of these:
+    Python apps should introduce themselves well
 
-    argdoc --help
-    bash --help
-    bind --help
-    cal --help
-    cat --help
-    column --help
-    cp --help
-    date --help
-    dd --help
-    doctestbash --help
-    echo --help
-    exit --help
-    find --help
-    fmt --help
-    grep --help
-    help --help
-    hexdump --help
-    history --help
-    hostname --help
-    jq --help
-    ls --help
-    make --help
-    mv --help
-    pwd --help
-    read --help
-    rm --help
-    subsh --help
-    tar --help
-    touch --help
-    tr --help
-    watch --help
-    wc --help
+    Try typing the name of the app, and add ' --h'
+    For instance, to learn more of 'bin/echo.py', try:
+
+        echo --h
+
+    Many apps will say hello well if you type just one dash
+    For instance, try:
+
+        grep -h | head
+
+    Next try any of:
+
+        argdoc  bash  bind  cal  cat  column  cp  date  dd  doctestbash  echo  exit  expand
+        find  fmt  grep  help  hexdump  history  hostname  jq  ls  make  mv  pwd  read  rm
+        subsh  tar  touch  tr  watch  wc
 
     (pybashish) $
     + exit 1
     $
 
-We've not yet delivered much test coverage for what works inside PyBashIsh
+It's a bug if it surprises you, because a bug is a thing that bother somebody who matters, and
+you matter
 
-It's a bug if it surprises you, please tell us about it
+Please tell us about it
 
 
 # 2 ) Man PyBashIsh All
@@ -165,13 +153,19 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
       Oh no! No examples disclosed!! 💥 💔 💥
     """
 
+
+    import sys
+
     import argdoc
 
 
     def main():
         args = argdoc.parse_args()
         main.args = args
-        print(args)
+        sys.stderr.write("{}\n".format(args))
+        sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
+        sys.stderr.write("/dev/null: error: not implemented\n")
+        sys.exit(2)  # exit 2 from rejecting usage
 
 
     if __name__ == '__main__':
@@ -188,10 +182,25 @@ Drop that starter Doc and Python into your source, call it, and work it up from 
 
 ## 2.2 ) Bash
 
+Do nothing, but noisily
+
+    $ bin/bash.py
+    usage: bash.py [-h] [-i]
+    bash.py: warning: arguments other than -i not implemented
+    $
+
+Decline to do the most basic non-interactive thing
+
+    $ bin/bash.py -c 'echo Hello Bash World'
+    usage: bash.py [-h] [-i]
+    bash.py: error: unrecognized arguments: -c echo Hello Bash World
+    + exit 2
+    $
+
 
 ## 2.3 ) Bind
 
-Lorem ipsum dolor sit amet
+Give help for the keystrokes of the "bin/read.py" command line editor
 
     $ bin/bind.py -p
     "\C-?": drop-char
@@ -212,8 +221,30 @@ Lorem ipsum dolor sit amet
     None:   self-insert
     $
 
+    $ git grep 'd'rop.next.char | 'grep' def | 'grep' '^bin/read.py:'
+    bin/read.py:    def _drop_next_char(self, stdin):
+    $
+
 
 ## 2.4 ) Cal
+
+    $ bin/cal.py -h 19700101
+
+       December 1969
+    Mo Tu We Th Fr Sa Su
+            ...
+    15 16 17 18 19 20 21
+    22 23 24 25 26 27 28
+    29 30 31
+
+        January 1970
+    Mo Tu We Th Fr Sa Su
+              1  2  3  4
+     5  6  7  8  9 10 11
+    12 13 14 15 16 17 18
+            ...
+
+    $
 
 
 ## 2.5 ) Cat
@@ -225,13 +256,23 @@ Lorem ipsum dolor sit amet
     $
 
 
-## 2.6 ) Clips
+## 2.6 ) Cp
+
+    $ bin/cp.py
+    usage: cp.py [-h] [-i] [-p] [-R] FILE
+    cp.py: error: the following arguments are required: FILE
+    + exit 2
+    $
+
+    $ bin/cp.py f.file
+    Namespace(R=None, file='f.file', i=None, p=None)
+    usage: cp.py [-h] [-i] [-p] [-R] FILE
+    cp.py: error: not implemented
+    + exit 2
+    $
 
 
-## 2.7 ) Cp
-
-
-## 2.9 ) Column
+## 2.7 ) Column
 
 Left-justify columns of words
 
@@ -264,16 +305,38 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.10 ) Date
+## 2.8 ) Date
+
+    $ bin/date.py -j 123123591970.59123456
+    1970-12-31 23:59:59.123456
+    $ bin/date.py --date '1970-12-31 23:59:59.123456'
+    1970-12-31 23:59:59.123456
+    $
 
 
-## 2.11 ) Dd
+## 2.9 ) Dd
+
+    $ bin/dd.py </dev/null
+
+    dd.py: Press ⌃T SIGINFO to see progress, a la Linux:  killall -SIGUSR1 python3
+    dd.py: Press ⌃Z to pause, and then tell Bash to 'fg' to resume
+    dd.py: Press ⌃C SIGINT to quit, press ⌃\ SIGQUIT if you really mean it
+    Press ⌃D EOF to quit
+
+    dd.py: ⌃D EOF
+    $
 
 
-## 2.12 ) DocTestBash
+## 2.10 ) DocTestBash
+
+    $ bin/doctestbash.py
+    usage: doctestbash.py [-h] [-b] [-q] [-v] tests/
+    doctestbash.py: error: more arbitrary arguments not implemented
+    + exit 2
+    $
 
 
-## 2.13 ) Echo
+## 2.11 ) Echo
 
     $ bin/echo.py 'Hello, Echo World!'
     Hello, Echo World!
@@ -285,7 +348,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.14 ) Exit
+## 2.12 ) Exit
 
     $ bin/exit.py
     $
@@ -301,22 +364,68 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     + exit 255
     $
 
-    $ exit 256
-    $
-
     $ bin/exit.py 256  # alias of zero
     exit.py: error: returning 256 as 0
     $
 
+    $ exit 256
+    $
 
-## 2.15 ) Find
+    $ exit 258
+    + exit 2
+    $
+
+
+## 2.13 ) Expand
+
+    $ bin/expand.py - </dev/null
+    $
+
+    $ bash -c "bin/echo.py -n $'t\tr\rn\n'" | bin/expand.py | cat -etv
+    t       r$
+    n$
+    $
+
+    $ echo 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | bin/expand.py
+    åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢
+    $
+
+    $ echo $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | bin/expand.py --plain
+      " " " ' " - -- ' '' '''
+    $
+
+
+## 2.14 ) Find
 
     $ bin/find.py /dev/null
     /dev/null
     $
 
+    $ rm -fr finddir/
+    $
 
-## 2.16 ) Fmt
+    $ mkdir -p finddir/a/b/c finddir/p/q/r
+    $ echo hello >finddir/a/b/d
+    $ echo goodbye > finddir/a/b/e
+    $
+
+    $ bin/find.py finddir/
+    finddir
+    finddir/a
+    finddir/p
+    finddir/a/b
+    finddir/a/b/d
+    finddir/a/b/e
+    finddir/a/b/c
+    finddir/p/q
+    finddir/p/q/r
+    $
+
+    $ rm -fr finddir/
+    $
+
+
+## 2.15 ) Fmt
 
     $ echo $(seq 0 39) | bin/fmt.py -w42  # split to fit inside width
     0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
@@ -337,10 +446,37 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.17 ) Grep
+## 2.16 ) Grep
+
+Search with no key
+
+    $ bin/grep.py
+    cd -
+    $
+
+Search in any order
+
+    $ bin/grep.py quit vim
+    # vim  : ZZ ZQ  => ex command such as :q, save-then-quit-vim, quit-vim-without-saving
+    $
+
+    $ bin/grep.py vim quit
+    # vim  : ZZ ZQ  => ex command such as :q, save-then-quit-vim, quit-vim-without-saving
+    $
+
+Search out lines to paste into Bash or Zsh, in place of keyboard input
+
+    $ bin/grep.py cd..dev
+    cd /dev/null  # always fails inside the shell
+    $
+    $ bin/grep.py cd..dev | bash -xe
+    + cd /dev/null
+    bash: line 1: cd: /dev/null: Not a directory
+    + exit 1
+    $
 
 
-## 2.18 ) Help
+## 2.17 ) Help
 
     $ bin/help_.py help
     usage: help_.py [-h] [VERB]
@@ -361,31 +497,226 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.19 ) HexDump
+## 2.18 ) HexDump
+
+    $ bin/hexdump.py -C </dev/null
+    Namespace(C=1)
+    usage: hexdump.py [-h] [-C]
+    hexdump.py: error: not implemented
+    + exit 2
+    $
 
 
-## 2.20 ) History
+## 2.19 ) History
+
+    $ echo 'echo abc$echo def$history$' | tr '$' '\n' | bin/bash.py -i
+
+    Pybashish 0.x.y for Linux and Mac OS Terminals
+    Type "help" and press Return for more information.
+    Type "exit" and press Return to quit, or press ⌃D EOF to quit
+
+    ...@...:...$
+    (pybashish) $ echo abc
+    abc
+    (pybashish) $ echo def
+    def
+    (pybashish) $ history
+        1  echo abc
+        2  echo def
+        3  history
+    (pybashish) $
+    (pybashish) $
+    + exit 1
+    $
 
 
-## 2.21 ) Hostname
+## 2.20 ) Hostname
+
+    $ bin/hostname.py
+    ...
+    $ bin/hostname.py --short
+    ...
+    $ bin/hostname.py --fqdn
+    ...
+    $
 
 
-## 2.22 ) Jq
+## 2.21 ) Jq
+
+Require that "jq.py" not crash more often, without requiring correct output
+
+    $ echo '["aa", "cc", "bb"]' | bin/jq.py .
+    ...
+    $
+
+    $ bash -c "bin/jq.py . <(echo '[12, 345, 6789]')"
+    ...
+    $
 
 
-## 2.21 ) Ls
+## 2.22 ) Ls
+
+List the files and dirs inside a dir
+
+    $ rm -fr lsdir/
+    $
+
+    $ mkdir -p lsdir/dir
+    $ touch lsdir/execable
+    $ chmod +x lsdir/execable
+    $ touch lsdir/file
+    $ ln -s "$PWD"/lsdir/file lsdir/link
+    $
+
+    $ (cd lsdir/ && ../bin/ls.py -C)
+    dir  execable  file  link
+    $
+
+    $ (cd lsdir/ && COLUMNS=1 ../bin/ls.py -C)
+    dir
+    execable
+    file
+    link
+    $
+
+    $ (cd lsdir/ && ../bin/ls.py -CF)
+    dir/  execable*  file  link@
+    $
+
+    $ (cd lsdir/ && ../bin/ls.py -1)
+    dir
+    execable
+    file
+    link
+    $
+
+    $ (cd lsdir/ && ../bin/ls.py -al)
+    drwxr-xr-x  .  .  .  .  ...  .
+    drwxr-xr-x  .  .  .  .  ...  ..
+    drwxr-xr-x  .  .  .  .  ...  dir
+    -rwxr-xr-x  .  .  .  0  ...  execable
+    -rw-r--r--  .  .  .  0  ...  file
+    -rw-r--r--  .  .  .  0  ...  link
+    $
+
+    $ (cd lsdir/ && ../bin/ls.py -l)
+    drwxr-xr-x  .  .  .  .  ...  dir
+    -rwxr-xr-x  .  .  .  0  ...  execable
+    -rw-r--r--  .  .  .  0  ...  file
+    -rw-r--r--  .  .  .  0  ...  link
+    $
+
+    $ (cd lsdir/ && ../bin/ls.py -CFr)
+    link@  file  execable*  dir/
+    $ (cd lsdir/ && ../bin/ls.py -CF --sort=name --ascending)
+    dir/  execable*  file  link@
+    $ (cd lsdir/ && ../bin/ls.py -CF --sort=name --descending)
+    link@  file  execable*  dir/
+    $
+
+Sort by time and sort by size
+
+    $ rm -fr lsdir/
+    $ mkdir lsdir/
+    $ touch lsdir/first
+    $ touch lsdir/second
+    $ touch lsdir/third
+    $ echo a >lsdir/a
+    $ echo abb >lsdir/abb
+    $ echo abbccc >lsdir/abbccc
+    $
+
+    $ (cd lsdir/ && ../bin/ls.py -Ct)
+    abbccc  abb  a  third  second  first
+    $ (cd lsdir/ && ../bin/ls.py -C --sort=time -r)
+    first  second  third  a  abb  abbccc
+    $
+
+    $ (cd lsdir/ && ../bin/ls.py -CS)
+    abbccc  abb  a  first  second  third
+    $ (cd lsdir/ && ../bin/ls.py -C --sort=size -r)
+    first  second  third  a  abb  abbccc
+    $
+
+Sort by ext and by version
+
+    $ rm -fr lsdir/
+    $ mkdir lsdir/
+    $ touch lsdir/1z.zip
+    $ touch lsdir/2p.py
+    $ touch lsdir/3c.c
+    $ touch lsdir/4q.py
+
+    $ (cd lsdir/ && ../bin/ls.py -CX)
+    3c.c  2p.py  4q.py  1z.zip
+    $ (cd lsdir/ && ../bin/ls.py -C --sort=ext -r)
+    1z.zip  2p.py  4q.py  3c.c
+    $
+
+Sort by version
+
+    $ rm -fr lsdir/
+    $ mkdir lsdir/
+    $ touch lsdir/3.10.py
+    $ touch lsdir/3.2.1.py
+    $ touch lsdir/3.2.9.py
+    $ touch lsdir/3.py
+    $ touch lsdir/c.c
+    $ touch lsdir/z.zip
+    $
+
+    $ (cd lsdir/ && ../bin/ls.py -Cv)
+    c.c  z.zip  3.py  3.2.1.py  3.2.9.py  3.10.py
+    $ (cd lsdir/ && ../bin/ls.py -C --sort=version -r)
+    3.10.py  3.2.9.py  3.2.1.py  3.py  z.zip  c.c
+    $
+
+Clean up
+
+    $ rm -fr lsdir/
+    $
 
 
-## 2.22 ) Make
+## 2.23 ) Make
+
+    % bin/make.py </dev/null
+    Namespace()
+    usage: make.py [-h]
+    make.py: error: not implemented
+    + exit 2
+    %
 
 
-## 2.23 ) Mv
+## 2.24 ) Mv
+
+    $ bin/mv.py
+    usage: mv.py [-h] [-i] FILE
+    mv.py: error: the following arguments are required: FILE
+    + exit 2
+    $
+
+    $ bin/mv.py f.file
+    Namespace(file='f.file', i=None)
+    usage: mv.py [-h] [-i] FILE
+    mv.py: error: not implemented
+    + exit 2
+    $
 
 
-## 2.24 ) Pwd
+## 2.25 ) Pwd
+
+    $ bin/pwd_.py
+    ...
+    $ bin/pwd_.py -P
+    ...
+    $ bin/pwd_.py --brief
+    ...
+    $ bin/pwd_.py --home
+    ...
+    $
 
 
-## 2.25 ) Read
+## 2.26 ) Read
 
     $ echo 'Hello, Line Editor' | bin/read.py
     ? Hello, Line Editor
@@ -402,57 +733,181 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑'
     $
 
-## 2.26 ) Rm
+## 2.27 ) Rm
+
+    $ bin/rm.py
+    Namespace(files=[])
+    usage: rm.py [-h] [FILE [FILE ...]]
+    rm.py: error: not implemented
+    + exit 2
+    $
 
 
-## 2.27 ) SubSh
+## 2.28 ) SubSh
 
     $ bin/subsh.py echo 'Hello, Subsh World!'
-    ('{"args": ["echo", "Hello, Subsh World!"], "returncode": 0, "stdout": "Hello, '
-     'Subsh World!\\n", "stderr": ""}')
+    {'args': ['echo', 'Hello, Subsh World!'],
+     'returncode': 0,
+     'stderr': b'',
+     'stdout': b'Hello, Subsh World!\n'}
+    $
+
+    $ python2 bin/subsh2.py echo 'Hello, Subsh World!'
+    {'args': ['echo', 'Hello, Subsh World!'],
+     'returncode': 0,
+     'stderr': '',
+     'stdout': 'Hello, Subsh World!\n'}
     $
 
 
-## 2.28 ) Tar
+## 2.29 ) Tar
 
-    $ rm -fr dir/ dir.tgz
-    $ mkdir -p dir/a/b/c dir/p/q/r
-    $ echo hello >dir/a/b/d
-    $ echo goodbye > dir/a/b/e
-    $ tar czf dir.tgz dir/  # ordered differently at Mac, at Linux
-    $ rm -fr dir/
+    $ rm -fr tardir/ tardir.tgz
     $
 
-    $ bin/tar.py tvf /dev/null/child -tvf dir.tgz 2>&1 | sort
-    dir/
-    dir/a/
-    dir/a/b/
-    dir/a/b/c/
-    dir/a/b/d
-    dir/a/b/e
-    dir/p/
-    dir/p/q/
-    dir/p/q/r/
+    $ mkdir -p tardir/a/b/c tardir/p/q/r
+    $ echo hello >tardir/a/b/d
+    $ echo goodbye > tardir/a/b/e
+    $ tar czf tardir.tgz tardir/  # ordered differently at Mac, at Linux
     $
 
-    $ bin/tar.py xvkf dir.tgz 2>&1 | grep -v '^dir/' | wc
+    $ rm -fr tardir/
+    $
+
+    $ bin/tar.py tvf /dev/null/child -tvf tardir.tgz 2>&1 | sort
+    tardir/
+    tardir/a/
+    tardir/a/b/
+    tardir/a/b/c/
+    tardir/a/b/d
+    tardir/a/b/e
+    tardir/p/
+    tardir/p/q/
+    tardir/p/q/r/
+    $
+
+    $ bin/tar.py xvkf tardir.tgz 2>&1 | grep -v '^tardir/' | wc
            2       2      14
     $
 
-    $ python2 bin/tar2.py tvf /dev/null/child -tvf dir.tgz 2>/dev/null
-    $ python2 bin/tar2.py xvkf dir.tgz >/dev/null 2>&1
+    $ python2 bin/tar2.py tvf /dev/null/child -tvf tardir.tgz 2>/dev/null
+    $ python2 bin/tar2.py xvkf tardir.tgz >/dev/null 2>&1
     $
 
-## 2.29 ) Touch
+    $ rm -fr tardir.tgz
+    $
 
 
-## 2.30 ) Tr
+## 2.30 ) Touch
+
+    % bin/touch.py
+    Namespace(files=[])
+    usage: touch.py [-h] [FILE [FILE ...]]
+    touch.py: error: not implemented
+    + exit 2
+    %
 
 
-## 2.31 ) Watch
+## 2.31 ) Tr
+
+    $ cat $(git ls-files) | bin/tr.py | awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
+
+     !"#$%&'()*+,-./
+    0123456789:;<=>?@
+    ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`
+    abcdefghijklmnopqrstuvwxyz{|}~
+    «»åéîøü–—’“”′″‴←↑→↓⇧⌃⌘⌥💔💥😊😠😢
+    $
 
 
-## 2.32 ) Wc
+## 2.32 ) Watch
+
+    $ bin/watch.py
+    Namespace(interval=None, words=[])
+    usage: watch.py [-h] [-n SECS] [WORD [WORD ...]]
+    watch.py: error: not implemented
+    + exit 2
+    $
+
+
+## 2.33 ) Wc
+
+    $ bin/wc.py
+    Namespace(bytes=None, chars=None, files=[], lines=None, max_line_length=None)
+    usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE [FILE ...]]
+    wc.py: error: not implemented
+    + exit 2
+    $
+
+
+## 3 ) Additional tests
+
+Show verbs called with no args return exit status 2 from rejecting usage
+
+    $ bin/argdoc.py </dev/null >/dev/null 2>&1
+    $ bin/bash.py >/dev/null 2>&1
+    $ bin/bind.py </dev/null >/dev/null 2>&1
+    $ bin/cal.py </dev/null >/dev/null 2>&1
+    $ bin/cat.py </dev/null >/dev/null 2>&1
+    $ bin/column.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $ bin/cp.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $
+
+    $ bin/date.py </dev/null >/dev/null 2>&1
+    $ bin/dd.py </dev/null >/dev/null 2>&1
+    $ bin/doctestbash.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $
+
+    $ bin/echo.py </dev/null >/dev/null 2>&1
+    $ bin/exit.py </dev/null >/dev/null 2>&1
+    $ bin/expand.py </dev/null >/dev/null 2>&1
+    $ bin/find.py </dev/null >/dev/null 2>&1
+    $ bin/fmt.py </dev/null >/dev/null 2>&1
+    $ bin/grep.py </dev/null >/dev/null 2>&1
+    $ bin/help_.py </dev/null >/dev/null 2>&1
+    $ bin/hexdump.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $
+
+    $ : history
+    $
+
+    $ bin/hostname.py </dev/null >/dev/null 2>&1
+    $ bin/jq.py </dev/null >/dev/null 2>&1
+    $ bin/ls.py </dev/null >/dev/null 2>&1
+    $ bin/make.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $ bin/mv.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $
+
+    $ bin/pwd_.py </dev/null >/dev/null 2>&1
+    $ bin/read.py </dev/null >/dev/null 2>&1
+    $ bin/rm.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $
+
+    $ bin/subsh.py </dev/null >/dev/null 2>&1
+    $ bin/tar.py </dev/null >/dev/null 2>&1
+    $ bin/touch.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $
+
+    $ bin/tr.py </dev/null >/dev/null 2>&1
+    $ bin/watch.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $ bin/wc.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $
+
+Clean up
+
+    $ rm -fr ../pybashish/bin/argdoc.pyc
+    $ rm -fr ../pybashish/bin/pybashish.pyc
+    $
 
 
 // FIXME: remake this into a ".md" Markdown file

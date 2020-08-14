@@ -35,9 +35,9 @@ examples:
 # FIXME: block no args:  subsh
 # FIXME: test:  subsh --
 
+
 from __future__ import print_function
 
-import json
 import pprint
 import shlex
 import subprocess
@@ -57,12 +57,7 @@ def main(argv):
 
     verbed = verb(*words[1:])
 
-    dumpable = verbed.vars
-    dumpable = {
-        k: (v.decode() if isinstance(v, bytes) else v) for (k, v,) in dumpable.items()
-    }
-
-    pprint.pprint(json.dumps(dumpable))
+    pprint.pprint(verbed.vars)
 
     exit_status = verbed
     sys.exit(exit_status)
@@ -96,8 +91,6 @@ class ShVerb(object):
 
         kwargs__ = dict(kwargs_)
         kwargs__.update(kwargs)
-
-        # print(args__, kwargs__, file=sys.stderr)
 
         ran = subprocess.run(args__, **kwargs__)
         vars_ = vars(ran)

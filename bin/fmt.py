@@ -11,10 +11,14 @@ optional arguments:
   --ruler     show a ruler to count off the columns (and discard all Stdin)
 
 bugs:
-  does prompt once for Stdin, unlike Bash "fmt"
   doesn't default to prefer 65 within max 75 in the way of Bash
   does count columns up from 1, not up from 0, same as Bash
   prints '_' skids in the ruler to mark only the tabsize=8 tab stops:  1, 9, 17, ...
+
+popular bugs:
+  does prompt once for stdin, like bash "grep -R", unlike bash "fmt"
+  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+  does accept "-" as meaning "/dev/stdin", like linux "fmt -", unlike mac "fmt -"
 
 examples:
   echo $(seq 0 99) | fmt  # split to fit inside Terminal
@@ -25,6 +29,7 @@ examples:
   : # 5678_0123456_8901234_6789012_4567890 2345678_0123456_8901234_6789012  # 72-column ruler
 
 """
+
 
 import os
 import sys

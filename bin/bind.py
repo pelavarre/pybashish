@@ -10,21 +10,24 @@ optional arguments:
   -p          print what each keystroke means
 
 bugs:
-  discloses usage when called with no args, unlike Bash "bind" no-op or Zsh "bindkey" flood
-  prints "drop-next-char" as the binding for "⌃D", which means that only while line not empty
-  prints the empty "" as the encoding for "end-input", unlike no mention in Bash / Zsh
-  prints the unspecific None as the encoding for "self-insert", more accurately than Bash or Zsh
-  sorts by binding like Bash, not by encoding like Zsh
+  floods the terminal when called with no args, same as zsh "bindkey", unlike bash "bind" no-op
+  prints "drop-next-char" as the binding for ⌃D, but ⌃D at flush left ends input
+  prints "end-input" as the binding for empty "" input, unlike no mention in bash / zsh
+  prints none as the encoding for "self-insert", unlike bash / zsh leaving much unicode unmentioned
+  sorts by binding like bash, not by encoding like zsh
+  prints just the bindings only for ansi ↑ ↓ arrows, till "read.py" grows to bind the → ← arrows
 
 examples:
-  bind -p | grep '".e[[][DCAB]"' | sort  # Ansi ↑ ↓ → ← arrows here and in Bash
-  bindkey | grep '".[[][[][ABCD]"'  # Ansi ↑ ↓ → ← arrows in Zsh
+  bind -p | grep '".e[[][DCAB]"' | sort  # ansi ↑ ↓ → ← arrows in bash
+  bindkey | grep '".[[][[][ABCD]"'  # ansi ↑ ↓ → ← arrows in zsh
+  bind.py | grep '".e[[][DCAB]"' | sort  # ansi ↑ ↓ → ← arrows in pybashish
 """
 # FIXME --mac       print what each means, but in Apple style
 # FIXME --zsh       print what each means, but in Zsh "bindkey" style
 # FIXME --vim       print what each means, but in Vim and "cat -etv" style
 # FIXME offers "--mac" and "--vim", unlike Bash
 # FIXME example: bind --mac  # ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑ ... Control Option Shift Command ...
+
 
 from __future__ import print_function
 
@@ -37,12 +40,7 @@ import read
 
 def main():
 
-    args = argdoc.parse_args()
-
-    if not args.p:
-        stderr_print(argdoc.format_usage().rstrip())
-        stderr_print("bind.py: error: no arguments")
-        sys.exit(2)  # exit 2 from rejecting usage
+    _ = argdoc.parse_args()
 
     gt = read.GlassTeletype()
     bots_by_stdin = gt._bots_by_stdin  # peek inside

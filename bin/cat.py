@@ -1,37 +1,41 @@
 #!/usr/bin/env python3
 
 r"""
-usage: cat.py [-h] [-n] [FILE [FILE ...]]
+usage: cat.py [-h] [-E] [-e] [-n] [-T] [-t] [-v] [FILE [FILE ...]]
 
-copy files to standard output ("cat"enate them)
+copy binary (or text) files to standard output (by "cat"enating them)
 
 positional arguments:
-  FILE          a file to copy out
+  FILE                  a file to copy out
 
 optional arguments:
-  -h, --help    show this help message and exit
-  -n, --number  number each line of output
+  -h, --help            show this help message and exit
+  -E, --show-ends       print each "\n" lf as "$\n"
+  -e                    call for -E and -v
+  -n, --number          number each line of output
+  -T, --show-tabs       show each "\t" tab as r"\t" backslash tee
+  -t                    call for -T and -v
+  -v, --show-nonprinting
+                        convert all but \n and \t and printable us-ascii r"[ -~]" to \ escapes
 
 bugs:
-  does prompt once for Stdin, when Stdin chosen as FILE "-" or by no FILE args, unlike Bash "cat"
-  doesn't accurately catenate binary files, unlike Bash
-  does convert classic Mac CR "\r" end-of-line to Linux LF "\n", unlike Bash "cat"
-  does always end the last line with Linux LF "\n" end-of-line, unlike Bash "cat"
-  does print hard b"\x09" after each line number, via "{:6}\t", same as Bash "cat"
-  accepts only the "stty -a" line-editing C0-Control's, not the "bind -p" C0-Control's
-  doesn't define "cat -etv" to show all "us-ascii" rejects
-  doesn't undo Mac "use smart quotes and dashes"
-  doesn't convert indented line-broken plain-text to Html
+  does stop copying at first ⌃D of stdin, even when last line not completed by "\n"
+  does print hard b"\x09" tab after each line number, via "{:6}\t", same as bash "cat"
+
+popular bugs:
+  does prompt once for stdin, like bash "grep -R", unlike bash "cat" and "cat -"
+  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
 examples:
   cat -  # copy out each line of input
   cat - >/dev/null  # echo and discard each line of input
-  pbpaste | cat -etv
+  cat - | grep . | cat.py -etv  # collect and echo some input, then echo it escaped
+  (echo a; echo b; echo c) | cat -n | cat -etv
+  pbpaste | cat.py -etv
 """
-# FIXME FIXME: fix "cat" bugs: -etv, smart quotes and dashes, Html
-# FIXME: dream up a good way to accurately catenate binary files
+# FIXME: amp up argdoc to stop insisting on breaking help off of options to align them
+# FIXME: rewrite as Python 2 without contextlib.ContextDecorator
 
-from __future__ import print_function
 
 import contextlib
 import os
@@ -43,46 +47,95 @@ import argdoc
 def main(argv):
 
     args = argdoc.parse_args(argv[1:])
+
+    if args.e:
+        args.show_ends = True
+        args.show_nonprinting = True
+
+    if args.t:
+        args.show_tabs = True
+        args.show_nonprinting = True
+
     relpaths = args.files if args.files else ["-"]
+
+    # Catenate each binary (or text) file
 
     if "-" in relpaths:
         prompt_tty_stdin()
 
-    # Visit each file
-
-    line_index = 1
-    for relpath in relpaths:  # FIXME: evade Linux-specific "/dev/stdin"
-        relpath = "/dev/stdin" if (relpath == "-") else relpath
-
-        # Fail fast if file not found
-
-        if not os.path.exists(relpath):  # FIXME: stop branching on os.path.exists
+    for relpath in relpaths:
+        if relpath == "-":
+            cat_incoming(fd=sys.stdin.fileno(), args=args)
+        else:
             try:
-                with open(relpath, "rt"):
-                    pass
+                with open(relpath, "rb") as incoming:
+                    cat_incoming(fd=incoming.fileno(), args=args)
             except FileNotFoundError as exc:
                 stderr_print("cat.py: error: {}: {}".format(type(exc).__name__, exc))
                 sys.exit(1)
 
-        # Number on the right side of 6 columns, then a hard tab 2 column separator, then the line
 
-        with open(relpath, "r") as reading:
+def cat_incoming(fd, args):
+    """Copy out some form of each byte as it arrives"""
 
-            line = "\n"
-            while True:
+    ofd = sys.stdout.fileno()
 
-                line = reading.readline()
-                if not line:
-                    break
+    line_index = 0
+    line_bytes = b""
+    fd_byte = b"\n"
 
-                rstripped = line.rstrip()
+    while True:
 
+        length = 1
+        if fd_byte:
+            fd_byte = os.read(fd, length)
+
+        rep = cat_repr_byte(fd_byte, args)
+        line_bytes += rep
+
+        if line_bytes:
+
+            if (fd_byte == b"\n") or (not fd_byte):
+                tag = "{:6}\t".format(1 + line_index)
                 if args.number:
-                    print("{:6}\t{}".format(line_index, rstripped))
-                else:
-                    print(rstripped)
+                    os.write(ofd, tag.encode())
+
+                os.write(ofd, line_bytes)
 
                 line_index += 1
+                line_bytes = b""
+
+        if not fd_byte:
+
+            break
+
+
+def cat_repr_byte(fd_byte, args):
+    """Choose how to show each byte in the line"""
+
+    if fd_byte:
+
+        if fd_byte == b"\n":
+            if args.show_ends:
+                rep = b"$" + fd_byte
+
+                return rep
+
+        if fd_byte == b"\t":
+            if args.show_tabs:
+                rep = br"\t"
+
+                return rep
+
+        if args.show_nonprinting:
+            xx = ord(fd_byte)
+            if not (ord(" ") <= xx <= ord("~")):
+                rep_chars = r"\x{:02X}".format(xx)
+                rep = rep_chars.encode()
+
+                return rep
+
+    return fd_byte
 
 
 # deffed in many files  # missing from docs.python.org

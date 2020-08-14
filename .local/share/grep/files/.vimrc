@@ -1,6 +1,6 @@
-#
-# files/.vimrc:  Vim configuration
-#
+"
+" files/.vimrc:  Vim configuration
+"
 
 " ~/.vimrc
 
@@ -29,4 +29,6 @@ function! RStripEachLine()
     %s/\s\+$//e
     call cursor(with_line, with_col)
 endfun
-" RStripEachLine = delete the trailing whitespace from each line (not yet from file)
+" RStripEachLine = delete the trailing whitespace from each line (not from file)
+
+" copied from:  git clone https://github.com/pelavarre/pybashish.git

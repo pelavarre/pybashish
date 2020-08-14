@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 
 """
-usage: bash.py [-h]
+usage: bash.py [-h] [-i]
 
 chat with people: prompt, then listen, then speak, and repeat
 
 optional arguments:
   -h, --help  show this help message and exit
+  -i          ask more questions
 
 bugs:
+  returns exit status 0 after printing usage, if called with no arguments
   returns exit status 127, not 258, for ⌃D EOF pressed while ' or "" input quote open
-  zeroes exit status after next line of input, no matter if input is blank
-  lots more bugs not yet reported, please help us out
+  changes exit status after next line of input, no matter if input is blank
+  leaves most of "bash" unimplemented
 
 examples:
-  bash.py  # chat till "exit", or ⌃D EOF pressed to quit, or Ssh drops, etc
+  bash.py  # chat till "exit", or ⌃D EOF pressed to quit, or ssh drops, etc
 """
 # FIXME: add --color=never|always|auto
 
@@ -35,7 +37,11 @@ import read
 
 def main(argv):
 
-    argdoc.parse_args()
+    args = argdoc.parse_args()
+    if not args.i:
+        stderr_print(argdoc.format_usage().rstrip())
+        stderr_print("bash.py: warning: arguments other than -i not implemented")
+        sys.exit()
 
     # Print banner
 
@@ -88,7 +94,7 @@ def builtin_pass(argv):  # FIXME FIXME FIXME: build in "-h" and "--help" without
 def builtin_exit(argv):
     """Inject a choice of process returncode"""
 
-    file_dir = _calc_file_dir()
+    file_dir = os.path.split(os.path.realpath(__file__))[0]
     wherewhat = os.path.join(file_dir, "exit.py")
 
     ran = subprocess.run(
@@ -123,12 +129,14 @@ def builtin_history(argv):
         _ = argdoc.parse_args(args=argv[1:], doc=doc)
     except SystemExit as exc:
         returncode = exc.code
+
         return returncode
 
     shlines = read.ShLineHistory.shlines  # couple less tightly  # add date/time-stamp's
     for (index, shline,) in enumerate(shlines):
         lineno = 1 + index
         print("{:5d}  {}".format(lineno, shline))
+    sys.stdout.flush()
 
 
 def _parse_shline(shline):
@@ -158,7 +166,7 @@ def _compile_shline(shline, argv):
 
     if argv is None:
 
-        how = _compile_log_error()
+        how = _compile_return_error()  # hope crash in _parse_shline printed a message
 
         return how
 
@@ -189,61 +197,92 @@ def _compile_shline(shline, argv):
     verb = argv[0]
     if ("/" in verb) or ("." in verb):
 
-        if os.path.exists(verb):
-            how = _compile_log_error(
-                "bash.py: warning: {}: No such file or directory in bash path".format(
-                    verb
-                )
-            )
-            return how
+        how = _compile_explicit_relpath(verb)
 
-        how = _compile_log_error(
-            "bash.py: warning: {}: No such file or directory".format(verb)
-        )
         return how
 
-    # Map plain verb to Py file
+    # Map one plain verb to each Py file
 
-    file_dir = _calc_file_dir()
-
-    what = f"{verb}_.py"
-    wherewhat = os.path.join(file_dir, what)
-    if not os.path.exists(wherewhat):
-        what = f"{verb}.py"
-        wherewhat = os.path.join(file_dir, what)
+    wherewhat = _calc_wherewhat(verb)
 
     # Plan to call a Py file that exists
 
     if os.path.exists(wherewhat):
 
         def how(argv):
-            ran = subprocess.run([wherewhat] + argv[1:])
+            try:
+                ran = subprocess.run([wherewhat] + argv[1:])
+            except PermissionError as exc:
+                stderr_print("bash.py: error: {}: {}".format(type(exc).__name__, exc))
+                ran.returncode = 126  # exit 126 from executable permission error
             return ran.returncode
 
         return how
 
-    # Plan to rejecy a verb that maps to a Py file that doesn't exist
+    # Plan to reject a verb that maps to a Py file that doesn't exist
 
     how = _compile_log_error("bash.py: warning: {}: command not found".format(verb))
+
     return how
 
 
-def _calc_file_dir():
+def _compile_explicit_relpath(verb):
+    """Decline to map any explicit relpath to verb"""
+
+    assert ("/" in verb) or ("." in verb)
+
+    if os.path.exists(verb):
+        how = _compile_log_error(
+            "bash.py: warning: {}: No such file or directory in bash path".format(verb)
+        )
+
+        return how
+
+    how = _compile_log_error(
+        "bash.py: warning: {}: No such file or directory".format(verb)
+    )
+
+    return how
+
+
+def _calc_wherewhat(verb):
+    """Map verb to file"""
+
     file_dir = os.path.split(os.path.realpath(__file__))[0]
-    return file_dir
+
+    what = f"{verb}_.py"
+    wherewhat = os.path.join(file_dir, what)
+    if not os.path.exists(wherewhat):
+        if not verb.endswith("_"):
+            what = f"{verb}.py"
+            wherewhat = os.path.join(file_dir, what)
+
+    return wherewhat
 
 
-def _compile_log_error(message=None):
+def _compile_log_error(message):
+    """Plan to log an error message and return nonzero"""
+
     def how(argv):
-        return log_error(message)
+        return _log_error(message)
+
+
+def _compile_return_error():
+    """Plan to to return nonzero, as if error message already logged"""
+
+    def how(argv):
+        return 127
 
     return how
 
 
-def log_error(message):
-    if message is not None:
-        stderr_print(message)
-        sys.stderr.flush()
+def _log_error(message):
+    """Log an error message and return nonzero"""
+
+    assert message
+    stderr_print(message)
+    sys.stderr.flush()
+
     return 127
 
 
@@ -257,6 +296,7 @@ def calc_ps1():
 
     if hasattr(calc_ps1, "user"):
         ps1 = f"({env}) {mark} "
+
         return ps1
 
     # But first calculate a long prompt
@@ -276,6 +316,7 @@ def calc_ps1():
     blue = "\x1B[00;34m"
 
     ps1 = f"{green}{user}@{hostname}{nocolor}:{blue}{where}{nocolor}{mark} \r\n({env}) {mark} "
+
     return ps1
 
 

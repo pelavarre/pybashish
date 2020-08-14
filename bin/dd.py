@@ -9,13 +9,19 @@ optional arguments:
   -h, --help  show this help message and exit
 
 bugs:
-  does forward interactive input lines immediately, unlike Bash
+  does forward interactive input lines immediately, unlike bash
   crashes "pybashish" shell if called from there, at ⌃C SIGINT
+  implements mac SIGINFO as linux SIGUSR1
+
+popular bugs:
+  does prompt once for stdin, like bash "grep -R", unlike bash "dd"
+  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
 examples:
   dd  # run demo of ⌃T SIGINFO and ⌃C SIGINT, till ⌃D EOF or ⌃\ SIGQUIT
 """
-# FIXME: fix more bugs
+# FIXME: fix "dd" bugs
+
 
 from __future__ import print_function
 
@@ -30,11 +36,11 @@ def main():
 
     argdoc.parse_args()
 
-    # Print banner
+    # Print banner  # in place of popular def prompt_tty_stdin
 
     stderr_print()
     stderr_print(
-        "dd.py: Press ⌃T SIGINFO to see progress, a la Linux 'killall -i -10 dd # SIGUSR1'"
+        "dd.py: Press ⌃T SIGINFO to see progress, a la Linux:  killall -SIGUSR1 python3"
     )
     stderr_print("dd.py: Press ⌃Z to pause, and then tell Bash to 'fg' to resume")
     stderr_print(
@@ -91,13 +97,19 @@ class SigInfoHandler(contextlib.ContextDecorator):
 
     def __enter__(self):
         handle_signum_frame = self.handle_signum_frame
-        with_siginfo = signal.signal(signal.SIGINFO, handle_signum_frame)
+        if hasattr(signal, "SIGINFO"):  # Mac
+            with_siginfo = signal.signal(signal.SIGINFO, handle_signum_frame)
+        else:  # Linux
+            with_siginfo = signal.signal(signal.SIGUSR1, handle_signum_frame)
         self.with_siginfo = with_siginfo
         return self
 
     def __exit__(self, *exc_info):
         with_siginfo = self.with_siginfo
-        signal.signal(signal.SIGINFO, with_siginfo)
+        if hasattr(signal, "SIGINFO"):  # Mac
+            signal.signal(signal.SIGINFO, with_siginfo)
+        else:  # Linux
+            signal.signal(signal.SIGUSR1, with_siginfo)
 
 
 # deffed in many files  # missing from docs.python.org

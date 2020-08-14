@@ -3,14 +3,14 @@
 """
 usage: doctestbash.py [-h] [-b] [-q] [-v] [FILE [FILE ...]]
 
-Test if Bash behaves as the transcripts say it should
+test if bash behaves as the transcripts say it should
 
 positional arguments:
-  FILE                  Folders or files of '.typescript' files
+  FILE                  folders or files of '.typescript' files
 
 optional arguments:
   -h, --help            show this help message and exit
-  -b, --rip-bash-paste  copy the Bash input lines out of the transcript, but don't run them
+  -b, --rip-bash-paste  copy the bash input lines out of the transcript, but don't run them
   -q, --quiet           say less
   -v, --verbose         say more
 
@@ -22,12 +22,13 @@ examples:
   mkdir -p tests/
   cp -ip doctestbash.py tests/pybashish.typescript && ./doctestbash.py $PWD
 
-see also:  Python "import doctest"
+see also:  python "import doctest"
 """
 # FIXME: walk for exts
 # FIXME: rip Bash paste distinguished only by repeated prompt ending in '$' or '#'
 # FIXME: rip Python '>>>' paste, and Makefile paste, and Zsh '%' paste, not just Bash paste
 # FIXME: think harder when no files chosen
+
 
 import doctest
 import os
@@ -46,6 +47,7 @@ def main(argv):
 
     if args.files != ["tests/"]:
         stderr_print("usage: doctestbash.py [-h] [-b] [-q] [-v] tests/")
+        stderr_print("doctestbash.py: error: more arbitrary arguments not implemented")
         sys.exit(2)  # exit 2 from rejecting usage
 
     main.args = args
@@ -256,7 +258,7 @@ def require_test_passed(args_file, passes, gots, dent, wants):
         if got != want:
 
             try:
-                assert equal_but_for_ellipses(got, want)
+                assert equal_but_for_ellipses(want, got=got)
             except AssertionError:
 
                 vv_print()
@@ -297,7 +299,7 @@ def require_test_passed(args_file, passes, gots, dent, wants):
         vv_print(dent + got)
 
 
-def equal_but_for_ellipses(got, want):
+def equal_but_for_ellipses(want, got):
     """Compare two strings, but match "..." to zero or more characters"""
 
     ellipsis = "..."
@@ -309,6 +311,10 @@ def equal_but_for_ellipses(got, want):
         assert must in given
         must_at = given.index(must)
         given = given[must_at:][len(must) :]
+
+    if len(musts) > 1:
+        if not musts[-1]:
+            given = ""
 
     assert not given  # FIXME: incomplete equal_but_for_ellipses
 
