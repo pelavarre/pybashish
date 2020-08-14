@@ -1,0 +1,461 @@
+pathWelcome to testing PyBashIsh
+
+
+Contents
+========
+
++ 1. Welcome
+
+++ 1.1 ) Hello Bash Doc World
+++ 1.2 ) PyBashIsh works like Bash
+
++ 2 ) Man PyBashIsh All
+
+++ 2.1 ) ArgDoc
+++ 2.2 ) Bash
+++ 2.3 ) Bind
+++ 2.4 ) Cal
+++ 2.5 ) Cat
+++ 2.6 ) Clips
+++ 2.7 ) Cp
+++ 2.9 ) Column
+++ 2.10 ) Date
+++ 2.11 ) Dd
+++ 2.12 ) DocTestBash
+++ 2.13 ) Echo
+++ 2.14 ) Exit
+++ 2.15 ) Find
+++ 2.16 ) Fmt
+++ 2.17 ) Grep
+++ 2.18 ) Help
+++ 2.19 ) HexDump
+++ 2.20 ) History
+++ 2.21 ) Hostname
+++ 2.22 ) Jq
+++ 2.21 ) Ls
+++ 2.22 ) Make
+++ 2.23 ) Mv
+++ 2.24 ) Pwd
+++ 2.25 ) Read
+++ 2.26 ) Rm
+++ 2.27 ) SubSh
+++ 2.28 ) Tar
+++ 2.29 ) Touch
+++ 2.30 ) Tr
+++ 2.31 ) Watch
+++ 2.32 ) Wc
+
+
+To refresh this table of contents, try:
+
+    cat tests/pybashish.typescript | grep '^#'
+
+
+
+# 1. Welcome
+
+## 1.1 ) Hello Bash Doc World
+
+This file is a Bash Doc Test file
+
+This file is like a Doc Test file of Python "import doctest",
+except this file is for testing Python inside Bash, not for testing Python apart from Bash
+
+To run this file, try:
+
+    bin/doctestbash.py tests/pybashish.typescript
+
+
+## 1.2 ) PyBashIsh works like Bash
+
+You can call PyBashIsh in place of Bash
+
+PyBashIsh is bits of Bash, rewritten in the kinder Literate programming style, as Python
+
+PyBashIsh does a few things much much better, some things just as well, and many things more poorly
+
+    $ pwd
+    .../pybashish
+    $
+
+    $ (echo; echo echo "'Hello, PyBashish World.'"; echo; echo help) | python3 ../pybashish/
+
+    Pybashish 0.x.y for Linux and Mac OS Terminals
+    Type "help" and press Return for more information.
+    Type "exit" and press Return to quit, or press ⌃D EOF to quit
+
+    ...@...:...$
+    (pybashish) $
+    (pybashish) $ echo 'Hello, PyBashish World.'
+    Hello, PyBashish World.
+    (pybashish) $
+    (pybashish) $ help
+
+    For more information, try one of these:
+
+    argdoc --help
+    bash --help
+    bind --help
+    cal --help
+    cat --help
+    column --help
+    cp --help
+    date --help
+    dd --help
+    doctestbash --help
+    echo --help
+    exit --help
+    find --help
+    fmt --help
+    grep --help
+    help --help
+    hexdump --help
+    history --help
+    hostname --help
+    jq --help
+    ls --help
+    make --help
+    mv --help
+    pwd --help
+    read --help
+    rm --help
+    subsh --help
+    tar --help
+    touch --help
+    tr --help
+    watch --help
+    wc --help
+
+    (pybashish) $
+    + exit 1
+    $
+
+We've not yet delivered much test coverage for what works inside PyBashIsh
+
+It's a bug if it surprises you, please tell us about it
+
+
+# 2 ) Man PyBashIsh All
+
+
+## 2.1 ) ArgDoc
+
+ArgDoc compiles standard Python Arg Docs into standard Python ArgParser Parsers
+
+Compiling "/dev/null" gives you an Arg Doc that works, to start with
+
+    $ bin/argdoc.py -ijk
+    usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- [ARG [ARG ...]]]
+    argdoc.py: error: unrecognized arguments: -ijk
+    + exit 2
+    $
+
+    $ bin/argdoc.py
+    #!/usr/bin/env python3
+
+    """
+    usage: null [-h]
+
+    do good stuff
+
+    optional arguments:
+      -h, --help  show this help message and exit
+
+    examples:
+      Oh no! No examples disclosed!! 💥 💔 💥
+    """
+
+    import argdoc
+
+
+    def main():
+        args = argdoc.parse_args()
+        main.args = args
+        print(args)
+
+
+    if __name__ == '__main__':
+        main()
+    $
+
+    $ bin/argdoc.py /dev/null xyz
+    argdoc.py: error: unrecognized args: xyz
+    + exit 1
+    $
+
+Drop that starter Doc and Python into your source, call it, and work it up from there
+
+
+## 2.2 ) Bash
+
+
+## 2.3 ) Bind
+
+Lorem ipsum dolor sit amet
+
+    $ bin/bind.py -p
+    "\C-?": drop-char
+    "\C-h": drop-char
+    "\C-u": drop-line
+    "\C-d": drop-next-char
+    "":     end-input
+    "\C-j": end-line
+    "\C-m": end-line
+    "\C-n": next-history
+    "\e[B": next-history
+    "\C-p": previous-history
+    "\e[A": previous-history
+    "\C-v": quoted-insert
+    "\C-c": raise-keyboard-interrupt
+    "\C-r": reprint
+    "\C-g": ring-bell
+    None:   self-insert
+    $
+
+
+## 2.4 ) Cal
+
+
+## 2.5 ) Cat
+
+    $ echo a b c | tr ' ' '\n' | bin/cat.py -
+    a
+    b
+    c
+    $
+
+
+## 2.6 ) Clips
+
+
+## 2.7 ) Cp
+
+
+## 2.9 ) Column
+
+Left-justify columns of words
+
+    $ echo 'su per ca $ li fra gil $ is tic ex $ pi a li $ doc ious' | tr '$' '\n' | bin/column.py -t
+    su   per   ca
+    li   fra   gil
+    is   tic   ex
+    pi   a     li
+    doc  ious
+    $
+
+Right-justify columns of numbers
+
+    $ echo '27 735 43 $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' | tr '$' '\n' | bin/column.py -t
+     27   735   43
+     51   785  640
+     23   391   62
+     14     6   19
+    002  8809
+    $
+
+Call a column numeric when two-thirds of its cells contain decimal digits
+
+    $ echo 'su per ca $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' | tr '$' '\n' | bin/column.py -t
+     su   per  ca
+     51   785  640
+     23   391  62
+     14     6  19
+    002  8809
+    $
+
+
+## 2.10 ) Date
+
+
+## 2.11 ) Dd
+
+
+## 2.12 ) DocTestBash
+
+
+## 2.13 ) Echo
+
+    $ bin/echo.py 'Hello, Echo World!'
+    Hello, Echo World!
+    $
+
+    $ bin/echo.py --v 'Hello, Echo World!'
+    ['Hello, Echo World!']
+    Hello, Echo World!
+    $
+
+
+## 2.14 ) Exit
+
+    $ bin/exit.py
+    $
+
+    $ bin/exit.py 0
+    $
+
+    $ bin/exit.py 1
+    + exit 1
+    $
+
+    $ bin/exit.py -1
+    + exit 255
+    $
+
+    $ exit 256
+    $
+
+    $ bin/exit.py 256  # alias of zero
+    exit.py: error: returning 256 as 0
+    $
+
+
+## 2.15 ) Find
+
+    $ bin/find.py /dev/null
+    /dev/null
+    $
+
+
+## 2.16 ) Fmt
+
+    $ echo $(seq 0 39) | bin/fmt.py -w42  # split to fit inside width
+    0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+    17 18 19 20 21 22 23 24 25 26 27 28 29 30
+    31 32 33 34 35 36 37 38 39
+    $
+
+    $ echo $(seq 0 39) | tr -d ' ' | bin/fmt.py -w42  # no split at width
+    0123456789101112131415161718192021222324252627282930313233343536373839
+    $
+
+    $ echo su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | bin/fmt.py -w42  # no split at "-"
+    su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious
+    $
+
+    $ bin/fmt.py --ruler -w72  # ends in column 72
+    _2345678_0123456_8901234_6789012_4567890 2345678_0123456_8901234_6789012
+    $
+
+
+## 2.17 ) Grep
+
+
+## 2.18 ) Help
+
+    $ bin/help_.py help
+    usage: help_.py [-h] [VERB]
+
+    print some help
+
+    positional arguments:
+      VERB        a verb to explain
+
+    optional arguments:
+      -h, --help  show this help message and exit
+
+    examples:
+      help_.py
+      help_.py fmt
+      man bash
+      man zshall
+    $
+
+
+## 2.19 ) HexDump
+
+
+## 2.20 ) History
+
+
+## 2.21 ) Hostname
+
+
+## 2.22 ) Jq
+
+
+## 2.21 ) Ls
+
+
+## 2.22 ) Make
+
+
+## 2.23 ) Mv
+
+
+## 2.24 ) Pwd
+
+
+## 2.25 ) Read
+
+    $ echo 'Hello, Line Editor' | bin/read.py
+    ? Hello, Line Editor
+    'Hello, Line Editor\n'
+    $
+
+    $ echo 'Hello, ^ULine Editor' | sed 's,\^U,@,g' | tr '@' '\25' | bin/read.py
+    ? Line Editor
+    'Line Editor\n'
+    $
+
+    $ echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | tr -d '\n' | bin/read.py
+    ? ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑
+    '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑'
+    $
+
+## 2.26 ) Rm
+
+
+## 2.27 ) SubSh
+
+    $ bin/subsh.py echo 'Hello, Subsh World!'
+    ('{"args": ["echo", "Hello, Subsh World!"], "returncode": 0, "stdout": "Hello, '
+     'Subsh World!\\n", "stderr": ""}')
+    $
+
+
+## 2.28 ) Tar
+
+    $ rm -fr dir/ dir.tgz
+    $ mkdir -p dir/a/b/c dir/p/q/r
+    $ echo hello >dir/a/b/d
+    $ echo goodbye > dir/a/b/e
+    $ tar czf dir.tgz dir/  # ordered differently at Mac, at Linux
+    $ rm -fr dir/
+    $
+
+    $ bin/tar.py tvf /dev/null/child -tvf dir.tgz 2>&1 | sort
+    dir/
+    dir/a/
+    dir/a/b/
+    dir/a/b/c/
+    dir/a/b/d
+    dir/a/b/e
+    dir/p/
+    dir/p/q/
+    dir/p/q/r/
+    $
+
+    $ bin/tar.py xvkf dir.tgz 2>&1 | grep -v '^dir/' | wc
+           2       2      14
+    $
+
+    $ python2 bin/tar2.py tvf /dev/null/child -tvf dir.tgz 2>/dev/null
+    $ python2 bin/tar2.py xvkf dir.tgz >/dev/null 2>&1
+    $
+
+## 2.29 ) Touch
+
+
+## 2.30 ) Tr
+
+
+## 2.31 ) Watch
+
+
+## 2.32 ) Wc
+
+
+// FIXME: remake this into a ".md" Markdown file
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git
