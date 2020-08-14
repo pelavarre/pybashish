@@ -27,10 +27,13 @@ black:
 
 test-once:
 	:
+	bin/doctestbash.py tests/ || (bin/doctestbash.py -vv tests/; exit 1)
+	:
+	rm -fr ../pybashish/.local/share/grep/files/
+	bin/grep.py >/dev/null
+	:
 	for F in bin/*.py; do bin/argdoc.py $$F >/dev/null && continue; echo "make: error:  python3 -m pdb bin/argdoc.py $$F" >&2; exit 1; done
 	: argdoc: tests passed
-	:
-	bin/doctestbash.py tests/ || (bin/doctestbash.py -vv tests/; exit 1)
 	:
 	(cd bin; python3 -m doctest -- ../tests/_test_subsh-typescript.txt)
 	: doctest: tests passed

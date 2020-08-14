@@ -18,13 +18,14 @@ emacs -nw ~/.emacs
 # emacs  fixme => move balance
 #
 # emacs  ⌃D ⌥D ⌥Z  => delete char, word, to char
+# emacs  ⌃@⌃@ ⌃@ ⌃X⌃X ⌃U⌃@  => mark: begin, place, bounce, goto
 # emacs  ⌃K ⌃W ⌥W ⌃Y ⌥Y ⌥T  => cut, copy, paste, paste-next-instead, join, transpose
 # emacs  ⌥H ⌥Q  => paragraph: mark, reflow
 #
-# emacs  ⌃U1234567890 ⌃- ⌃_ ⌃Xu ⌥L ⌥U ⌥C  => repeat, undo, undo, lower, upper, title
+# emacs  ⌃U1234567890 ⌃- ⌃_ ⌃Xu  => repeat, undo, undo
+# emacs  ⌥L ⌥U ⌥C ⌃U1⌃Xrni⌃Xr+i⌃Xrii  => lower, upper, title, increment
 # emacs  ⌃S ⌃R ⌥% => find, replace
 #
-# emacs  ⌃@⌃@ ⌃@ ⌃X⌃X ⌃U⌃@  => mark: begin, place, bounce, goto
 # emacs  ⌃X( ⌃X) ⌃Xe  => record replay
 # emacs  fixme => vertical delete copy paste insert
 # emacs  fixme => dent/dedent
