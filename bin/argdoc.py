@@ -1683,6 +1683,7 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
         return words
 
 
+# deffed in many files  # missing from docs.python.org
 class ShardsTaker(argparse.Namespace):
     """Walk once thru source chars, as split
 

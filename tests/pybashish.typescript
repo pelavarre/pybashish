@@ -109,9 +109,9 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
     Next try any of:
 
-        argdoc  bash  bind  cal  cat  column  cp  date  dd  doctestbash  echo  exit  expand
-        find  fmt  grep  help  hexdump  history  hostname  jq  ls  make  mv  pwd  read  rm
-        subsh  tar  touch  tr  watch  wc
+        argdoc  bash  bind  cal  cat  column  cp  cspsh  date  dd  doctestbash  echo  exit
+        expand  find  fmt  grep  help  hexdump  history  hostname  jq  ls  make  mv  pwd
+        read  rm  subsh  tar  touch  tr  watch  wc
 
     (pybashish) $
     + exit 1
@@ -816,7 +816,7 @@ Clean up
     0123456789:;<=>?@
     ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`
     abcdefghijklmnopqrstuvwxyz{|}~
-    «»åéîøü–—’“”′″‴←↑→↓⇧⌃⌘⌥💔💥😊😠😢
+    «µ»åéîøü–—’“”•′″‴←↑→↓⇧⌃⌘⌥💔💥😊😠😢
     $
 
 
@@ -911,6 +911,7 @@ Clean up
 
 
 // FIXME: remake this into a ".md" Markdown file
+// FIXME: add "cspsh" into the table-of-contexts, and add some tests for it
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git
