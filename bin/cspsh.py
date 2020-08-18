@@ -1,34 +1,33 @@
 #!/usr/bin/env python3
 
 r"""
-usage: cspsh.py [-h] [-i]
+usage: cspsh.py [-h] [-f] [-i]
 
 chat of "communicating sequential processes"
 
 optional arguments:
   -h, --help      show this help message and exit
+  -f, --force     ask less questions
   -i, --interact  ask more questions
 
 csp examples:
-  coin → STOP  # 1.1 X1
-  coin → choc → coin → choc → STOP  # 1.1 X2
-  CLOCK = (tick → CLOCK)  # 1.1.2
+  tick → STOP
+  tick tick → STOP
+  CLOCK = (tick → CLOCK)
   CLOCK
-  # CLOCK = µ X : {tick} • (tick → X)  # 1.1.2 X1
-  VMS = (coin → (choc → VMS))  # 1.1.2 X2
+  coin → choc → STOP
+  coin → choc → coin → choc → STOP
+  VMS = (coin → choc → VMS)
   VMS
-  CH5A = (in5p → out2p → out1p → out2p → CH5A)  # 1.1.2 X3
-  CH5A
-  CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
-  CH5B
 
 examples:
   cspsh.py -i
 """
+# FIXME: take lines till "("s balanced by ")"s
+# FIXME: limit the trace of ProcessWithSuch to its alphabet
 
 
 import argparse
-import pprint
 import re
 import sys
 import textwrap
@@ -36,8 +35,8 @@ import textwrap
 import argdoc
 
 
-NAME_REGEX = r"(?P<name>[A-Za-z_][0-9A-Za-z_]*)"
-MARK_REGEX = r"(?P<mark>[=()→])"
+NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
+MARK_REGEX = r"(?P<mark>[():={}µ•→])"
 BLANKS_REGEX = r"(?P<blanks>[ ]+)"
 
 SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
@@ -47,20 +46,32 @@ def main():
 
     args = argdoc.parse_args()
 
-    if not args.interact:
+    if all((_ is None) for _ in vars(args).values()):
         stderr_print(argdoc.format_usage().rstrip())
-        stderr_print("cspsh.py: warning: arguments other than -i not implemented")
-        sys.exit()
+        stderr_print("cspsh.py: error: choose --force or --interact")
+        sys.exit(2)  # exit 2 from rejecting usage
 
     print()
     print()
 
     lines = list()
-    if False:
+    if args.force:
 
         lines = (
             textwrap.dedent(
                 """
+
+                # test examples from the help lines
+
+                coin → STOP
+                coin → choc → coin → choc → STOP
+                VMS = (coin → choc → VMS)
+                VMS
+                tick → tick → STOP
+                CLOCK = (tick → CLOCK)
+                CLOCK
+
+                # test examples from the textbook
 
                 coin → STOP  # 1.1 X1
                 coin → choc → coin → choc → STOP  # 1.1 X2
@@ -68,7 +79,8 @@ def main():
                 CLOCK = (tick → CLOCK)  # 1.1.2
                 CLOCK
 
-                # CLOCK = µ X : {tick} • (tick → X)  # 1.1.2 X1
+                CLOCK = µ X : {tick} • (tick → X)  # 1.1.2 X1
+                CLOCK
 
                 VMS = (coin → (choc → VMS))  # 1.1.2 X2
                 VMS
@@ -79,42 +91,42 @@ def main():
                 CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
                 CH5B
 
+                HER.WALTZ = (her.right.back → her.left.hook.back → her.right.close → her.left.forward → her.right.hook.forward → her.left.close)
+                HIS.WALTZ = (his.left.forward → his.right.hook.forward → his.left.close → his.right.back → his.left.hook.back → his.right.close)
+                HER.WALTZ
+                HIS.WALTZ
+
                 """
             )
             .strip()
-            .splitlines()
+            .splitlines(keepends=True)
         )
 
-        lines.append(None)
+        lines.append("")
 
     print("Type some line of CSP, press Return to see it run")
     print("Such as:  coin → choc → coin → choc → STOP")
-    print("Press ⌃D EOF or ⌃C SIGINT or ⌃\ SIGQUIT to quit")
+    print(r"Press ⌃D EOF or ⌃C SIGINT or ⌃\ SIGQUIT to quit")
 
     while True:
 
         if lines:
 
-            print("? ", lines[0])
+            print("? " + lines[0])
 
         else:
 
             print("? ", end="")
             sys.stdout.flush()
             line = sys.stdin.readline()
-
-            if not line:
-                break
-
             lines.append(line)
 
         line = lines[0]
         lines = lines[1:]
 
-        if line is None:
+        if not line:
+            assert not lines
             break
-
-        print()
 
         text = line[: line.index("#")] if ("#" in line) else line
         text = text.strip()
@@ -122,93 +134,405 @@ def main():
         if not text:
             continue
 
-        cwt = CspWordsTaker(text.rstrip())
+        words_taker = CspWordsTaker(text.rstrip())
+        shards_taker = words_taker.shards_taker
+
         try:
-            cursor = cwt.take_line()
-            # print()
+            worker = CspCommandLine.take_one_worker(words_taker)
         except Exception:
-            print(cwt.taker.shards)
+            print(shards_taker.shards)
             raise
 
-        source = cursor.format_source()
-        print(source)
+        print("+", worker)
         print()
 
         top = argparse.Namespace()
-        vars(top)[type(cursor).__name__] = cursor
-        if False:
-            pprint.pprint(namespace_to_dict(cursor))
-            print()
+        vars(top)[type(worker).__name__] = worker
 
-        SourceGraph.reinit()
-        cursor.run()
+        worker()
 
         print()
         print()
 
 
-class SourceGraph(argparse.Namespace):
+class CspWorker(argparse.Namespace):
+    """Work through a process"""
 
-    process_by_name = dict()
+    def __call__(self):
+        self.worker()
 
-    def format_source(self):
-        chars = " ".join(_.format_source() for _ in vars(self).values())
+    def __repr__(self):
+        return object.__repr__(self)
+
+    def __str__(self):
+        chars = "".join(str(_) for _ in vars(self).values()).strip()
+        chars = chars.replace("  ", " ")
         return chars
 
+
+class CspCommandLine(CspWorker):
+    """Work through a line of source code"""
+
+    top_worker = None
+
+    processes_by_name = dict()
+
+    def __init__(self, **kwargs):
+        CspWorker.__init__(self, **kwargs)
+
+        self.gotos = list()
+        CspCommandLine.top_worker = self
+
+    def __str__(self):
+        return str(self.worker)
+
     @classmethod
-    def reinit(cls):
+    def take_one_worker(cls, taker):
 
-        cls.gotos = list()
+        shards_taker = taker.shards_taker
+
+        words = shards_taker.peek_many_shards_else_none(2)
+        if words and (words[1][1] == "="):
+            worker = ProcessIs.take_one_worker(taker)
+        else:
+            worker = Process.take_one_worker(taker)
+
+        shards_taker.take_end_shard()
+
+        worker = CspCommandLine(worker=worker)
+        return worker
+
+    def call_named_process(self, name, process):
+        assert name and process
+
+        self.gotos.append(name)
+        count = self.gotos.count(name)
+
+        if count > 3:
+            print(name, "...")
+        else:
+            process()
+
+
+class Process(CspWorker):
+    """Work through a process"""
 
     @classmethod
-    def run_to(cls, name):
+    def take_one_worker(cls, taker):
 
-        count = cls.gotos.count(name)
-        cls.gotos.append(name)
+        shards_taker = taker.shards_taker
 
-        if name in cls.process_by_name:
-            process = cls.process_by_name[name]
-            if count < 2:
-                return process
+        words = shards_taker.peek_many_shards_else_none(2)
+        if words and (words[0][-1] == "("):
+            worker = OpenProcessClose.take_one_worker(
+                taker, after_mark="(", upto_mark=")"
+            )
+        elif words and (words[1][-1] == "→"):
+            worker = EventThenProcess.take_one_worker(taker)
+        else:
+            worker = ProcessCaller.take_one_worker(taker)
 
+        worker = Process(worker=worker)
+        return worker
+
+
+class EventThenProcess(CspWorker):
+    """Work through one (or more) events and then a process"""
+
+    def __call__(self):
+        name = self.event_name.name
+        assert name
         print(name)
+        self.worker()
+
+    @classmethod
+    def take_one_worker(self, taker):
+
+        shards_taker = taker.shards_taker
+
+        event_names = list()
+        then_marks = list()
+        while True:
+
+            words = shards_taker.peek_many_shards_else_none(2)
+            if not words:
+                break
+            if words[1][-1] != "→":
+                break
+
+            event_name = CspName.take_one_worker(taker)
+            then_mark = CspMark.take_one_worker(taker, "→")
+
+            event_names.append(event_name)
+            then_marks.append(then_mark)
+
+        word = shards_taker.peek_one_shard()
+        if word[-1] == "(":
+            worker = OpenProcessClose.take_one_worker(
+                taker, after_mark="(", upto_mark=")"
+            )
+        else:
+            worker = Process.take_one_worker(taker)
+
+        pairs = zip(event_names, then_marks)
+        for (event_name, then_mark,) in reversed(list(pairs)):
+            worker = EventThenProcess(
+                event_name=event_name, then_mark=then_mark, worker=worker
+            )
+
+        return worker
 
 
-class ProcessCall(SourceGraph):
-    def run(self):
-        name = self.process_name.name
-        cursor = SourceGraph.run_to(name)
-        if cursor:
-            cursor.run()
+class CspName(CspWorker):
+    """Capture a fragment of source that names something else"""
+
+    @classmethod
+    def take_one_worker(self, taker):
+
+        shards_taker = taker.shards_taker
+
+        word = shards_taker.peek_one_shard()
+        assert word[0] == "name"
+        name = word[-1]
+        shards_taker.take_one_shard()
+
+        worker = CspName(name=name)
+        return worker
 
 
-class ProcessDefinition(SourceGraph):
-    def run(self):
-        name = self.process_name.name
-        SourceGraph.process_by_name[name] = self.open_process_close
+class CspMark(CspWorker):
+    """Capture a fragment of source that names itself"""
 
-
-class OpenProcessClose(SourceGraph):
-    def run(self):
-        self.runnable.run()
-
-
-class EventThenProcess(SourceGraph):
-    def run(self):
-        print(self.event_name.name)
-        self.runnable.run()
-
-
-class CspMark(SourceGraph):
-    def format_source(self):
-        chars = self.mark
+    def __str__(self):
+        chars = " {} ".format(self.mark)
         return chars
 
+    @classmethod
+    def take_one_mark(self, taker, mark):
+        shards_taker = taker.shards_taker
+        word = shards_taker.peek_one_shard()
+        assert word[0] == "mark"
+        assert word[-1] == mark
+        shards_taker.take_one_shard()
 
-class CspName(SourceGraph):
-    def format_source(self):
-        chars = self.name
+    @classmethod
+    def take_one_worker(self, taker, mark):
+
+        CspMark.take_one_mark(taker, mark=mark)
+
+        worker = CspMark(mark=mark)
+        return worker
+
+
+class CspOpenMark(CspMark):
+    """Capture a mark that opens a scope of source"""
+
+    def __str__(self):
+        chars = " {}".format(self.mark)  # no blank inside on the right
         return chars
+
+    @classmethod
+    def take_one_worker(self, taker, mark):
+
+        CspMark.take_one_mark(taker, mark=mark)
+
+        worker = CspOpenMark(mark=mark)
+        return worker
+
+
+class CspCloseMark(CspMark):
+    """Capture a mark that opens a scope of source"""
+
+    def __str__(self):
+        chars = "{} ".format(self.mark)  # no blank inside on the left
+        return chars
+
+    @classmethod
+    def take_one_worker(self, taker, mark):
+
+        CspMark.take_one_mark(taker, mark=mark)
+
+        worker = CspCloseMark(mark=mark)
+        return worker
+
+
+class ProcessCaller(CspWorker):
+    """Call a process by name"""
+
+    def __str__(self):
+        return str(self.source)
+
+    def __call__(self):
+
+        source = self.source
+        name = self.process_name.name
+        process = self.process
+
+        # print("__call__", repr(self), name, process)
+        if not source:
+            process()
+        elif process:
+            CspCommandLine.top_worker.call_named_process(name, process)
+        else:
+            print(name)
+
+    @classmethod
+    def take_one_worker(cls, taker):
+
+        process_name = CspName.take_one_worker(taker)
+        source = process_name.name
+
+        process = None
+        process_name = process_name
+        if process_name.name in CspCommandLine.processes_by_name:
+            process = CspCommandLine.processes_by_name[process_name.name]
+            process_name = process.process_name
+
+        worker = ProcessCaller(
+            source=source, process_name=process_name, process=process
+        )
+        return worker
+
+
+class ProcessIs(CspWorker):
+    """Name a process to call"""
+
+    def __call__(self):
+        pass
+
+    @classmethod
+    def take_one_worker(self, taker):
+
+        shards_taker = taker.shards_taker
+
+        process_name = CspName.take_one_worker(taker)
+        is_mark = CspMark.take_one_worker(taker, "=")
+
+        process_caller = ProcessCaller(source=None, process_name=process_name)
+        CspCommandLine.processes_by_name[process_name.name] = process_caller
+
+        word = shards_taker.peek_one_shard()
+        if word[-1] != "(":
+            body = ProcessWithSuch.take_one_worker(taker, process_caller)
+        else:
+            body = OpenProcessClose.take_one_worker(
+                taker, after_mark="(", upto_mark=")"
+            )
+            process_caller.process = body
+
+        assert CspCommandLine.processes_by_name[process_name.name] == process_caller
+
+        worker = ProcessIs(process_name=process_name, is_mark=is_mark, body=body)
+        return worker
+
+
+class ProcessWithSuch(CspWorker):
+    """Define a process as a named thing that works with an alphabet"""
+
+    def __call__(self):
+        assert False
+
+    @classmethod
+    def take_one_worker(self, taker, process_caller):
+
+        the_process_mark = CspMark.take_one_worker(taker, "µ")
+        process_name = CspName.take_one_worker(taker)
+
+        assert process_name.name not in CspCommandLine.processes_by_name.keys()
+        CspCommandLine.processes_by_name[process_name.name] = process_caller
+
+        with_alphabet_mark = CspMark.take_one_worker(taker, ":")
+        alphabet = CspAlphabet.take_one_worker(taker, after_mark="{", upto_mark="}")
+
+        such_that_mark = CspMark.take_one_worker(taker, "•")
+        process = Process.take_one_worker(taker)
+
+        assert CspCommandLine.processes_by_name[process_name.name] == process_caller
+        process_caller.process = process
+        del CspCommandLine.processes_by_name[process_name.name]
+
+        worker = ProcessWithSuch(
+            the_process_mark=the_process_mark,
+            process_name=process_name,
+            with_alphabet_mark=with_alphabet_mark,
+            alphabet=alphabet,
+            such_that_mark=such_that_mark,
+            process=process,
+        )
+        return worker
+
+
+class CspAlphabet(CspWorker):
+    """Collect events into an alphabet"""
+
+    def __call__(self):
+        assert False
+
+    def __str__(self):
+
+        str_pairs = zip(
+            list(str(_) for _ in self.event_names[:-1]),
+            list(str(_) for _ in self.comma_marks),
+        )
+        str_event_name = str(self.event_names[-1])
+
+        chars = ""
+        chars += str(self.open_after)
+        chars += " ".join(list("{}{}".format(*_) for _ in str_pairs) + [str_event_name])
+        chars += str(self.upto_close)
+
+        return chars
+
+    @classmethod
+    def take_one_worker(self, taker, after_mark, upto_mark):
+
+        shards_taker = taker.shards_taker
+
+        open_after = CspOpenMark.take_one_worker(taker, after_mark)
+
+        event_names = list()
+        comma_marks = list()
+        while True:
+
+            words = shards_taker.peek_many_shards_else_none(2)
+            if not words:
+                break
+            if words[1][-1] != ",":
+                break
+
+            event_name = CspName.take_one_worker(taker)
+            comma_mark = CspMark.take_one_worker(taker, ",")
+
+            event_names.append(event_name)
+            comma_marks.append(comma_mark)
+
+        event_name = CspName.take_one_worker(taker)
+        event_names.append(event_name)
+
+        upto_close = CspCloseMark.take_one_worker(taker, upto_mark)
+        worker = CspAlphabet(
+            open_after=open_after,
+            event_names=event_names,
+            comma_marks=comma_marks,
+            upto_close=upto_close,
+        )
+        return worker
+
+
+class OpenProcessClose(CspWorker):
+    """Define a process as the work after a "(" mark and before a ")" mark"""
+
+    @classmethod
+    def take_one_worker(self, taker, after_mark, upto_mark):
+
+        open_after = CspOpenMark.take_one_worker(taker, after_mark)
+        worker = Process.take_one_worker(taker)
+        upto_close = CspCloseMark.take_one_worker(taker, upto_mark)
+
+        worker = OpenProcessClose(
+            open_after=open_after, worker=worker, upto_close=upto_close,
+        )
+        return worker
 
 
 class CspWordsTaker(argparse.Namespace):
@@ -216,14 +540,14 @@ class CspWordsTaker(argparse.Namespace):
 
     def __init__(self, line):
 
-        self.taker = ShardsTaker()
+        self.shards_taker = ShardsTaker()
 
         self.give_line(line)
 
     def give_line(self, line):
         """Give a source line as its non-blank words"""
 
-        taker = self.taker
+        shards_taker = self.shards_taker
 
         items = list()
         while line:
@@ -247,132 +571,8 @@ class CspWordsTaker(argparse.Namespace):
             items.append(match_item)
 
         words = [_ for _ in items if _[0] != "blanks"]
-        # print(words)
-        # print()
 
-        taker.give_shards(words)
-
-    def take_line(self):
-
-        taker = self.taker
-
-        words = taker.peek_many_shards_else_none(2)
-        if words and (words[1][1] == "="):
-            space = self.take_process_definition()
-        elif words and (words[1][1] == "→"):
-            space = self.take_many_events_then_process()
-        else:
-            space = self.take_process_call()
-
-        taker.take_end_shard()
-
-        return space
-
-    def take_process_call(self):
-
-        process_name = self.take_process_name()
-
-        space = ProcessCall(process_name=process_name)
-        return space
-
-    def take_process_definition(self):
-
-        process_name = self.take_process_name()
-        equals = self.take_mark("=")
-        open_process_close = self.take_open_process_close("(", ")")
-
-        space = ProcessDefinition(
-            process_name=process_name,
-            equals=equals,
-            open_process_close=open_process_close,
-        )
-        return space
-
-    def take_open_process_close(self, after_mark, upto_mark):
-
-        open_after = self.take_mark(after_mark)
-        runnable = self.take_many_events_then_process()
-        upto_close = self.take_mark(upto_mark)
-
-        space = OpenProcessClose(
-            open_after=open_after, runnable=runnable, upto_close=upto_close,
-        )
-        return space
-
-    def take_many_events_then_process(self):
-
-        taker = self.taker
-
-        event_names = list()
-        while True:
-
-            words = taker.peek_many_shards_else_none(2)
-            if not words:
-                break
-            if words[1][-1] != "→":
-                break
-
-            event_name = self.take_event_name()
-            mark = self.take_mark("→")
-
-            event_names.append(event_name)
-
-        word = taker.peek_one_shard()
-        if word[-1] == "(":
-            runnable = self.take_open_process_close(after_mark="(", upto_mark=")")
-        else:
-            runnable = self.take_process_call()
-
-        for event_name in reversed(event_names):
-            runnable = EventThenProcess(
-                event_name=event_name, then_mark=mark, runnable=runnable
-            )
-
-        return runnable
-
-    def take_mark(self, mark):
-
-        taker = self.taker
-
-        word = taker.peek_one_shard()
-
-        assert word[0] == "mark"
-
-        assert word[-1] == mark
-        taker.take_one_shard()
-
-        space = CspMark(mark=mark)
-        return space
-
-    def take_event_name(self):
-
-        taker = self.taker
-
-        word = taker.peek_one_shard()
-
-        assert word[0] == "name"
-        name = word[-1]
-
-        assert name == name.lower()
-        taker.take_one_shard()
-
-        space = CspName(name=name)
-        return space
-
-    def take_process_name(self):
-
-        taker = self.taker
-
-        word = taker.peek_one_shard()
-
-        assert word[0] == "name"
-        name = word[-1]
-
-        assert name == name.upper()
-        taker.take_one_shard()
-
-        space = CspName(name=name)
-        return space
+        shards_taker.give_shards(words)
 
 
 # deffed in many files  # missing from docs.python.org
@@ -402,8 +602,6 @@ class ShardsTaker(argparse.Namespace):
 
     def take_one_shard(self):
         """Consume the next shard, without returning it"""
-
-        # print("take_one_shard", self.shards[0])
 
         self.shards = self.shards[1:]
 
@@ -477,16 +675,6 @@ class ShardsTaker(argparse.Namespace):
 
         if count:
             self.shards = self.shards[count:]
-
-
-def namespace_to_dict(space):
-
-    v_by_k = dict(vars(space))
-    for (k, v,) in v_by_k.items():
-        if isinstance(v_by_k[k], argparse.Namespace):
-            v_by_k[k] = namespace_to_dict(v)  # recursive
-
-    return v_by_k
 
 
 # deffed in many files  # missing from docs.python.org
