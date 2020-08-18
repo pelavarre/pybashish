@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: cspsh.py [-h] [-f] [-i]
+usage: cspsh.py [-h] [-f] [-i] [-q] [-v]
 
 chat of "communicating sequential processes"
 
@@ -9,6 +9,8 @@ optional arguments:
   -h, --help      show this help message and exit
   -f, --force     ask less questions
   -i, --interact  ask more questions
+  -q, --quiet     say less
+  -v, --verbose   say more
 
 csp examples:
   tick → STOP
@@ -45,14 +47,15 @@ SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
 def main():
 
     args = argdoc.parse_args()
+    main.args = args
 
     if all((_ is None) for _ in vars(args).values()):
         stderr_print(argdoc.format_usage().rstrip())
         stderr_print("cspsh.py: error: choose --force or --interact")
         sys.exit(2)  # exit 2 from rejecting usage
 
-    print()
-    print()
+    verbose_print()
+    verbose_print()
 
     lines = list()
     if args.force:
@@ -104,19 +107,20 @@ def main():
 
         lines.append("")
 
-    print("Type some line of CSP, press Return to see it run")
-    print("Such as:  coin → choc → coin → choc → STOP")
-    print(r"Press ⌃D EOF or ⌃C SIGINT or ⌃\ SIGQUIT to quit")
+    if not args.quiet:
+        stderr_print("Type some line of CSP, press Return to see it run")
+        stderr_print("Such as:  coin → choc → coin → choc → STOP")
+        stderr_print(r"Press ⌃D EOF or ⌃C SIGINT or ⌃\ SIGQUIT to quit")
 
     while True:
 
         if lines:
 
-            print("? " + lines[0])
+            stderr_print("? " + lines[0])
 
         else:
 
-            print("? ", end="")
+            stderr_print("? ", end="")
             sys.stdout.flush()
             line = sys.stdin.readline()
             lines.append(line)
@@ -140,19 +144,19 @@ def main():
         try:
             worker = CspCommandLine.take_one_worker(words_taker)
         except Exception:
-            print(shards_taker.shards)
+            stderr_print(shards_taker.shards)
             raise
 
-        print("+", worker)
-        print()
+        verbose_print("+", worker)
+        verbose_print()
 
         top = argparse.Namespace()
         vars(top)[type(worker).__name__] = worker
 
         worker()
 
-        print()
-        print()
+        verbose_print()
+        verbose_print()
 
 
 class CspWorker(argparse.Namespace):
@@ -368,7 +372,6 @@ class ProcessCaller(CspWorker):
         name = self.process_name.name
         process = self.process
 
-        # print("__call__", repr(self), name, process)
         if not source:
             process()
         elif process:
@@ -556,7 +559,7 @@ class CspWordsTaker(argparse.Namespace):
             try:
                 assert match
             except AssertionError:
-                print(repr(line))
+                stderr_print(repr(line))
                 raise
 
             match_items = match.groupdict().items()
@@ -577,7 +580,8 @@ class CspWordsTaker(argparse.Namespace):
 
 # deffed in many files  # missing from docs.python.org
 class ShardsTaker(argparse.Namespace):
-    """Walk once thru source chars, as split
+    """
+    Walk once thru source chars, as split
 
     Define "take" to mean require and consume
     Define "peek" to mean look ahead
@@ -678,9 +682,18 @@ class ShardsTaker(argparse.Namespace):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # for when kwargs["end"] != "\n"
 
+
+# deffed in many files  # missing from docs.python.org
+def verbose_print(*args, **kwargs):
+    sys.stdout.flush()
+    if main.args.verbose:
+        print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # for when kwargs["end"] != "\n"
 
 if __name__ == "__main__":
     main()
