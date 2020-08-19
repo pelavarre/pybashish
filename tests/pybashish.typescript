@@ -18,32 +18,33 @@ Contents
 ++ 2.5 ) Cat
 ++ 2.6 ) Cp
 ++ 2.7 ) Column
-++ 2.8 ) Date
-++ 2.9 ) Dd
-++ 2.10 ) DocTestBash
-++ 2.11 ) Echo
-++ 2.12 ) Exit
-++ 2.13 ) Expand
-++ 2.14 ) Find
-++ 2.15 ) Fmt
-++ 2.16 ) Grep
-++ 2.17 ) Help
-++ 2.18 ) HexDump
-++ 2.19 ) History
-++ 2.20 ) Hostname
-++ 2.21 ) Jq
-++ 2.22 ) Ls
-++ 2.23 ) Make
-++ 2.24 ) Mv
-++ 2.25 ) Pwd
-++ 2.26 ) Read
-++ 2.27 ) Rm
-++ 2.28 ) SubSh
-++ 2.29 ) Tar
-++ 2.30 ) Touch
-++ 2.31 ) Tr
-++ 2.32 ) Watch
-++ 2.33 ) Wc
+++ 2.8 ) CspSh
+++ 2.9 ) Date
+++ 2.10 ) Dd
+++ 2.11 ) DocTestBash
+++ 2.12 ) Echo
+++ 2.13 ) Exit
+++ 2.14 ) Expand
+++ 2.15 ) Find
+++ 2.16 ) Fmt
+++ 2.17 ) Grep
+++ 2.18 ) Help
+++ 2.19 ) HexDump
+++ 2.20 ) History
+++ 2.21 ) Hostname
+++ 2.22 ) Jq
+++ 2.23 ) Ls
+++ 2.24 ) Make
+++ 2.25 ) Mv
+++ 2.26 ) Pwd
+++ 2.27 ) Read
+++ 2.28 ) Rm
+++ 2.29 ) SubSh
+++ 2.30 ) Tar
+++ 2.31 ) Touch
+++ 2.32 ) Tr
+++ 2.33 ) Watch
+++ 2.34 ) Wc
 
 + 3 ) Additional tests
 
@@ -177,6 +178,28 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
     + exit 1
     $
 
+    $ rm -fr bin/p.py
+    $
+
+    $ bin/argdoc.py --rip doc /dev/null >/dev/null
+    $
+
+    $ bin/argdoc.py --rip argdoc /dev/null >bin/p.py
+    $ python3 bin/p.py
+    Namespace()
+    usage: null [-h]
+    /dev/null: error: not implemented
+    + exit 2
+    $
+
+    $ bin/argdoc.py --rip argparse /dev/null >bin/p.py
+    $ python3 bin/p.py
+    Namespace()
+    $
+
+    $ rm -fr bin/p.py
+    $
+
 Drop that starter Doc and Python into your source, call it, and work it up from there
 
 
@@ -186,7 +209,8 @@ Do nothing, but noisily
 
     $ bin/bash.py
     usage: bash.py [-h] [-i]
-    bash.py: warning: arguments other than -i not implemented
+    error: choose --interact
+    + exit 2
     $
 
 Decline to do the most basic non-interactive thing
@@ -305,7 +329,23 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.8 ) Date
+## 2.8 ) CspSh
+
+    $ echo 'tick → STOP$tick → tick → STOP$CLOCK = (tick → CLOCK)$CLOCK' | tr '$' '\n' | bin/cspsh.py -qi
+    ? tick
+    STOP
+    ? tick
+    tick
+    STOP
+    ? ? tick
+    tick
+    tick
+    CLOCK ...
+    ?
+    $
+
+
+## 2.9 ) Date
 
     $ bin/date.py -j 123123591970.59123456
     1970-12-31 23:59:59.123456
@@ -314,7 +354,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.9 ) Dd
+## 2.10 ) Dd
 
     $ bin/dd.py </dev/null
 
@@ -327,7 +367,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.10 ) DocTestBash
+## 2.11 ) DocTestBash
 
     $ bin/doctestbash.py
     usage: doctestbash.py [-h] [-b] [-q] [-v] tests/
@@ -336,7 +376,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.11 ) Echo
+## 2.12 ) Echo
 
     $ bin/echo.py 'Hello, Echo World!'
     Hello, Echo World!
@@ -348,7 +388,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.12 ) Exit
+## 2.13 ) Exit
 
     $ bin/exit.py
     $
@@ -376,7 +416,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.13 ) Expand
+## 2.14 ) Expand
 
     $ bin/expand.py - </dev/null
     $
@@ -395,7 +435,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.14 ) Find
+## 2.15 ) Find
 
     $ bin/find.py /dev/null
     /dev/null
@@ -425,7 +465,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.15 ) Fmt
+## 2.16 ) Fmt
 
     $ echo $(seq 0 39) | bin/fmt.py -w42  # split to fit inside width
     0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
@@ -446,7 +486,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $
 
 
-## 2.16 ) Grep
+## 2.17 ) Grep
 
 Search with no key
 
@@ -476,7 +516,7 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
     $
 
 
-## 2.17 ) Help
+## 2.18 ) Help
 
     $ bin/help_.py help
     usage: help_.py [-h] [VERB]
@@ -497,7 +537,7 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
     $
 
 
-## 2.18 ) HexDump
+## 2.19 ) HexDump
 
     $ bin/hexdump.py -C </dev/null
     Namespace(C=1)
@@ -507,7 +547,7 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
     $
 
 
-## 2.19 ) History
+## 2.20 ) History
 
     $ echo 'echo abc$echo def$history$' | tr '$' '\n' | bin/bash.py -i
 
@@ -530,7 +570,7 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
     $
 
 
-## 2.20 ) Hostname
+## 2.21 ) Hostname
 
     $ bin/hostname.py
     ...
@@ -541,7 +581,7 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
     $
 
 
-## 2.21 ) Jq
+## 2.22 ) Jq
 
 Require that "jq.py" not crash more often, without requiring correct output
 
@@ -554,7 +594,7 @@ Require that "jq.py" not crash more often, without requiring correct output
     $
 
 
-## 2.22 ) Ls
+## 2.23 ) Ls
 
 List the files and dirs inside a dir
 
@@ -677,7 +717,7 @@ Clean up
     $
 
 
-## 2.23 ) Make
+## 2.24 ) Make
 
     % bin/make.py </dev/null
     Namespace()
@@ -687,7 +727,7 @@ Clean up
     %
 
 
-## 2.24 ) Mv
+## 2.25 ) Mv
 
     $ bin/mv.py
     usage: mv.py [-h] [-i] FILE
@@ -703,7 +743,7 @@ Clean up
     $
 
 
-## 2.25 ) Pwd
+## 2.26 ) Pwd
 
     $ bin/pwd_.py
     ...
@@ -716,7 +756,7 @@ Clean up
     $
 
 
-## 2.26 ) Read
+## 2.27 ) Read
 
     $ echo 'Hello, Line Editor' | bin/read.py
     ? Hello, Line Editor
@@ -733,7 +773,7 @@ Clean up
     '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑'
     $
 
-## 2.27 ) Rm
+## 2.28 ) Rm
 
     $ bin/rm.py
     Namespace(files=[])
@@ -743,7 +783,7 @@ Clean up
     $
 
 
-## 2.28 ) SubSh
+## 2.29 ) SubSh
 
     $ bin/subsh.py echo 'Hello, Subsh World!'
     {'args': ['echo', 'Hello, Subsh World!'],
@@ -760,7 +800,7 @@ Clean up
     $
 
 
-## 2.29 ) Tar
+## 2.30 ) Tar
 
     $ rm -fr tardir/ tardir.tgz
     $
@@ -798,7 +838,7 @@ Clean up
     $
 
 
-## 2.30 ) Touch
+## 2.31 ) Touch
 
     % bin/touch.py
     Namespace(files=[])
@@ -808,7 +848,7 @@ Clean up
     %
 
 
-## 2.31 ) Tr
+## 2.32 ) Tr
 
     $ cat $(git ls-files) | bin/tr.py | awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
 
@@ -820,7 +860,7 @@ Clean up
     $
 
 
-## 2.32 ) Watch
+## 2.33 ) Watch
 
     $ bin/watch.py
     Namespace(interval=None, words=[])
@@ -830,7 +870,7 @@ Clean up
     $
 
 
-## 2.33 ) Wc
+## 2.34 ) Wc
 
     $ bin/wc.py
     Namespace(bytes=None, chars=None, files=[], lines=None, max_line_length=None)
@@ -842,16 +882,21 @@ Clean up
 
 ## 3 ) Additional tests
 
-Show verbs called with no args return exit status 2 from rejecting usage
+Show every verb called with no args return exit 0,
+else exit status 2 from rejecting usage,
+else exit status 2 from being stubbed out
 
     $ bin/argdoc.py </dev/null >/dev/null 2>&1
     $ bin/bash.py >/dev/null 2>&1
+    + exit 2
     $ bin/bind.py </dev/null >/dev/null 2>&1
     $ bin/cal.py </dev/null >/dev/null 2>&1
     $ bin/cat.py </dev/null >/dev/null 2>&1
     $ bin/column.py </dev/null >/dev/null 2>&1
     + exit 2
     $ bin/cp.py </dev/null >/dev/null 2>&1
+    + exit 2
+    $ bin/cspsh.py </dev/null >/dev/null 2>&1
     + exit 2
     $
 
@@ -903,6 +948,31 @@ Show verbs called with no args return exit status 2 from rejecting usage
     + exit 2
     $
 
+Test optional argument help of "show this help message and exit"
+spelled differently than:  -h, --help
+
+    $ rm -fr bin/p.py
+    $
+
+    $ bin/argdoc.py --rip doc bin/cal.py >/dev/null
+    $
+
+    $ bin/argdoc.py --rip argdoc bin/cal.py >bin/p.py
+    $ python3 bin/p.py
+    Namespace(h=None, help=None, ymd=None)
+    usage: cal.py [--help] [-h] [YMD]
+    bin/cal.py: error: not implemented
+    + exit 2
+    $
+
+    $ bin/argdoc.py --rip argparse bin/cal.py >bin/p.py
+    $ python3 bin/p.py
+    Namespace(h=None, help=None, ymd=None)
+    $
+
+    $ rm -fr bin/p.py
+    $
+
 Clean up
 
     $ rm -fr ../pybashish/bin/argdoc.pyc
@@ -911,7 +981,6 @@ Clean up
 
 
 // FIXME: remake this into a ".md" Markdown file
-// FIXME: add "cspsh" into the table-of-contexts, and add some tests for it
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

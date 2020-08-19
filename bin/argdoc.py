@@ -362,7 +362,15 @@ class _ArgDocApp:
     def rip_argparse(self, parser_source, joined_help_options):
         """Show how the file calls Arg Parse"""
 
-        print(parser_source.rstrip())
+        two_imports = "import argparse\nimport textwrap"
+        assert two_imports in parser_source
+
+        patched = parser_source
+        if joined_help_options:
+            three_imports = "import argparse\nimport sys\nimport textwrap"
+            patched = parser_source.replace(two_imports, three_imports)
+
+        print(patched.rstrip())
         print()
 
         d = r"    "  # choose indentation
@@ -371,7 +379,7 @@ class _ArgDocApp:
             # FIXME: reduce this down to:  if args.help or args.h or ...:
             # FIXME: by way of choosing the "add_argument" "dest" correctly, eg, at --x -y
             print(
-                "if any(vars(args_).get(_) for _ in {}.split()):".format(
+                "if any(vars(args).get(_) for _ in {}.split()):".format(
                     black_repr(joined_help_options)
                 )
             )
@@ -900,8 +908,20 @@ class _ArgDocTaker(argparse.Namespace):
         tabsize_8 = 8
         doc_chars = textwrap.dedent(doc.expandtabs(tabsize_8)).strip()
 
-        self.taker = ShardsTaker()
-        self.taker.give_sourcelines(doc_chars)
+        taker = ShardsTaker()
+        self.taker = taker
+
+        self._give_doclines(doc_chars)
+
+    def _give_doclines(self, chars):
+        """Give chars, split into lines, but drop the trailing whitespace from each line"""
+
+        taker = self.taker
+
+        lines = chars.splitlines()
+        lines = list(_.rstrip() for _ in lines)
+
+        taker.give_shards(shards=lines)
 
     def take_arg_doc_into(self, parts):
         """Parse an Arg Doc into its Parts"""
@@ -1175,7 +1195,7 @@ class _ArgDocTaker(argparse.Namespace):
         """Do nothing if all lines consumed, else crash"""
 
         taker = self.taker
-        taker.take_end_shard()
+        taker.take_beyond_shards()
 
 
 class _UsagePhrasesSyntax(argparse.Namespace):
@@ -1222,7 +1242,7 @@ class _UsagePhrasesTaker(argparse.Namespace):
 
             self.accept_usage_remains()
 
-        taker.take_end_shard()
+        taker.take_beyond_shards()
 
     def accept_peeked_usage_chars(self):
         """Name a copy of the entire Usage Line, including its "usage:" prefix"""
@@ -1230,9 +1250,9 @@ class _UsagePhrasesTaker(argparse.Namespace):
         taker = self.taker
         uses = self.uses
 
-        strung_remains = taker.peek_strung_remains()
+        joined_remains = "".join(taker.peek_more_shards())
 
-        usage_chars = strung_remains.strip()
+        usage_chars = joined_remains.strip()
         uses.usage_chars = usage_chars
 
     def take_usage_word(self):
@@ -1242,20 +1262,19 @@ class _UsagePhrasesTaker(argparse.Namespace):
         uses = self.uses
 
         hopes = "usage:"
-        many = taker.peek_some_shards(hopes)
-        if many != hopes:
+        if not taker.peek_equal_shards(hopes):
 
-            word = taker.peek_one_strung_word()
+            word = "".join(taker.peek_upto_blank_shard())
             reason = "{!r} is here, but the first word of an Arg Doc is{!r}".format(
                 word, hopes
             )
 
             raise ArgDocError(reason)
 
-        taker.take_counted_shards(len(hopes))
+        taker.take_some_shards(len(hopes))
         taker.accept_blank_shards()
 
-        usage_tail = taker.peek_strung_remains()
+        usage_tail = "".join(taker.peek_more_shards())
         uses.usage_tail = usage_tail
 
     def take_prog(self):
@@ -1266,13 +1285,13 @@ class _UsagePhrasesTaker(argparse.Namespace):
 
         taker.accept_blank_shards()
 
-        if not taker.peek_more():
+        prog_phrase = "".join(taker.peek_upto_blank_shard())
+        if not prog_phrase:
             reason = "second word of Arg Doc must exist, to name the app"
 
             raise ArgDocError(reason)
 
-        prog_phrase = taker.peek_one_strung_word()
-        taker.take_counted_shards(len(prog_phrase))
+        taker.take_some_shards(len(prog_phrase))
         taker.accept_blank_shards()
 
         uses.prog_phrase = prog_phrase
@@ -1284,7 +1303,7 @@ class _UsagePhrasesTaker(argparse.Namespace):
         uses = self.uses
 
         uses.optionals_phrases = list()
-        while taker.peek_some_shards("[-") == "[-":
+        while taker.peek_equal_shards("[-"):
             argument_phrase = self.accept_argument_phrase()
 
             kwarg_phrase = OptionalPhraseSyntaxTaker(argument_phrase)
@@ -1316,10 +1335,10 @@ class _UsagePhrasesTaker(argparse.Namespace):
 
         while taker.peek_more():
 
-            word = taker.peek_one_strung_word()
+            word = "".join(taker.peek_upto_blank_shard())
             assert word
 
-            taker.take_counted_shards(len(word))
+            taker.take_some_shards(len(word))
             taker.accept_blank_shards()
 
             words.append(word)
@@ -1340,8 +1359,8 @@ class _UsagePhrasesTaker(argparse.Namespace):
 
         taker = self.taker
 
-        remains = taker.peek_strung_remains()
-        taker.take_counted_shards(len(remains))
+        remains = "".join(taker.peek_more_shards())
+        taker.take_some_shards(len(remains))
 
 
 class ArgumentLineSyntaxTaker(argparse.Namespace):
@@ -1461,9 +1480,9 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
         shards = (
             (list(words) + ["", self.arg_help_line]) if self.arg_help_line else words
         )
-        strung = " ".join(str(_) for _ in shards)  # tolerate None's
+        joined = " ".join(str(_) for _ in shards)  # tolerate None's
 
-        return strung
+        return joined
 
     def _tuple_argument_words(self):
         """Format as a tuple of words to begin an argument declaration line in an Arg Doc"""
@@ -1576,9 +1595,9 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
     def format_usage_phrase(self):
         """Format as a phrase of a Usage Line in an Arg Doc"""
 
-        strung = "[{}]".format(" ".join(self._tuple_comparable_words()))
+        joined = "[{}]".format(" ".join(self._tuple_comparable_words()))
 
-        return strung
+        return joined
 
     def _tuple_comparable_words(self):
         """Format as a tuple of words to compare with an argument declaration line in an Arg Doc"""
@@ -1665,15 +1684,15 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
         """Format as a phrase of a Usage Line in an Arg Doc"""
 
         if self.nargs == "...":
-            strung = "[{} [{} ...]]".format(self.metavar, self.metavar)
+            joined = "[{} [{} ...]]".format(self.metavar, self.metavar)
             if self.dashdash:
-                strung = "[-- [{} [{} ...]]]".format(self.metavar, self.metavar)
+                joined = "[-- [{} [{} ...]]]".format(self.metavar, self.metavar)
         elif self.nargs == "?":
-            strung = "[{}]".format(self.metavar)
+            joined = "[{}]".format(self.metavar)
         else:
-            strung = "{}".format(self.metavar)
+            joined = "{}".format(self.metavar)
 
-        return strung
+        return joined
 
     def _tuple_comparable_words(self):
         """Format as a tuple of words to compare with an argument declaration line in an Arg Doc"""
@@ -1685,23 +1704,16 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
 
 # deffed in many files  # missing from docs.python.org
 class ShardsTaker(argparse.Namespace):
-    """Walk once thru source chars, as split
+    """
+    Walk once thru source chars, as split
 
     Define "take" to mean require and consume
-    Define "peek" to mean look ahead
+    Define "peek" to mean look ahead if present, else into an infinite stream of None's
     Define "accept" to mean take if given, and don't take if not given
     """
 
     def __init__(self, shards=()):
         self.shards = list(shards)  # the shards being peeked, taken, and accepted
-
-    def give_sourcelines(self, chars):
-        """Give chars, split into lines, but drop the trailing whitespace from each line"""
-
-        lines = chars.splitlines()
-        lines = list(_.rstrip() for _ in lines)
-
-        self.give_shards(shards=lines)
 
     def give_shards(self, shards):
         """Give shards"""
@@ -1713,10 +1725,36 @@ class ShardsTaker(argparse.Namespace):
 
         self.shards = self.shards[1:]
 
+    def take_some_shards(self, count):
+        """Take a number of shards"""
+
+        self.shards = self.shards[count:]
+
     def peek_one_shard(self):
         """Return the next shard, without consuming it"""
 
-        return self.shards[0]
+        if self.shards:  # infinitely many None's past the end
+            return self.shards[0]
+
+    def peek_some_shards(self, count):
+        """Return the next few shards, without consuming them"""
+
+        nones = count * [None]
+        some = (self.shards[:count] + nones)[:count]
+
+        return some
+
+    def peek_equal_shards(self, hopes):
+        """Return the next few"""
+
+        some = self.peek_some_shards(len(hopes))
+        if some == list(hopes):
+            return True
+
+    def take_beyond_shards(self):
+        """Do nothing if all shards consumed, else mystically crash"""
+
+        assert not self.peek_more()
 
     def peek_more(self):
         """Return True while shards remain"""
@@ -1724,10 +1762,11 @@ class ShardsTaker(argparse.Namespace):
         more = bool(self.shards)
         return more
 
-    def take_end_shard(self):
-        """Do nothing if all shards consumed, else crash"""
+    def peek_more_shards(self):
+        """List remaining shards """
 
-        assert not self.peek_more()
+        more_shards = list(self.shards)
+        return more_shards
 
     def accept_blank_shards(self):
         """Discard zero or more blank shards"""
@@ -1738,45 +1777,16 @@ class ShardsTaker(argparse.Namespace):
                 break
             self.take_one_shard()
 
-    def peek_strung_remains(self):
-        """Return the remaining shards strung together """
+    def peek_upto_blank_shard(self):
+        """Peek the non-blank shards here, if any"""
 
-        strung_remains = "".join(self.shards)
-        return strung_remains
+        shards = list()
+        for shard in self.shards:
+            if not shard.strip():
+                break
+            shards.append(shard)
 
-    def peek_one_strung_word(self):
-        """Return the first word of the remaining shards strung together"""
-
-        strung_remains = "".join(self.shards)
-
-        words = strung_remains.split()
-        if not words:
-            raise ArgDocError("precondition violated: no words available")
-
-        word = words[0]
-
-        return word
-
-    def peek_some_shards(self, hopes):
-        """Return a copy of the hopes strung together, if and only if available to be taken now"""
-
-        shards = self.shards
-
-        if len(shards) < len(hopes):
-            return None
-
-        for (shard, hope,) in zip(shards, hopes):
-            if shard != hope:
-                return None
-
-        strung = "".join(hopes)
-        return strung
-
-    def take_counted_shards(self, count):
-        """Take a number of shards"""
-
-        if count:
-            self.shards = self.shards[count:]
+        return shards
 
 
 def black_triple_quote_repr(chars):

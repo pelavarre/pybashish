@@ -6,13 +6,14 @@ usage: bash.py [-h] [-i]
 chat with people: prompt, then listen, then speak, and repeat
 
 optional arguments:
-  -h, --help  show this help message and exit
-  -i          ask more questions
+  -h, --help      show this help message and exit
+  -i, --interact  ask more questions
 
 bugs:
   returns exit status 0 after printing usage, if called with no arguments
   returns exit status 127, not 258, for ⌃D EOF pressed while ' or "" input quote open
   changes exit status after next line of input, no matter if input is blank
+  defines "--interact" to expand on "-i", whereas "bash" doesn't bother
   leaves most of "bash" unimplemented
 
 examples:
@@ -38,10 +39,10 @@ import read
 def main(argv):
 
     args = argdoc.parse_args()
-    if not args.i:
+    if not args.interact:
         stderr_print(argdoc.format_usage().rstrip())
-        stderr_print("bash.py: warning: arguments other than -i not implemented")
-        sys.exit()
+        stderr_print("bash.py: error: choose --interact")
+        sys.exit(2)  # exit 2 from rejecting usage
 
     # Print banner
 

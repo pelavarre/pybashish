@@ -24,6 +24,8 @@ examples:
 
 see also:  python "import doctest"
 """
+# FIXME: let '>' prompts of Bash continue '$' prompts of Bash
+# FIXME: learn the '<<-EOF' here docs, but accept blanks as tabs
 # FIXME: walk for exts
 # FIXME: rip Bash paste distinguished only by repeated prompt ending in '$' or '#'
 # FIXME: rip Python '>>>' paste, and Makefile paste, and Zsh '%' paste, not just Bash paste
