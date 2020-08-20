@@ -44,3 +44,6 @@ pushd ~/Desktop >/dev/null
 dirs +0  # aka:  dirs | awk '{print $1}'
 
 export PS1='(public) \$ '
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

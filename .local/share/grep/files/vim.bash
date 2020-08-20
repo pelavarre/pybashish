@@ -48,9 +48,10 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 # vim  :help ⌃V...  # help with key chord sequence
 
 #
-# vim  " to show space v tab
+# vim  " to show visible space v tab with : syntax or : set list
 # vim  :syntax on
 # vim  :set syntax=whitespace
+# vim  :set list
 #
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

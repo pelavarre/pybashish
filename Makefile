@@ -41,6 +41,12 @@ test-once:
 	tests/_test_subsh.py >/dev/null
 	: test_subsh: tests passed
 	:
+	rm -fr a b
+	git ls-files | grep -vE '(README.md|__init__.py|.gitignore)' >a
+	git grep -l copied.from $$(git ls-files) >b
+	diff -burp a b
+	rm -fr a b
+	:
 	rm -fr ../pybashish/bin/pyish.pyc
 	:
 

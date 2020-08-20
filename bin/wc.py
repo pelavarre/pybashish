@@ -42,3 +42,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

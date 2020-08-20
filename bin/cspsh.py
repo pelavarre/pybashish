@@ -268,6 +268,7 @@ class CspCommandLine(CspWorker):
 
         self.taker = ShardsTaker()
         self.traces = list()
+        self.crossings = list()
         self.gotos = list()
 
         CspCommandLine.top_worker = self
@@ -275,25 +276,14 @@ class CspCommandLine(CspWorker):
     def __call__(self):
         worker = self.worker
         if worker:
-            self.trace_open()
+            self.trace_open(crossing=False)
             worker()
             self.trace_close()
 
     def __str__(self):
         return str(self.worker)
 
-    def call_named_process(self, name, process):
-        assert name and process
-
-        self.gotos.append(name)
-        count = self.gotos.count(name)
-
-        if count > 3:
-            CspCommandLine.top_worker.trace(name, "...")
-        else:
-            process()
-
-    def trace_open(self):
+    def trace_open(self, crossing):
         traces = self.traces
 
         if traces:
@@ -305,6 +295,7 @@ class CspCommandLine(CspWorker):
         trace = list()
         self.traces.append(list())
         self.trace("⟨")
+        self.crossings.append(crossing)
 
     def trace(self, *args):
         trace = self.traces[-1]
@@ -312,9 +303,11 @@ class CspCommandLine(CspWorker):
 
     def trace_close(self):
         traces = self.traces
+        crossings = self.crossings
 
         self.trace("⟩")
         trace = traces.pop()
+        crossings.pop()
         self.trace_print(len(traces), trace=trace)
 
     def trace_print(self, depth, trace):
@@ -339,6 +332,26 @@ class CspCommandLine(CspWorker):
             trace = trace[1:]
 
         print(dents + chars)
+
+    def call_named_process(self, name, process):
+        assert name and process
+
+        crossings = self.crossings
+        crossing = crossings[-1] if crossings else None
+
+        if crossing:
+
+            CspCommandLine.top_worker.trace(name, "...")
+
+        else:
+
+            self.gotos.append(name)
+            count = self.gotos.count(name)
+
+            if count > 3:
+                CspCommandLine.top_worker.trace(name, "...")
+            else:
+                process()
 
     @classmethod
     def take_one_worker(cls, taker):
@@ -437,8 +450,10 @@ class EventChoice(CspWorker):
     """Let the work through a first event choose which process comes next"""
 
     def __call__(self):
-        for worker in self.workers:
-            CspCommandLine.top_worker.trace_open()
+        last_index = len(self.workers) - 1
+        for (index, worker,) in enumerate(self.workers):
+            crossing = index < last_index
+            CspCommandLine.top_worker.trace_open(crossing)
             worker()
             CspCommandLine.top_worker.trace_close()
 
@@ -866,3 +881,6 @@ def verbose_print(*args, **kwargs):
 
 if __name__ == "__main__":
     main()
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

@@ -89,3 +89,6 @@ def stderr_print(*args):
 
 # deffed in many files  # since Oct/2019 Python 3.7  # since Dec/2016 CPython 3.6
 dict = collections.OrderedDict
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git
