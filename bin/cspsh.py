@@ -21,7 +21,6 @@ csp examples:
 examples:
   cspsh.py -i
 """
-# FIXME: take lines till "("s balanced by ")"s
 # FIXME: limit the trace of ProcessWithSuch to its alphabet
 
 
@@ -38,6 +37,10 @@ MARK_REGEX = r"(?P<mark>[():={}µ•→])"
 BLANKS_REGEX = r"(?P<blanks>[ ]+)"
 
 SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
+
+
+OPEN_MARK_REGEX = r"[(\[{]"
+CLOSE_MARK_REGEX = r"[)\]}]"
 
 
 def main():
@@ -69,8 +72,14 @@ def main():
 
                 # test more examples from us
 
-                HER.WALTZ = (her.right.back → her.left.hook.back → her.right.close → her.left.forward → her.right.hook.forward → her.left.close)
-                HIS.WALTZ = (his.left.forward → his.right.hook.forward → his.left.close → his.right.back → his.left.hook.back → his.right.close)
+                HER.WALTZ = (
+                    her.right.back → her.left.hook.back → her.right.close →
+                    her.left.forward → her.right.hook.forward → her.left.close
+                    )
+                HIS.WALTZ = (
+                    his.left.forward → his.right.hook.forward → his.left.close →
+                    his.right.back → his.left.hook.back → his.right.close
+                )
                 HER.WALTZ
                 HIS.WALTZ
 
@@ -109,24 +118,9 @@ def main():
 
     while True:
 
-        if lines:
-
-            stderr_print("? " + lines[0])
-
-        else:
-
-            stderr_print("? ", end="")
-            sys.stdout.flush()
-            line = sys.stdin.readline()
-            if not line:
-                stderr_print()
-            lines.append(line)
-
-        line = lines[0]
-        lines = lines[1:]
+        line = pull_line(lines, stdin=sys.stdin)
 
         if not line:
-            assert not lines
             break
 
         ccl = CspCommandLine()
@@ -147,6 +141,90 @@ def main():
 
         verbose_print()
         verbose_print()
+
+
+def pull_line(lines, stdin):
+
+    line = ""
+    while True:
+
+        open_marks = csp_pick_open_marks(line)
+        if line and not open_marks:
+            break
+
+        prompt = "{} > ".format(open_marks) if line else "? "
+
+        if lines:
+
+            stderr_print(prompt + lines[0])
+
+        else:
+
+            stderr_print(prompt, end="")
+            sys.stdout.flush()
+            more = stdin.readline()
+            if not more:
+                stderr_print()
+
+            lines.append(more)
+
+        more = lines[0]
+        lines[:] = lines[1:]
+
+        if not more:
+            assert not lines
+            break
+
+        line += "\n"
+        line += more
+
+    return line
+
+
+def csp_pick_open_marks(string):
+    """
+    List the marks not yet closed
+
+    Count the ) ] } marks as closing the ( [ { marks
+
+    Count the other marks (such as = µ • →) as closed by the next name
+    """
+
+    # To list which marks are left open, if any:  open marks, and close the last mark
+
+    pairs = list()
+    for ch in string:
+
+        if re.match(r"^{}$".format(OPEN_MARK_REGEX), string=ch):
+
+            open_mark = ch
+            close_mark = CLOSE_MARK_REGEX[OPEN_MARK_REGEX.index(ch)]
+            assert (open_mark + close_mark) in "() [] {}".split()
+
+            pair = (
+                open_mark,
+                close_mark,
+            )
+            pairs.append(pair)
+
+        elif pairs and (ch == pairs[-1][-1]):
+
+            pairs = pairs[:-1]
+
+    # Count the last mark as an open mark if no name follows it
+
+    open_marks = "".join(_[0] for _ in pairs)
+    chars = string.rstrip()
+    if chars:
+        last_mark = chars[-1]
+
+        if re.match(r"^{}$".format(MARK_REGEX), string=last_mark):
+            if not re.match(r"^{}$".format(OPEN_MARK_REGEX), string=last_mark):
+                if not re.match(r"^{}$".format(CLOSE_MARK_REGEX), string=last_mark):
+
+                    open_marks += last_mark
+
+    return open_marks
 
 
 class CspWorker(argparse.Namespace):
@@ -220,7 +298,9 @@ class CspCommandLine(CspWorker):
         text = text.strip()
 
         tabsize_8 = 8
-        text = text.expandtabs(tabsize_8).rstrip()
+        text = text.expandtabs(tabsize_8)  # replace "\t" with between 1 and 8 " "
+        text = " ".join(text.splitlines())  # replace "\r\n" or "\r" or "\n" with " "
+        text = text.rstrip()
 
         items = list()
         while text:
