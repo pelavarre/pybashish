@@ -332,16 +332,14 @@ Call a column numeric when two-thirds of its cells contain decimal digits
 ## 2.8 ) CspSh
 
     $ echo 'tick → STOP$tick → tick → STOP$CLOCK = (tick → CLOCK)$CLOCK' | tr '$' '\n' | bin/cspsh.py -qi
-    ? tick
-    STOP
-    ? tick
-    tick
-    STOP
-    ? ? tick
-    tick
-    tick
-    CLOCK ...
-    ?
+      ? tick → STOP
+    ⟨tick, STOP⟩
+      ? tick → tick → STOP
+    ⟨tick, tick, STOP⟩
+      ? CLOCK = (tick → CLOCK)
+      ? CLOCK
+    ⟨tick, tick, tick, CLOCK, ...⟩
+      ?
     $
 
 
@@ -856,7 +854,7 @@ Clean up
     0123456789:;<=>?@
     ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`
     abcdefghijklmnopqrstuvwxyz{|}~
-    «µ»åéîøü–—’“”•′″‴←↑→↓⇧⌃⌘⌥💔💥😊😠😢
+    «µ»åéîøü–—’“”•′″‴←↑→↓⇧⌃⌘⌥⟨⟩💔💥😊😠😢
     $
 
 

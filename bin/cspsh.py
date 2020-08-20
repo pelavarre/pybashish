@@ -33,14 +33,14 @@ import argdoc
 
 
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
-MARK_REGEX = r"(?P<mark>[():={}µ•→])"
+MARK_REGEX = r"(?P<mark>[():={|}µ•→⟨⟩])"
 BLANKS_REGEX = r"(?P<blanks>[ ]+)"
 
 SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
 
 
-OPEN_MARK_REGEX = r"[(\[{]"
-CLOSE_MARK_REGEX = r"[)\]}]"
+OPEN_MARK_REGEX = r"[(\[{⟨]"
+CLOSE_MARK_REGEX = r"[)\]}⟩]"
 
 
 def main():
@@ -72,6 +72,9 @@ def main():
 
                 # test more examples from us
 
+                PQR = (a → P | b → Q | c → R)
+                PQR
+
                 HER.WALTZ = (
                     her.right.back → her.left.hook.back → her.right.close →
                     her.left.forward → her.right.hook.forward → her.left.close
@@ -102,6 +105,14 @@ def main():
 
                 CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
                 CH5B
+
+                (up → STOP | right → right → up → STOP)
+
+                CH5C = in5p → (
+                    out1p → out1p → out1p → out2p → CH5C |
+                    out2p → out1p → out2p → CH5C
+                )
+                CH5C
 
                 """
             )
@@ -152,17 +163,19 @@ def pull_line(lines, stdin):
         if line and not open_marks:
             break
 
-        prompt = "{} > ".format(open_marks) if line else "? "
+        prompt = "{} > ".format(open_marks[-1]) if line else "  ? "
 
         if lines:
 
-            stderr_print(prompt + lines[0])
+            stderr_print(prompt + lines[0].rstrip())
 
         else:
 
             stderr_print(prompt, end="")
             sys.stdout.flush()
             more = stdin.readline()
+            if not stdin.isatty():  # FIXME: distrust this "isatty" guess
+                stderr_print(more.rstrip())
             if not more:
                 stderr_print()
 
@@ -253,10 +266,18 @@ class CspCommandLine(CspWorker):
     def __init__(self, **kwargs):
         CspWorker.__init__(self, **kwargs)
 
-        self.gotos = list()
         self.taker = ShardsTaker()
+        self.traces = list()
+        self.gotos = list()
 
         CspCommandLine.top_worker = self
+
+    def __call__(self):
+        worker = self.worker
+        if worker:
+            self.trace_open()
+            worker()
+            self.trace_close()
 
     def __str__(self):
         return str(self.worker)
@@ -268,9 +289,56 @@ class CspCommandLine(CspWorker):
         count = self.gotos.count(name)
 
         if count > 3:
-            print(name, "...")
+            CspCommandLine.top_worker.trace(name, "...")
         else:
             process()
+
+    def trace_open(self):
+        traces = self.traces
+
+        if traces:
+            trace = traces[-1]
+            if trace:
+                self.trace_print(len(traces[:-1]), trace=trace)
+                traces[-1] = list()
+
+        trace = list()
+        self.traces.append(list())
+        self.trace("⟨")
+
+    def trace(self, *args):
+        trace = self.traces[-1]
+        trace.extend(args)
+
+    def trace_close(self):
+        traces = self.traces
+
+        self.trace("⟩")
+        trace = traces.pop()
+        self.trace_print(len(traces), trace=trace)
+
+    def trace_print(self, depth, trace):
+
+        dents = depth * "    "
+
+        chars = ""
+
+        if trace and (trace[0] == "⟨"):
+            chars += "⟨"
+            trace = trace[1:]
+
+        while trace and (trace[0] != "⟩"):
+            event = trace[0]
+            if chars not in ("", "⟨",):
+                chars += ", "
+            chars += str(event)
+            trace = trace[1:]
+
+        if trace and (trace[0] == "⟩"):
+            chars += "⟩"
+            trace = trace[1:]
+
+        print(dents + chars)
 
     @classmethod
     def take_one_worker(cls, taker):
@@ -280,7 +348,8 @@ class CspCommandLine(CspWorker):
 
             words = taker.peek_some_shards(2)
             if words[-1] and (words[1][1] == "="):
-                worker = DefineProcess.take_one_worker(taker)
+                DefineProcess.take_one_worker(taker)
+                worker = None
             else:
                 worker = Process.take_one_worker(taker)
 
@@ -340,7 +409,7 @@ class Process(CspWorker):
                 taker, after_mark="(", upto_mark=")"
             )
         elif words[-1] and (words[1][-1] == "→"):
-            worker = EventThenProcess.take_one_worker(taker)
+            worker = EventChoice.take_one_worker(taker)
         else:
             worker = ProcessCaller.take_one_worker(taker)
 
@@ -364,13 +433,62 @@ class OpenProcessClose(CspWorker):
         return worker
 
 
+class EventChoice(CspWorker):
+    """Let the work through a first event choose which process comes next"""
+
+    def __call__(self):
+        for worker in self.workers:
+            CspCommandLine.top_worker.trace_open()
+            worker()
+            CspCommandLine.top_worker.trace_close()
+
+    def __str__(self):
+
+        bars = self.bars
+        choices = self.choices
+
+        choice = choices[0]
+        chars = str(choice)
+        for (bar, choice,) in zip(bars, choices[1:]):
+            chars += str(bar)
+            chars += str(choice)
+
+        return chars
+
+    @classmethod
+    def take_one_worker(self, taker):
+
+        choices = list()
+        bars = list()
+
+        choice = EventThenProcess.take_one_worker(taker)
+        choices.append(choice)
+
+        while True:
+            word = taker.peek_one_shard()
+            if word and (word[-1] == "|"):
+                bar = CspMark.take_one_worker(taker, "|")
+                bars.append(bar)
+                choice = EventThenProcess.take_one_worker(taker)
+                choices.append(choice)
+            else:
+                break
+
+        if len(choices) == 1:
+            worker = choices[0]
+            return worker
+
+        worker = EventChoice(workers=choices, bars=bars)
+        return worker
+
+
 class EventThenProcess(CspWorker):
     """Work through one (or more) events and then a process"""
 
     def __call__(self):
         name = self.event_name.name
         assert name
-        print(name)
+        CspCommandLine.top_worker.trace(name)
         self.worker()
 
     @classmethod
@@ -426,7 +544,7 @@ class ProcessCaller(CspWorker):
         elif process:
             CspCommandLine.top_worker.call_named_process(name, process)
         else:
-            print(name)
+            CspCommandLine.top_worker.trace(name)
 
     @classmethod
     def take_one_worker(cls, taker):
@@ -450,7 +568,7 @@ class DefineProcess(CspWorker):
     """Name a process to call"""
 
     def __call__(self):
-        pass
+        assert False
 
     @classmethod
     def take_one_worker(self, taker):
@@ -462,12 +580,10 @@ class DefineProcess(CspWorker):
         CspCommandLine.processes_by_name[process_name.name] = process_caller
 
         word = taker.peek_one_shard()
-        if word[-1] != "(":
+        if word[-1] == "µ":
             body = ProcessWithSuch.take_one_worker(taker, process_caller)
         else:
-            body = OpenProcessClose.take_one_worker(
-                taker, after_mark="(", upto_mark=")"
-            )
+            body = Process.take_one_worker(taker)
             process_caller.process = body
 
         assert CspCommandLine.processes_by_name[process_name.name] == process_caller
