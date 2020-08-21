@@ -35,16 +35,17 @@ Contents
 ++ 2.22 ) Jq
 ++ 2.23 ) Ls
 ++ 2.24 ) Make
-++ 2.25 ) Mv
-++ 2.26 ) Pwd
-++ 2.27 ) Read
-++ 2.28 ) Rm
-++ 2.29 ) SubSh
-++ 2.30 ) Tar
-++ 2.31 ) Touch
-++ 2.32 ) Tr
-++ 2.33 ) Watch
-++ 2.34 ) Wc
+++ 2.25 ) MkDir
+++ 2.26 ) Mv
+++ 2.27 ) Pwd
+++ 2.28 ) Read
+++ 2.29 ) Rm
+++ 2.30 ) SubSh
+++ 2.31 ) Tar
+++ 2.32 ) Touch
+++ 2.33 ) Tr
+++ 2.34 ) Watch
+++ 2.35 ) Wc
 
 + 3 ) Additional tests
 
@@ -79,7 +80,7 @@ PyBashIsh is bits of Bash, rewritten in the kinder Literate programming style, a
 
 PyBashIsh does a few things much much better, some things just as well, and many things more poorly
 
-    $ pwd
+    $ bin/pwd_.py
     .../pybashish
     $
 
@@ -108,11 +109,11 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
         grep -h | head
 
-    Next try any of:
+    Next try one of:
 
         argdoc  bash  bind  cal  cat  column  cp  cspsh  date  dd  doctestbash  echo  exit
-        expand  find  fmt  grep  help  hexdump  history  hostname  jq  ls  make  mv  pwd
-        read  rm  subsh  tar  touch  tr  watch  wc
+        expand  find  fmt  grep  help  hexdump  history  hostname  jq  ls  make  mkdir  mv
+        pwd  read  rm  subsh  tar  touch  tr  watch  wc
 
     (pybashish) $
     + exit 1
@@ -273,7 +274,7 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 
 ## 2.5 ) Cat
 
-    $ echo a b c | tr ' ' '\n' | bin/cat.py -
+    $ bin/echo.py a b c | tr ' ' '\n' | bin/cat.py -
     a
     b
     c
@@ -300,7 +301,7 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 
 Left-justify columns of words
 
-    $ echo 'su per ca $ li fra gil $ is tic ex $ pi a li $ doc ious' | tr '$' '\n' | bin/column.py -t
+    $ bin/echo.py 'su per ca $ li fra gil $ is tic ex $ pi a li $ doc ious' | tr '$' '\n' | bin/column.py -t
     su   per   ca
     li   fra   gil
     is   tic   ex
@@ -310,7 +311,7 @@ Left-justify columns of words
 
 Right-justify columns of numbers
 
-    $ echo '27 735 43 $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' | tr '$' '\n' | bin/column.py -t
+    $ bin/echo.py '27 735 43 $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' | tr '$' '\n' | bin/column.py -t
      27   735   43
      51   785  640
      23   391   62
@@ -320,7 +321,7 @@ Right-justify columns of numbers
 
 Call a column numeric when two-thirds of its cells contain decimal digits
 
-    $ echo 'su per ca $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' | tr '$' '\n' | bin/column.py -t
+    $ bin/echo.py 'su per ca $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' | tr '$' '\n' | bin/column.py -t
      su   per  ca
      51   785  640
      23   391  62
@@ -331,7 +332,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
 
 ## 2.8 ) CspSh
 
-    $ echo 'tick → STOP$tick → tick → STOP$CLOCK = (tick → CLOCK)$CLOCK' | tr '$' '\n' | bin/cspsh.py -qi
+    $ bin/echo.py 'tick → STOP$tick → tick → STOP$CLOCK = (tick → CLOCK)$CLOCK' | tr '$' '\n' | bin/cspsh.py -qi
       ? tick → STOP
     ⟨tick, STOP⟩
       ? tick → tick → STOP
@@ -424,11 +425,11 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     n$
     $
 
-    $ echo 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | bin/expand.py
+    $ bin/echo.py 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | bin/expand.py
     åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢
     $
 
-    $ echo $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | bin/expand.py --plain
+    $ bin/echo.py $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | bin/expand.py --plain
       " " " ' " - -- ' '' '''
     $
 
@@ -442,9 +443,9 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $ rm -fr finddir/
     $
 
-    $ mkdir -p finddir/a/b/c finddir/p/q/r
-    $ echo hello >finddir/a/b/d
-    $ echo goodbye > finddir/a/b/e
+    $ bin/mkdir.py -p finddir/a/b/c finddir/p/q/r
+    $ bin/echo.py hello >finddir/a/b/d
+    $ bin/echo.py goodbye > finddir/a/b/e
     $
 
     $ bin/find.py finddir/
@@ -465,17 +466,17 @@ Call a column numeric when two-thirds of its cells contain decimal digits
 
 ## 2.16 ) Fmt
 
-    $ echo $(seq 0 39) | bin/fmt.py -w42  # split to fit inside width
+    $ bin/echo.py $(seq 0 39) | bin/fmt.py -w42  # split to fit inside width
     0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
     17 18 19 20 21 22 23 24 25 26 27 28 29 30
     31 32 33 34 35 36 37 38 39
     $
 
-    $ echo $(seq 0 39) | tr -d ' ' | bin/fmt.py -w42  # no split at width
+    $ bin/echo.py $(seq 0 39) | tr -d ' ' | bin/fmt.py -w42  # no split at width
     0123456789101112131415161718192021222324252627282930313233343536373839
     $
 
-    $ echo su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | bin/fmt.py -w42  # no split at "-"
+    $ bin/echo.py su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | bin/fmt.py -w42  # no split at "-"
     su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious
     $
 
@@ -547,7 +548,7 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
 
 ## 2.20 ) History
 
-    $ echo 'echo abc$echo def$history$' | tr '$' '\n' | bin/bash.py -i
+    $ bin/echo.py 'echo abc$echo def$history$' | tr '$' '\n' | bin/bash.py -i
 
     Pybashish 0.x.y for Linux and Mac OS Terminals
     Type "help" and press Return for more information.
@@ -583,7 +584,7 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
 
 Require that "jq.py" not crash more often, without requiring correct output
 
-    $ echo '["aa", "cc", "bb"]' | bin/jq.py .
+    $ bin/echo.py '["aa", "cc", "bb"]' | bin/jq.py .
     ...
     $
 
@@ -599,10 +600,10 @@ List the files and dirs inside a dir
     $ rm -fr lsdir/
     $
 
-    $ mkdir -p lsdir/dir
-    $ touch lsdir/execable
+    $ bin/mkdir.py -p lsdir/dir
+    $ bin/touch.py lsdir/execable
     $ chmod +x lsdir/execable
-    $ touch lsdir/file
+    $ bin/touch.py lsdir/file
     $ ln -s "$PWD"/lsdir/file lsdir/link
     $
 
@@ -655,13 +656,13 @@ List the files and dirs inside a dir
 Sort by time and sort by size
 
     $ rm -fr lsdir/
-    $ mkdir lsdir/
-    $ touch lsdir/first
-    $ touch lsdir/second
-    $ touch lsdir/third
-    $ echo a >lsdir/a
-    $ echo abb >lsdir/abb
-    $ echo abbccc >lsdir/abbccc
+    $ bin/mkdir.py lsdir/
+    $ bin/touch.py lsdir/first
+    $ bin/touch.py lsdir/second
+    $ bin/touch.py lsdir/third
+    $ bin/echo.py a >lsdir/a
+    $ bin/echo.py abb >lsdir/abb
+    $ bin/echo.py abbccc >lsdir/abbccc
     $
 
     $ (cd lsdir/ && ../bin/ls.py -Ct)
@@ -679,11 +680,11 @@ Sort by time and sort by size
 Sort by ext and by version
 
     $ rm -fr lsdir/
-    $ mkdir lsdir/
-    $ touch lsdir/1z.zip
-    $ touch lsdir/2p.py
-    $ touch lsdir/3c.c
-    $ touch lsdir/4q.py
+    $ bin/mkdir.py lsdir/
+    $ bin/touch.py lsdir/1z.zip
+    $ bin/touch.py lsdir/2p.py
+    $ bin/touch.py lsdir/3c.c
+    $ bin/touch.py lsdir/4q.py
 
     $ (cd lsdir/ && ../bin/ls.py -CX)
     3c.c  2p.py  4q.py  1z.zip
@@ -694,13 +695,13 @@ Sort by ext and by version
 Sort by version
 
     $ rm -fr lsdir/
-    $ mkdir lsdir/
-    $ touch lsdir/3.10.py
-    $ touch lsdir/3.2.1.py
-    $ touch lsdir/3.2.9.py
-    $ touch lsdir/3.py
-    $ touch lsdir/c.c
-    $ touch lsdir/z.zip
+    $ bin/mkdir.py lsdir/
+    $ bin/touch.py lsdir/3.10.py
+    $ bin/touch.py lsdir/3.2.1.py
+    $ bin/touch.py lsdir/3.2.9.py
+    $ bin/touch.py lsdir/3.py
+    $ bin/touch.py lsdir/c.c
+    $ bin/touch.py lsdir/z.zip
     $
 
     $ (cd lsdir/ && ../bin/ls.py -Cv)
@@ -717,15 +718,39 @@ Clean up
 
 ## 2.24 ) Make
 
-    % bin/make.py </dev/null
-    Namespace()
+    $ bin/make.py </dev/null
     usage: make.py [-h]
     make.py: error: not implemented
     + exit 2
-    %
+    $
 
 
-## 2.25 ) Mv
+## 2.25 ) MkDir
+
+    $ rm -fr x y z
+    $
+
+    $ bin/mkdir.py x/11 y/21 z/31
+    mkdir.py: error: FileNotFoundError: [Errno 2] No such file or directory: 'x/11'
+    mkdir.py: error: FileNotFoundError: [Errno 2] No such file or directory: 'y/21'
+    mkdir.py: error: FileNotFoundError: [Errno 2] No such file or directory: 'z/31'
+    + exit 1
+    $
+    $ bin/mkdir.py -p x/11 y/21 z/31
+    $
+
+    $ bin/touch.py x/11/ y/21/ y/22 z/31/ z/32 z/33
+    $
+
+    $ bin/ls.py -dCF x/* y/* z/*
+    x/11/  y/21/  y/22  z/31/  z/32  z/33
+    $
+
+    $ rm -fr x y z
+    $
+
+
+## 2.26 ) Mv
 
     $ bin/mv.py
     usage: mv.py [-h] [-i] FILE
@@ -741,7 +766,7 @@ Clean up
     $
 
 
-## 2.26 ) Pwd
+## 2.27 ) Pwd
 
     $ bin/pwd_.py
     ...
@@ -754,24 +779,24 @@ Clean up
     $
 
 
-## 2.27 ) Read
+## 2.28 ) Read
 
-    $ echo 'Hello, Line Editor' | bin/read.py
+    $ bin/echo.py 'Hello, Line Editor' | bin/read.py
     ? Hello, Line Editor
     'Hello, Line Editor\n'
     $
 
-    $ echo 'Hello, ^ULine Editor' | sed 's,\^U,@,g' | tr '@' '\25' | bin/read.py
+    $ bin/echo.py 'Hello, ^ULine Editor' | sed 's,\^U,@,g' | tr '@' '\25' | bin/read.py
     ? Line Editor
     'Line Editor\n'
     $
 
-    $ echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | tr -d '\n' | bin/read.py
+    $ bin/echo.py '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | tr -d '\n' | bin/read.py
     ? ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑
     '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑'
     $
 
-## 2.28 ) Rm
+## 2.29 ) Rm
 
     $ bin/rm.py
     Namespace(files=[])
@@ -781,7 +806,7 @@ Clean up
     $
 
 
-## 2.29 ) SubSh
+## 2.30 ) SubSh
 
     $ bin/subsh.py echo 'Hello, Subsh World!'
     {'args': ['echo', 'Hello, Subsh World!'],
@@ -798,14 +823,14 @@ Clean up
     $
 
 
-## 2.30 ) Tar
+## 2.31 ) Tar
 
     $ rm -fr tardir/ tardir.tgz
     $
 
-    $ mkdir -p tardir/a/b/c tardir/p/q/r
-    $ echo hello >tardir/a/b/d
-    $ echo goodbye > tardir/a/b/e
+    $ bin/mkdir.py -p tardir/a/b/c tardir/p/q/r
+    $ bin/echo.py hello >tardir/a/b/d
+    $ bin/echo.py goodbye > tardir/a/b/e
     $ tar czf tardir.tgz tardir/  # ordered differently at Mac, at Linux
     $
 
@@ -836,17 +861,26 @@ Clean up
     $
 
 
-## 2.31 ) Touch
+## 2.32 ) Touch
 
-    % bin/touch.py
-    Namespace(files=[])
-    usage: touch.py [-h] [FILE [FILE ...]]
-    touch.py: error: not implemented
-    + exit 2
-    %
+    $ rm -fr x y z
+    $
+
+    $ bin/mkdir.py x
+    $
+
+    $ bin/touch.py x y z
+    $
+
+    $ bin/ls.py -dCF x y z
+    x/  y  z
+    $
+
+    $ rm -fr x y z
+    $
 
 
-## 2.32 ) Tr
+## 2.33 ) Tr
 
     $ cat $(git ls-files) | bin/tr.py | awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
 
@@ -858,7 +892,7 @@ Clean up
     $
 
 
-## 2.33 ) Watch
+## 2.34 ) Watch
 
     $ bin/watch.py
     Namespace(interval=None, words=[])
@@ -868,7 +902,7 @@ Clean up
     $
 
 
-## 2.34 ) Wc
+## 2.35 ) Wc
 
     $ bin/wc.py
     Namespace(bytes=None, chars=None, files=[], lines=None, max_line_length=None)

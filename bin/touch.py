@@ -11,25 +11,47 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs
+bugs:
   runs ahead and works with me, without mandating that I spell out the new name, unlike Bash "touch"
 
 examples:
   touch  # creates "touch~1", then "touch~2", etc
 """
 
-
+import os
 import sys
 
 import argdoc
 
 
 def main():
+
     args = argdoc.parse_args()
-    sys.stderr.write("{}\n".format(args))
-    sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
-    sys.stderr.write("touch.py: error: not implemented\n")
-    sys.exit(2)  # exit 2 from rejecting usage
+
+    if not args.files:
+        stderr_print("touch.py: error: touch of zero args not implemented")
+        sys.exit(2)  # exit 2 from rejecting usage
+
+    exit_status = None
+    for file_ in args.files:
+
+        if not os.path.exists(file_):
+            with open(file_, "w"):
+                pass
+            continue
+
+        try:
+            os.utime(file_)
+        except OSError as exc:
+            stderr_print("touch.py: error: {}: {}".format(type(exc).__name__, exc))
+            exit_status = 1
+
+    sys.exit(exit_status)
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
+    print(*args, file=sys.stderr)
 
 
 if __name__ == "__main__":

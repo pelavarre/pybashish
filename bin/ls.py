@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: ls.py [-h] [-1] [-C] [-l] [--headings] [-a] [--full-time] [-F]
+usage: ls.py [-h] [-1] [-C] [-l] [--headings] [-d] [-a] [--full-time] [-F]
              [--sort FIELD] [-S] [-X] [-f] [-t] [-v] [--ascending]
              [--descending] [-r]
              [TOP [TOP ...]]
@@ -9,26 +9,27 @@ usage: ls.py [-h] [-1] [-C] [-l] [--headings] [-a] [--full-time] [-F]
 show the files and dirs inside a dir
 
 positional arguments:
-  TOP             the name of a dir or file to show
+  TOP              the name of a dir or file to show
 
 optional arguments:
-  -h, --help      show this help message and exit
-  -1              print as column: one filename per line
-  -C              print as zig-zag: filenames across one line, and more if need be (default: True)
-  -l              print as rows of permissions, links, owner, group, size, date/time-stamp, name
-  --headings      print as rows (a la -l), but start with one row of column headings
-  -a, --all       list more rows: add the names starting with a "." dot
-  --full-time     list more details: add the %a weekday and %f microseconds into date/time-stamps
-  -F, --classify  lits more details: mark names as "/*@" for dirs, "chmod +x", and "ln -s"
-  --sort FIELD    choose sort field by name: ext, name, none, time, or size
-  -S              sort by size descending (or -r ascending)
-  -X              sort by ext ascending (or -r descending)
-  -f              sort by none and imply --all (like classic -f, distinct from Linux -U)
-  -t              sort by time descending (or -r ascending)
-  -v              sort by version ascending (or -r descending) (such as 3.2.1 before 3.10)
-  --ascending     sort ascending:  newest to oldest, largest to smallest, etc
-  --descending    sort descending:  newest to oldest, largest to smallest, etc
-  -r              reverse the default sorts by size ascending, time ascending, name descending, etc
+  -h, --help       show this help message and exit
+  -1               print as column: one filename per line
+  -C               print as zig-zag: filenames across one line, and more if need be (default: True)
+  -l               print as rows of permissions, links, owner, group, size, date/time-stamp, name
+  --headings       print as rows (a la -l), but start with one row of column headings
+  -d, --directory  list less rows: each top only as itself, omitting the dirs and files inside it
+  -a, --all        list more rows: add the names starting with a "." dot
+  --full-time      list more details: add the %a weekday and %f microseconds into date/time-stamps
+  -F, --classify   list more details: mark names as "/*@" for dirs, "chmod +x", and "ln -s"
+  --sort FIELD     choose sort field by name: ext, name, none, time, or size
+  -S               sort by size descending (or -r ascending)
+  -X               sort by ext ascending (or -r descending)
+  -f               sort by none and imply --all (like classic -f, distinct from Linux -U)
+  -t               sort by time descending (or -r ascending)
+  -v               sort by version ascending (or -r descending) (such as 3.2.1 before 3.10)
+  --ascending      sort ascending:  newest to oldest, largest to smallest, etc
+  --descending     sort descending:  newest to oldest, largest to smallest, etc
+  -r               reverse the default sorts by size ascending, time ascending, name descending, etc
 
 bugs:
   doesn't show owner and group
@@ -83,6 +84,8 @@ def main():
     tops = args.tops if args.tops else [os.curdir]
     for index in range(len(tops)):
         print_one_top_walk(tops=tops, index=index, args=args)
+        if args.directory:
+            break
 
 
 def correct_args(args, stdout_isatty, stdout_columns):
@@ -271,13 +274,17 @@ def print_one_top_walk(tops, index, args):
 
     # Trace the top and separate by blank line, if more than one top
 
-    print_as_plural_if_plural(tops, index)
+    if not args.directory:
+        print_as_plural_if_plural(tops, index)
 
     # Find dirs and files inside this one top dir
     # FIXME: conform to Linux listing CurDir and ParDir in other places, unlike Mac Bash
 
     top = tops[index]
-    listed = [os.curdir, os.pardir] + os.listdir(top)
+    if args.directory:
+        listed = list(tops)
+    else:
+        listed = [os.curdir, os.pardir] + os.listdir(top)
 
     names = listed
     if not args.all:
@@ -288,7 +295,7 @@ def print_one_top_walk(tops, index, args):
 
     stats_by_name = dict()
     for name in names:
-        wherewhat = os.path.join(top, name)
+        wherewhat = name if args.directory else os.path.join(top, name)
         stats_by_name[name] = os.stat(wherewhat)
 
     # Mark each with r"[*/@]" for executable-not-dir, dir, or symbolic link
@@ -297,7 +304,8 @@ def print_one_top_walk(tops, index, args):
 
     markeds_by_name = dict()
     for name in names:
-        rep = mark_name(name, stats=stats_by_name[name])
+        wherewhat = name if args.directory else os.path.join(top, name)
+        rep = mark_name(name=name, wherewhat=wherewhat, stats=stats_by_name[name])
         markeds_by_name[name] = rep
 
     reps_by_name = markeds_by_name if args.classify else names_by_name
@@ -327,16 +335,16 @@ def print_one_top_walk(tops, index, args):
         )
 
 
-def mark_name(name, stats):
+def mark_name(name, wherewhat, stats):
     """Mark name with r"[*/@]" for executable-not-dir, dir, or symbolic link, else no mark"""
 
-    isdir = os.path.isdir(name)
+    isdir = os.path.isdir(wherewhat)
     stats_isdir = bool(stats.st_mode & stat.S_IFDIR)
     assert stats_isdir == isdir
 
     isx = bool(stats.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXGRP))
 
-    islink = os.path.islink(name)
+    islink = os.path.islink(wherewhat)
 
     mark = ""
     if isdir:

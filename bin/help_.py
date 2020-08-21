@@ -86,7 +86,7 @@ def main():
         ).strip()
     )
     stderr_print()
-    stderr_print("Next try any of:")
+    stderr_print("Next try one of:")
     stderr_print()
     sys.stderr.flush()
 
