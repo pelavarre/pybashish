@@ -473,21 +473,48 @@ Call a column numeric when two-thirds of its cells contain decimal digits
 
 ## 2.16 ) Fmt
 
-    $ bin/echo.py $(seq 0 39) | bin/fmt.py -w42  # split to fit inside width
+
+Sketch the idea of Fmt
+
+    $ echo 'a b  c  d e f g  h i j   k  l m' | fmt.py -9  # keep blanks except at joins and splits
+    a b  c  d
+    e f g  h
+    i j   k
+    l m
+    $
+
+    $ echo '  a b c$  d e f$  g$$h' | tr '$' '\n' | fmt.py -9  # group by common indents
+      a b c d
+      e f g
+
+    h
+    $
+
+    $ echo '   a b c' | fmt.py -1  # forward indentation wider than wanted, if present
+       a
+       b
+       c
+    $
+
+Show Fmt working with a wider terminal
+
+    $ echo $(seq 0 39) | fmt.py -42  # split to fit inside width
     0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
     17 18 19 20 21 22 23 24 25 26 27 28 29 30
     31 32 33 34 35 36 37 38 39
     $
 
-    $ bin/echo.py $(seq 0 39) | tr -d ' ' | bin/fmt.py -w42  # no split at width
+    $ echo $(seq 0 39) | tr -d ' ' | fmt.py -42  # no split at width
     0123456789101112131415161718192021222324252627282930313233343536373839
     $
 
-    $ bin/echo.py su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | bin/fmt.py -w42  # no split at "-"
+    $ echo su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | fmt.py -42  # no split at "-" dashes
     su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious
     $
 
-    $ bin/fmt.py --ruler -w72  # ends in column 72
+Show the ruler
+
+    $ fmt.py --ruler -w72  # ends in column 72
     _2345678_0123456_8901234_6789012_4567890 2345678_0123456_8901234_6789012
     $
 
@@ -921,8 +948,18 @@ Clean up
 
 ## 2.36 ) XArgs
 
+Join words of lines into one line
+
     $ echo 'a  b  c$  d  e$$f  g$' | tr '$' '\n' | xargs.py
     a b c d e f g
+    $
+
+Split words of lines into one word per line
+
+    $ echo a b c | xargs.py -n 1
+    a
+    b
+    c
     $
 
 

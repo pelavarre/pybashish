@@ -53,6 +53,7 @@ examples:
   argdoc.py argdoc.py -- --help         # parse the arg "--help" with the file's arg doc
   argdoc.py argdoc.py -- hi world       # parse the two args "hi world" with the file's arg doc
 '''
+# FIXME FIXME: complain of trouble when auto-helping, not just when run separately
 # FIXME FIXME: complain, as often as run, of Arg Docs wrong only in whitespace
 # FIXME: parsed args whose names begin with a '_' skid shouldn't print here, via argparse.SUPPRESS
 # FIXME: consider looping over a list of [FILE [FILE ...]]
@@ -2006,10 +2007,15 @@ def stderr_print(*args):
 def str_splitdent(line):
     """Split apart the indentation of a line, from the remainder of the line"""
 
-    len_dent = len(line) - len(line.lstrip())
-    dent = len_dent * " "
+    lstripped = line.lstrip()
+    len_dent = len(line) - len(lstripped)
 
-    tail = line[len(dent) :]
+    tail = lstripped
+    if not lstripped:  # see no chars, not all chars, as the indentation of a blank line
+        tail = line
+        len_dent = 0
+
+    dent = len_dent * " "
 
     return (
         dent,

@@ -23,35 +23,50 @@ popular bugs:
   does accept "-" as meaning "/dev/stdin", like linux "fmt -", unlike mac "fmt -"
 
 examples:
-  echo 'a b  c  d e f g  h i j   k  l m' | fmt.py -w9  # keep blanks except at joins and splits
-  echo '  a b c$  d e f$  g$$h' | tr '$' '\n' | fmt -w9  # group by common indents
+  echo 'a b  c  d e f g  h i j   k  l m' | fmt.py -9  # keep blanks except at joins and splits
+  echo '  a b c$  d e f$  g$$h' | tr '$' '\n' | fmt.py -9  # group by common indents
+  echo '   a b c' | fmt.py -1  # forward indentation wider than wanted, if present
+  :
   echo $(seq 0 99) | fmt.py  # split to fit inside Terminal
-  echo $(seq 0 39) | fmt.py -w42  # split to fit inside width
-  echo $(seq 0 39) | tr -d ' ' | fmt.py -w42  # no split at width
-  echo su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | fmt.py -w42  # no split at "-" dashes
+  echo $(seq 0 39) | fmt.py -42  # split to fit inside width
+  echo $(seq 0 39) | tr -d ' ' | fmt.py -42  # no split at width
+  echo su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | fmt.py -42  # no split at "-" dashes
+  :
   fmt.py --ruler -w72  # ends in column 72
   : # 5678_0123456_8901234_6789012_4567890 2345678_0123456_8901234_6789012  # the 72-column ruler
 """
 
 
 import os
+import re
 import sys
 import textwrap
 
 import argdoc
 
 
-def main():
+def main(argv):
     """Run from the command line"""
 
     stdout_columns = guess_stdout_columns()
 
-    args = argdoc.parse_args()
+    # Parse the command line
+
+    fmt_argv_tail = list(argv[1:])
+    for (index, arg,) in enumerate(fmt_argv_tail):
+        if re.match(r"^[-][0-9]+$", string=arg):
+            fmt_argv_tail[index] = "-w{}".format(-int(arg))
+
+    args = argdoc.parse_args(fmt_argv_tail)
     width = (stdout_columns - 1) if (args.width is None) else int(args.width)
+
+    # Option to print the ruler and discard Stdin
 
     if args.ruler:
         print_ruler(width)
         return
+
+    # Else join and split Stdin
 
     fmt_paragraphs_of_stdin(width)
 
@@ -75,9 +90,10 @@ def print_ruler(width):
 
 
 def fmt_paragraphs_of_stdin(width):
-    """Join words of paragraphs from Stdin, and then resplit them into lines of Stdout"""
+    """Join lines of the same indentation, and split at width or before it"""
 
-    prompt_tty_stdin()
+    column = width + 1
+    prompt_tty_stdin("Joining words, resplitting before column {}".format(column))
 
     para = list()
     para_dent = None
@@ -86,36 +102,43 @@ def fmt_paragraphs_of_stdin(width):
         line = sys.stdin.readline()
         if not line:
             if para:
-                fmt_one_paragraph((para_dent * " "), para=para, width=width)
+                fmt_one_paragraph(para_dent, para=para, width=width)
             break
 
-        text = line.lstrip()
-        line_dent = (len(line) - len(text)) if text else 0
+        (str_dent, text,) = str_splitdent(line)
 
-        if (not text) or (line_dent != para_dent):
+        rstripped = text.rstrip()
+        dent = str_dent if rstripped else None
+
+        if (dent != para_dent) or (not rstripped):
             if para:
-                fmt_one_paragraph((para_dent * " "), para=para, width=width)
+                fmt_one_paragraph(para_dent, para=para, width=width)
                 para = list()
-            para_dent = line_dent
+            para_dent = dent
 
-        if not text:
-            print()
+        if rstripped:
+            para.append(rstripped)
         else:
-            para.append(line.strip())
+            print()
 
 
 def fmt_one_paragraph(dent, para, width):
-    """Join words of one paragraph, resplit them into lines, and print the lines"""
+    """Join words of one paragraph, resplit them into fewest wide lines, and print the lines"""
 
-    width = (width - len(dent)) if (width > len(dent)) else 1
+    assert dent is not None
+    assert all(_ for _ in para)
 
     text = "\n".join(para)
 
-    filled = textwrap.fill(
-        text, width=width, break_on_hyphens=False, break_long_words=False
+    fill_width = (width - len(dent)) if (len(dent) < width) else 1
+    chars = textwrap.fill(
+        text, width=fill_width, break_on_hyphens=False, break_long_words=False
     )
+    lines = chars.splitlines()
 
-    for line in filled.splitlines():
+    assert lines
+
+    for line in chars.splitlines():
         print((dent + line).rstrip())
 
 
@@ -202,9 +225,31 @@ def guess_stdout_columns_os_environ_int(hint):
 
 
 # deffed in many files  # missing from docs.python.org
-def prompt_tty_stdin():
+def prompt_tty_stdin(message=None):
     if sys.stdin.isatty():
+        if message is not None:
+            stderr_print(message)
         stderr_print("Press ⌃D EOF to quit")
+
+
+# deffed in many files  # missing from docs.python.org
+def str_splitdent(line):
+    """Split apart the indentation of a line, from the remainder of the line"""
+
+    lstripped = line.lstrip()
+    len_dent = len(line) - len(lstripped)
+
+    tail = lstripped
+    if not lstripped:  # see no chars, not all chars, as the indentation of a blank line
+        tail = line
+        len_dent = 0
+
+    dent = len_dent * " "
+
+    return (
+        dent,
+        tail,
+    )
 
 
 # deffed in many files  # missing from docs.python.org
@@ -213,7 +258,7 @@ def stderr_print(*args):
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

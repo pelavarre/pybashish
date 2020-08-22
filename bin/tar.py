@@ -55,11 +55,11 @@ def main(argv):
 
     # Parse the command line
 
-    parseables = list(argv[1:])
+    tar_argv_tail = list(argv[1:])
     if argv[1:] and not argv[1].startswith("-"):
-        parseables[0] = "-{}".format(argv[1])
+        tar_argv_tail[0] = "-{}".format(argv[1])
 
-    args = argdoc.parse_args(parseables if parseables else "--help".split())
+    args = argdoc.parse_args(tar_argv_tail if tar_argv_tail else "--help".split())
 
     # Require -tvf or -xvkf
 

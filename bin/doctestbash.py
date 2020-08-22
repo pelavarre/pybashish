@@ -145,13 +145,19 @@ def _run_bash_test_doc(incoming, args_file):
     return passes
 
 
-def str_splitdent(line):  # deffed by "doctestbash.py", "fmt.py
+# deffed in many files  # missing from docs.python.org
+def str_splitdent(line):
     """Split apart the indentation of a line, from the remainder of the line"""
 
-    len_dent = len(line) - len(line.lstrip())
-    dent = len_dent * " "
+    lstripped = line.lstrip()
+    len_dent = len(line) - len(lstripped)
 
-    tail = line[len(dent) :]
+    tail = lstripped
+    if not lstripped:  # see no chars, not all chars, as the indentation of a blank line
+        tail = line
+        len_dent = 0
+
+    dent = len_dent * " "
 
     return (
         dent,
