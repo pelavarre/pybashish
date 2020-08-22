@@ -101,8 +101,14 @@ def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
     if args is None:
         args = sys.argv[1:]
 
+    quiet = True
+    for arg in args:
+        if (arg == "-h") or ((len(arg) >= len("--h")) and "--help".startswith(arg)):
+            quiet = False
+        # FIXME: cooperate more closely with apps that declare alternative help options
+
     try:
-        parser = ArgumentParser(doc, doc_filename=doc_filename)
+        parser = ArgumentParser(doc, doc_filename=doc_filename, quiet=quiet)
     except ArgDocError as exc:
         stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
         sys.exit(1)
@@ -136,8 +142,12 @@ def print_usage(file=None):
     parser.print_usage(file=file_)
 
 
-def ArgumentParser(doc=None, doc_filename=None):  # FIXME: class ArgumentParser
+# FIXME: class ArgumentParser
+def ArgumentParser(doc=None, doc_filename=None, quiet=False):
     """Compile the Doc into Parser Source, and exec that source to build the Parser"""
+
+    if not quiet:
+        main.args.verbose += 1
 
     main_module = sys.modules["__main__"]
     if doc is None:
@@ -178,7 +188,6 @@ def scrape_help_options(doc):
 
                 if "show this help message and exit" == " ".join(help_words):
                     help_options.extend(_.lstrip("-").rstrip(",") for _ in options)
-                    # FIXME: this would read "---help" as a help option, maybe we don't like that
 
     return help_options
 
@@ -208,6 +217,9 @@ def main(argv):
         raise
 
 
+main.args = argparse.Namespace(verbose=0)
+
+
 class _ArgDocApp:
     """Bundle some command-line services"""
 
@@ -215,6 +227,7 @@ class _ArgDocApp:
         """Run from the command line, but trust the caller to interpret exceptions"""
 
         args = self.parse_main_argv(argv)
+        args.verbose = True
 
         main.args = args
 
@@ -397,12 +410,6 @@ class _ArgDocApp:
         if file_doc.strip() == help_doc.strip():
             return
 
-        if False:  # FIXME: configure logging
-            with open("a", "w") as outgoing:
-                outgoing.write(file_doc.strip())
-            with open("b", "w") as outgoing:
-                outgoing.write(help_doc.strip())
-
         stderr_print(
             "argdoc.py: warning: doc vs help diffs at:  bin/argdoc.py {} >/dev/null".format(
                 doc_filename
@@ -524,8 +531,8 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
             emitted_usage = emitted_usage.replace("[-r] ", "[-r]{}".format(ls_split))
 
         if parts_usage.split() != emitted_usage.split():
-            stderr_print("argdoc.py: warning: doc'ced usage: {}".format(parts_usage))
-            stderr_print("argdoc.py: warning: emitted usage: {}".format(emitted_usage))
+            verbose_print("argdoc.py: warning: doc'ced usage: {}".format(parts_usage))
+            verbose_print("argdoc.py: warning: emitted usage: {}".format(emitted_usage))
 
         if emitted_usage:
             if "..." in emitted_usage:
@@ -941,8 +948,16 @@ class _ArgDocTaker(argparse.Namespace):
             self.take_usage_chars()
             self.accept_description()
 
+            self.parts.taglines = list()
             self.accept_positionals_declarations()  # Positionals before Optionals in Arg Doc lines
             self.accept_optionals_declarations()
+
+            if "positional arguments:" not in self.parts.taglines:
+                self.accept_positionals_declarations()
+                if "positional arguments:" in self.parts.taglines:
+                    verbose_print(
+                        "argdoc.py: warning: optionals declared before positionals"
+                    )
 
             self.accept_doc_remains()
 
@@ -974,6 +989,13 @@ class _ArgDocTaker(argparse.Namespace):
         self.parts.uses = uses
         self.parts.usage = uses.usage_tail
         self.parts.prog = uses.prog_phrase
+
+        if uses.remains:  # FIXME: does this never happen?
+            verbose_print(
+                "argdoc.py: warning: meaningless (late?) usage phrases:  {}".format(
+                    uses.remains
+                )
+            )
 
     def accept_description(self):
         """Take the line of description"""
@@ -1019,13 +1041,21 @@ class _ArgDocTaker(argparse.Namespace):
             line = taker.peek_one_shard()
 
             if line == tagline:
+                self.parts.taglines.append(tagline)
+
                 taker.take_one_shard()
                 taker.accept_blank_shards()
 
                 argument_lines = self.accept_argument_lines(tagline=tagline)
-                # FIXME: more test of empty tables of Positionals or Optionals
 
-                arg_declarations = self.reconcile_lines_phrases(
+                if not argument_lines:
+                    verbose_print(
+                        "argdoc.py: warning: no arguments declared inside {!r}".format(
+                            tagline
+                        )
+                    )
+
+                arg_declarations = self.reconcile_arg_lines_phrases(
                     argument_lines,
                     tagline=tagline,
                     startswith_dash=startswith_dash,
@@ -1034,24 +1064,119 @@ class _ArgDocTaker(argparse.Namespace):
 
         return arg_declarations
 
-    def reconcile_lines_phrases(
+    def reconcile_arg_lines_phrases(
         self, argument_lines, tagline, startswith_dash, arg_phrases
     ):
 
-        # Calculate words comparable between Usage Phrases and Argument Declaration Lines
-        # FIXME: detect multiple phrase declarations earlier
+        self._disentangle_optionals_positionals(
+            argument_lines, tagline=tagline, startswith_dash=startswith_dash
+        )
 
-        phrases_by_arg_key = collections.OrderedDict()  # could be "dict" in Python 3
+        phrases_by_arg_key = self._index_phrases_by_arg_key(arg_phrases)
+        lines_by_arg_key = self._index_lines_by_arg_key(argument_lines)
+
+        phrase_arg_keys = list(phrases_by_arg_key.keys())
+        line_arg_keys = list(lines_by_arg_key.keys())
+        self._require_matching_argument_declarations(
+            tagline, phrase_arg_keys=phrase_arg_keys, line_arg_keys=line_arg_keys
+        )
+
+        arg_keys = line_arg_keys + phrase_arg_keys  # lines before phrases
+        arg_declarations = self._reconcile_arg_declarations(
+            arg_keys,
+            phrases_by_arg_key=phrases_by_arg_key,
+            lines_by_arg_key=lines_by_arg_key,
+            startswith_dash=startswith_dash,
+        )
+
+        return arg_declarations
+
+    def _reconcile_arg_declarations(
+        self, arg_keys, phrases_by_arg_key, lines_by_arg_key, startswith_dash,
+    ):
+
+        declarations_by_arg_key = collections.OrderedDict()  # as if Python 3 "dict"
+        for arg_key in arg_keys:
+
+            if arg_key in declarations_by_arg_key.keys():
+                continue
+
+            arg_phrase = phrases_by_arg_key.get(arg_key)
+            arg_line = lines_by_arg_key.get(arg_key)
+            if not arg_phrase:
+                arg_phrase = self._fabricate_arg_phrase(arg_line)
+            if not arg_line:
+                arg_line = self._fabricate_arg_line(arg_phrase)
+
+            assert arg_phrase.concise in (arg_line.option, arg_line.alt_option, None,)
+            assert arg_phrase.mnemonic in (arg_line.option, arg_line.alt_option, None,)
+            assert arg_line.metavar == arg_phrase.metavar
+            assert (not arg_line.alt_metavar) or (
+                arg_line.alt_metavar == arg_phrase.metavar
+            )
+
+            if not startswith_dash:  # positional argument
+                assert arg_phrase.nargs
+                assert arg_phrase.metavar and arg_line.metavar
+            else:  # optional argument
+                assert arg_phrase.concise or arg_phrase.mnemonic
+                assert arg_line.option or arg_line.alt_option
+
+            arg_declaration = argparse.Namespace(
+                arg_phrase=arg_phrase, arg_line=arg_line
+            )
+
+            declarations_by_arg_key[arg_key] = arg_declaration
+
+        arg_declarations = declarations_by_arg_key.values()
+        return arg_declarations
+
+    def _index_phrases_by_arg_key(self, arg_phrases):
+        """Calculate words comparable between Usage Phrases and Argument Declaration Lines"""
+
+        phrases_by_arg_key = collections.OrderedDict()  # as if Python 3 "dict"
         for arg_phrase in arg_phrases:
-            arg_key = arg_phrase._calc_arg_key()
 
+            # FIXME: detect multiple phrase declarations earlier
+
+            arg_key = arg_phrase._calc_arg_key()
             if arg_key in phrases_by_arg_key.keys():
-                raise ArgDocError("multiple phrase declarations of {}".format(arg_key))
+                verbose_print(
+                    "argdoc.py: warning: multiple phrase declarations of {}".format(
+                        arg_key
+                    )
+                )
 
             phrases_by_arg_key[arg_key] = arg_phrase
 
-        # Require Positionals declared with Positionals
-        # strictly separate from Optionals declared with Optionals
+        return phrases_by_arg_key
+
+    def _index_lines_by_arg_key(self, argument_lines):
+        """Calculate words comparable between Argument Declaration Lines and Usage Phrase"""
+
+        lines_by_arg_key = collections.OrderedDict()  # as if Python 3 "dict"
+        for argument_line in argument_lines:
+
+            arg_line = ArgumentLineSyntaxTaker(argument_line)
+            # call ArgumentLineSyntaxTaker as early as the two PhraseSyntaxTaker's
+            # FIXME: detect multiple line declarations earlier
+
+            arg_key = arg_line._calc_arg_key()
+            if arg_key in lines_by_arg_key.keys():
+                verbose_print(
+                    "argdoc.py: warning: multiple line declarations of {}".format(
+                        arg_key
+                    )
+                )
+
+            lines_by_arg_key[arg_key] = arg_line
+
+        return lines_by_arg_key
+
+    def _disentangle_optionals_positionals(
+        self, argument_lines, tagline, startswith_dash
+    ):
+        """Require Positionals declared strictly apart from Optionals, and vice versa"""
 
         for argument_line in argument_lines:
             stripped = argument_line.strip()
@@ -1065,68 +1190,44 @@ class _ArgDocTaker(argparse.Namespace):
                     )
                 )
 
-        # Calculate words comparable between Argument Declaration Lines and Usage Phrase
+    def _fabricate_arg_phrase(self, arg_line):
+        """Fabricate a usage phrase that matches an arg doc line declaring an arg"""
 
-        lines_by_arg_key = collections.OrderedDict()  # could be "dict" in Python 3
-        for argument_line in argument_lines:
-            arg_line = ArgumentLineSyntaxTaker(argument_line)
-            arg_key = arg_line._calc_arg_key()
+        assert arg_line.option or arg_line.metavar
 
-            if arg_key in lines_by_arg_key.keys():
-                raise ArgDocError("multiple line declarations of {}".format(arg_key))
+        argument_phrase = ""
+        if arg_line.option:
+            argument_phrase += "["
+            argument_phrase += arg_line.option
+        if arg_line.metavar:
+            argument_phrase += " "
+            argument_phrase += arg_line.metavar
 
-            lines_by_arg_key[arg_key] = arg_line
+        if arg_line.option:
+            argument_phrase += "]"
+            arg_phrase = OptionalPhraseSyntaxTaker(argument_phrase)
+        else:
+            arg_phrase = PositionalPhraseSyntaxTaker(argument_phrase)
 
-        # Require comparable declarations in the Usage Line and in the Argument Lines
+        return arg_phrase
 
-        phrase_arg_keys = list(phrases_by_arg_key.keys())
-        line_arg_keys = list(lines_by_arg_key.keys())
-        self._require_matching_argument_declarations(
-            tagline, phrase_arg_keys=phrase_arg_keys, line_arg_keys=line_arg_keys
-        )
-        # FIXME: assert these are keyed by (-r',) or ('--sort', 'FIELD',) etc
+    def _fabricate_arg_line(self, arg_phrase):
+        """Fabricate an arg doc line that matches a usage phrase declaring an arg"""
 
-        # Group together the Usage Line for NArg with the Argument Line for Alt Option and Help
+        assert bool(arg_phrase.concise) ^ bool(arg_phrase.mnemonic)
 
-        arg_keys = phrase_arg_keys
+        argument_line = ""
+        if arg_phrase.concise:
+            argument_line += arg_phrase.concise
+        if arg_phrase.mnemonic:
+            argument_line += arg_phrase.mnemonic
+        if arg_phrase.metavar:
+            argument_line += " "
+            argument_line += arg_phrase.metavar
 
-        arg_declarations = list()
-        for arg_key in arg_keys:
+        arg_line = ArgumentLineSyntaxTaker(argument_line)
 
-            arg_phrase = phrases_by_arg_key[arg_key]
-            arg_line = lines_by_arg_key.get(arg_key)
-
-            assert arg_phrase or arg_line
-            if arg_phrase and arg_line:
-
-                assert arg_phrase.concise in (
-                    arg_line.option,
-                    arg_line.alt_option,
-                    None,
-                )
-                assert arg_phrase.mnemonic in (
-                    arg_line.option,
-                    arg_line.alt_option,
-                    None,
-                )
-                assert arg_line.metavar == arg_phrase.metavar
-                assert (not arg_line.alt_metavar) or (
-                    arg_line.alt_metavar == arg_phrase.metavar
-                )
-
-                if not startswith_dash:  # positional argument
-                    assert arg_phrase.nargs
-                    assert arg_phrase.metavar and arg_line.metavar
-                else:  # optional argument
-                    assert arg_phrase.concise or arg_phrase.mnemonic
-                    assert arg_line.option or arg_line.alt_option
-
-            arg_declaration = argparse.Namespace(
-                arg_phrase=arg_phrase, arg_line=arg_line
-            )
-            arg_declarations.append(arg_declaration)
-
-        return arg_declarations
+        return arg_line
 
     def _require_matching_argument_declarations(
         self, tagline, phrase_arg_keys, line_arg_keys
@@ -1142,23 +1243,25 @@ class _ArgDocTaker(argparse.Namespace):
 
         if phrase_arg_keys != line_arg_keys:
 
-            stderr_print(
-                "argdoc.py: warning: via phrases:  {}".format(usage_phrase_arg_keys)
+            verbose_print(
+                "argdoc.py: warning: usage via phrases:  {}".format(
+                    usage_phrase_arg_keys
+                )
             )
-            stderr_print(
-                "argdoc.py: warning: via lines:::  {}".format(usage_line_arg_keys)
+            verbose_print(
+                "argdoc.py: warning: vs usage at lines:  {}".format(usage_line_arg_keys)
             )
             # FIXME: suggest multiple usage lines when too wide for one usage line
 
             if set(phrase_arg_keys) == set(line_arg_keys):
-                raise ArgDocError(
-                    "same sets, different orders, declared as usage and as {}".format(
+                verbose_print(
+                    "argdoc.py: warning: same sets, different orders, as usage and as {}".format(
                         tagline.rstrip(":")
                     )
                 )
             else:
-                raise ArgDocError(
-                    "different sets of words declared as usage and as {}".format(
+                verbose_print(
+                    "argdoc.py: warning: different sets of words as usage and as {}".format(
                         tagline.rstrip(":")
                     )
                 )
@@ -1191,31 +1294,21 @@ class _ArgDocTaker(argparse.Namespace):
         return argument_lines
 
     def accept_doc_remains(self):
-        """Take zero or more trailing lines, as if they must be the Epilog"""
+        """
+        Take zero or more trailing lines, as if they must be the Epilog
+
+        Aggressively take whatever trailing lines exist as arbitrary epilog:
+        like let them "optional args:", or "positional arguments", or blank, whatever
+        """
 
         taker = self.taker
 
         lines = list()
         while taker.peek_more():
-            line = taker.peek_one_shard()  # may be blank
 
-            # FIXME: rethink these practical defenses
-
-            if self.parts.optionals_declarations:
-                if "positional arguments:" in line:
-                    reason = "Optionals before Positionals in Arg Doc"
-                    raise ArgDocError("argdoc.py: error: {}".format(reason))
-
-            if (not self.parts.positionals_declarations) and (
-                not self.parts.optionals_declarations
-            ):
-                if ("positional arg" in line) or ("optional arg" in line):
-                    reason = "Arg Doc came too late with Arg Line Declaration @ {!r}".format(
-                        line
-                    )
-                    raise ArgDocError("argdoc.py: error: {}".format(reason))
-
+            line = taker.peek_one_shard()
             lines.append(line)
+
             taker.take_one_shard()
 
         self.parts.epilog_chars = "\n".join(lines)
@@ -1265,9 +1358,7 @@ class _UsagePhrasesTaker(argparse.Namespace):
 
             self.take_usage_word()
             self.take_prog()
-
-            self.accept_optionals_phrases()
-            self.accept_positionals_phrases()
+            self.accept_arg_phrases()
 
             self.accept_usage_remains()
 
@@ -1325,33 +1416,34 @@ class _UsagePhrasesTaker(argparse.Namespace):
 
         uses.prog_phrase = prog_phrase
 
-    def accept_optionals_phrases(self):
-        """Accept zero or more of [-h] or [--help] or [-w WIDTH] and such"""
+    def accept_arg_phrases(self):
+        """Accept zero or more arg phrases of the usage lines"""
 
         taker = self.taker
         uses = self.uses
 
         uses.optionals_phrases = list()
-        while taker.peek_equal_shards("[-"):
-            argument_phrase = self.accept_argument_phrase()
-
-            kwarg_phrase = OptionalPhraseSyntaxTaker(argument_phrase)
-            uses.optionals_phrases.append(kwarg_phrase)
-
-    def accept_positionals_phrases(self):
-        """Accept zero or more of FILE or [FILE] or [FILE [FILE ...]] and such"""
-
-        taker = self.taker
-        uses = self.uses
-
         uses.positionals_phrases = list()
+
         while taker.peek_more():
-            argument_phrase = self.accept_argument_phrase()
 
-            arg_phrase = PositionalPhraseSyntaxTaker(argument_phrase)
-            uses.positionals_phrases.append(arg_phrase)
+            startswith_bracket_dash = taker.peek_equal_shards("[-")
+            startswith_bracket_dash_dash_blank = taker.peek_equal_shards("[-- ")
+            # FIXME: simplify the syntax differences between optionals and positionals
 
-    def accept_argument_phrase(self):
+            argument_phrase = self.accept_one_arg_phrase()
+
+            # Accept [-h] or [--help] or [-w WIDTH] and such, and
+            # accept FILE or [FILE] or [FILE [FILE ...]] and such
+
+            if startswith_bracket_dash and not startswith_bracket_dash_dash_blank:
+                optional_phrase = OptionalPhraseSyntaxTaker(argument_phrase)
+                uses.optionals_phrases.append(optional_phrase)
+            else:
+                positional_phrase = PositionalPhraseSyntaxTaker(argument_phrase)
+                uses.positionals_phrases.append(positional_phrase)
+
+    def accept_one_arg_phrase(self):
         """Take one word, or more, but require the [...] brackets to balance"""
 
         taker = self.taker
@@ -1387,9 +1479,12 @@ class _UsagePhrasesTaker(argparse.Namespace):
     def accept_usage_remains(self):
 
         taker = self.taker
+        uses = self.uses
 
         remains = "".join(taker.peek_more_shards())
         taker.take_some_shards(len(remains))
+
+        uses.remains = remains  # FIXME: is this always empty?
 
 
 class ArgumentLineSyntaxTaker(argparse.Namespace):
@@ -1571,6 +1666,7 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
     """Parse one of the [-h] or [--help] or [-w WIDTH] and such"""
 
     def __init__(self, argument_phrase):
+        assert argument_phrase.startswith("[-")
 
         self._take_optional_phrase(argument_phrase)
 
@@ -1583,7 +1679,9 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
 
         words = list(_ for _ in shards if _ not in "-- ...".split())
         if not words:
-            raise ArgDocError("no metavars in optional {}".format(argument_phrase))
+            raise ArgDocError(
+                "no concise nor mnemonic in optional usage {}".format(argument_phrase)
+            )
 
         if len(words) > 2:
             raise ArgDocError(
@@ -1610,15 +1708,17 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
         emitted_usage = self.format_usage_phrase()
         if argument_phrase != emitted_usage:
             stderr_print(
-                "argdoc.py: error: optional argument_phrase:  {}".format(
+                "argdoc.py: error: optional doc usage phrase:  {}".format(
                     argument_phrase
                 )
             )
             stderr_print(
-                "argdoc.py: error: optional emitted_usage:  {}".format(emitted_usage)
+                "argdoc.py: error: optional emitted usage phrase:  {}".format(
+                    emitted_usage
+                )
             )
             raise ArgDocError(
-                "meaningless optional usage phrase {}".format(argument_phrase)
+                "meaningless optional doc usage phrase {}".format(argument_phrase)
             )
 
     def format_usage_phrase(self):
@@ -1667,14 +1767,18 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
 
         words = list(_ for _ in shards if _ not in "-- ...".split())
         if not words:
-            raise ArgDocError("no metavars in positional {}".format(argument_phrase))
-
-        if list(set(words)) != [words[0]]:
             raise ArgDocError(
-                "too many metavars in positional {}".format(argument_phrase)
+                "no metavars in positional usage phrase:  {}".format(argument_phrase)
             )
 
         metavar = words[0]
+
+        if list(set(words)) != [metavar]:
+            raise ArgDocError(
+                "too many metavars in positional usage phrase:  {}".format(
+                    argument_phrase
+                )
+            )
 
         # Pick out the one ArgParse "nargs"
         # FIXME: sometimes prefer nargs="*" argparse.ZERO_OR_MORE, or nargs > 1
@@ -2072,6 +2176,13 @@ def str_splitword(chars, count=1):
         head,
         tail,
     )
+
+
+def verbose_print(*args):
+
+    message = "".join(str(a) for a in args)
+    if main.args.verbose:
+        print(message, file=sys.stderr)
 
 
 # call inline to define 'import argdoc' to require Python >= June/2019 Python 3.7
