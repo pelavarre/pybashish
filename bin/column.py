@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: column [-h] [-t]
+usage: column.py [-h] [-t]
 
 align words of lines into columns
 

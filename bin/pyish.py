@@ -59,7 +59,12 @@ def shlex_join(argv):
 
 # deffed in many files  # since Sep/2015 Python 3.5
 def subprocess_run(*args, **kwargs):
-    """Emulate Python 3 "subprocess.run" """
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Leave in place the standard defaults of stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr
+    Although most callers mean to say stdin=subprocess.PIPE
+    """
 
     args_ = args[0] if args else kwargs["args"]
     kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...

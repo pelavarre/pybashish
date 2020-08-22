@@ -6,14 +6,15 @@ usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE [FILE ...]]
 count lines and words and characters and bytes
 
 positional arguments:
-  FILE                   a file to examine
+  FILE                  a file to examine
 
 optional arguments:
-  -h, --help             show this help message and exit
-  -L, --max-line-length  count max characters per line
-  -l, --lines            count lines
-  -m, --chars            count characters
-  -c, --bytes            count bytes
+  -h, --help            show this help message and exit
+  -L, --max-line-length
+                        count max characters per line
+  -l, --lines           count lines
+  -m, --chars           count characters
+  -c, --bytes           count bytes
 
 bugs:
   acts like "wc -L -l" if called without args, unlike Bash "wc"

@@ -163,7 +163,9 @@ def pull_line(lines, stdin):
         if line and not open_marks:
             break
 
-        prompt = "{} > ".format(open_marks[-1]) if line else "  ? "
+        prompt = "{}>  ".format(open_marks[-1]) if open_marks else "??  "
+        if not open_marks:
+            prompt = "\n" + prompt
 
         if lines:
 

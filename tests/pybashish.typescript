@@ -46,6 +46,7 @@ Contents
 ++ 2.33 ) Tr
 ++ 2.34 ) Watch
 ++ 2.35 ) Wc
+++ 2.36 ) XArgs
 
 + 3 ) Additional tests
 
@@ -113,7 +114,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
         argdoc  bash  bind  cal  cat  column  cp  cspsh  date  dd  doctestbash  echo  exit
         expand  find  fmt  grep  help  hexdump  history  hostname  jq  ls  make  mkdir  mv
-        pwd  read  rm  subsh  tar  touch  tr  watch  wc
+        pwd  read  rm  subsh  tar  touch  tr  watch  wc  xargs
 
     (pybashish) $
     + exit 1
@@ -333,14 +334,20 @@ Call a column numeric when two-thirds of its cells contain decimal digits
 ## 2.8 ) CspSh
 
     $ bin/echo.py 'tick → STOP$tick → tick → STOP$CLOCK = (tick → CLOCK)$CLOCK' | tr '$' '\n' | bin/cspsh.py -qi
-      ? tick → STOP
+
+    ??  tick → STOP
     ⟨tick, STOP⟩
-      ? tick → tick → STOP
+
+    ??  tick → tick → STOP
     ⟨tick, tick, STOP⟩
-      ? CLOCK = (tick → CLOCK)
-      ? CLOCK
+
+    ??  CLOCK = (tick → CLOCK)
+
+    ??  CLOCK
     ⟨tick, tick, tick, CLOCK, ...⟩
-      ?
+
+    ??
+
     $
 
 
@@ -909,6 +916,13 @@ Clean up
     usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE [FILE ...]]
     wc.py: error: not implemented
     + exit 2
+    $
+
+
+## 2.36 ) XArgs
+
+    $ echo 'a  b  c$  d  e$$f  g$' | tr '$' '\n' | xargs.py
+    a b c d e f g
     $
 
 

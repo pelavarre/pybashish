@@ -58,6 +58,7 @@ examples:
 # FIXME: consider looping over a list of [FILE [FILE ...]]
 # FIXME: autocorrect wrong Arg Docs
 # FIXME: complain of prog != file name, eg, "tar.py" help inside "tar2.py"
+# FIXME: warn when filename endswith ".py" and prog does not endswith ".py"
 
 
 from __future__ import print_function

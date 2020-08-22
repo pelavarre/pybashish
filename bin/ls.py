@@ -13,8 +13,8 @@ positional arguments:
 
 optional arguments:
   -h, --help       show this help message and exit
-  -1               print as column: one filename per line
-  -C               print as zig-zag: filenames across one line, and more if need be (default: True)
+  -1               print as one column: one filename per line
+  -C               print by filling multiple columns (default: True)
   -l               print as rows of permissions, links, owner, group, size, date/time-stamp, name
   --headings       print as rows (a la -l), but start with one row of column headings
   -d, --directory  list less rows: each top only as itself, omitting the dirs and files inside it
@@ -39,9 +39,9 @@ bugs:
   marks lines as r"[-dl]" on request, but misses out on r"[bcps]"
   accepts --all, --classify, and --full-time to mean -a, -F, and --full-time (beyond Mac options)
   defines --headings, --ascending, --descending, and --sort=name (beyond Mac and Linux)
-  falls back to "/dev/tty" for "ls -C" width when stdout is not a tty (beyond Mac and Linux)
   doesn't show dirs to pipe like to terminal, doesn't show one dir like one of more
   shows dirs in just one way, sorts by just one field, chokes when args call for more
+  guesses -C terminal width from "COLUMNS", else sys.stdout, else "/dev/tty", else guesses 80
   sees files as hidden if and only if name starts with ".", as if just for Mac and Linux
 
 examples:
@@ -51,10 +51,11 @@ examples:
   ls -C
   ls -alFt | tac  # reverse sort without ls -r at Linux
   ls -alFt | tail -r  # reverse sort without ls -r at Mac
-  bin/ls.py --headings
-  COLUMNS=101 ls -C | tee as-wide-as-you-say.txt
-  bin/ls.py -C | tee as-wide-as-tty.txt
+  ls.py --headings
+  COLUMNS=101 ls.py -C | tee as-wide-as-you-say.txt
+  ls.py -C | tee as-wide-as-tty.txt
 """
+# FIXME FIXME:  -x               print by filling multiple rows
 # FIXME: add -R recursive walk
 # FIXME: closer match at "ls.py -C" to classic line splits of "ls -C"
 # FIXME argdoc: somehow separate help lines for -1 -C -l --hea / -a --fu -F / --sort ...
@@ -62,6 +63,7 @@ examples:
 
 from __future__ import print_function
 
+import collections
 import datetime as dt
 import distutils.version
 import os
@@ -76,7 +78,7 @@ def main():
 
     stdout_isatty = sys.stdout.isatty()
     stdout_columns = guess_stdout_columns()
-    # FIXME: port to "/dev/tty" outside of Mac and Linux
+    # stderr_print("stdout_columns={}".format(stdout_columns))
 
     args = argdoc.parse_args()
     correct_args(args, stdout_isatty=stdout_isatty, stdout_columns=stdout_columns)
@@ -91,21 +93,19 @@ def main():
 def correct_args(args, stdout_isatty, stdout_columns):
     """Auto-correct else reject contradictions among the command line args"""
 
+    args.stdout_columns = stdout_columns
+
     print_as = _decide_print_as_args(args)
 
     args._print_as = print_as
     if not print_as:
         if stdout_isatty:
-            args._print_as = "zigzag"
+            args._print_as = "columns_of_names"
         else:
-            args._print_as = "column"
-
-    args._zigzag_columns = None
-    if args._print_as == "zigzag":
-        args._zigzag_columns = stdout_columns
+            args._print_as = "lines_of_names"
 
     args._print_total_row = None
-    if args._print_as == "rows":
+    if args._print_as == "rows_of_detail":
         if stdout_isatty:
             args._print_total_row = True
 
@@ -151,11 +151,11 @@ def _decide_print_as_args(args):
     args_print_as = None
     if votes:
         if vote_one:
-            args_print_as = "column"
+            args_print_as = "lines_of_names"
         elif vote_cee:
-            args_print_as = "zigzag"
+            args_print_as = "columns_of_names"
         else:
-            args_print_as = "rows"
+            args_print_as = "rows_of_detail"
 
     return args_print_as
 
@@ -270,7 +270,7 @@ def _decide_sort_order_args(args):
 
 
 def print_one_top_walk(tops, index, args):
-    """Print files and dirs found, as zigzag, column, or rows"""
+    """Print files and dirs found, as lines of names, as a matrix of names, or as rows of detail"""
 
     # Trace the top and separate by blank line, if more than one top
 
@@ -315,17 +315,17 @@ def print_one_top_walk(tops, index, args):
     items = stats_items_sorted(stats_by_name, by=args._sort_by, order=args._sort_order)
     reps = list(reps_by_name[_[0]] for _ in items)
 
-    # Print as one column of cells, as one zigzag of cells, or as one or more rows of columns
+    # Print as one name per line, as columns or rows of names, or as rows of details
 
     now = dt.datetime.now()
 
-    if args._print_as == "column":
-        print_as_column(reps)
-    elif args._print_as == "zigzag":
-        print_as_zigzag(reps, stdout_columns=args._zigzag_columns)
+    if args._print_as == "lines_of_names":
+        print_as_lines_of_names(reps)
+    elif args._print_as == "columns_of_names":
+        print_as_matrix_of_names(reps, stdout_columns=args.stdout_columns)
     else:
-        assert args._print_as == "rows"
-        print_as_rows(
+        assert args._print_as == "rows_of_detail"
+        print_as_rows_of_detail(
             tops,
             index=index,
             args=args,
@@ -430,15 +430,15 @@ def print_as_plural_if_plural(tops, index):
         print("{}:".format(top))
 
 
-def print_as_column(cells):
+def print_as_lines_of_names(cells):
     """Print as one column of names, marked or not"""
 
     for cell in cells:
         print(cell)
 
 
-def print_as_zigzag(cells, stdout_columns):
-    """Print as lines of words"""
+def print_as_matrix_of_names(cells, stdout_columns):
+    """Print as columns or rows of words"""
 
     sep = "  "
     rows = spill_cells(cells, columns=stdout_columns, sep=sep)
@@ -446,8 +446,8 @@ def print_as_zigzag(cells, stdout_columns):
         print(sep.join(row).rstrip())
 
 
-def print_as_rows(tops, index, args, items, reps_by_name, now_year):
-    """Print as many rows of columns"""
+def print_as_rows_of_detail(tops, index, args, items, reps_by_name, now_year):
+    """Print as rows of details, for one name per line"""
 
     # Choose how to print None
 
@@ -549,7 +549,9 @@ def left_justify_cells_in_rows(rows):
     return justified_rows
 
 
-def spill_cells(cells, columns, sep):  # FIXME  # noqa C901
+def spill_cells(cells, columns, sep):  # FIXME FIXME FIXME  # noqa C901
+
+    #
 
     cell_strs = list(str(c) for c in cells)
 
@@ -557,12 +559,17 @@ def spill_cells(cells, columns, sep):  # FIXME  # noqa C901
     if not cell_strs:
         return no_floors
 
+    #
+
     floors = None  # FIXME: review spill_cells closely, now that it mostly works
     widths = None  # FIXME: offer tabulation with 1 to N "\t" in place of 1 to N " "
 
     for width in reversed(range(1, len(cell_strs) + 1)):
         height = (len(cell_strs) + width - 1) // width
         assert (width * height) >= len(cell_strs)
+
+        # Fill each shaft in order, let the last shaft stop short
+        # FIXME: Option to fill each floor in order, let the last floor stop short
 
         shafts = list()
         for shaft_index in range(width):
@@ -578,18 +585,24 @@ def spill_cells(cells, columns, sep):  # FIXME  # noqa C901
                     floor.append(str_cell)
             floors.append(floor)
 
-        # FIXME: stop requiring first row to be 1 of the longest
-        widths = len(floors[0]) * [0]
+        # Count out the width of each shaft
+
+        widths = collections.defaultdict(int)
         for floor in floors:
             for (shaft_index, str_cell,) in enumerate(floor):
                 widths[shaft_index] = max(widths[shaft_index], len(str_cell))
 
+        # Take the first matrix that fits, else the last matrix tried
+        # FIXME: Print it to see if it fits
+
         sep = "  "
-        if (sum(widths) + (len(sep) * (len(widths) - 1))) < columns:
+        if (sum(widths.values()) + (len(sep) * (width - 1))) < columns:
             break
 
         if width == 1:
             break
+
+    # Print the matrix
 
     rows = list()
     for floor in floors:
@@ -605,23 +618,24 @@ def spill_cells(cells, columns, sep):  # FIXME  # noqa C901
 # deffed in many files  # missing from docs.python.org
 def guess_stdout_columns(*hints):
     """
-    Run all the searches offered, accept the first result found if any, else assert False
+    Run all the searches offered, accept the first result found if any, else return None
 
     Default to search:  "COLUMNS", sys.stdout, "/dev/tty", 80
 
-    To fail fast, call for all the guesses always, but still just return the first that works
+    To fail fast, call for all the guesses always, while still returning only the first that works
     """
 
     chosen_hints = hints if hints else ("COLUMNS", sys.stdout, "/dev/tty", 80,)
+    # FIXME: port to "/dev/tty" outside of Mac and Linux
 
     terminal_widths = list()
     for hint in chosen_hints:
 
         terminal_width = guess_stdout_columns_os(hint)
-        if terminal_width is not None:
-            _ = guess_stdout_columns_os_environ_int(hint)
-        else:
+        if terminal_width is None:
             terminal_width = guess_stdout_columns_os_environ_int(hint)
+        else:
+            _ = guess_stdout_columns_os_environ_int(hint)
 
         if terminal_width is not None:
             terminal_widths.append(terminal_width)
@@ -630,8 +644,6 @@ def guess_stdout_columns(*hints):
         terminal_width = terminal_widths[0]
 
         return terminal_width
-
-    assert False
 
 
 # deffed in many files  # missing from docs.python.org
