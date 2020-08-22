@@ -642,12 +642,12 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         # Pick out source fragments
 
-        metavar = positionals_declaration.line.metavar
+        metavar = positionals_declaration.arg_line.metavar
 
-        nargs = positionals_declaration.phrase.nargs
-        usage_phrase = positionals_declaration.phrase.format_usage_phrase()
+        nargs = positionals_declaration.arg_phrase.nargs
+        usage_phrase = positionals_declaration.arg_phrase.format_usage_phrase()
 
-        arg_help_line = positionals_declaration.line.arg_help_line
+        arg_help_line = positionals_declaration.arg_line.arg_help_line
 
         # Name the attribute for this positional option in the namespace built by "parse_args"
         # Go with the metavar, else guess the English plural of the metavar
@@ -723,15 +723,15 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
 
         # Pick out source fragments
 
-        option = optionals_declaration.line.option
-        metavar = optionals_declaration.line.metavar
-        alt_option = optionals_declaration.line.alt_option
-        alt_metavar = optionals_declaration.line.alt_metavar
+        option = optionals_declaration.arg_line.option
+        metavar = optionals_declaration.arg_line.metavar
+        alt_option = optionals_declaration.arg_line.alt_option
+        alt_metavar = optionals_declaration.arg_line.alt_metavar
 
-        nargs = optionals_declaration.phrase.nargs
-        usage_phrase = optionals_declaration.phrase.format_usage_phrase()
+        nargs = optionals_declaration.arg_phrase.nargs
+        usage_phrase = optionals_declaration.arg_phrase.format_usage_phrase()
 
-        arg_help_line = optionals_declaration.line.arg_help_line
+        arg_help_line = optionals_declaration.arg_line.arg_help_line
         repr_help = black_repr(arg_help_line).replace("%", "%%")
 
         assert option
@@ -994,8 +994,8 @@ class _ArgDocTaker(argparse.Namespace):
 
         self.parts.positionals_declarations = self.accept_tabulated_arguments(
             "positional arguments:",
-            line_mark="",
-            phrases=self.parts.uses.positionals_phrases,
+            startswith_dash="",
+            arg_phrases=self.parts.uses.positionals_phrases,
         )
 
     def accept_optionals_declarations(self):
@@ -1003,11 +1003,11 @@ class _ArgDocTaker(argparse.Namespace):
 
         self.parts.optionals_declarations = self.accept_tabulated_arguments(
             "optional arguments:",
-            line_mark="-",
-            phrases=self.parts.uses.optionals_phrases,
+            startswith_dash="-",
+            arg_phrases=self.parts.uses.optionals_phrases,
         )
 
-    def accept_tabulated_arguments(self, tagline, line_mark, phrases):
+    def accept_tabulated_arguments(self, tagline, startswith_dash, arg_phrases):
         """Take the Positional or Optional arguments led by a tagline followed by dented lines"""
 
         arg_declarations = None
@@ -1028,25 +1028,27 @@ class _ArgDocTaker(argparse.Namespace):
                 arg_declarations = self.reconcile_lines_phrases(
                     argument_lines,
                     tagline=tagline,
-                    line_mark=line_mark,
-                    phrases=phrases,
+                    startswith_dash=startswith_dash,
+                    arg_phrases=arg_phrases,
                 )
 
         return arg_declarations
 
-    def reconcile_lines_phrases(self, argument_lines, tagline, line_mark, phrases):
+    def reconcile_lines_phrases(
+        self, argument_lines, tagline, startswith_dash, arg_phrases
+    ):
 
         # Calculate words comparable between Usage Phrases and Argument Declaration Lines
         # FIXME: detect multiple phrase declarations earlier
 
-        phrases_by_words = collections.OrderedDict()  # could be "dict" in Python 3
-        for phrase in phrases:
-            words = phrase._tuple_comparable_words()
+        phrases_by_arg_key = collections.OrderedDict()  # could be "dict" in Python 3
+        for arg_phrase in arg_phrases:
+            arg_key = arg_phrase._calc_arg_key()
 
-            if words in phrases_by_words.keys():
-                raise ArgDocError("multiple phrase declarations of {}".format(words))
+            if arg_key in phrases_by_arg_key.keys():
+                raise ArgDocError("multiple phrase declarations of {}".format(arg_key))
 
-            phrases_by_words[words] = phrase
+            phrases_by_arg_key[arg_key] = arg_phrase
 
         # Require Positionals declared with Positionals
         # strictly separate from Optionals declared with Optionals
@@ -1054,87 +1056,112 @@ class _ArgDocTaker(argparse.Namespace):
         for argument_line in argument_lines:
             stripped = argument_line.strip()
 
-            doc_line_mark = "-" if stripped.startswith("-") else ""
-            if doc_line_mark != line_mark:
+            doc_startswith_dash = "-" if stripped.startswith("-") else ""
+            if doc_startswith_dash != startswith_dash:
 
                 raise ArgDocError(
                     "{!r} != {!r} inside {!r} at:  {}".format(
-                        doc_line_mark, line_mark, tagline, argument_line
+                        doc_startswith_dash, startswith_dash, tagline, argument_line
                     )
                 )
 
         # Calculate words comparable between Argument Declaration Lines and Usage Phrase
 
-        lines_by_words = collections.OrderedDict()  # could be "dict" in Python 3
+        lines_by_arg_key = collections.OrderedDict()  # could be "dict" in Python 3
         for argument_line in argument_lines:
-            line = ArgumentLineSyntaxTaker(argument_line)
-            words = line._tuple_comparable_words()
+            arg_line = ArgumentLineSyntaxTaker(argument_line)
+            arg_key = arg_line._calc_arg_key()
 
-            if words in lines_by_words.keys():
-                raise ArgDocError("multiple line declarations of {}".format(words))
+            if arg_key in lines_by_arg_key.keys():
+                raise ArgDocError("multiple line declarations of {}".format(arg_key))
 
-            lines_by_words[words] = line
+            lines_by_arg_key[arg_key] = arg_line
 
         # Require comparable declarations in the Usage Line and in the Argument Lines
 
-        via_phrases = list(phrases_by_words.keys())
-        via_lines = list(lines_by_words.keys())
+        phrase_arg_keys = list(phrases_by_arg_key.keys())
+        line_arg_keys = list(lines_by_arg_key.keys())
         self._require_matching_argument_declarations(
-            tagline, via_phrases=via_phrases, via_lines=via_lines
+            tagline, phrase_arg_keys=phrase_arg_keys, line_arg_keys=line_arg_keys
         )
         # FIXME: assert these are keyed by (-r',) or ('--sort', 'FIELD',) etc
 
         # Group together the Usage Line for NArg with the Argument Line for Alt Option and Help
 
-        args_by_words = via_phrases
+        arg_keys = phrase_arg_keys
 
         arg_declarations = list()
-        for words in args_by_words:
-            phrase = phrases_by_words[words]
-            line = lines_by_words[words]
+        for arg_key in arg_keys:
 
-            assert phrase.concise in (line.option, line.alt_option, None,)
-            assert phrase.mnemonic in (line.option, line.alt_option, None,)
-            assert line.metavar == phrase.metavar
-            assert (not line.alt_metavar) or (line.alt_metavar == phrase.metavar)
+            arg_phrase = phrases_by_arg_key[arg_key]
+            arg_line = lines_by_arg_key.get(arg_key)
 
-            if not line_mark:  # positional argument
-                assert phrase.nargs
-                assert phrase.metavar and line.metavar
-            else:  # optional argument
-                assert phrase.concise or phrase.mnemonic
-                assert line.option or line.alt_option
+            assert arg_phrase or arg_line
+            if arg_phrase and arg_line:
 
-            arg_declaration = argparse.Namespace(phrase=phrase, line=line)
+                assert arg_phrase.concise in (
+                    arg_line.option,
+                    arg_line.alt_option,
+                    None,
+                )
+                assert arg_phrase.mnemonic in (
+                    arg_line.option,
+                    arg_line.alt_option,
+                    None,
+                )
+                assert arg_line.metavar == arg_phrase.metavar
+                assert (not arg_line.alt_metavar) or (
+                    arg_line.alt_metavar == arg_phrase.metavar
+                )
+
+                if not startswith_dash:  # positional argument
+                    assert arg_phrase.nargs
+                    assert arg_phrase.metavar and arg_line.metavar
+                else:  # optional argument
+                    assert arg_phrase.concise or arg_phrase.mnemonic
+                    assert arg_line.option or arg_line.alt_option
+
+            arg_declaration = argparse.Namespace(
+                arg_phrase=arg_phrase, arg_line=arg_line
+            )
             arg_declarations.append(arg_declaration)
 
         return arg_declarations
 
-    def _require_matching_argument_declarations(self, tagline, via_phrases, via_lines):
-        """Raise ArgDocError unless same args declared line by line and in usage line"""
+    def _require_matching_argument_declarations(
+        self, tagline, phrase_arg_keys, line_arg_keys
+    ):
+        """Require same args declared line by line and in usage line"""
 
-        usage_via_phrases = " ".join("[{}]".format(" ".join(_)) for _ in via_phrases)
-        usage_via_lines = " ".join("[{}]".format(" ".join(_)) for _ in via_lines)
+        usage_phrase_arg_keys = " ".join(
+            "[{}]".format(" ".join(_)) for _ in phrase_arg_keys
+        )
+        usage_line_arg_keys = " ".join(
+            "[{}]".format(" ".join(_)) for _ in line_arg_keys
+        )
 
-        if via_phrases != via_lines:
+        if phrase_arg_keys != line_arg_keys:
 
             stderr_print(
-                "argdoc.py: warning: via phrases:  {}".format(usage_via_phrases)
+                "argdoc.py: warning: via phrases:  {}".format(usage_phrase_arg_keys)
             )
-            stderr_print("argdoc.py: warning: via lines:::  {}".format(usage_via_lines))
+            stderr_print(
+                "argdoc.py: warning: via lines:::  {}".format(usage_line_arg_keys)
+            )
             # FIXME: suggest multiple usage lines when too wide for one usage line
 
-            if set(via_phrases) == set(via_lines):
+            if set(phrase_arg_keys) == set(line_arg_keys):
                 raise ArgDocError(
                     "same sets, different orders, declared as usage and as {}".format(
                         tagline.rstrip(":")
                     )
                 )
-            raise ArgDocError(
-                "different sets of words declared as usage and as {}".format(
-                    tagline.rstrip(":")
+            else:
+                raise ArgDocError(
+                    "different sets of words declared as usage and as {}".format(
+                        tagline.rstrip(":")
+                    )
                 )
-            )
 
     def accept_argument_lines(self, tagline):
         """Take zero or more dented lines as defining Positional or Optional arguments"""
@@ -1521,8 +1548,8 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
 
         return words
 
-    def _tuple_comparable_words(self):
-        """Format as a tuple of words to compare with an argument declaration line in an Arg Doc"""
+    def _calc_arg_key(self):
+        """Choose words to find the Positional Arg Line to mix into this Usage Phrase"""
 
         if not self.option:
             words = (self.metavar,)
@@ -1597,12 +1624,12 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
     def format_usage_phrase(self):
         """Format as a phrase of a Usage Line in an Arg Doc"""
 
-        joined = "[{}]".format(" ".join(self._tuple_comparable_words()))
+        joined = "[{}]".format(" ".join(self._calc_arg_key()))
 
         return joined
 
-    def _tuple_comparable_words(self):
-        """Format as a tuple of words to compare with an argument declaration line in an Arg Doc"""
+    def _calc_arg_key(self):
+        """Choose words to find the Optional Arg Line to mix into this Usage Phrase"""
 
         if not self.nargs:
             if self.concise:
@@ -1696,7 +1723,7 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
 
         return joined
 
-    def _tuple_comparable_words(self):
+    def _calc_arg_key(self):
         """Format as a tuple of words to compare with an argument declaration line in an Arg Doc"""
 
         words = (self.metavar,)
