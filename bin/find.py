@@ -103,7 +103,7 @@ def os_walk_sorted_relpaths(top):
 
         for where_ in wheres:
             wherewhere = os.path.join(where, where_)
-            yield wherewhere  # FIXME: delay these till the walk starts into them
+            yield wherewhere  # FIXME: delay yield dir till the walk starts into the dir
 
 
 # deffed in many files  # missing from docs.python.org

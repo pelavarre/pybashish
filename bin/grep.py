@@ -79,7 +79,7 @@ examples:
 #
 # FIXME: call it one hit when only one hit has more copies of some or of all the patterns, eg, ~ gs
 #
-# FIXME: quit after ten hits
+# FIXME: quit after like ten hits, but say how many hits were found vs shown
 #
 # FIXME: populate the cat ~/.local/share/grep/hitfiles with the files hit
 # FIXME: example ignore case, example respect case
@@ -341,7 +341,7 @@ def _ext_files_readlines(ext, files):
     )
 
 
-def grep_lines(args, lines, chosen_lines):  # FIXME  # noqa C901
+def grep_lines(args, lines, chosen_lines):  # FIXME FIXME  # noqa C901
 
     patterns = args.patterns
 

@@ -33,7 +33,6 @@ examples:
   (echo a; echo b; echo c) | cat -n | cat -etv
   pbpaste | cat.py -etv
 """
-# FIXME: amp up argdoc to stop insisting on breaking help off of options to align them
 # FIXME: rewrite as Python 2 without contextlib.ContextDecorator
 
 

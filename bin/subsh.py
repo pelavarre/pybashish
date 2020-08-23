@@ -32,8 +32,8 @@ examples:
   subsh.py echo 'Hello, Subsh World!'
   subsh.py ls
 """
-# FIXME: block no args:  subsh
-# FIXME: test:  subsh --
+# FIXME: more test of:  subsh.py -- bash -i
+# FIXME: think deeper into no args opening up a Bash subshell
 
 
 from __future__ import print_function

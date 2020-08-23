@@ -153,7 +153,6 @@ def guess_stdout_columns(*hints):
     """
 
     chosen_hints = hints if hints else ("COLUMNS", sys.stdout, "/dev/tty", 80,)
-    # FIXME: port to "/dev/tty" outside of Mac and Linux
 
     terminal_widths = list()
     for hint in chosen_hints:

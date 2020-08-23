@@ -19,6 +19,7 @@ bugs:
   does strip leading and trailing empty lines, unlike bash "expand"
   does convert classic mac CR "\r" end-of-line to linux LF "\n", unlike bash "expand"
   does always end the last line with linux LF "\n" end-of-line, unlike bash "expand"
+  does print eight-nybble \U code points as four lowercase nybbles then four uppercase
   doesn't implement classic -t 9,17 tab list, nor -t 4 tab width, nor linux --tabs alias thereof
   doesn't implement linux -i, --initial for keeping tabs in line after first nonwhite
   doesn't implement mac unexpand -a for compressing files maximally by replacing spaces with tabs
@@ -38,11 +39,11 @@ examples:
   echo -n $'\xC0\x80' | expand.py | hexdump -C  # Linux preserves binary, Mac says 'illegal byte'
   echo -n $'t\tr\rn\n' | expand.py | cat -etv
   echo 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | expand.py
+  echo 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | expand.py --repr
   echo $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | expand.py --plain
   echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | expand.py --wiki
 
 """
-# FIXME: rewrite as Python 2 without contextlib.ContextDecorator
 
 
 import collections
@@ -151,8 +152,13 @@ def code_points_as_unicode_escapes(chars):
         elif ord(ch) <= 0xFFFF:
             rep = r"\u{:04X}".format(ord(ch))
             reps += rep
-        else:
-            assert False  # FIXME: cope with Unicode beyond \uFFFF (if it exists here?)
+        elif ord(ch) <= 0xFFFFFFFF:
+            nybbles = "{:08X}".format(ord(ch))
+            assert len(nybbles) == 8
+            rep = r"\u{}{}".format(nybbles[:4].lower(), nybbles[4:].upper())
+            reps += rep
+        else:  # FIXME: cope with Unicode beyond \uffffFFFF (if it exists here?)
+            assert False
 
     return reps
 

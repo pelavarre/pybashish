@@ -53,11 +53,10 @@ examples:
   argdoc.py argdoc.py -- --help         # parse the arg "--help" with the file's arg doc
   argdoc.py argdoc.py -- hi world       # parse the two args "hi world" with the file's arg doc
 '''
-# FIXME: parsed args whose names begin with a '_' skid shouldn't print here, via argparse.SUPPRESS
-# FIXME: consider looping over a list of [FILE [FILE ...]]
-# FIXME: autocorrect wrong Arg Docs
-# FIXME: complain of prog != file name, eg, "tar.py" help inside "tar2.py"
-# FIXME: warn when filename endswith ".py" and prog does not endswith ".py"
+# FIXME: option to push the autocorrection into the Arg Doc
+# FIXME: comment --rip argparse at colliding "dest"s from multiple args, such as "[--ymd YMD] [YMD]"
+# FIXME: parsed args whose names begin with a '_' skid shouldn't print, via argparse.SUPPRESS
+# FIXME: consider [FILE [FILE ...]] in usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- ...]
 
 
 from __future__ import print_function
@@ -103,7 +102,7 @@ def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
     for arg in args:
         if (arg == "-h") or ((len(arg) >= len("--h")) and "--help".startswith(arg)):
             quiet = False
-        # FIXME: cooperate more closely with apps that declare alternative help options
+        # FIXME: fit quiet/not more tightly to apps that declare alternative help options
 
     try:
         parser = ArgumentParser(doc, doc_filename=doc_filename, quiet=quiet)
@@ -279,7 +278,7 @@ class _ArgDocApp:
         if args.rip:
 
             shreds = "argdoc argparse doc".split()
-            for shred_ in shreds:  # FIXME: invent how to say this in Arg Doc
+            for shred_ in shreds:  # FIXME: declare a vocabulary of choices in Arg Doc
                 if shred_.startswith(args.rip):
                     shred = shred_
                     break
@@ -524,27 +523,34 @@ class _ArgDocCoder(
 
         lines = list()
 
+        lines.append("#!/usr/bin/env python")
+        lines.append("# -*- coding: utf-8 -*-")
+
         lines.append("import argparse")
         lines.append("import textwrap")
         lines.append("")
 
-        comment = "  # copied from {!r} by {!r}".format(doc_filename, __file__)
+        what = os.path.split(__file__)[-1]
+        comment = "  # copied from {!r} by {!r}".format(doc_filename, what)
         lines.append("parser = argparse.ArgumentParser({}".format(comment))
 
         # Name the app
 
         prog = parts.prog if parts.prog else os.path.split(doc_filename)[-1]
 
-        assert prog  # ArgParse guesses the calling prog name, if none chosen
+        assert prog  # always give a prog name to ArgParse, don't let them guess
+        repr_prog = black_repr(prog)
+        lines.append(d + "prog={repr_prog},".format(repr_prog=repr_prog))
 
-        lines.append(d + "prog={repr_prog},".format(repr_prog=black_repr(prog)))
+        # FIXME: think into {what} in place of {what}.py, and more unusual prog names
+        # assert prog == os.path.split(doc_filename)[-1]
 
         # Improve on the conventional Usage Line, when desperate
 
         parts_usage = prog if (self.parts.usage is None) else self.parts.usage
 
         emitted_usage = prog if (args_emitted_usage is None) else args_emitted_usage
-        if prog == "ls.py":  # FIXME: teach "argdoc.py" to emit multiline usage
+        if prog == "ls.py":  # FIXME FIXME: teach "argdoc.py" to emit multiline usage
             ls_split = "\n{}".format(13 * (" "))
             emitted_usage = emitted_usage.replace(
                 "[-F] ", "[-F]{}".format(ls_split)
@@ -679,13 +685,13 @@ class _ArgDocCoder(
         usage_phrase = positionals_declaration.arg_phrase.format_usage_phrase()
         arg_help_line = positionals_declaration.arg_line.arg_help_line
 
-        assert nargs in (None, "...", "?",)  # .REMAINDER .OPTIONAL
+        assert nargs in (None, "*", "?",)  # .ZERO_OR_MORE .OPTIONAL
 
         # Name the attribute for this positional option in the namespace built by "parse_args"
         # Go with the metavar, else guess the English plural of the metavar
 
         dest = metavar.lower()
-        if nargs == "...":  # "..." argparse.REMAINDER
+        if nargs == "*":  # "*" argparse.ZERO_OR_MORE
             dest = plural_en(metavar.lower())
 
         # Emit usage phrase
@@ -1137,7 +1143,7 @@ class _ArgDocTaker(argparse.Namespace):
             )
 
             if not startswith_dash:  # positional argument
-                assert arg_phrase.nargs in (None, "...", "?",)  # .REMAINDER .OPTIONAL
+                assert arg_phrase.nargs in (None, "*", "?",)  # .ZERO_OR_MORE .OPTIONAL
                 assert arg_phrase.metavar and arg_line.metavar
             else:  # optional argument
                 assert arg_phrase.concise or arg_phrase.mnemonic
@@ -1800,11 +1806,11 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
             )
 
         # Pick out the one ArgParse "nargs"
-        # FIXME: parse and emit nargs="*" argparse.ZERO_OR_MORE, or nargs = 1, or nargs > 1
+        # FIXME: parse and emit nargs="..." argparse.REMAINDER, or nargs = 1, or nargs > 1
 
         nargs = None
         if "..." in argument_phrase:
-            nargs = "..."  # "..." argparse.REMAINDER
+            nargs = "*"  # "*" argparse.ZERO_OR_MORE
         elif "[" in argument_phrase:
             nargs = "?"  # "?" argparse.OPTIONAL
 
@@ -1835,7 +1841,7 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
     def format_usage_phrase(self):
         """Format as a phrase of a Usage Line in an Arg Doc"""
 
-        if self.nargs == "...":  # "..." argparse.REMAINDER
+        if self.nargs == "*":  # "*" argparse.ZERO_OR_MORE
             joined = "[{} [{} ...]]".format(self.metavar, self.metavar)
             if self.dashdash:
                 joined = "[-- [{} [{} ...]]]".format(self.metavar, self.metavar)

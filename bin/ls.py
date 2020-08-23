@@ -59,7 +59,7 @@ examples:
 # FIXME: add -R recursive walk
 # FIXME: closer match at "ls.py -C" to classic line splits of "ls -C"
 # FIXME argdoc: somehow separate help lines for -1 -C -l --hea / -a --fu -F / --sort ...
-# FIXME: "import column" "import fmt" (or vice versa) to reach "def spill_cells" etc
+# FIXME: share "def spill_cells" etc with "import column", "import fmt, etc
 
 from __future__ import print_function
 

@@ -25,7 +25,6 @@ examples:
 
 see also:  man script, man watch
 """
-# FIXME: amp up argdoc to stop insisting on breaking help off of options to align them
 
 
 from __future__ import print_function
