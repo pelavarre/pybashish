@@ -86,6 +86,8 @@ examples:
 # FIXME: example duplicate patterns must show up more than once
 # FIXME: match trailing N patterns to 1 or more "..." as args, not just to themselves
 #
+# FIXME: add --color=yes|no|auto for "grep.py" when isatty and not
+#
 
 
 import contextlib

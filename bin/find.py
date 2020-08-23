@@ -13,10 +13,10 @@ optional arguments:
   -h, --help  show this help message and exit
 
 bugs:
-  searches "./" if called with no args, unlike Mac Bash
-  leads each hit inside "./" with "" not "./", unlike Bash
-  leads each hit inside "~/" with "~/" not "$PWD", unlike Bash
-  hits the realpath of each sym link, not abspath, unlike Bash
+  searches "./" if called with no args, unlike mac bash
+  leads each hit inside "./" with "" not with "./", unlike bash
+  leads each hit inside "~/" with "~/" not with "$PWD", unlike bash
+  hits the realpath of each sym link, not abspath, unlike bash
 
 examples:
   find ~/bin/
@@ -24,8 +24,6 @@ examples:
   find /dev/null  # device, not dir
 """
 # FIXME: rethink "find.py" bugs
-# FIXME FIXME: factor the yields out apart from the choice of what to do with them
-# FIXME: remember what i meant by find ~/bin/  # FIXME test old
 
 
 from __future__ import print_function

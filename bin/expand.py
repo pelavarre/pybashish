@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: expand.py [-h] [--plain] [--repr] [FILE [FILE ...]]
+usage: expand.py [-h] [--plain] [--repr] [--wiki] [FILE [FILE ...]]
 
 replace tabs with spaces, replace cr with lf, strip leading and trailing empty lines
 
@@ -12,6 +12,7 @@ optional arguments:
   -h, --help  show this help message and exit
   --plain     replace smart quotes, smart dashes, and such with plain us-ascii " ' -
   --repr      replace all but r"[\n\r\t]" and plain us-ascii with python \u escapes
+  --wiki      escape as html p of code nbsp br (fit for insertion into atlassian wiki)
 
 bugs:
   doesn't accurately catenate binary files, unlike classic bash "expand"
@@ -22,7 +23,7 @@ bugs:
   doesn't implement linux -i, --initial for keeping tabs in line after first nonwhite
   doesn't implement mac unexpand -a for compressing files maximally by replacing spaces with tabs
 
-popular bugs:
+unsurprising bugs:
   does prompt once for stdin, like bash "grep -R", unlike bash "expand"
   accepts only the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
   does accept "-" as meaning "/dev/stdin", like linux "expand -", unlike mac "expand -"
@@ -34,17 +35,19 @@ see also:
 
 examples:
   expand.py -
-  echo -n $'\xC0\x80' | expand | hexdump -C  # Linux preserves binary, Mac says 'illegal byte'
+  echo -n $'\xC0\x80' | expand.py | hexdump -C  # Linux preserves binary, Mac says 'illegal byte'
   echo -n $'t\tr\rn\n' | expand.py | cat -etv
   echo 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | expand.py
   echo $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | expand.py --plain
+  echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | expand.py --wiki
+
 """
-# FIXME FIXME: translate to Html
 # FIXME: rewrite as Python 2 without contextlib.ContextDecorator
 
 
 import collections
 import contextlib
+import html
 import os
 import sys
 
@@ -94,6 +97,8 @@ def expand_incoming(incoming, args):
                 expanded = dash_quote_as_ascii(expanded)
             if args.repr:
                 expanded = code_points_as_unicode_escapes(expanded)
+            if args.wiki:
+                expanded = chars_as_wiki_html(expanded)
             expanded = expanded.rstrip()
 
             if not expanded:
@@ -110,6 +115,27 @@ def expand_incoming(incoming, args):
                 print(expanded)
 
                 begun = True
+
+
+def chars_as_wiki_html(chars):
+    """Escape as html of code nbsp br in p (fit for insertion into atlassian wiki"""
+
+    lines = list()
+    lines.append("<p>")
+
+    for line in chars.splitlines():
+
+        untabbed = line.expandtabs(tabsize=8)
+        escaped = html.escape(untabbed)
+        markup = escaped.replace(" ", "&nbsp;")
+
+        lines.append("<code>{}</code><br></br>".format(markup))
+
+    lines.append("</p>")
+
+    reps = "\n".join(lines)
+
+    return reps
 
 
 # deffed in many files  # missing from docs.python.org

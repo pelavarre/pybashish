@@ -22,7 +22,7 @@ bugs:
   prints names found inside to stderr, not to classic stdout
   extracts always to stdout, never to the name found inside
 
-popular bugs:
+unsurprising bugs:
   does prompt once for stdin, like bash "grep -R", a la linux "tar ztvf -", unlike mac "tar tvf -"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 

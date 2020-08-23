@@ -22,7 +22,7 @@ bugs:
   does stop copying at first ⌃D of stdin, even when last line not completed by "\n"
   does print hard b"\x09" tab after each line number, via "{:6}\t", same as bash "cat"
 
-popular bugs:
+unsurprising bugs:
   does prompt once for stdin, like bash "grep -R", unlike bash "cat" and "cat -"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 

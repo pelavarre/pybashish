@@ -176,8 +176,9 @@ def pull_line(lines, stdin):
             stderr_print(prompt, end="")
             sys.stdout.flush()
             more = stdin.readline()
-            if not stdin.isatty():  # FIXME: distrust this "isatty" guess
+            if not stdin.isatty():
                 stderr_print(more.rstrip())
+                # FIXME: make --echo-input=yes easy to say when not isatty
             if not more:
                 stderr_print()
 

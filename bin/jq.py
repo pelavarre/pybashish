@@ -15,7 +15,7 @@ optional arguments:
 bugs:
   does nothing except test python json.loads and json.dumps
 
-popular bugs:
+unsurprising bugs:
   does prompt once for stdin, when stdin chosen as file "-" or by no file args, unlike bash "cat"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 

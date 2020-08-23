@@ -169,6 +169,8 @@ class GlassTeletype(contextlib.ContextDecorator):
             when = termios.TCSADRAIN  # not termios.TCSAFLUSH
             tty.setraw(self.fdin, when)
 
+        # FIXME: testcases where isatty but want like not isatty
+
         return self
 
     def __exit__(self, *exc_info):

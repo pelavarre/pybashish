@@ -106,7 +106,7 @@ def correct_args(args, stdout_isatty, stdout_columns):
 
     args._print_total_row = None
     if args._print_as == "rows_of_detail":
-        if stdout_isatty:
+        if stdout_isatty:  # FIXME: make --total=yes easy to add when not isatty
             args._print_total_row = True
 
     args._sort_by = _decide_sort_field_args(args)

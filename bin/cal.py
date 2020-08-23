@@ -43,6 +43,8 @@ def main():
 
     args = argdoc.parse_args()
     args.color = sys.stdout.isatty() and not args.h
+    # FIXME: make --color=yes easy to say when not isatty
+
     main.args = args
 
     now = dt.datetime.now()

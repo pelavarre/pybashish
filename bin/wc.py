@@ -19,7 +19,7 @@ optional arguments:
 bugs:
   acts like "wc -L -l" if called without args, unlike Bash "wc"
 
-popular bugs:
+unsurprising bugs:
   does prompt once for stdin, like bash "grep -R", unlike bash "fmt"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 

@@ -17,7 +17,7 @@ bugs:
   guesses -w terminal width from "COLUMNS", else sys.stdout, else "/dev/tty", else guesses 80
   prints '_' skids onto the ruler to mark the tabsize=8 tab stops:  1, 9, 17, ...
 
-popular bugs:
+unsurprising bugs:
   does prompt once for stdin, like bash "grep -R", unlike bash "fmt"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
   does accept "-" as meaning "/dev/stdin", like linux "fmt -", unlike mac "fmt -"

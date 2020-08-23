@@ -13,7 +13,7 @@ bugs:
   crashes "pybashish" shell if called from there, at ⌃C SIGINT
   implements mac SIGINFO as linux SIGUSR1
 
-popular bugs:
+unsurprising bugs:
   does prompt once for stdin, like bash "grep -R", unlike bash "dd"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 

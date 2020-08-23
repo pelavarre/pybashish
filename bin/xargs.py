@@ -31,10 +31,11 @@ def main():
     len_words = len(words)
     words_per_line = len_words if (args.max_args is None) else int(args.max_args)
 
-    for index in range(0, len_words, words_per_line):
-        argv_tail = words[index:][:words_per_line]
-        stdout = "{}\n".format(" ".join(argv_tail))
-        sys.stdout.write(stdout)
+    if len_words:
+        for index in range(0, len_words, words_per_line):
+            argv_tail = words[index:][:words_per_line]
+            stdout = "{}\n".format(" ".join(argv_tail))
+            sys.stdout.write(stdout)
 
 
 if __name__ == "__main__":

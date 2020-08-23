@@ -30,13 +30,13 @@ usage as a python import:
     print(args)
 
 bugs:
-  the top line usage summary names the metavars even when written to accept more than one
-  to see review comments pop up to work with you, you must damage an arg doc and run this again
-  cutting out all "optional arguments" declarations leaves you with no "-h, --help" option
-  long option names always splits the option declaration line from its help line
-  usage longer than one line gets stuck with a meaningless warning till you patch "argdoc.py"
+  to see review comments pop up to work with you, you must damage an arg doc and run it
+  long option and metavar names split their line and spill their words of help onto the next line
+  you lose your "-h" and "--help" options if you drop all "optional arguments:" from an arg doc
+  you get only english plural "dest"s for plural args, such as "[top [top ..]]" goes to "args.tops"
+  you get only simple argparses unless you rip and edit, you can't mix your python into the arg doc
 
-popular bugs:
+unsurprising bugs:
   does prompt once for stdin when called as "argdoc -", like bash "grep -R", unlike bash "cat -"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
@@ -53,8 +53,6 @@ examples:
   argdoc.py argdoc.py -- --help         # parse the arg "--help" with the file's arg doc
   argdoc.py argdoc.py -- hi world       # parse the two args "hi world" with the file's arg doc
 '''
-# FIXME FIXME: complain of trouble when auto-helping, not just when run separately
-# FIXME FIXME: complain, as often as run, of Arg Docs wrong only in whitespace
 # FIXME: parsed args whose names begin with a '_' skid shouldn't print here, via argparse.SUPPRESS
 # FIXME: consider looping over a list of [FILE [FILE ...]]
 # FIXME: autocorrect wrong Arg Docs
@@ -145,6 +143,7 @@ def print_usage(file=None):
 # FIXME: class ArgumentParser
 def ArgumentParser(doc=None, doc_filename=None, quiet=False):
     """Compile the Doc into Parser Source, and exec that source to build the Parser"""
+    # FIXME: factor out overlap with the "def run_parsed_main_args" of _ArgDocApp
 
     if not quiet:
         main.args.verbose += 1
@@ -158,6 +157,17 @@ def ArgumentParser(doc=None, doc_filename=None, quiet=False):
     coder = _ArgDocCoder()
     parser_source = coder.compile_parser_source_from(doc, doc_filename=doc_filename)
     parser = coder.exec_parser_source(parser_source)
+
+    if not quiet:
+
+        app = _ArgDocApp()
+        file_doc = doc
+
+        help_doc = parser.format_help()
+        if file_doc.strip():
+            app.compare_file_to_help_doc(
+                file_doc, doc_filename=doc_filename, help_doc=help_doc
+            )
 
     return parser
 
@@ -300,6 +310,7 @@ class _ArgDocApp:
 
     def run_parsed_main_args(self, doc_filename, shred, argv_separator, tail_argv):
         """Print the Arg Doc, or compile it, or run it"""
+        # FIXME: factor out overlap with the "class ArgumentParser" of "argdoc.py"
 
         coder = _ArgDocCoder()
 
@@ -410,19 +421,13 @@ class _ArgDocApp:
         if file_doc.strip() == help_doc.strip():
             return
 
-        stderr_print(
-            "argdoc.py: warning: doc vs help diffs at:  bin/argdoc.py {} >/dev/null".format(
-                doc_filename
-            )
-        )
-
-        doc_help_shline = "bin/argdoc.py --rip argdoc {} >a".format(doc_filename)
-        file_doc_shline = "bin/argdoc.py --rip doc {} >b".format(doc_filename)
+        file_doc_shline = "argdoc.py --rip doc {} >a".format(doc_filename)
+        doc_help_shline = "argdoc.py --rip argdoc {} >b".format(doc_filename)
         diff_urp_hline = "diff -urp a b"
 
         stderr_print(
             "argdoc.py: warning: doc vs help diffs at:  {} && {} && {}".format(
-                doc_help_shline, file_doc_shline, diff_urp_hline
+                file_doc_shline, doc_help_shline, diff_urp_hline
             )
         )
 
@@ -475,7 +480,26 @@ class _ArgDocApp:
                 print("{k}={v!r}".format(k=k, v=v))
 
 
-class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style is
+# add class ArgParseAuthor to wrap around _ArgDocCoder
+#
+# develop some good way to patch up the Python, such as
+#
+#   author = ArgParseAuthor()  # move  [TOP [TOP ...]] to args.cimas
+#
+#   author.ArgumentParser.add_help = False
+#   author.add_argument(metavar="TOP").metavar = "cimas"
+#   author.add_argument(dest="width").type = int
+#   author.add_argument("--verbose").action = "store_true"
+#
+#   assert author.parser.add_help == False
+#
+#   args = author.parse_args()
+#
+
+
+class _ArgDocCoder(
+    argparse.Namespace
+):  # FIXME: test how black'ened its emitted style is
     """Work up an ArgumentParser to match its Arg Doc"""
 
     def compile_parser_source_from(self, doc, doc_filename):
@@ -650,11 +674,12 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         # Pick out source fragments
 
         metavar = positionals_declaration.arg_line.metavar
-
         nargs = positionals_declaration.arg_phrase.nargs
-        usage_phrase = positionals_declaration.arg_phrase.format_usage_phrase()
 
+        usage_phrase = positionals_declaration.arg_phrase.format_usage_phrase()
         arg_help_line = positionals_declaration.arg_line.arg_help_line
+
+        assert nargs in (None, "...", "?",)  # .REMAINDER .OPTIONAL
 
         # Name the attribute for this positional option in the namespace built by "parse_args"
         # Go with the metavar, else guess the English plural of the metavar
@@ -680,7 +705,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
             "parser.add_argument(",
         ]
 
-        if nargs == 1:
+        if nargs is None:
 
             if dest == metavar:
                 mid_lines = [
@@ -695,7 +720,6 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
                 ]
 
         else:
-            assert nargs != 1
 
             if dest == metavar:
                 mid_lines = [
@@ -735,14 +759,12 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
         alt_option = optionals_declaration.arg_line.alt_option
         alt_metavar = optionals_declaration.arg_line.alt_metavar
 
-        nargs = optionals_declaration.arg_phrase.nargs
         usage_phrase = optionals_declaration.arg_phrase.format_usage_phrase()
-
         arg_help_line = optionals_declaration.arg_line.arg_help_line
+
         repr_help = black_repr(arg_help_line).replace("%", "%%")
 
         assert option
-        assert (not metavar) or (nargs == 1)
         assert (not alt_metavar) or (alt_metavar == metavar)
 
         # Separate concise and mnemonic options
@@ -806,7 +828,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
             "parser.add_argument(",
         ]
 
-        if not nargs:
+        if not metavar:
 
             action = "count"
             repr_action = black_repr(action)
@@ -830,8 +852,7 @@ class _ArgDocCoder(argparse.Namespace):  # FIXME: test how black'ened this style
                     )
                 ]
 
-        else:  # FIXME FIXME: "argparse" "add_argument" expresses our nargs=1 as "action=None"?
-            assert nargs == 1
+        else:
 
             if not alt_option:
                 if dest == option.lower():
@@ -1116,7 +1137,7 @@ class _ArgDocTaker(argparse.Namespace):
             )
 
             if not startswith_dash:  # positional argument
-                assert arg_phrase.nargs
+                assert arg_phrase.nargs in (None, "...", "?",)  # .REMAINDER .OPTIONAL
                 assert arg_phrase.metavar and arg_line.metavar
             else:  # optional argument
                 assert arg_phrase.concise or arg_phrase.mnemonic
@@ -1693,7 +1714,6 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
         concise = words[0] if not words[0].startswith("--") else None
         mnemonic = words[0] if words[0].startswith("--") else None
         metavar = words[1] if words[1:] else None
-        nargs = 1 if metavar else None
 
         # Publish results
 
@@ -1701,7 +1721,6 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
         self.mnemonic = mnemonic
         self.dashdash = dashdash
         self.metavar = metavar
-        self.nargs = nargs
 
         # Require emitted usage equals usage source
 
@@ -1731,7 +1750,7 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
     def _calc_arg_key(self):
         """Choose words to find the Optional Arg Line to mix into this Usage Phrase"""
 
-        if not self.nargs:
+        if not self.metavar:
             if self.concise:
                 words = (self.concise,)
             elif self.mnemonic:
@@ -1781,13 +1800,13 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
             )
 
         # Pick out the one ArgParse "nargs"
-        # FIXME: sometimes prefer nargs="*" argparse.ZERO_OR_MORE, or nargs > 1
+        # FIXME: parse and emit nargs="*" argparse.ZERO_OR_MORE, or nargs = 1, or nargs > 1
 
-        nargs = 1
+        nargs = None
         if "..." in argument_phrase:
             nargs = "..."  # "..." argparse.REMAINDER
         elif "[" in argument_phrase:
-            nargs = "?"  # # "?" argparse.OPTIONAL
+            nargs = "?"  # "?" argparse.OPTIONAL
 
         # Publish results
 
@@ -1816,13 +1835,14 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
     def format_usage_phrase(self):
         """Format as a phrase of a Usage Line in an Arg Doc"""
 
-        if self.nargs == "...":
+        if self.nargs == "...":  # "..." argparse.REMAINDER
             joined = "[{} [{} ...]]".format(self.metavar, self.metavar)
             if self.dashdash:
                 joined = "[-- [{} [{} ...]]]".format(self.metavar, self.metavar)
-        elif self.nargs == "?":
+        elif self.nargs == "?":  # "?" argparse.OPTIONAL
             joined = "[{}]".format(self.metavar)
         else:
+            assert self.nargs is None
             joined = "{}".format(self.metavar)
 
         return joined
@@ -1958,7 +1978,7 @@ def black_repr(chars):
     return rep
 
 
-def plural_en(word):  # FIXME FIXME: make this easy to override
+def plural_en(word):  # FIXME: make this easy to override
     """Guess the English plural of a word"""
 
     consonants = "bcdfghjklmnpqrstvwxz"  # without "y"
