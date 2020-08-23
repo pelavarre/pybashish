@@ -38,10 +38,7 @@ def main():
 
     if not (-0x80 <= status <= 0x7F):
         partial = status & 0xFF
-        print(
-            "exit.py: error: returning {} as {}".format(status, partial),
-            file=sys.stderr,
-        )
+        sys.stderr.write("exit.py: error: returning {} as {}\n".format(status, partial))
 
     sys.exit(status)
 

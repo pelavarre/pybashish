@@ -93,11 +93,20 @@ def main():
     #
 
     verbs = list(whats_by_verb.keys())
+    verbs.append("-")
+    verbs.append("..")
+    # verbs.append(":")  # FIXME: think more about shline=": --help"
     verbs.append("history")  # FIXME: collect all the BUILTINS of "bin/bash.py"
     verbs.sort()
 
     print_cells(verbs, width=89)  # 89 columns is a 2020 Black terminal
     sys.stdout.flush()
+
+    stderr_print()
+    stderr_print("Note: The '#' hash mark means ignore the following chars in the line")
+    stderr_print(
+        "Note: The ':' colon as the first word means mostly ignore the following words in the line"
+    )
 
     stderr_print()
     sys.stderr.flush()

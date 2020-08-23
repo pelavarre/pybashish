@@ -36,6 +36,9 @@ import pwd_  # FIXME: packaging
 import read
 
 
+FILE_DIR = os.path.split(os.path.realpath(__file__))[0]  # sample before 1st "os.chdir"
+
+
 def main(argv):
 
     args = argdoc.parse_args()
@@ -77,9 +80,7 @@ def main(argv):
 
         # Compile and execute the line
 
-        argv = _parse_shline(shline)
-        how = _compile_shline(shline, argv=argv)
-        returncode = how(argv)
+        returncode = compile_and_run_shline(shline)
 
         main.returncode = returncode
 
@@ -88,28 +89,117 @@ def main(argv):
             # FIXME: think into trace "shline" of nonzero "returncode", a la Zsh
 
 
-def builtin_pass(argv):  # FIXME FIXME FIXME: build in "-h" and "--help" without a verb
-    pass  # FIXME: stop zeroing last exit status "$?" at each blank input line
+def compile_and_run_shline(shline):
+
+    argv = _parse_shline(shline)
+    how = _compile_shline(shline, argv=argv)
+    returncode = how(argv)
+
+    return returncode
+
+
+#
+#
+#
+
+
+def builtin_cd(argv):
+    """Inject a change of working dir"""
+
+    ran = builtin_via_py("cd.py", argv)
+    returncode = ran.returncode
+
+    changing_dir = True
+
+    if ran.stdout and (len(ran.stdout.splitlines()) > 1):
+        os.write(sys.stdout.fileno(), ran.stdout)
+        sys.stdout.flush()
+        changing_dir = False
+
+    if ran.stderr:
+        os.write(sys.stderr.fileno(), ran.stderr)
+        sys.stderr.flush()
+        changing_dir = False
+
+    if ran.returncode:
+        changing_dir = False
+
+    if changing_dir:
+
+        stdouts = ran.stdout.decode()
+        stdouts = stdouts.splitlines()
+
+        assert len(stdouts) == 1
+        args_dir = stdouts[0]
+
+        before_realpath = os.path.realpath(os.getcwd())
+        os.environ["OLDPWD"] = before_realpath
+
+        os.chdir(args_dir)
+
+        after_realpath = os.path.realpath(os.getcwd())
+        os.environ["PWD"] = after_realpath
+
+        ran = builtin_via_py("pwd_.py")
+        returncode = ran.returncode
+
+        if ran.stdout:
+            os.write(sys.stdout.fileno(), ran.stdout)
+            sys.stdout.flush()
+
+        if ran.stderr:
+            os.write(sys.stderr.fileno(), ran.stderr)
+            sys.stderr.flush()
+
+    return returncode
+
+
+def builtin_cd_back(argv):
+    implied_argv = ["cd", "-"] + argv[1:]
+    returncode = builtin_cd(implied_argv)
+    return returncode
+
+
+def builtin_cd_up(argv):
+    implied_argv = ["cd", ".."] + argv[1:]
+    returncode = builtin_cd(implied_argv)
+    return returncode
 
 
 def builtin_exit(argv):
     """Inject a choice of process returncode"""
 
-    file_dir = os.path.split(os.path.realpath(__file__))[0]
-    wherewhat = os.path.join(file_dir, "exit.py")
+    ran = builtin_via_py("exit.py", argv)
+
+    if ran.stdout:
+        os.write(sys.stdout.fileno(), ran.stdout)
+        sys.stdout.flush()
+
+    if ran.stderr:
+        os.write(sys.stderr.fileno(), ran.stderr)
+        sys.stderr.flush()
+
+    assert ran.returncode is not None
+    if (not ran.stdout) and (not ran.stderr):
+        sys.exit(ran.returncode)
+
+    return ran.returncode
+
+
+def builtin_via_py(what_py, argv=None):
+
+    wherewhat = os.path.join(FILE_DIR, what_py)
+    argv_tail = argv[1:] if argv else list()
 
     ran = subprocess.run(
-        [wherewhat] + argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        [wherewhat] + argv_tail, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
-    os.write(sys.stdout.fileno(), ran.stdout)
-    assert ran.returncode is not None
-    assert not ran.stderr  # because stderr=subprocess.STDOUT
 
-    returncode = ran.returncode
-    if not ran.stdout:
-        sys.exit(returncode)
+    return ran
 
-    return returncode
+
+def builtin_help(argv):
+    compile_and_run_shline("help")
 
 
 def builtin_history(argv):
@@ -138,6 +228,15 @@ def builtin_history(argv):
         lineno = 1 + index
         print("{:5d}  {}".format(lineno, shline))
     sys.stdout.flush()
+
+
+def builtin_pass(argv):  # think more about  $ : --help
+    pass  # FIXME: stop zeroing last exit status "$?" at each blank input line
+
+
+#
+#
+#
 
 
 def _parse_shline(shline):
@@ -249,14 +348,12 @@ def _compile_explicit_relpath(verb):
 def _calc_wherewhat(verb):
     """Map verb to file"""
 
-    file_dir = os.path.split(os.path.realpath(__file__))[0]
-
     what = f"{verb}_.py"
-    wherewhat = os.path.join(file_dir, what)
+    wherewhat = os.path.join(FILE_DIR, what)
     if not os.path.exists(wherewhat):
         if not verb.endswith("_"):
             what = f"{verb}.py"
-            wherewhat = os.path.join(file_dir, what)
+            wherewhat = os.path.join(FILE_DIR, what)
 
     return wherewhat
 
@@ -266,6 +363,8 @@ def _compile_log_error(message):
 
     def how(argv):
         return _log_error(message)
+
+    return how
 
 
 def _compile_return_error():
@@ -326,11 +425,19 @@ def stderr_print(*args):
     print(*args, file=sys.stderr)
 
 
-BUILTINS = dict()
-BUILTINS[":"] = builtin_pass
-BUILTINS["exit"] = builtin_exit
-BUILTINS["history"] = builtin_history
-# FIXME FIXME: implement BUILTINS["cd"]
+BUILTINS = {
+    "-": builtin_cd_back,
+    "--h": builtin_help,
+    "--he": builtin_help,
+    "--hel": builtin_help,
+    "--help": builtin_help,
+    "-h": builtin_help,
+    "..": builtin_cd_up,
+    ":": builtin_pass,
+    "cd": builtin_cd,
+    "exit": builtin_exit,
+    "history": builtin_history,
+}
 
 
 if __name__ == "__main__":
