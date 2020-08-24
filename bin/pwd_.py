@@ -44,8 +44,13 @@ def main(argv):
     abspath = os.path.abspath(pwd)
     realpath = os.path.realpath(pwd)
 
-    cwd = os.getcwd()
-    assert cwd == realpath
+    try:
+        gotcwd = os.getcwd()
+    except FileNotFoundError as exc:
+        sys.stderr.write("pwd.py: error: {}: {}\n".format(type(exc).__name__, exc))
+        sys.exit(1)  # FIXME: more robust "pwd" vs the current working dir deleted
+
+    assert gotcwd == realpath
 
     path = realpath if args.physical else abspath  # FIXME: count -L -P contradictions
     formatter = min_path_formatter_not_relpath(path)

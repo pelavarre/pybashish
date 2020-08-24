@@ -34,31 +34,59 @@ import argdoc
 
 def main():
 
+    # Parse args
+
     args = argdoc.parse_args()
 
     if (args.dir is None) or (args.dir == "~"):
-        relpath = os.environ["HOME"]
+        path = os.environ["HOME"]
     elif args.dir == "-":
         try:
-            relpath = os.environ["OLDPWD"]
+            path = os.environ["OLDPWD"]
         except KeyError:
             sys.stderr.write("cd.py: error: OLDPWD not set\n")
             sys.exit(1)  # classic exit status 1 for violating this env var precondition
     else:
-        relpath = args.dir
+        path = args.dir
         if args.dir.startswith("~"):
-            relpath = os.environ["HOME"] + args.dir[1:]
+            path = os.environ["HOME"] + args.dir[1:]
 
-    before_realpath = os.path.realpath(os.getcwd())
-    os.environ["OLDPWD"] = before_realpath  # unneeded, unless this raises an exception
+    dry_run_cd(path, args=args)
 
-    os.chdir(relpath)
-    after_realpath = os.path.realpath(os.getcwd())
+
+def dry_run_cd(path, args):
+    """Dry run a call of "os.chdir" inside this process, don't change parent process"""
+
+    # Sample cwd
+
+    try:
+        before_cwd = os.getcwd()
+    except FileNotFoundError:
+        before_cwd = None
+
+    if before_cwd is not None:
+        before_realpath = os.path.realpath(before_cwd)
+        os.environ[
+            "OLDPWD"
+        ] = before_realpath  # unneeded, unless this raises an exception
+
+    # Change cwd and resample cwd
+
+    try:
+        os.chdir(path)
+        after_cwd = os.getcwd()
+    except FileNotFoundError as exc:
+        sys.stderr.write("cd.py: error: {}: {}\n".format(type(exc).__name__, exc))
+        sys.exit(1)
+
+    after_realpath = os.path.realpath(after_cwd)
 
     if args.dir == "-":
         if before_realpath == after_realpath:
             sys.stderr.write("cd.py: error: new dir is old dir\n")
             sys.exit(1)
+
+    # Declare success
 
     print(after_realpath)
 

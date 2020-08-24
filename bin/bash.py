@@ -130,26 +130,51 @@ def builtin_cd(argv):
         stdouts = stdouts.splitlines()
 
         assert len(stdouts) == 1
-        args_dir = stdouts[0]
+        realpath = stdouts[0]
 
-        before_realpath = os.path.realpath(os.getcwd())
-        os.environ["OLDPWD"] = before_realpath
+        returncode = os_chdir_path(path=realpath)
 
-        os.chdir(args_dir)
+    return returncode
 
-        after_realpath = os.path.realpath(os.getcwd())
-        os.environ["PWD"] = after_realpath
 
-        ran = builtin_via_py("pwd_.py")
-        returncode = ran.returncode
+def os_chdir_path(path):
+    """Change the working dir of this process"""
 
-        if ran.stdout:
-            os.write(sys.stdout.fileno(), ran.stdout)
-            sys.stdout.flush()
+    # Sample cwd
 
-        if ran.stderr:
-            os.write(sys.stderr.fileno(), ran.stderr)
-            sys.stderr.flush()
+    try:
+        before_cwd = os.getcwd()
+    except FileNotFoundError:
+        before_cwd = None
+
+    if before_cwd is not None:
+        before_realpath = os.path.realpath(before_cwd)
+        os.environ[
+            "OLDPWD"
+        ] = before_realpath  # unneeded, unless this raises an exception
+
+    # Change cwd and resample cwd
+
+    try:
+        os.chdir(path)
+        after_cwd = os.getcwd()
+    except FileNotFoundError as exc:
+        sys.stderr.write("cd.py: error: {}: {}\n".format(type(exc).__name__, exc))
+        return 1
+
+    after_realpath = os.path.realpath(after_cwd)
+    os.environ["PWD"] = after_realpath
+
+    ran = builtin_via_py("pwd_.py")
+    returncode = ran.returncode
+
+    if ran.stdout:
+        os.write(sys.stdout.fileno(), ran.stdout)
+        sys.stdout.flush()
+
+    if ran.stderr:
+        os.write(sys.stderr.fileno(), ran.stderr)
+        sys.stderr.flush()
 
     return returncode
 
@@ -407,7 +432,14 @@ def calc_ps1():
 
     user = calc_ps1.user
     hostname = platform.node()
-    where = pwd_.os_path_homepath(os.getcwd())
+
+    gotcwd = os.environ["PWD"]
+    try:
+        gotcwd = os.getcwd()
+    except FileNotFoundError:
+        pass
+
+    where = pwd_.os_path_homepath(gotcwd)
 
     assert read.ESC_CHAR == "\x1B"
 

@@ -31,6 +31,10 @@ optional arguments:
   --descending     sort descending:  newest to oldest, largest to smallest, etc
   -r               reverse the default sorts by size ascending, time ascending, name descending, etc
 
+temporary bugs:
+  doesn't sort the files before the dirs when given both files and dirs as tops
+  shows only first failure to list a top and quit, should show all failures and successes
+
 bugs:
   doesn't show owner and group
   doesn't show size for dirs, nor for links
@@ -42,6 +46,7 @@ bugs:
   doesn't show dirs to pipe like to terminal, doesn't show one dir like one of more
   shows dirs in just one way, sorts by just one field, chokes when args call for more
   guesses -C terminal width from "COLUMNS", else sys.stdout, else "/dev/tty", else guesses 80
+  slams a deleted dir as a "stale file handle", like later Linux, unlike Mac and older Linux
   sees files as hidden if and only if name starts with ".", as if just for Mac and Linux
 
 examples:
@@ -54,12 +59,16 @@ examples:
   ls.py --headings
   COLUMNS=101 ls.py -C | tee as-wide-as-you-say.txt
   ls.py -C | tee as-wide-as-tty.txt
+  (mkdir foo && cd foo/ && echo hi>x && rm -fr ../foo/ && ls.py .)
 """
 # FIXME FIXME:  -x               print by filling multiple rows
 # FIXME: add -R recursive walk
 # FIXME: closer match at "ls.py -C" to classic line splits of "ls -C"
 # FIXME argdoc: somehow separate help lines for -1 -C -l --hea / -a --fu -F / --sort ...
 # FIXME: share "def spill_cells" etc with "import column", "import fmt, etc
+# FIXME: fix the "temporary" doesn't sort the files before the dirs when given both
+# FIXME: shows only first failure to list a top and quit, should show all failures and successes
+
 
 from __future__ import print_function
 
@@ -68,6 +77,7 @@ import datetime as dt
 import distutils.version
 import os
 import stat
+import subprocess
 import sys
 
 import argdoc
@@ -270,33 +280,94 @@ def _decide_sort_order_args(args):
 
 
 def print_one_top_walk(tops, index, args):
+
+    (top, names, args_directory,) = _plan_one_top_walk(tops, index=index, args=args)
+
+    _run_one_top_walk(
+        tops,
+        index=index,
+        top=top,
+        names=names,
+        args=args,
+        args_directory=args_directory,
+    )
+
+
+def _plan_one_top_walk(tops, index, args):
+    """Plan to run differently, as per -a and -d or not, as per top is dir or not"""
+
+    # Pick apart dirs and files
+    # FIXME: think well into mixing dirs and files, relpaths and abspaths, deleted and not
+
+    args_directory = args.directory  # FIXME: better variable name than args_directory
+    if args.directory:
+
+        top = None
+        listed = list(tops)
+
+    elif not os.path.isdir(tops[index]):
+
+        args_directory = True
+        top = None
+        listed = [tops[index]]
+
+    else:
+
+        top = tops[index]
+
+        listed = list()
+        listed.append(os.curdir)
+        listed.append(os.pardir)
+        os_listdir_top = os.listdir(top)
+        listed.extend(os_listdir_top)
+
+        if os_path_isdir_deleted(
+            top
+        ):  # should be False, and unneeded, when not os_listdir_top
+            stderr_print(
+                "ls.py: warning: cannot access {!r}: stale file handle {}".format(
+                    top, "of deleted dir"
+                )
+            )
+            sys.exit(2)  # classic exit status 2 for a deleted dir
+
+    names = listed
+    if not args.all:
+        names = list(_ for _ in names if not os.path.split(_)[-1].startswith("."))
+        # hidden file names start with "." at Mac and Linux, per:  os.name == "posix"
+
+    return (
+        top,
+        names,
+        args_directory,
+    )
+
+
+def _run_one_top_walk(tops, index, top, names, args, args_directory):
     """Print files and dirs found, as lines of names, as a matrix of names, or as rows of detail"""
 
     # Trace the top and separate by blank line, if more than one top
 
-    if not args.directory:
+    if not args_directory:
         print_as_plural_if_plural(tops, index)
+    elif not args.directory:
+        if len(tops) > 1:
+            print()  # FIXME: sort the files before dirs when both tops
 
     # Find dirs and files inside this one top dir
     # FIXME: conform to Linux listing CurDir and ParDir in other places, unlike Mac Bash
-
-    top = tops[index]
-    if args.directory:
-        listed = list(tops)
-    else:
-        listed = [os.curdir, os.pardir] + os.listdir(top)
-
-    names = listed
-    if not args.all:
-        names = list(_ for _ in names if not _.startswith("."))
-        # hidden file names start with "." at Mac and Linux, per:  os.name == "posix"
 
     # Collect stats for each
 
     stats_by_name = dict()
     for name in names:
-        wherewhat = name if args.directory else os.path.join(top, name)
-        stats_by_name[name] = os.stat(wherewhat)
+        wherewhat = name if args_directory else os.path.join(top, name)
+        try:
+            stats = os.stat(wherewhat)
+        except FileNotFoundError as exc:
+            stderr_print("ls.py: error: {}: {}".format(type(exc).__name__, exc))
+            sys.exit(1)  # FIXME: defer the FileNotFoundError's to list the rest
+        stats_by_name[name] = stats
 
     # Mark each with r"[*/@]" for executable-not-dir, dir, or symbolic link
 
@@ -304,7 +375,7 @@ def print_one_top_walk(tops, index, args):
 
     markeds_by_name = dict()
     for name in names:
-        wherewhat = name if args.directory else os.path.join(top, name)
+        wherewhat = name if args_directory else os.path.join(top, name)
         rep = mark_name(name=name, wherewhat=wherewhat, stats=stats_by_name[name])
         markeds_by_name[name] = rep
 
@@ -332,6 +403,7 @@ def print_one_top_walk(tops, index, args):
             items=items,
             reps_by_name=reps_by_name,
             now_year=now.year,
+            args_directory=args_directory,
         )
 
 
@@ -446,7 +518,9 @@ def print_as_matrix_of_names(cells, stdout_columns):
         print(sep.join(row).rstrip())
 
 
-def print_as_rows_of_detail(tops, index, args, items, reps_by_name, now_year):
+def print_as_rows_of_detail(
+    tops, index, args, items, reps_by_name, now_year, args_directory
+):
     """Print as rows of details, for one name per line"""
 
     # Choose how to print None
@@ -499,10 +573,20 @@ def print_as_rows_of_detail(tops, index, args, items, reps_by_name, now_year):
         row = (chmods, links, owner, group, size, str_stamp, rep)
         rows.append(row)
 
+    print_the_formed_rows(
+        rows, str_none=str_none, args=args, args_directory=args_directory
+    )
+
+
+def print_the_formed_rows(rows, str_none, args, args_directory):
+
     # Print rows
 
     if args._print_total_row:
-        print("total {}".format(str_none))  # not a count of 512-byte data blocks
+        if args_directory and not args.directory:
+            pass
+        else:
+            print("total {}".format(str_none))  # not a count of 512-byte data blocks
 
     justifieds = left_justify_cells_in_rows(rows)
     for justified in justifieds:
@@ -695,6 +779,21 @@ def guess_stdout_columns_os_environ_int(hint):
         terminal_width = None
 
     return terminal_width
+
+
+# deffed in many files  # missing from docs.python.org
+def os_path_isdir_deleted(top):  # FIXME: solve this without calling:  bash /dev/null
+    """Mark a deleted dir apart from undeleted dirs, even if working inside of it"""
+
+    ran = subprocess.run(
+        "bash /dev/null".split(),
+        cwd=top,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if ran.stdout or ran.stderr or ran.returncode:
+        return True
 
 
 # deffed in many files  # missing from docs.python.org
