@@ -6,17 +6,18 @@ usage: help_.py [-h] [VERB]
 print some help
 
 positional arguments:
-  VERB        a verb to explain
+  VERB        a verb to explain, such as "grep" or "echo"
 
 optional arguments:
   -h, --help  show this help message and exit
 
 examples:
   help_.py
-  help_.py fmt
+  help_.py fmt  # calls out to:  fmt.py --help
   man bash
   man zshall
 """
+# FIXME: help '#', help :, help .., help -
 
 
 from __future__ import print_function

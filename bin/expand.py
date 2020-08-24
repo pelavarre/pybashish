@@ -78,7 +78,7 @@ def main(argv):
 
 
 def expand_incoming(incoming, args):
-    """Copy each non-empty line out as it arrives, but pass it through .expandtabs and .rstrip"""
+    """Copy each non-empty line out as it arrives, but transform it first"""
 
     begun = False
     stripped = 0
@@ -93,14 +93,7 @@ def expand_incoming(incoming, args):
 
         for line in lines:
 
-            expanded = line.expandtabs()
-            if args.plain:
-                expanded = dash_quote_as_ascii(expanded)
-            if args.repr:
-                expanded = code_points_as_unicode_escapes(expanded)
-            if args.wiki:
-                expanded = chars_as_wiki_html(expanded)
-            expanded = expanded.rstrip()
+            expanded = expand_line(line, args=args)
 
             if not expanded:
 
@@ -117,12 +110,38 @@ def expand_incoming(incoming, args):
 
                 begun = True
 
+    if hasattr(expand_line, "wiki_begun"):
+        print("</p>")
+
+
+def expand_line(line, args):
+    """Transform one line"""
+
+    expanded = line.expandtabs()
+
+    if args.plain:
+        expanded = dash_quote_as_ascii(expanded)
+
+    if args.repr:
+        expanded = code_points_as_unicode_escapes(expanded)
+
+    if args.wiki:
+        expanded = chars_as_wiki_html(expanded)
+
+    expanded = expanded.rstrip()
+
+    if args.wiki:
+        if expanded and not hasattr(expand_line, "wiki_begun"):
+            expand_line.wiki_begun = None
+            print("<p>")
+
+    return expanded
+
 
 def chars_as_wiki_html(chars):
     """Escape as html of code nbsp br in p (fit for insertion into atlassian wiki"""
 
     lines = list()
-    lines.append("<p>")
 
     for line in chars.splitlines():
 
@@ -131,8 +150,6 @@ def chars_as_wiki_html(chars):
         markup = escaped.replace(" ", "&nbsp;")
 
         lines.append("<code>{}</code><br></br>".format(markup))
-
-    lines.append("</p>")
 
     reps = "\n".join(lines)
 

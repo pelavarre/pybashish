@@ -3,7 +3,7 @@
 """
 usage: pwd_.py [-h] [-P] [--brief] [--home]
 
-show the os.environ["HOME"], by default just its "os.path.abspath"
+show the os.environ["PWD"], by default just its "os.path.abspath"
 
 optional arguments:
   -h, --help      show this help message and exit
@@ -47,6 +47,8 @@ def main(argv):
     try:
         gotcwd = os.getcwd()
     except FileNotFoundError as exc:
+        print(pwd)
+        sys.stdout.flush()
         sys.stderr.write("pwd.py: error: {}: {}\n".format(type(exc).__name__, exc))
         sys.exit(1)  # FIXME: more robust "pwd" vs the current working dir deleted
 

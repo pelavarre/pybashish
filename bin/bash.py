@@ -111,15 +111,15 @@ def builtin_cd(argv):
 
     changing_dir = True
 
-    if ran.stdout and (len(ran.stdout.splitlines()) > 1):
-        os.write(sys.stdout.fileno(), ran.stdout)
-        sys.stdout.flush()
+    if (not ran.stdout) or len(ran.stdout.splitlines()) != 1:
         changing_dir = False
+        if ran.stdout:
+            os.write(sys.stdout.fileno(), ran.stdout)
+            sys.stdout.flush()
 
     if ran.stderr:
         os.write(sys.stderr.fileno(), ran.stderr)
         sys.stderr.flush()
-        changing_dir = False
 
     if ran.returncode:
         changing_dir = False
@@ -431,7 +431,14 @@ def calc_ps1():
     calc_ps1.user = user
 
     user = calc_ps1.user
+
     hostname = platform.node()
+    #
+    # FIXME: Noise to Stderr at "platform.node()" in such tests as:  mkdir foo/ && cd foo/ && rm -fr ../foo/
+    #
+    #   Linux => sh: 0: getcwd() failed: No such file or directory"
+    #   Mac => shell-init: error retrieving current directory: getcwd: cannot access parent directories: No such file or directory
+    #
 
     gotcwd = os.environ["PWD"]
     try:

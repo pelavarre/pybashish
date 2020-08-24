@@ -564,14 +564,8 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $ bin/echo.py 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | bin/expand.py --wiki
     <p>
     <code>import&nbsp;sys</code><br></br>
-    </p>
-    <p>
     <code>if&nbsp;sys.stdout.isatty():</code><br></br>
-    </p>
-    <p>
     <code>&nbsp;&nbsp;&nbsp;&nbsp;print(&quot;isatty&quot;)</code><br></br>
-    </p>
-    <p>
     </p>
     $
 
@@ -702,14 +696,14 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
     print some help
 
     positional arguments:
-      VERB        a verb to explain
+      VERB        a verb to explain, such as "grep" or "echo"
 
     optional arguments:
       -h, --help  show this help message and exit
 
     examples:
       help_.py
-      help_.py fmt
+      help_.py fmt  # calls out to:  fmt.py --help
       man bash
       man zshall
     $

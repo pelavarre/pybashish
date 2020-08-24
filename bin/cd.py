@@ -64,6 +64,14 @@ def dry_run_cd(path, args):
     except FileNotFoundError:
         before_cwd = None
 
+        if args.dir == "-":
+            sys.stderr.write(
+                "cd.py: warning: cannot access {!r}: stale file handle {}\n".format(
+                    ".", "of deleted dir"
+                )
+            )
+
+    before_realpath = None
     if before_cwd is not None:
         before_realpath = os.path.realpath(before_cwd)
         os.environ[

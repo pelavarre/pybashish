@@ -4,6 +4,12 @@ default: black test-once
 	:
 	git status | grep -v '^$$'
 	:
+	: consider
+	:
+	@echo 'git clean -ffxdq'
+	@echo 'git commit --all --amend'
+	@echo 'git status'
+	:
 	: make: passed
 	:
 
