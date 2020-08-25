@@ -463,32 +463,8 @@ def stats_items_sorted(stats_by_name, by, order):
 # deffed in many files  # missing from docs.python.org
 def looser_comparable_version(vstring):
     """Workaround TypeError in LooseVersion comparisons between int and str"""
-
-    diffables = list()
-
     words = distutils.version.LooseVersion(vstring).version
-
-    ints = list()
-    strs = list()
-    for word in words:
-        if isinstance(word, int):
-            if strs:
-                diffables.extend([ints, strs])
-                strs = list()
-            ints.append(word)
-        elif (
-            type(word).__mro__[-2] is str.__mro__[-2]
-        ):  # aka Python 3 isinstance(_, str)
-            if ints:
-                diffables.extend([ints, strs])
-                ints = list()
-            strs.append(word)
-        else:
-            assert False
-
-    if ints or strs:
-        diffables.extend([ints, strs])
-
+    diffables = [([_], [],) if isinstance(_, int) else ([], [_],) for _ in words]
     return diffables
 
 

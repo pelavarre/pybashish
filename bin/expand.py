@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: expand.py [-h] [--plain] [--repr] [--wiki] [FILE [FILE ...]]
+usage: expand.py [-h] [--csv] [--plain] [--repr] [--wiki] [FILE [FILE ...]]
 
 replace tabs with spaces, replace cr with lf, strip leading and trailing empty lines
 
@@ -10,6 +10,7 @@ positional arguments:
 
 optional arguments:
   -h, --help  show this help message and exit
+  --csv       convert to a ".csv" table
   --plain     replace smart quotes, smart dashes, and such with plain us-ascii " ' -
   --repr      replace all but r"[\n\r\t]" and plain us-ascii with python \u escapes
   --wiki      escape as html p of code nbsp br (fit for insertion into atlassian wiki)
@@ -38,8 +39,8 @@ examples:
   expand.py -
   echo -n $'\xC0\x80' | expand.py | hexdump -C  # Linux preserves binary, Mac says 'illegal byte'
   echo -n $'t\tr\rn\n' | expand.py | cat -etv
-  echo 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | expand.py
-  echo 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | expand.py --repr
+  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | expand.py
+  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | expand.py --repr  # such as "\u22EE" for "⋮" vertical ellipsis
   echo $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | expand.py --plain
   echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | expand.py --wiki
 
@@ -55,22 +56,31 @@ import sys
 import argdoc
 
 
+def passme():
+    pass
+
+
 def main(argv):
 
     args = argdoc.parse_args(argv[1:])
-    relpaths = args.files if args.files else ["-"]
+
+    passme.print_lines = None
+    if args.csv:
+        passme.print_lines = list()
 
     # Expand each file
 
-    if "-" in relpaths:
+    paths = args.files if args.files else ["-"]
+
+    if "-" in paths:
         prompt_tty_stdin()
 
-    for relpath in relpaths:
-        if relpath == "-":
+    for path in paths:
+        if path == "-":
             expand_incoming(sys.stdin, args=args)
         else:
             try:
-                with open(relpath, "rt") as incoming:
+                with open(path, "rt") as incoming:
                     expand_incoming(incoming, args=args)
             except FileNotFoundError as exc:
                 stderr_print("expand.py: error: {}: {}".format(type(exc).__name__, exc))
@@ -79,6 +89,8 @@ def main(argv):
 
 def expand_incoming(incoming, args):
     """Copy each non-empty line out as it arrives, but transform it first"""
+
+    passme.wiki_begun = False
 
     begun = False
     stripped = 0
@@ -92,26 +104,25 @@ def expand_incoming(incoming, args):
             break
 
         for line in lines:
-
             expanded = expand_line(line, args=args)
-
             if not expanded:
-
                 if begun:
                     stripped += 1
-
             else:
 
                 if stripped:
-                    print((stripped - 1) * "\n")
+                    asif_print((stripped - 1) * "\n")
                     stripped = 0
 
-                print(expanded)
+                asif_print(expanded)
 
                 begun = True
 
-    if hasattr(expand_line, "wiki_begun"):
-        print("</p>")
+    if passme.wiki_begun:
+        asif_print("</p>")
+
+    if args.csv:
+        exit_csv(passme.print_lines)
 
 
 def expand_line(line, args):
@@ -130,10 +141,11 @@ def expand_line(line, args):
 
     expanded = expanded.rstrip()
 
-    if args.wiki:
-        if expanded and not hasattr(expand_line, "wiki_begun"):
-            expand_line.wiki_begun = None
-            print("<p>")
+    if expanded:
+        if args.wiki:
+            if not passme.wiki_begun:
+                passme.wiki_begun = True
+                asif_print("<p>")
 
     return expanded
 
@@ -156,9 +168,49 @@ def chars_as_wiki_html(chars):
     return reps
 
 
+def asif_print(*args):
+    """Print, or just collect, lines of output"""
+
+    if passme.print_lines is None:
+
+        print(*args)
+
+    else:
+
+        line = " ".join(str(_) for _ in args)
+        passme.print_lines.append(line)
+
+
+def exit_csv(lines):
+    """Convert to Csv from PSql today, and maybe to Csv from messier sources tomorrow"""
+
+    for (index, line,) in enumerate(lines):
+
+        bars = list(_ for (_, ch,) in enumerate(line) if ch == "|")
+        if index == 0:
+            bars0 = bars
+        elif bars != bars0:
+            plusses = list(_ for (_, ch,) in enumerate(line) if ch == "+")
+            if index == 1:
+                assert plusses == bars0
+            elif (not line) and (index == (len(lines) - 1)):
+                pass  # FIXME: not relevant when "expand.py" has stripped trailing lines
+            else:  # FIXME: limit to one trailer not more
+                trailer = "({} rows)".format((index + 1) - 3)
+                assert line == trailer
+
+        else:
+
+            assert "," not in line
+            cells = list(_.strip() for _ in line.split("|"))
+            _ = cells
+
+    print(len(lines))  # FIXME: finish implementing "--csv"
+
+
 # deffed in many files  # missing from docs.python.org
 def code_points_as_unicode_escapes(chars):
-    r"""Replace all but r"[\n\r\t]" and plain us-ascii with python \uXXXX escapes"""
+    r"""Replace all but r"[\n\r\t]" and plain us-ascii with \uXXXX and \uxxxxXXXX escapes"""
 
     reps = ""
     for ch in chars:

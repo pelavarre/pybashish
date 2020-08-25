@@ -22,11 +22,12 @@ bugs:
   doesn't delete \ backslashes
 
 examples:
-  echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | read.py  # Control Option Shift Command Arrows
+  echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | read.py  # Control Option Shift Command Arrows as ordered by Apple
   echo 'å é î ø ü' | read.py  # the accented vowels prominent in Mac ⌥ Option
-  read -e  # in Bash
+  echo '⋮' | read.py  # more favorite characters of mine
   read.py
   read.py --lines
+  read -e  # in Bash
   FOO=123; vared -e FOO  # in Zsh
 """
 # FIXME FIXME:  stop discarding history edits at ⌃N "_next_history"

@@ -60,11 +60,11 @@ def main(argv):
 
     file_dir = os.path.split(__file__)[0]
     tests_dir = os.path.join(file_dir, os.pardir, "tests")
-    args_file = os.path.join(tests_dir, "pybashish.typescript")
-    args_file = os.path.relpath(args_file)
+    tests_path = os.path.join(tests_dir, "pybashish.typescript")
+    path = os.path.relpath(tests_path)  # abbreviate as relpath for tracing later
 
-    with open(args_file) as incoming:
-        passes = _run_bash_test_doc(incoming, args_file=args_file)
+    with open(path) as incoming:
+        passes = _run_bash_test_doc(incoming, path=path)
 
     # Declare success
 
@@ -93,7 +93,7 @@ def _show_doctest_result(want="2.718"):
     doctest.run_docstring_examples(f, globs, optionflags=doctest.ELLIPSIS)
 
 
-def _run_bash_test_doc(incoming, args_file):
+def _run_bash_test_doc(incoming, path):
     """Run each test of a Bash Test Doc"""
 
     passes = 0
@@ -136,7 +136,7 @@ def _run_bash_test_doc(incoming, args_file):
 
         # Require correct output
 
-        require_test_passed(args_file, passes=passes, gots=gots, dent=dent, wants=wants)
+        require_test_passed(path, passes=passes, gots=gots, dent=dent, wants=wants)
 
         # Count passed tests
 
@@ -255,7 +255,7 @@ def run_one_shline(shline):
     return gots
 
 
-def require_test_passed(args_file, passes, gots, dent, wants):
+def require_test_passed(path, passes, gots, dent, wants):
     """Raise exception, unless actual output roughly equals expected output"""
 
     max_len = max(len(wants), len(gots))
@@ -296,7 +296,7 @@ def require_test_passed(args_file, passes, gots, dent, wants):
                 if main.args.vq < len("vv"):
                     reasons.append("try again with -vv")
                 reasons.append(
-                    "fix the code, and/or fix the test at:  vim {}".format(args_file)
+                    "fix the code, and/or fix the test at:  vim {}".format(path)
                 )
 
                 for reason in reasons:

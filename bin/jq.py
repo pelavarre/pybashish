@@ -41,13 +41,13 @@ def main():
     # Fetch
 
     files = args.files if args.files else "-".split()
-    for file_ in files:
+    for path in files:
 
-        if file_ == "-":
+        if path == "-":
             prompt_tty_stdin()
             chars = sys.stdin.read()
         else:
-            with open(file_) as incoming:
+            with open(path) as incoming:
                 chars = incoming.read()
 
         # Munge

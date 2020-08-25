@@ -768,8 +768,6 @@ class _ArgDocCoder(
         usage_phrase = optionals_declaration.arg_phrase.format_usage_phrase()
         arg_help_line = optionals_declaration.arg_line.arg_help_line
 
-        repr_help = black_repr(arg_help_line).replace("%", "%%")
-
         assert option
         assert (not alt_metavar) or (alt_metavar == metavar)
 
@@ -815,11 +813,38 @@ class _ArgDocCoder(
                     (concise == "-h")
                     and (mnemonic == "--help")
                     and (arg_help_line == addable_help)
+                    and (metavar is None)
                 ):
                     parts.add_help = True
 
                     no_lines = list()
                     return no_lines
+
+        # Empty Python Source
+
+        lines = self.emit_optional_as_python(
+            optionals_declaration, mnemonic=mnemonic, dest=dest
+        )
+        return lines
+
+    def emit_optional_as_python(self, optionals_declaration, mnemonic, dest):
+
+        # Pick out source fragments
+
+        option = optionals_declaration.arg_line.option
+        metavar = optionals_declaration.arg_line.metavar
+        alt_option = optionals_declaration.arg_line.alt_option
+        alt_metavar = optionals_declaration.arg_line.alt_metavar
+
+        nargs = optionals_declaration.arg_line.nargs
+        default = optionals_declaration.arg_line.default
+
+        arg_help_line = optionals_declaration.arg_line.arg_help_line
+
+        repr_help = black_repr(arg_help_line).replace("%", "%%")
+
+        assert option
+        assert (not alt_metavar) or (alt_metavar == metavar)
 
         # Emit Python source
 
@@ -829,6 +854,8 @@ class _ArgDocCoder(
         repr_alt = black_repr(alt_option)
         repr_var = black_repr(metavar)
         repr_dest = black_repr(dest)
+        repr_default = None if (default is None) else black_repr(default)
+        repr_nargs = None if (nargs is None) else black_repr(nargs)
 
         head_lines = [
             "parser.add_argument(",
@@ -860,29 +887,41 @@ class _ArgDocCoder(
 
         else:
 
+            suffixes = ""
+            if nargs is not None:
+                suffixes += " nargs={repr_nargs},".format(repr_nargs=repr_nargs)
+            if default is not None:
+                suffixes += " default={repr_default},".format(repr_default=repr_default)
+
             if not alt_option:
                 if dest == option.lower():
                     mid_lines = [
                         d
-                        + "{repr_option}, metavar={repr_var},".format(
-                            repr_option=repr_option, repr_var=repr_var
+                        + "{repr_option}, metavar={repr_var},{suffixes}".format(
+                            repr_option=repr_option,
+                            repr_var=repr_var,
+                            suffixes=suffixes,
                         )
                     ]
                 else:
                     mid_lines = [
                         d
-                        + "{repr_option}, metavar={repr_var}, dest={repr_dest},".format(
+                        + "{repr_option}, metavar={repr_var}, dest={repr_dest},{suffixes}".format(
                             repr_option=repr_option,
                             repr_var=repr_var,
                             repr_dest=repr_dest,
+                            suffixes=suffixes,
                         )
                     ]
             else:
                 assert dest == mnemonic.lower()
                 mid_lines = [
                     d
-                    + "{repr_option}, {repr_alt}, metavar={repr_var},".format(
-                        repr_option=repr_option, repr_alt=repr_alt, repr_var=repr_var
+                    + "{repr_option}, {repr_alt}, metavar={repr_var},{suffixes}".format(
+                        repr_option=repr_option,
+                        repr_alt=repr_alt,
+                        repr_var=repr_var,
+                        suffixes=suffixes,
                     )
                 ]
 
@@ -1251,6 +1290,7 @@ class _ArgDocTaker(argparse.Namespace):
         if arg_phrase.metavar:
             argument_line += " "
             argument_line += arg_phrase.metavar
+            # an arg phrase alone can't imply an arg line of:  --mnemonic [OPTIONAL_METAVAR]
 
         arg_line = ArgumentLineSyntaxTaker(argument_line)
 
@@ -1302,17 +1342,17 @@ class _ArgDocTaker(argparse.Namespace):
         argument_lines = list()
         dent = None
         while taker.peek_more():
-            line = taker.peek_one_shard()
-            if not line.startswith(" "):
+            argument_line = taker.peek_one_shard()
+            if not argument_line.startswith(" "):
                 break
-            assert line.startswith(" ")
+            assert argument_line.startswith(" ")
 
             denting = dent
-            dent = str_splitdent(line)
+            dent = str_splitdent(argument_line)
             if denting and (denting[0] < dent[0]):
-                argument_lines[-1] += "\n" + line  # FIXME: mutation
+                argument_lines[-1] += "\n" + argument_line  # FIXME: mutation
             else:
-                argument_lines.append(line)
+                argument_lines.append(argument_line)
 
             taker.take_one_shard()
 
@@ -1523,6 +1563,8 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
         self.metavar = None
         self.alt_option = None
         self.alt_metavar = None
+        self.nargs = None
+        self.default = None
         self.arg_help_line = None
 
         self._take_argument_line(argument_line)
@@ -1537,7 +1579,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
         stripped = argument_line.strip()
         if any(troubles):
             raise ArgDocError(
-                "want: {{[-c|--mnemonic] [METAVAR], ...}} got:  {}".format(stripped)
+                "want: {{[-c|--mnemonic] METAVAR, ...}} got:  {}".format(stripped)
             )
 
     def _take_argument_line(self, argument_line):
@@ -1561,6 +1603,14 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
             return
 
         self._take_1_2_4_argument_words(words)
+
+        if self.metavar:
+            if (self.alt_metavar is None) or (self.metavar == self.alt_metavar):
+                name = self.metavar.replace("[", "").replace("]", "")
+                if self.metavar == "[{}]".format(name):
+                    self.metavar = name
+                    self.nargs = "?"  # argparse.OPTIONAL
+                    self.default = False
 
     def _take_1_2_4_argument_words(self, words):
         """Return the possible parses of one or two [-c|--mnemonic] [METAVAR] argument syntax"""
@@ -1627,7 +1677,8 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
     def _format_argument_line(self):
         """Format as a line of optional or positional argument declaration in an Arg Doc"""
 
-        words = self._tuple_argument_words()
+        words = self._tuple_argument_line_words()
+
         shards = (
             (list(words) + ["", self.arg_help_line]) if self.arg_help_line else words
         )
@@ -1635,16 +1686,24 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
 
         return joined
 
-    def _tuple_argument_words(self):
-        """Format as a tuple of words to begin an argument declaration line in an Arg Doc"""
+    def _tuple_argument_line_words(self):
+        """Format as the first 1, 2, or 4 words of an argument declaration line in an Arg Doc"""
+
+        metavar = self.metavar
+        alt_metavar = self.alt_metavar
+        if self.nargs:
+            assert self.nargs == "?"  # argparse.OPTIONAL
+            assert self.default is False
+            metavar = "[{}]".format(self.metavar)
+            alt_metavar = "[{}]".format(self.alt_metavar)
 
         if not self.option and not self.alt_option:
 
-            words = (self.metavar,)
+            words = (metavar,)
 
         elif self.option and self.alt_option:
 
-            if not self.metavar:
+            if not metavar:
                 words = (
                     (self.option + ","),
                     self.alt_option,
@@ -1652,20 +1711,20 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
             else:
                 words = (
                     self.option,
-                    (self.metavar + ","),
+                    (metavar + ","),
                     self.alt_option,
-                    self.alt_metavar,
+                    alt_metavar,
                 )
 
         else:
             assert self.option and not self.alt_option
 
-            if not self.metavar:
+            if not metavar:
                 words = (self.option,)
             else:
                 words = (
                     self.option,
-                    self.metavar,
+                    metavar,
                 )
 
         return words
@@ -1750,6 +1809,7 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
         """Format as a phrase of a Usage Line in an Arg Doc"""
 
         joined = "[{}]".format(" ".join(self._calc_arg_key()))
+        # .nargs and .default stand alone in the Arg Line, do not change the Usage Phrase
 
         return joined
 

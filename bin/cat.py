@@ -55,19 +55,19 @@ def main(argv):
         args.show_tabs = True
         args.show_nonprinting = True
 
-    relpaths = args.files if args.files else ["-"]
+    paths = args.files if args.files else ["-"]
 
     # Catenate each binary (or text) file
 
-    if "-" in relpaths:
+    if "-" in paths:
         prompt_tty_stdin()
 
-    for relpath in relpaths:
-        if relpath == "-":
+    for path in paths:
+        if path == "-":
             cat_incoming(fd=sys.stdin.fileno(), args=args)
         else:
             try:
-                with open(relpath, "rb") as incoming:
+                with open(path, "rb") as incoming:
                     cat_incoming(fd=incoming.fileno(), args=args)
             except FileNotFoundError as exc:
                 stderr_print("cat.py: error: {}: {}".format(type(exc).__name__, exc))

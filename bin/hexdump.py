@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 
 r"""
-usage: hexdump.py [-h] [-C] [--bytes] [FILE [FILE ...]]
+usage: hexdump.py [-h] [-C] [--bytes BYTES] [--dump-byteset] [FILE [FILE ...]]
 
 show bytes as nybbles and more
 
 positional arguments:
-  FILE        a file to copy out
+  FILE             a file to copy out
 
 optional arguments:
-  -h, --help  show this help message and exit
-  -C          show bytes visibly as characters, not just as visually overloaded nybbles
-  --bytes     discard stdin and write the bytes b"\x00" through b"\xff" to stdout
+  -h, --help       show this help message and exit
+  -C               show bytes as characters, not just as visually overloaded nybbles
+  --bytes [BYTES]  show bytes as bytes:  distinct monospaced glyphs (default: 1 at a time)
+  --dump-byteset   first read a file of the bytes b"\x00" through b"\xff"
 
 bugs:
   too many emoji don't do monospace, and passing through arbitrary unicode has arbitrary effects
@@ -33,7 +34,7 @@ examples:
   echo hexdump | hexdump.py -C
   hexdump.py /dev/null
   echo -n 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | hexdump.py -C
-  hexdump.py --bytes | hexdump.py -C
+  hexdump.py --dump-byteset | hexdump.py -C
 """
 # FIXME: implement usage: hexdump.py -s OFFSET -n LENGTH  # accept 0x hex for either
 
@@ -47,11 +48,18 @@ import argdoc
 
 def main(argv):
 
+    # Fetch and auto-correct the args
+
     args = argdoc.parse_args(argv[1:])
+
+    if args.bytes is not False:
+        args.bytes = 1 if (args.bytes is None) else int(args.bytes)
+        args.C = True
+        assert args.bytes
 
     # Discard Stdin and write the bytes b"\x00" through b"\xFF" to Stdout
 
-    if args.bytes:
+    if args.dump_byteset:
         assert not args.files
 
         for xx in range(0x100):
@@ -65,13 +73,13 @@ def main(argv):
 
     dumper = HexDumper(args)
 
-    relpaths = args.files if args.files else ["-"]
+    paths = args.files if args.files else ["-"]
 
-    if "-" in relpaths:
+    if "-" in paths:
         prompt_tty_stdin()
 
-    for relpath in relpaths:
-        openable = "/dev/stdin" if (relpath == "-") else relpath
+    for path in paths:
+        openable = "/dev/stdin" if (path == "-") else path
         try:
             with open(openable, "rb") as incoming:
                 dumper.dump_incoming(incoming)
@@ -86,10 +94,13 @@ class HexDumper:
         self.args = args
 
         self.incomings = b""
+
         self.encodeds = b""
+        self.nybbleds = ""
         self.decodeds = ""
 
         self.offset = 0
+        self.skids_open = None
 
     def dump_incoming(self, incoming):
         """Pull each byte as needed"""
@@ -107,6 +118,8 @@ class HexDumper:
     def dump_decodables(self, more):
         """Dump only what's decodable, till there are no more bytes"""
 
+        args = self.args
+
         while True:
 
             some = b""
@@ -118,7 +131,7 @@ class HexDumper:
                 # Quit if more bytes needed for decode, till there are no more
 
                 xx = incomings[0]
-                len_decode = self.len_utf8_decode(xx)
+                len_decode = 1 if args.bytes else self.len_utf8_decode(xx)
                 if more:
                     if len(incomings) < len_decode:
                         break
@@ -130,17 +143,14 @@ class HexDumper:
                 # Decode all the bytes, else just the first byte
 
                 some = encodeds
-                if (len(encodeds) == 1) and (
-                    (ord(encodeds) < 0x20) or (ord(encodeds) == 0x7F)
-                ):
-                    _ = encodeds.decode()  # affirm no UnicodeDecodeError raised
-                    rep = chr(0x100 + ord(encodeds))  # not as decoded
-                else:
-                    try:
-                        rep = encodeds.decode()
+                rep = self.rep_byte_as_char(encodeds[:1])
+                if not args.bytes:
+                    try:  # decode if decodes, except keep \u00XX unprintables printable
+                        decoded = encodeds.decode()
+                        if len(some) > 1:
+                            rep = decoded
                     except UnicodeDecodeError:
                         some = encodeds[:1]
-                        rep = chr(0x100 + ord(encodeds[:1]))  # as if decoded
 
                 assert some
                 assert len(rep) == 1
@@ -150,12 +160,27 @@ class HexDumper:
             # Emit the byte or bytes, and the character
 
             more_here = more or self.incomings
-            self.dump_encodeds_decoded(some, rep=rep, more=more_here)
+            self.dump_one_char(some, rep=rep, more=more_here)
 
             # Quit after decoding all the fetched bytes
 
             if not self.incomings:
                 break
+
+    def rep_byte_as_char(self, encodeds):
+
+        assert len(encodeds) == 1
+
+        xx = ord(encodeds)
+        assert 0 <= xx <= 0xFF
+
+        rep = chr(0x100 + ord(encodeds))  # not as decoded
+        if 0x20 <= xx <= 0x7E:
+            rep = chr(xx)
+        elif (0xA1 <= xx) and (xx != 0xDA):
+            rep = chr(xx)
+
+        return rep
 
     def len_utf8_decode(self, xx):
         """Group one to eight bytes together, in the way of utf-8"""
@@ -170,41 +195,59 @@ class HexDumper:
 
         return len(masks)
 
-    def dump_encodeds_decoded(self, some, rep, more):
+    def dump_one_char(self, some, rep, more):
         """Dump a line at a time, untill there is no more"""
 
         self.encodeds += some
-        self.decodeds += len(some) * rep
+        self.nybbleds += "_".join("{:02X}".format(_) for _ in some) + " "
+        self.decodeds += rep.ljust(len(some))
 
         width = 0x10
         if (len(self.encodeds) >= width) or (not more):
 
-            self.dump_line(
-                self.encodeds[:width], decodeds=self.decodeds[:width], more=more
+            self.dump_line_of_chars(
+                self.encodeds[:width],
+                nybbleds=self.nybbleds[: (len("XX_") * width)],
+                decodeds=self.decodeds[:width],
+                more=more,
             )
+
             self.encodeds = self.encodeds[width:]
+            self.nybbleds = self.nybbleds[(len("XX_") * width) :]
             self.decodeds = self.decodeds[width:]
 
             assert len(self.encodeds) < width
 
         assert len(self.encodeds) == len(self.decodeds)
+        assert len(self.nybbleds) == (len("XX_") * len(self.encodeds))
 
-    def dump_line(self, encodeds, decodeds, more):
+    def dump_line_of_chars(self, encodeds, nybbleds, decodeds, more):
         """Dump 0x30 columns of 2 .. 0x20 nybbles, with an option for 1 .. 0x10 characters too"""
 
+        str_open = ("_" if self.skids_open else " ") if self.args.C else ""
+
         str_offset = "{:07X}".format(self.offset)
-        str_nybbles = self.str_nybbles(encodeds)
+        str_nybbles = self.str_nybbles(nybbleds)
         str_bytes = self.str_chars(decodeds)
 
         if not self.args.C:
             sep = " "
-            line = str_offset.lower() + sep[:-1] + str_nybbles.lower().replace("-", " ")
+            line = (
+                str_offset.lower()
+                + sep
+                + str_open
+                + str_nybbles.lower().replace("_", " ")
+            )
         else:
             sep = "  "
-            line = str_offset + sep[:-1] + str_nybbles + sep + "|" + str_bytes + "|"
+            line = (
+                str_offset + sep + str_open + str_nybbles + sep + "|" + str_bytes + "|"
+            )
+        line = line.rstrip()
 
         if encodeds:
-            print(line.rstrip())
+            print(line)
+            self.skids_open = str_nybbles.endswith("_")
 
         self.offset += len(encodeds)
 
@@ -214,26 +257,27 @@ class HexDumper:
             else:
                 print("{:07X}".format(self.offset))
 
-    def str_nybbles(self, encodeds):
-        """Format 0x30 chars  to rep between 2 and 0x20 nybbles"""
+    def str_nybbles(self, nybbleds):
+        """Format 0x30 chars to rep between 2 and 0x20 nybbles"""
 
-        reps = ""
-        for index in range(0x10):
-            if index >= len(encodeds):
-                reps += "   "
-            else:
-                ord_byte = encodeds[index]
-                sep = "-" if (index % 4) else " "
-                reps += "{}{:02X}".format(sep, ord_byte)
+        reps = nybbleds.ljust(len("XX_") * 0x10)
 
         return reps
 
     def str_chars(self, decodeds):
+        """Format between 1 and 0x10 chars, with " " spaces injected to group them, or not"""
+
+        stride = self.args.bytes
+
+        if stride is False:
+            return decodeds
+
+        assert stride
 
         reps = ""
-        for index in range(0, len(decodeds), 4):
+        for index in range(0, len(decodeds), stride):
             reps += " "
-            reps += decodeds[index:][:4]
+            reps += decodeds[index:][:stride]
         if decodeds:
             reps += " "
 
