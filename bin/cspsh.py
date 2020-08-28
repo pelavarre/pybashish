@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 r"""
-usage: cspsh.py [-h] [-f] [-i] [-q] [-v]
+usage: cspsh.py [-h] [-c COMMAND] [-f] [-i] [-q] [-v]
 
 chat of "communicating sequential processes"
 
 optional arguments:
   -h, --help      show this help message and exit
+  -c COMMAND      interpret one command without prompting for more
   -f, --force     ask less questions
   -i, --interact  ask more questions
   -q, --quiet     say less
@@ -15,15 +16,20 @@ optional arguments:
 csp examples:
   tick → STOP
   tick → tick → STOP
-  CLOCK = (tick → CLOCK)
+  CLOCK = (tick → tock → CLOCK)
   CLOCK
 
 examples:
   cspsh.py -i  # chat out one result at a time
   cspsh.py -f  # dump a large pile of results
 """
-# FIXME: limit the trace of ProcessWithSuch to its alphabet
+# FIXME: disentangle "passme.cspvm" from "def CspCommandLine"
+# FIXME: add labels into the trace as labels X: CLOCK: etc
+# FIXME: flush events to trace when they happen: stop delaying whole trace lines
+# FIXME: trace EventChoice sources indented as well as traces
 # FIXME: clean up the echo to interleave prompt and input, for paste of multiple input lines
+# FIXME: limit the trace of ProcessWithSuch to its alphabet
+# FIXME: all 5 of the f-i-x-m-e scattered far below
 
 
 import argparse
@@ -39,7 +45,7 @@ CspWord = collections.namedtuple("CspWord", "kind, chars".split(", "))
 
 
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
-MARK_REGEX = r"(?P<mark>[():={|}µ•→⟨⟩])"
+MARK_REGEX = r"(?P<mark>[(),:={|}µ•→⟨⟩])"
 BLANKS_REGEX = r"(?P<blanks>[ ]+)"
 
 SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
@@ -49,8 +55,8 @@ OPEN_MARK_REGEX = r"[(\[{⟨]"
 CLOSE_MARK_REGEX = r"[)\]}⟩]"
 
 
-class CspError(Exception):
-    pass
+class CspError(SyntaxError):
+    """Mark compilation errors"""
 
 
 def main():
@@ -63,150 +69,22 @@ def main():
         stderr_print("cspsh.py: error: choose --force or --interact")
         sys.exit(2)  # exit 2 from rejecting usage
 
-    verbose_print()
-    verbose_print()
-
     lines = list()
     if args.force:
-
-        lines = (
-            textwrap.dedent(
-                """
-
-                #
-                # test examples from the help lines
-                #
-
-                tick → STOP
-                tick → tick → STOP
-                CLOCK = (tick → CLOCK)
-                CLOCK
-
-
-                #
-                # test more examples from us
-                #
-
-                HER.WALTZ = (
-                    her.right.back → her.left.hook.back → her.right.close →
-                    her.left.forward → her.right.hook.forward → her.left.close →
-                    HER.WALTZ)
-                HIS.WALTZ = (
-                    his.left.forward → his.right.hook.forward → his.left.close →
-                    his.right.back → his.left.hook.back → his.right.close →
-                    HIS.WALTZ)
-                HER.WALTZ
-                HIS.WALTZ
-
-
-                #
-                # test examples from the textbook
-                #
-
-
-                # 1.1.1 Prefix
-
-                coin → STOP  # 1.1.1 X1
-                coin → choc → coin → choc → STOP  # 1.1.1 X2
-
-                CTR = (right → up → right → right → STOP)  # 1.1.1 X3
-                CTR
-                x → y  # meaningless per process name 'y' is not upper case 'Y'
-                P → Q  # meaningless per event name 'P' is not lower case 'p'
-                x → (y → STOP)
-
-
-                # 1.1.2 Recursion
-
-                CLOCK = (tick → CLOCK)
-                CLOCK
-
-                CLOCK = (tick → tick → tick → CLOCK)
-                CLOCK
-
-                CLOCK = µ X : {tick} • (tick → X)  # 1.1.2 X1
-                CLOCK
-
-                VMS = (coin → (choc → VMS))  # 1.1.2 X2
-                VMS
-
-                CH5A = (in5p → out2p → out1p → out2p → CH5A)  # 1.1.2 X3
-                CH5A
-
-                CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
-                CH5B
-
-
-                # 1.1.3 Choice
-
-                (up → STOP | right → right → up → STOP)  # 1.1.3 X1
-
-                CH5C = in5p → (  # 1.1.3 X2
-                    out1p → out1p → out1p → out2p → CH5C |
-                    out2p → out1p → out2p → CH5C)
-                CH5C
-
-                (x → P | y → Q)
-
-                VMCT = µ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
-                VMCT
-
-                VMC = (in2p → (large → VMC |  # 1.1.3 X4
-                               small → out1p → VMC) |
-                       in1p → (small → VMC |
-                               in1p → (large → VMC |
-                                       in1p → STOP)))
-                VMC
-
-                VMCRED = µ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
-                VMCRED
-
-                VMS2 = (coin → VMCRED)  # 1.1.3 X6
-                VMS2
-
-                COPYBIT = µ X • (in.0 → out.0 → X |  # 1.1.3 X7
-                                 in.1 → out.1 → X)
-                COPYBIT
-
-                (x → P | y → Q | z → R)
-                (x → P | x → Q)  # meaningless per choices not distinct: ['x', 'x']
-                (x → P | y)  # meaningless per '| y)' is not '| y → Q'
-                (x → P) | (y → Q)  # meaningless per | is not an operator on processes
-                (x → P | (y → Q | z → R))
-
-                # RUN-A = (x:A → RUN-A)  # 1.1.3 X8
-
-
-                # 1.1.4 Mutual recursion
-
-                DD1 = (setorange → O1 | setlemon → L1)
-                O1 = (orange → O1 | setlemon → L1 | setorange → O1)
-                L1 = (lemon → L1 | setorange → O1 | setlemon → L1)
-
-                O2 = (orange → O2 | setlemon → L2 | setorange → O2)
-                L2 = (lemon → L2 | setorange → O2 | setlemon → L2)
-                DD2 = (setorange → O2 | setlemon → L2)
-
-                L3 = (lemon → L3 | setorange → O3 | setlemon → L3)
-                O3 = (orange → O3 | setlemon → L3 | setorange → O3)
-                DD3 = (setlemon → L3 | setorange → O3)
-
-                DD4 = (setorange → O4 | setlemon → L4)
-                L4 = (lemon → L4 | setorange → O4 | setlemon → L4)
-                O4 = (orange → O4 | setlemon → L4 | setorange → O4)
-
-                DD1
-                DD2
-                DD3
-                DD4
-
-                """
-            )
-            .strip()
-            .splitlines(keepends=True)
-        )
-
+        lines = textwrap.dedent(TEST_LINES).strip().splitlines(keepends=True)
         lines.append("")
+
+    if args.command is not None:
+        lines.append(args.command + "\n")
+        lines.append("")
+
+    run_cspvm(lines, args=args)
+
+
+def run_cspvm(lines, args):
+
+    verbose_print()
+    verbose_print()
 
     if not args.quiet:
         stderr_print("Type some line of CSP, press Return to see it run")
@@ -223,7 +101,7 @@ def main():
         ccl = CspCommandLine()
         ccl.give_one_sourceline(line)
         try:
-            worker = ccl.take_one(ccl.taker)
+            ccl_ccl = ccl.take_one(ccl.taker)  # FIXME: disentangle ccl_ccl vs ccl
         except CspError as exc:
             stderr_print("cspsh.py: error: {}: {}".format(type(exc).__name__, exc))
             continue
@@ -233,13 +111,15 @@ def main():
             stderr_print("cspsh.py: error: {}: {}".format(type(exc).__name__, exc))
             raise
 
-        verbose_print("+++", worker)
-        verbose_print()
+        str_worker = str(ccl_ccl)
+        if str_worker:
+            verbose_print("+++", str_worker)
+            verbose_print()
 
         top = argparse.Namespace()
-        vars(top)[type(worker).__name__] = worker
+        vars(top)[type(ccl_ccl).__name__] = ccl_ccl
 
-        worker()
+        ccl_ccl()
 
         verbose_print()
         verbose_print()
@@ -340,8 +220,8 @@ class CspWorker(argparse.Namespace):
     """Work through a process"""
 
     def __call__(self):
-        if self.worker:
-            self.worker()
+        print(type(self).__name__)  # FIXME: more of a log message here
+        assert False
 
     def __repr__(self):
         return object.__repr__(self)
@@ -355,9 +235,9 @@ class CspWorker(argparse.Namespace):
 class CspCommandLine(CspWorker):
     """Work through a line of source code"""
 
-    top_worker = None
+    cspvm = None
 
-    processes_by_name = dict()
+    process_callers_by_name = dict()
 
     def __init__(self, **kwargs):
         CspWorker.__init__(self, **kwargs)
@@ -367,17 +247,21 @@ class CspCommandLine(CspWorker):
         self.crossings = list()
         self.gotos = list()
 
-        CspCommandLine.top_worker = self
+        CspCommandLine.cspvm = self
 
     def __call__(self):
+
         worker = self.worker
         if worker:
+
             self.trace_open(crossing=False)
             worker()
             self.trace_close()
 
     def __str__(self):
-        return str(self.str_worker)
+        if self.str_worker:
+            return str(self.str_worker)
+        return ""
 
     def trace_open(self, crossing):
         traces = self.traces
@@ -426,30 +310,34 @@ class CspCommandLine(CspWorker):
         if trace and (trace[0] == "⟩"):
             chars += "⟩"
             trace = trace[1:]
+        else:
+            if chars[-1] != "⟨":
+                chars += ","
 
         assert "None" not in chars  # PL FIXME: too strict?
 
         print(dents + chars)
 
-    def call_named_process(self, name, process):
-        assert name and process
+    def goto_named_process(self, name, process):
+        """Call the process, else print a less infinite substitute"""
+
+        assert process
 
         crossings = self.crossings
         crossing = crossings[-1] if crossings else None
-
         if crossing:
+            if process in self.gotos:
+                CspCommandLine.cspvm.trace(name, ". . .")
+                return
 
-            CspCommandLine.top_worker.trace(name, ". . .")
+        self.gotos.append(process)
 
-        else:
+        count = self.gotos.count(process)
+        if count > 3:
+            CspCommandLine.cspvm.trace(name, "...")
+            return
 
-            self.gotos.append(name)
-            count = self.gotos.count(name)
-
-            if count > 3:
-                CspCommandLine.top_worker.trace(name, "...")
-            else:
-                process()
+        process()
 
     @classmethod
     def take_one(cls, taker):
@@ -461,11 +349,12 @@ class CspCommandLine(CspWorker):
             words = taker.peek_some_shards(2)
             if words[-1] and (words[1][1] == "="):
                 define_process = DefineProcess.take_one(taker)
+                worker = None
                 str_worker = define_process
-                worker = None  # FIXME FIXME: worker = CspStrWorker(define_process)
             else:
-                worker = Process.take_one(taker)
-                str_worker = worker
+                process = Process.take_one(taker)
+                worker = process
+                str_worker = process
 
             if taker.peek_more():
                 words = SomeCspWords.take_one(taker)
@@ -473,8 +362,8 @@ class CspCommandLine(CspWorker):
 
             taker.take_beyond_shards()
 
-        worker = CspCommandLine(str_worker=str_worker, worker=worker)
-        return worker
+        ccl = CspCommandLine(worker=worker, str_worker=str_worker)
+        return ccl
 
     def give_one_sourceline(self, line):
 
@@ -517,47 +406,60 @@ class CspCommandLine(CspWorker):
 class Process(CspWorker):
     """Work through a process"""
 
+    def __call__(self):
+        self.worker()
+
     @classmethod
     def take_one(cls, taker):
 
         words = taker.peek_some_shards(2)
         if words[-1] and (words[0].chars == "("):
-            worker = OpenProcessClose.take_one(taker, after_mark="(", upto_mark=")")
+            opc = OpenProcessClose.take_one(taker, after_mark="(", upto_mark=")")
+            worker = opc
         elif words[-1] and (words[1].chars == "→"):
-            worker = EventChoice.take_one(taker)
+            event_choice = EventChoice.take_one(taker)
+            worker = event_choice
         else:
-            worker = ProcessCaller.take_one(taker)
+            process_caller = ProcessCaller.take_one(taker)
+            worker = process_caller
 
-        worker = Process(worker=worker)
-        return worker
+        process = Process(worker=worker)
+        return process
 
 
 class OpenProcessClose(CspWorker):
     """Define a process as the work after a "(" mark and before a ")" mark"""
 
+    def __call__(self):
+        self.process()
+
     @classmethod
-    def take_one(self, taker, after_mark, upto_mark):
+    def take_one(cls, taker, after_mark, upto_mark):
 
         open_after = CspOpenMark.take_one(taker, after_mark)
-        worker = Process.take_one(taker)
+        process = Process.take_one(taker)
         upto_close = CspCloseMark.take_one(taker, upto_mark)
 
-        worker = OpenProcessClose(
-            open_after=open_after, worker=worker, upto_close=upto_close,
+        opc = OpenProcessClose(
+            open_after=open_after, process=process, upto_close=upto_close,
         )
-        return worker
+        return opc
 
 
 class EventChoice(CspWorker):
     """Let the work through a first event choose which process comes next"""
 
     def __call__(self):
-        last_index = len(self.choices) - 1
-        for (index, choice,) in enumerate(self.choices):
-            crossing = index < last_index
-            CspCommandLine.top_worker.trace_open(crossing)
+        if len(self.choices) == 1:
+            choice = self.choices[0]
             choice()
-            CspCommandLine.top_worker.trace_close()
+        else:
+            last_index = len(self.choices) - 1
+            for (index, choice,) in enumerate(self.choices):
+                crossing = index < last_index
+                CspCommandLine.cspvm.trace_open(crossing)
+                choice()
+                CspCommandLine.cspvm.trace_close()
 
     def __str__(self):
 
@@ -573,7 +475,7 @@ class EventChoice(CspWorker):
         return chars
 
     @classmethod
-    def take_one(self, taker):
+    def take_one(cls, taker):
 
         choices = list()
         bars = list()
@@ -629,12 +531,8 @@ class EventChoice(CspWorker):
         if collisions:
             raise CspError("choices not distinct: {}".format(collisions))
 
-        if len(choices) == 1:
-            worker = choices[0]
-            return worker
-
-        worker = EventChoice(choices=choices, bars=bars)
-        return worker
+        event_choice = EventChoice(choices=choices, bars=bars)
+        return event_choice
 
 
 class EventThenProcess(CspWorker):
@@ -644,12 +542,12 @@ class EventThenProcess(CspWorker):
 
         name = self.event_name.name
         assert name
-        CspCommandLine.top_worker.trace(name)
+        CspCommandLine.cspvm.trace(name)
 
         self.worker()
 
     @classmethod
-    def take_one(self, taker):
+    def take_one(cls, taker):
 
         event_names = list()
         then_marks = list()
@@ -679,91 +577,113 @@ class EventThenProcess(CspWorker):
         else:
             worker = Process.take_one(taker)
 
+        event_then_process = None
         pairs = zip(event_names, then_marks)
         for (event_name, then_mark,) in reversed(list(pairs)):
-            worker = EventThenProcess(
+            event_then_process = EventThenProcess(
                 event_name=event_name, then_mark=then_mark, worker=worker
             )
+            worker = event_then_process
 
-        return worker
+        assert event_then_process
+        return event_then_process
 
 
 class ProcessCaller(CspWorker):
     """Call a process by name"""
 
-    def __str__(self):
-        return str(self.source)
-
     def __call__(self):
 
-        source = self.source
-        name = self.process_name.name
+        name = self.name
         process = self.process
 
-        if not source:
-            process()
-        elif process:
-            CspCommandLine.top_worker.call_named_process(name, process)
-        elif name == "STOP":
-            CspCommandLine.top_worker.trace(name)
+        if process:
+            if not isinstance(process, ProcessCaller):
+                CspCommandLine.cspvm.goto_named_process(name, process=process)
+            else:  # trace → X as the P at µ X in P = µ X : ... • ... → X
+                process_caller = process
+                CspCommandLine.cspvm.goto_named_process(
+                    process_caller.name, process=process_caller.process
+                )
+
+        elif name in CspCommandLine.cspvm.process_callers_by_name:
+
+            process_caller = CspCommandLine.cspvm.process_callers_by_name[name]
+            CspCommandLine.cspvm.goto_named_process(name, process=process_caller)
+            # FIXME: think into making this late binding sticky or no
+
         else:
-            CspCommandLine.top_worker.trace(name + "!")
+
+            if name == "STOP":
+                CspCommandLine.cspvm.trace(name)
+            else:
+                CspCommandLine.cspvm.trace(name + "!")
+
+    def __str__(self):
+        return str(self.process_name)
 
     @classmethod
     def take_one(cls, taker):
 
         process_name = ProcessName.take_one(taker)
-        source = process_name.name
+        name = process_name.name
 
         process = None
-        process_name = process_name
-        if process_name.name in CspCommandLine.processes_by_name:
-            process = CspCommandLine.processes_by_name[process_name.name]
-            process_name = process.process_name
+        if name in CspCommandLine.process_callers_by_name:
+            inner_process_caller = CspCommandLine.process_callers_by_name[name]
+            process = inner_process_caller
 
-        worker = ProcessCaller(
-            source=source, process_name=process_name, process=process
-        )
-        return worker
+        process_caller = ProcessCaller(process_name=process_name, process=process,)
+        process_caller.name = name
+
+        return process_caller
 
 
 class DefineProcess(CspWorker):
     """Name a process to call"""
 
-    def __call__(self):
-        assert False
-
-    def __str__(self):
-        chars = "{}{}{}".format(self.process_name, self.is_mark, self.body)
-        return chars
-
     @classmethod
-    def take_one(self, taker):
+    def take_one(cls, taker):
 
-        process_name = ProcessName.take_one(taker)
+        process_caller = ProcessCaller.take_one(taker)
+
+        name = process_caller.name
+        if process_caller.process is not None:
+            process_caller.process = None  # mutate, when not single-assignment
+
+        CspCommandLine.process_callers_by_name[name] = process_caller  # add or mutate
+
         is_mark = CspMark.take_one(taker, "=")
 
-        process_caller = ProcessCaller(source=None, process_name=process_name)
-        CspCommandLine.processes_by_name[process_name.name] = process_caller
-
         word = taker.peek_one_shard()
-        if word.chars == "µ":
-            body = ProcessWithSuch.take_one(taker, process_caller)
+        if word.chars != "µ":
+            process = Process.take_one(taker)
+            definition = process
+            process_caller_process = process
         else:
-            body = Process.take_one(taker)
-            process_caller.process = body
+            process_with_such = ProcessWithSuch.take_one(taker)
+            definition = process_with_such
+            process_caller_process = definition.process_caller
 
-        assert CspCommandLine.processes_by_name[process_name.name] == process_caller
+            assert process_with_such.process_caller.name
+            process_with_such.process_caller.name = name
+            # trace µ X as P in P = µ X : ... • ... → X
 
-        worker = DefineProcess(process_name=process_name, is_mark=is_mark, body=body)
-        return worker
+        assert CspCommandLine.process_callers_by_name[name] == process_caller
+        assert process_caller.process is None
+        process_caller.process = process_caller_process
+
+        define_process = DefineProcess(
+            process_caller=process_caller, is_mark=is_mark, definition=definition
+        )
+        return define_process
 
 
 class ProcessWithSuch(CspWorker):
     """Give a process a local name and an alphabet"""
 
     def __call__(self):
-        assert False
+        self.body()
 
     def __str__(self):
 
@@ -778,45 +698,49 @@ class ProcessWithSuch(CspWorker):
         return chars
 
     @classmethod
-    def take_one(self, taker, process_caller):
+    def take_one(cls, taker):
 
         the_process_mark = CspMark.take_one(taker, "µ")
-        process_name = ProcessName.take_one(taker)
 
-        assert process_name.name not in CspCommandLine.processes_by_name.keys()
-        CspCommandLine.processes_by_name[process_name.name] = process_caller
+        process_caller = ProcessCaller.take_one(taker)
+        name = process_caller.name
 
-        word = taker.peek_one_shard()
-        if word and (word.chars != ":"):  # defer EOF into "with_alphabet_mark ="
-            with_alphabet_mark = None
-            alphabet = None
-        else:
-            with_alphabet_mark = CspMark.take_one(taker, ":")
-            alphabet = CspAlphabet.take_one(taker, after_mark="{", upto_mark="}")
+        assert name not in CspCommandLine.process_callers_by_name
+        assert process_caller.process is None
 
-        such_that_mark = CspMark.take_one(taker, "•")
-        process = Process.take_one(taker)
+        CspCommandLine.process_callers_by_name[name] = process_caller
+        if True:
 
-        assert CspCommandLine.processes_by_name[process_name.name] == process_caller
-        process_caller.process = process
-        del CspCommandLine.processes_by_name[process_name.name]
+            word = taker.peek_one_shard()
+            if word and (word.chars != ":"):  # defer EOF into "with_alphabet_mark ="
+                with_alphabet_mark = None
+                alphabet = None
+            else:
+                with_alphabet_mark = CspMark.take_one(taker, ":")
+                alphabet = CspAlphabet.take_one(taker, after_mark="{", upto_mark="}")
 
-        worker = ProcessWithSuch(
+            such_that_mark = CspMark.take_one(taker, "•")
+            body = Process.take_one(taker)
+
+            assert CspCommandLine.process_callers_by_name[name] == process_caller
+            assert process_caller.process is None
+            process_caller.process = body
+
+        del CspCommandLine.process_callers_by_name[name]
+
+        process_with_such = ProcessWithSuch(
             the_process_mark=the_process_mark,
-            process_name=process_name,
+            process_caller=process_caller,
             with_alphabet_mark=with_alphabet_mark,
             alphabet=alphabet,
             such_that_mark=such_that_mark,
-            process=process,
+            body=body,
         )
-        return worker
+        return process_with_such
 
 
 class CspAlphabet(CspWorker):
     """Collect events into an alphabet"""
-
-    def __call__(self):
-        assert False
 
     def __str__(self):
 
@@ -834,7 +758,7 @@ class CspAlphabet(CspWorker):
         return chars
 
     @classmethod
-    def take_one(self, taker, after_mark, upto_mark):
+    def take_one(cls, taker, after_mark, upto_mark):
 
         open_after = CspOpenMark.take_one(taker, after_mark)
 
@@ -858,20 +782,20 @@ class CspAlphabet(CspWorker):
         event_names.append(event_name)
 
         upto_close = CspCloseMark.take_one(taker, upto_mark)
-        worker = CspAlphabet(
+        csp_alphabet = CspAlphabet(
             open_after=open_after,
             event_names=event_names,
             comma_marks=comma_marks,
             upto_close=upto_close,
         )
-        return worker
+        return csp_alphabet
 
 
 class EventName(CspWorker):
     """Capture the lowercase name of an event"""
 
     @classmethod
-    def take_one(self, taker):
+    def take_one(cls, taker):
 
         csp_name = CspName.take_one(taker)
 
@@ -882,15 +806,15 @@ class EventName(CspWorker):
                 )
             )
 
-        worker = EventName(name=csp_name.name)
-        return worker
+        event_name = EventName(name=csp_name.name)
+        return event_name
 
 
 class ProcessName(CspWorker):
     """Capture the uppercase name of a process"""
 
     @classmethod
-    def take_one(self, taker):
+    def take_one(cls, taker):
 
         csp_name = CspName.take_one(taker)
 
@@ -901,23 +825,23 @@ class ProcessName(CspWorker):
                 )
             )
 
-        worker = EventName(name=csp_name.name)
-        return worker
+        process_name = ProcessName(name=csp_name.name)
+        return process_name
 
 
 class CspName(CspWorker):
     """Capture a fragment of source that names something else"""
 
     @classmethod
-    def take_one(self, taker):
+    def take_one(cls, taker):
 
         word = taker.peek_one_shard()
         assert word.kind == "name"
         name = word.chars
         taker.take_one_shard()
 
-        worker = CspName(name=name)
-        return worker
+        csp_name = CspName(name=name)
+        return csp_name
 
 
 class CspOpenMark(CspWorker):
@@ -928,12 +852,12 @@ class CspOpenMark(CspWorker):
         return chars
 
     @classmethod
-    def take_one(self, taker, mark):
+    def take_one(cls, taker, mark):
 
         csp_mark = CspMark.take_one(taker, mark=mark)
 
-        worker = CspOpenMark(mark=csp_mark.mark)
-        return worker
+        csp_open_mark = CspOpenMark(mark=csp_mark.mark)
+        return csp_open_mark
 
 
 class CspCloseMark(CspWorker):
@@ -944,12 +868,12 @@ class CspCloseMark(CspWorker):
         return chars
 
     @classmethod
-    def take_one(self, taker, mark):
+    def take_one(cls, taker, mark):
 
         csp_mark = CspMark.take_one(taker, mark=mark)
 
-        worker = CspCloseMark(mark=csp_mark.mark)
-        return worker
+        csp_close_mark = CspCloseMark(mark=csp_mark.mark)
+        return csp_close_mark
 
 
 class CspMark(CspWorker):
@@ -960,22 +884,19 @@ class CspMark(CspWorker):
         return chars
 
     @classmethod
-    def take_one(self, taker, mark):
+    def take_one(cls, taker, mark):
 
         word = taker.peek_one_shard()
         assert word.kind == "mark"
         assert word.chars == mark
         taker.take_one_shard()
 
-        worker = CspMark(mark=word.chars)
-        return worker
+        csp_mark = CspMark(mark=word.chars)
+        return csp_mark
 
 
 class SomeCspWords(CspWorker):
     """Take the remaining words"""
-
-    def __call__(self):
-        assert False
 
     def __str__(self):
 
@@ -984,7 +905,7 @@ class SomeCspWords(CspWorker):
         return chars
 
     @classmethod
-    def take_one(self, taker):
+    def take_one(cls, taker):
 
         assert taker.peek_more()
 
@@ -999,8 +920,8 @@ class SomeCspWords(CspWorker):
 
             workers.append(worker)
 
-        worker = SomeCspWords(workers=workers)
-        return worker
+        some_csp_words = SomeCspWords(workers=workers)
+        return some_csp_words
 
 
 #
@@ -1112,6 +1033,146 @@ def verbose_print(*args, **kwargs):
     if main.args.verbose:
         print(*args, **kwargs, file=sys.stderr)
     sys.stderr.flush()  # for when kwargs["end"] != "\n"
+
+
+#
+# Supply the self-test with input
+#
+
+
+TEST_LINES = """
+
+    #
+    # test examples from the help lines
+    #
+
+    tick → STOP
+    tick → tick → STOP
+    CLOCK = (tick → tock → CLOCK)
+    CLOCK
+
+
+    #
+    # test more examples from us
+    #
+
+    CLOCK = µ X : {tick, tock} • (tick → tock → X)
+    CLOCK
+
+    HER.WALTZ = (
+        her.right.back → her.left.hook.back → her.right.close →
+        her.left.forward → her.right.hook.forward → her.left.close →
+        HER.WALTZ)
+    HIS.WALTZ = (
+        his.left.forward → his.right.hook.forward → his.left.close →
+        his.right.back → his.left.hook.back → his.right.close →
+        HIS.WALTZ)
+    HER.WALTZ
+    HIS.WALTZ
+
+
+    #
+    # test examples from the textbook
+    #
+
+
+    # 1.1.1 Prefix
+
+    coin → STOP  # 1.1.1 X1
+    coin → choc → coin → choc → STOP  # 1.1.1 X2
+
+    CTR = (right → up → right → right → STOP)  # 1.1.1 X3
+    CTR
+    x → y  # meaningless per process name 'y' is not upper case 'Y'
+    P → Q  # meaningless per event name 'P' is not lower case 'p'
+    x → (y → STOP)
+
+
+    # 1.1.2 Recursion
+
+    CLOCK = (tick → CLOCK)
+    CLOCK
+
+    CLOCK = (tick → tick → tick → CLOCK)
+    CLOCK
+
+    CLOCK = µ X : {tick} • (tick → X)  # 1.1.2 X1
+    CLOCK
+
+    VMS = (coin → (choc → VMS))  # 1.1.2 X2
+    VMS
+
+    CH5A = (in5p → out2p → out1p → out2p → CH5A)  # 1.1.2 X3
+    CH5A
+
+    CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
+    CH5B
+
+
+    # 1.1.3 Choice
+
+    (up → STOP | right → right → up → STOP)  # 1.1.3 X1
+
+    CH5C = in5p → (  # 1.1.3 X2
+        out1p → out1p → out1p → out2p → CH5C |
+        out2p → out1p → out2p → CH5C)
+    CH5C
+
+    (x → P | y → Q)
+
+    VMCT = µ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
+    VMCT
+
+    VMC = (in2p → (large → VMC |  # 1.1.3 X4
+                   small → out1p → VMC) |
+           in1p → (small → VMC |
+                   in1p → (large → VMC |
+                           in1p → STOP)))
+    VMC
+
+    VMCRED = µ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
+    VMCRED
+
+    VMS2 = (coin → VMCRED)  # 1.1.3 X6
+    VMS2
+
+    COPYBIT = µ X • (in.0 → out.0 → X |  # 1.1.3 X7
+                     in.1 → out.1 → X)
+    COPYBIT
+
+    (x → P | y → Q | z → R)
+    (x → P | x → Q)  # meaningless per choices not distinct: ['x', 'x']
+    (x → P | y)  # meaningless per '| y)' is not '| y → Q'
+    (x → P) | (y → Q)  # meaningless per | is not an operator on processes
+    (x → P | (y → Q | z → R))
+
+    # RUN-A = (x:A → RUN-A)  # 1.1.3 X8
+
+
+    # 1.1.4 Mutual recursion
+
+    DD1 = (setorange → O1 | setlemon → L1)
+    O1 = (orange → O1 | setlemon → L1 | setorange → O1)
+    L1 = (lemon → L1 | setorange → O1 | setlemon → L1)
+
+    O2 = (orange → O2 | setlemon → L2 | setorange → O2)
+    L2 = (lemon → L2 | setorange → O2 | setlemon → L2)
+    DD2 = (setorange → O2 | setlemon → L2)
+
+    L3 = (lemon → L3 | setorange → O3 | setlemon → L3)
+    O3 = (orange → O3 | setlemon → L3 | setorange → O3)
+    DD3 = (setlemon → L3 | setorange → O3)
+
+    DD4 = (setorange → O4 | setlemon → L4)
+    L4 = (lemon → L4 | setorange → O4 | setlemon → L4)
+    O4 = (orange → O4 | setlemon → L4 | setorange → O4)
+
+    DD1
+    DD2
+    DD3
+    DD4
+
+    """
 
 
 if __name__ == "__main__":

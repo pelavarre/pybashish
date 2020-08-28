@@ -16,10 +16,10 @@ Press ⌃D EOF or ⌃C SIGINT or ⌃\ SIGQUIT to quit
 ??  tick → tick → STOP
 ⟨tick, tick, STOP⟩
 
-??  CLOCK = (tick → CLOCK)
+??  CLOCK = (tick → tock → CLOCK)
 
 ??  CLOCK
-⟨tick, tick, tick, CLOCK, ...⟩
+⟨tick, tock, tick, tock, tick, tock, CLOCK, ...⟩
 
 ??
 
@@ -30,6 +30,13 @@ Press ⌃D EOF or ⌃C SIGINT or ⌃\ SIGQUIT to quit
 ??  # test more examples from us
 
 ??  #
+
+??
+
+??  CLOCK = µ X : {tick, tock} • (tick → tock → X)
+
+??  CLOCK
+⟨tick, tock, tick, tock, tick, tock, CLOCK, ...⟩
 
 ??
 
@@ -158,11 +165,11 @@ cspsh.py: error: CspError: event name 'P' is not lower case 'p'
 |>      out2p → out1p → out2p → CH5C)
 
 ??  CH5C
-⟨in5p
+⟨in5p,
     ⟨out1p, out1p, out1p, out2p, CH5C, . . .⟩
-    ⟨out2p, out1p, out2p, in5p
+    ⟨out2p, out1p, out2p, in5p,
         ⟨out1p, out1p, out1p, out2p, CH5C, . . .⟩
-        ⟨out2p, out1p, out2p, in5p
+        ⟨out2p, out1p, out2p, in5p,
             ⟨out1p, out1p, out1p, out2p, CH5C, . . .⟩
             ⟨out2p, out1p, out2p, CH5C, ...⟩
         ⟩
@@ -182,11 +189,11 @@ cspsh.py: error: CspError: event name 'P' is not lower case 'p'
 ??  VMCT = µ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
 
 ??  VMCT
-⟨coin
+⟨coin,
     ⟨choc, VMCT, . . .⟩
-    ⟨toffee, coin
+    ⟨toffee, coin,
         ⟨choc, VMCT, . . .⟩
-        ⟨toffee, coin
+        ⟨toffee, coin,
             ⟨choc, VMCT, . . .⟩
             ⟨toffee, VMCT, ...⟩
         ⟩
@@ -203,37 +210,37 @@ cspsh.py: error: CspError: event name 'P' is not lower case 'p'
 
 ??  VMC
 ⟨
-    ⟨in2p
+    ⟨in2p,
         ⟨large, VMC, . . .⟩
-        ⟨small, out1p
-            ⟨in2p
+        ⟨small, out1p,
+            ⟨in2p,
                 ⟨large, VMC, . . .⟩
-                ⟨small, out1p
-                    ⟨in2p
+                ⟨small, out1p,
+                    ⟨in2p,
                         ⟨large, VMC, . . .⟩
                         ⟨small, out1p, VMC, ...⟩
                     ⟩
-                    ⟨in1p
+                    ⟨in1p,
                         ⟨small, VMC, . . .⟩
-                        ⟨in1p
+                        ⟨in1p,
                             ⟨large, VMC, . . .⟩
                             ⟨in1p, STOP⟩
                         ⟩
                     ⟩
                 ⟩
             ⟩
-            ⟨in1p
+            ⟨in1p,
                 ⟨small, VMC, . . .⟩
-                ⟨in1p
+                ⟨in1p,
                     ⟨large, VMC, . . .⟩
                     ⟨in1p, STOP⟩
                 ⟩
             ⟩
         ⟩
     ⟩
-    ⟨in1p
+    ⟨in1p,
         ⟨small, VMC, . . .⟩
-        ⟨in1p
+        ⟨in1p,
             ⟨large, VMC, . . .⟩
             ⟨in1p, STOP⟩
         ⟩
@@ -247,9 +254,9 @@ cspsh.py: error: CspError: event name 'P' is not lower case 'p'
 ??  VMCRED
 ⟨
     ⟨coin, choc, VMCRED, . . .⟩
-    ⟨choc, coin
+    ⟨choc, coin,
         ⟨coin, choc, VMCRED, . . .⟩
-        ⟨choc, coin
+        ⟨choc, coin,
             ⟨coin, choc, VMCRED, . . .⟩
             ⟨choc, coin, VMCRED, ...⟩
         ⟩
@@ -261,11 +268,11 @@ cspsh.py: error: CspError: event name 'P' is not lower case 'p'
 ??  VMS2 = (coin → VMCRED)  # 1.1.3 X6
 
 ??  VMS2
-⟨coin
+⟨coin,
     ⟨coin, choc, VMCRED, . . .⟩
-    ⟨choc, coin
+    ⟨choc, coin,
         ⟨coin, choc, VMCRED, . . .⟩
-        ⟨choc, coin
+        ⟨choc, coin,
             ⟨coin, choc, VMCRED, . . .⟩
             ⟨choc, coin, VMCRED, ...⟩
         ⟩
@@ -280,9 +287,9 @@ cspsh.py: error: CspError: event name 'P' is not lower case 'p'
 ??  COPYBIT
 ⟨
     ⟨in.0, out.0, COPYBIT, . . .⟩
-    ⟨in.1, out.1
+    ⟨in.1, out.1,
         ⟨in.0, out.0, COPYBIT, . . .⟩
-        ⟨in.1, out.1
+        ⟨in.1, out.1,
             ⟨in.0, out.0, COPYBIT, . . .⟩
             ⟨in.1, out.1, COPYBIT, ...⟩
         ⟩
@@ -358,50 +365,122 @@ cspsh.py: error: CspError: '| y → Q' has meaning, '| ( y' does not
 
 ??  DD1
 ⟨
-    ⟨setorange, O1!⟩
-    ⟨setlemon, L1!⟩
+    ⟨setorange,
+        ⟨orange, O1, . . .⟩
+        ⟨setlemon,
+            ⟨lemon, L1, . . .⟩
+            ⟨setorange, O1, . . .⟩
+            ⟨setlemon,
+                ⟨lemon, L1, . . .⟩
+                ⟨setorange, O1, . . .⟩
+                ⟨setlemon,
+                    ⟨lemon, L1, . . .⟩
+                    ⟨setorange, O1, . . .⟩
+                    ⟨setlemon, L1, ...⟩
+                ⟩
+            ⟩
+        ⟩
+        ⟨setorange,
+            ⟨orange, O1, . . .⟩
+            ⟨setlemon, L1, . . .⟩
+            ⟨setorange,
+                ⟨orange, O1, . . .⟩
+                ⟨setlemon, L1, . . .⟩
+                ⟨setorange, O1, ...⟩
+            ⟩
+        ⟩
+    ⟩
+    ⟨setlemon, L1, ...⟩
 ⟩
 
 ??  DD2
 ⟨
-    ⟨setorange, O2, . . .⟩
-    ⟨setlemon
-        ⟨lemon, L2, . . .⟩
-        ⟨setorange, O2, . . .⟩
-        ⟨setlemon
+    ⟨setorange,
+        ⟨orange, O2, . . .⟩
+        ⟨setlemon,
             ⟨lemon, L2, . . .⟩
             ⟨setorange, O2, . . .⟩
-            ⟨setlemon
+            ⟨setlemon,
                 ⟨lemon, L2, . . .⟩
                 ⟨setorange, O2, . . .⟩
-                ⟨setlemon, L2, ...⟩
+                ⟨setlemon,
+                    ⟨lemon, L2, . . .⟩
+                    ⟨setorange, O2, . . .⟩
+                    ⟨setlemon, L2, ...⟩
+                ⟩
+            ⟩
+        ⟩
+        ⟨setorange,
+            ⟨orange, O2, . . .⟩
+            ⟨setlemon, L2, . . .⟩
+            ⟨setorange,
+                ⟨orange, O2, . . .⟩
+                ⟨setlemon, L2, . . .⟩
+                ⟨setorange, O2, ...⟩
             ⟩
         ⟩
     ⟩
+    ⟨setlemon, L2, ...⟩
 ⟩
 
 ??  DD3
 ⟨
-    ⟨setlemon, L3, . . .⟩
-    ⟨setorange
-        ⟨orange, O3, . . .⟩
-        ⟨setlemon, L3, . . .⟩
-        ⟨setorange
+    ⟨setlemon,
+        ⟨lemon, L3, . . .⟩
+        ⟨setorange,
             ⟨orange, O3, . . .⟩
             ⟨setlemon, L3, . . .⟩
-            ⟨setorange
+            ⟨setorange,
                 ⟨orange, O3, . . .⟩
                 ⟨setlemon, L3, . . .⟩
-                ⟨setorange, O3, ...⟩
+                ⟨setorange,
+                    ⟨orange, O3, . . .⟩
+                    ⟨setlemon, L3, . . .⟩
+                    ⟨setorange, O3, ...⟩
+                ⟩
+            ⟩
+        ⟩
+        ⟨setlemon,
+            ⟨lemon, L3, . . .⟩
+            ⟨setorange, O3, . . .⟩
+            ⟨setlemon,
+                ⟨lemon, L3, . . .⟩
+                ⟨setorange, O3, . . .⟩
+                ⟨setlemon, L3, ...⟩
             ⟩
         ⟩
     ⟩
+    ⟨setorange, O3, ...⟩
 ⟩
 
 ??  DD4
 ⟨
-    ⟨setorange, O4!⟩
-    ⟨setlemon, L4!⟩
+    ⟨setorange,
+        ⟨orange, O4, . . .⟩
+        ⟨setlemon,
+            ⟨lemon, L4, . . .⟩
+            ⟨setorange, O4, . . .⟩
+            ⟨setlemon,
+                ⟨lemon, L4, . . .⟩
+                ⟨setorange, O4, . . .⟩
+                ⟨setlemon,
+                    ⟨lemon, L4, . . .⟩
+                    ⟨setorange, O4, . . .⟩
+                    ⟨setlemon, L4, ...⟩
+                ⟩
+            ⟩
+        ⟩
+        ⟨setorange,
+            ⟨orange, O4, . . .⟩
+            ⟨setlemon, L4, . . .⟩
+            ⟨setorange,
+                ⟨orange, O4, . . .⟩
+                ⟨setlemon, L4, . . .⟩
+                ⟨setorange, O4, ...⟩
+            ⟩
+        ⟩
+    ⟩
+    ⟨setlemon, L4, ...⟩
 ⟩
 
 ??
