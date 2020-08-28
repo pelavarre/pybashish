@@ -36,6 +36,8 @@ test-once:
 	rm -fr ../pybashish/.local/share/grep/files/
 	bin/grep.py >/dev/null
 	:
+	bash -c 'diff -burp tests/cspsh-f.txt <(bin/cspsh.py -f 2>&1)'
+	:
 	bin/doctestbash.py tests/ || (bin/doctestbash.py -vv tests/; exit 1)
 	:
 	for F in bin/*.py; do bin/argdoc.py $$F >/dev/null && continue; echo "make: error:  python3 -m pdb bin/argdoc.py $$F" >&2; exit 1; done
@@ -48,7 +50,7 @@ test-once:
 	: test_subsh: tests passed
 	:
 	rm -fr a b
-	git ls-files | grep -vE '(README.md|__init__.py|.gitignore)' >a
+	git ls-files | grep -vE '(.gitignore|__init__.py|README.md|tests/cspsh-f.txt)' >a
 	git grep -l copied.from $$(git ls-files) >b
 	diff -burp a b
 	rm -fr a b

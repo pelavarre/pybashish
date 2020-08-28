@@ -1,0 +1,407 @@
+Type some line of CSP, press Return to see it run
+Such as:  coin → choc → coin → choc → STOP
+Press ⌃D EOF or ⌃C SIGINT or ⌃\ SIGQUIT to quit
+
+??  #
+
+??  # test examples from the help lines
+
+??  #
+
+??
+
+??  tick → STOP
+⟨tick, STOP⟩
+
+??  tick → tick → STOP
+⟨tick, tick, STOP⟩
+
+??  CLOCK = (tick → CLOCK)
+
+??  CLOCK
+⟨tick, tick, tick, CLOCK, ...⟩
+
+??
+
+??
+
+??  #
+
+??  # test more examples from us
+
+??  #
+
+??
+
+??  HER.WALTZ = (
+(>      her.right.back → her.left.hook.back → her.right.close →
+→>      her.left.forward → her.right.hook.forward → her.left.close →
+→>      HER.WALTZ)
+
+??  HIS.WALTZ = (
+(>      his.left.forward → his.right.hook.forward → his.left.close →
+→>      his.right.back → his.left.hook.back → his.right.close →
+→>      HIS.WALTZ)
+
+??  HER.WALTZ
+⟨her.right.back, her.left.hook.back, her.right.close, her.left.forward, her.right.hook.forward, her.left.close, her.right.back, her.left.hook.back, her.right.close, her.left.forward, her.right.hook.forward, her.left.close, her.right.back, her.left.hook.back, her.right.close, her.left.forward, her.right.hook.forward, her.left.close, HER.WALTZ, ...⟩
+
+??  HIS.WALTZ
+⟨his.left.forward, his.right.hook.forward, his.left.close, his.right.back, his.left.hook.back, his.right.close, his.left.forward, his.right.hook.forward, his.left.close, his.right.back, his.left.hook.back, his.right.close, his.left.forward, his.right.hook.forward, his.left.close, his.right.back, his.left.hook.back, his.right.close, HIS.WALTZ, ...⟩
+
+??
+
+??
+
+??  #
+
+??  # test examples from the textbook
+
+??  #
+
+??
+
+??
+
+??  # 1.1.1 Prefix
+
+??
+
+??  coin → STOP  # 1.1.1 X1
+⟨coin, STOP⟩
+
+??  coin → choc → coin → choc → STOP  # 1.1.1 X2
+⟨coin, choc, coin, choc, STOP⟩
+
+??
+
+??  CTR = (right → up → right → right → STOP)  # 1.1.1 X3
+
+??  CTR
+⟨right, up, right, right, STOP⟩
+
+??  x → y  # meaningless per process name 'y' is not upper case 'Y'
+cspsh.py: error: CspError: process name 'y' is not upper case 'Y'
+
+??  P → Q  # meaningless per event name 'P' is not lower case 'p'
+cspsh.py: error: CspError: event name 'P' is not lower case 'p'
+
+??  x → (y → STOP)
+⟨x, y, STOP⟩
+
+??
+
+??
+
+??  # 1.1.2 Recursion
+
+??
+
+??  CLOCK = (tick → CLOCK)
+
+??  CLOCK
+⟨tick, tick, tick, CLOCK, ...⟩
+
+??
+
+??  CLOCK = (tick → tick → tick → CLOCK)
+
+??  CLOCK
+⟨tick, tick, tick, tick, tick, tick, tick, tick, tick, CLOCK, ...⟩
+
+??
+
+??  CLOCK = µ X : {tick} • (tick → X)  # 1.1.2 X1
+
+??  CLOCK
+⟨tick, tick, tick, CLOCK, ...⟩
+
+??
+
+??  VMS = (coin → (choc → VMS))  # 1.1.2 X2
+
+??  VMS
+⟨coin, choc, coin, choc, coin, choc, VMS, ...⟩
+
+??
+
+??  CH5A = (in5p → out2p → out1p → out2p → CH5A)  # 1.1.2 X3
+
+??  CH5A
+⟨in5p, out2p, out1p, out2p, in5p, out2p, out1p, out2p, in5p, out2p, out1p, out2p, CH5A, ...⟩
+
+??
+
+??  CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
+
+??  CH5B
+⟨in5p, out1p, out1p, out1p, out2p, in5p, out1p, out1p, out1p, out2p, in5p, out1p, out1p, out1p, out2p, CH5B, ...⟩
+
+??
+
+??
+
+??  # 1.1.3 Choice
+
+??
+
+??  (up → STOP | right → right → up → STOP)  # 1.1.3 X1
+⟨
+    ⟨up, STOP⟩
+    ⟨right, right, up, STOP⟩
+⟩
+
+??
+
+??  CH5C = in5p → (  # 1.1.3 X2
+(>      out1p → out1p → out1p → out2p → CH5C |
+|>      out2p → out1p → out2p → CH5C)
+
+??  CH5C
+⟨in5p
+    ⟨out1p, out1p, out1p, out2p, CH5C, . . .⟩
+    ⟨out2p, out1p, out2p, in5p
+        ⟨out1p, out1p, out1p, out2p, CH5C, . . .⟩
+        ⟨out2p, out1p, out2p, in5p
+            ⟨out1p, out1p, out1p, out2p, CH5C, . . .⟩
+            ⟨out2p, out1p, out2p, CH5C, ...⟩
+        ⟩
+    ⟩
+⟩
+
+??
+
+??  (x → P | y → Q)
+⟨
+    ⟨x, P!⟩
+    ⟨y, Q!⟩
+⟩
+
+??
+
+??  VMCT = µ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
+
+??  VMCT
+⟨coin
+    ⟨choc, VMCT, . . .⟩
+    ⟨toffee, coin
+        ⟨choc, VMCT, . . .⟩
+        ⟨toffee, coin
+            ⟨choc, VMCT, . . .⟩
+            ⟨toffee, VMCT, ...⟩
+        ⟩
+    ⟩
+⟩
+
+??
+
+??  VMC = (in2p → (large → VMC |  # 1.1.3 X4
+|>                 small → out1p → VMC) |
+|>         in1p → (small → VMC |
+|>                 in1p → (large → VMC |
+|>                         in1p → STOP)))
+
+??  VMC
+⟨
+    ⟨in2p
+        ⟨large, VMC, . . .⟩
+        ⟨small, out1p
+            ⟨in2p
+                ⟨large, VMC, . . .⟩
+                ⟨small, out1p
+                    ⟨in2p
+                        ⟨large, VMC, . . .⟩
+                        ⟨small, out1p, VMC, ...⟩
+                    ⟩
+                    ⟨in1p
+                        ⟨small, VMC, . . .⟩
+                        ⟨in1p
+                            ⟨large, VMC, . . .⟩
+                            ⟨in1p, STOP⟩
+                        ⟩
+                    ⟩
+                ⟩
+            ⟩
+            ⟨in1p
+                ⟨small, VMC, . . .⟩
+                ⟨in1p
+                    ⟨large, VMC, . . .⟩
+                    ⟨in1p, STOP⟩
+                ⟩
+            ⟩
+        ⟩
+    ⟩
+    ⟨in1p
+        ⟨small, VMC, . . .⟩
+        ⟨in1p
+            ⟨large, VMC, . . .⟩
+            ⟨in1p, STOP⟩
+        ⟩
+    ⟩
+⟩
+
+??
+
+??  VMCRED = µ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
+
+??  VMCRED
+⟨
+    ⟨coin, choc, VMCRED, . . .⟩
+    ⟨choc, coin
+        ⟨coin, choc, VMCRED, . . .⟩
+        ⟨choc, coin
+            ⟨coin, choc, VMCRED, . . .⟩
+            ⟨choc, coin, VMCRED, ...⟩
+        ⟩
+    ⟩
+⟩
+
+??
+
+??  VMS2 = (coin → VMCRED)  # 1.1.3 X6
+
+??  VMS2
+⟨coin
+    ⟨coin, choc, VMCRED, . . .⟩
+    ⟨choc, coin
+        ⟨coin, choc, VMCRED, . . .⟩
+        ⟨choc, coin
+            ⟨coin, choc, VMCRED, . . .⟩
+            ⟨choc, coin, VMCRED, ...⟩
+        ⟩
+    ⟩
+⟩
+
+??
+
+??  COPYBIT = µ X • (in.0 → out.0 → X |  # 1.1.3 X7
+|>                   in.1 → out.1 → X)
+
+??  COPYBIT
+⟨
+    ⟨in.0, out.0, COPYBIT, . . .⟩
+    ⟨in.1, out.1
+        ⟨in.0, out.0, COPYBIT, . . .⟩
+        ⟨in.1, out.1
+            ⟨in.0, out.0, COPYBIT, . . .⟩
+            ⟨in.1, out.1, COPYBIT, ...⟩
+        ⟩
+    ⟩
+⟩
+
+??
+
+??  (x → P | y → Q | z → R)
+⟨
+    ⟨x, P!⟩
+    ⟨y, Q!⟩
+    ⟨z, R!⟩
+⟩
+
+??  (x → P | x → Q)  # meaningless per choices not distinct: ['x', 'x']
+cspsh.py: error: CspError: choices not distinct: ['x', 'x']
+
+??  (x → P | y)  # meaningless per '| y)' is not '| y → Q'
+cspsh.py: warning: gave up before reading: y )
+cspsh.py: error: CspError: '| y → Q' has meaning, '| y )' does not
+
+??  (x → P) | (y → Q)  # meaningless per | is not an operator on processes
+cspsh.py: error: CspError: gave up before reading:  |  ( y → Q )
+
+??  (x → P | (y → Q | z → R))
+cspsh.py: warning: gave up before reading:  ( y → Q | z → R )  )
+cspsh.py: error: CspError: '| y → Q' has meaning, '| ( y' does not
+
+??
+
+??  # RUN-A = (x:A → RUN-A)  # 1.1.3 X8
+
+??
+
+??
+
+??  # 1.1.4 Mutual recursion
+
+??
+
+??  DD1 = (setorange → O1 | setlemon → L1)
+
+??  O1 = (orange → O1 | setlemon → L1 | setorange → O1)
+
+??  L1 = (lemon → L1 | setorange → O1 | setlemon → L1)
+
+??
+
+??  O2 = (orange → O2 | setlemon → L2 | setorange → O2)
+
+??  L2 = (lemon → L2 | setorange → O2 | setlemon → L2)
+
+??  DD2 = (setorange → O2 | setlemon → L2)
+
+??
+
+??  L3 = (lemon → L3 | setorange → O3 | setlemon → L3)
+
+??  O3 = (orange → O3 | setlemon → L3 | setorange → O3)
+
+??  DD3 = (setlemon → L3 | setorange → O3)
+
+??
+
+??  DD4 = (setorange → O4 | setlemon → L4)
+
+??  L4 = (lemon → L4 | setorange → O4 | setlemon → L4)
+
+??  O4 = (orange → O4 | setlemon → L4 | setorange → O4)
+
+??
+
+??  DD1
+⟨
+    ⟨setorange, O1!⟩
+    ⟨setlemon, L1!⟩
+⟩
+
+??  DD2
+⟨
+    ⟨setorange, O2, . . .⟩
+    ⟨setlemon
+        ⟨lemon, L2, . . .⟩
+        ⟨setorange, O2, . . .⟩
+        ⟨setlemon
+            ⟨lemon, L2, . . .⟩
+            ⟨setorange, O2, . . .⟩
+            ⟨setlemon
+                ⟨lemon, L2, . . .⟩
+                ⟨setorange, O2, . . .⟩
+                ⟨setlemon, L2, ...⟩
+            ⟩
+        ⟩
+    ⟩
+⟩
+
+??  DD3
+⟨
+    ⟨setlemon, L3, . . .⟩
+    ⟨setorange
+        ⟨orange, O3, . . .⟩
+        ⟨setlemon, L3, . . .⟩
+        ⟨setorange
+            ⟨orange, O3, . . .⟩
+            ⟨setlemon, L3, . . .⟩
+            ⟨setorange
+                ⟨orange, O3, . . .⟩
+                ⟨setlemon, L3, . . .⟩
+                ⟨setorange, O3, ...⟩
+            ⟩
+        ⟩
+    ⟩
+⟩
+
+??  DD4
+⟨
+    ⟨setorange, O4!⟩
+    ⟨setlemon, L4!⟩
+⟩
+
+??

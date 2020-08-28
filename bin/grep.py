@@ -708,7 +708,7 @@ FILES_CHARS = r"""
         puts("Hello, World!");
     }
     EOF
-    ) && gcc -Wno-implicit-int -Wno-implicit-function-declaration c.c && ./a.out
+    ) && gcc -w c.c && ./a.out
     #
 
 

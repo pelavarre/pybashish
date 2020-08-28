@@ -16,12 +16,12 @@ optional arguments:
 
 bugs:
   too many emoji don't do monospace, and passing through arbitrary unicode has arbitrary effects
-  shows us-ascii terminal control codes \x00..\x1f and \x7f as if unicode \u100..\u11f and \u17f
-  shows utf-8 emoji as themselves, repeated for the byte length of their encoding
-  shows the bytes of encoding errors as if decoding \u0 ..\uff
+  shows terminal control (not data) characters of \u0000..\u00ff as \u0100..\u01ff
+  shows utf-8 emoji as themselves, followed by as many spaces as they have bytes
+  shows the bytes of encoding errors as if decoding the characters \u0000..\u00ff
   shows nybbles in uppercase (following black python not linux c, for the sake of human eyes)
   shows empty files as a zeroed count of bytes (unlike bash showing nothing to mean zero)
-  groups the -C nybbles and chars four at a time, never makes you count out eight of them
+  shows the --bytes in groups of n at a time (doesn't always make you count off all the bytes)
   ends each line when it ends, doesn't pad some with spaces
 
 unsurprising bugs:

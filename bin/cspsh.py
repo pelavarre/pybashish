@@ -22,18 +22,20 @@ examples:
   cspsh.py -i  # chat out one result at a time
   cspsh.py -f  # dump a large pile of results
 """
-# FIXME: add a tests of "cspsh.py -f" and "cspsh.py -fv" to Makefile
-# FIXME: declare a named tuple .kind .chars for the words
 # FIXME: limit the trace of ProcessWithSuch to its alphabet
 # FIXME: clean up the echo to interleave prompt and input, for paste of multiple input lines
 
 
 import argparse
+import collections
 import re
 import sys
 import textwrap
 
 import argdoc
+
+
+CspWord = collections.namedtuple("CspWord", "kind, chars".split(", "))
 
 
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
@@ -466,7 +468,7 @@ class CspCommandLine(CspWorker):
                 str_worker = worker
 
             if taker.peek_more():
-                words = CspWords.take_one(taker)
+                words = SomeCspWords.take_one(taker)
                 raise CspError("gave up before reading: {}".format(words))
 
             taker.take_beyond_shards()
@@ -485,29 +487,29 @@ class CspCommandLine(CspWorker):
         text = " ".join(text.splitlines())  # replace "\r\n" or "\r" or "\n" with " "
         text = text.rstrip()
 
-        items = list()
+        csp_words = list()
         while text:
 
-            match = re.match(SHARDS_REGEX, string=text)
+            shards_match = re.match(SHARDS_REGEX, string=text)
             try:
-                assert match
+                assert shards_match
             except AssertionError:
                 stderr_print(repr(text))
                 raise
 
-            match_items = match.groupdict().items()
-            match_items = list((k, v,) for (k, v,) in match_items if v)
+            matches = shards_match.groupdict().items()
+            matches = list((k, v,) for (k, v,) in matches if v)
 
-            assert len(match_items) == 1
-            match_item = match_items[0]
+            assert len(matches) == 1
+            (kind, chars,) = matches[0]
+            csp_word = CspWord(kind=kind, chars=chars)
 
-            assert text.startswith(match_item[-1])
-            text = text[len(match_item[-1]) :]
+            assert text.startswith(csp_word.chars)
+            text = text[len(csp_word.chars) :]
 
-            items.append(match_item)
+            csp_words.append(csp_word)
 
-        # FIXME namedtuple .kind .chars
-        words = [_ for _ in items if _[0] != "blanks"]
+        words = [_ for _ in csp_words if _.kind != "blanks"]  # drop BLANKS_REGEX
 
         taker.give_shards(words)
 
@@ -519,9 +521,9 @@ class Process(CspWorker):
     def take_one(cls, taker):
 
         words = taker.peek_some_shards(2)
-        if words[-1] and (words[0][-1] == "("):
+        if words[-1] and (words[0].chars == "("):
             worker = OpenProcessClose.take_one(taker, after_mark="(", upto_mark=")")
-        elif words[-1] and (words[1][-1] == "→"):
+        elif words[-1] and (words[1].chars == "→"):
             worker = EventChoice.take_one(taker)
         else:
             worker = ProcessCaller.take_one(taker)
@@ -577,7 +579,7 @@ class EventChoice(CspWorker):
         bars = list()
 
         words = taker.peek_some_shards(2)
-        assert words[-1] and (words[1][-1] == "→")
+        assert words[-1] and (words[-1].chars == "→")
 
         choice = EventThenProcess.take_one(taker)
         choices.append(choice)
@@ -585,27 +587,28 @@ class EventChoice(CspWorker):
         while True:
 
             word = taker.peek_one_shard()
-            if word and (word[-1] == "|"):
+            if word and (word.chars == "|"):
+                three_words = taker.peek_some_shards(3)
+
                 bar = CspMark.take_one(taker, "|")
                 bars.append(bar)
 
-                words = taker.peek_some_shards(2)
-                if words[-1] and (words[1][-1] == "→"):
+                if three_words[-1] and (three_words[-1].chars == "→"):
                     choice = EventThenProcess.take_one(taker)
                     choices.append(choice)
 
                 else:
 
-                    bar_words = [(None, "|",)] + words
-                    str_bar_words = " ".join(_[-1] for _ in bar_words)
-
-                    words = CspWords.take_one(taker)
+                    some_last_words = SomeCspWords.take_one(taker)
                     stderr_print(
-                        "cspsh.py: warning: gave up before reading: {}".format(words)
+                        "cspsh.py: warning: gave up before reading: {}".format(
+                            some_last_words
+                        )
                     )
 
+                    str_three_words = " ".join(_.chars for _ in three_words)
                     raise CspError(
-                        "'| y → Q' has meaning, {!r} does not".format(str_bar_words)
+                        "'| y → Q' has meaning, {!r} does not".format(str_three_words)
                     )
 
             else:
@@ -652,14 +655,14 @@ class EventThenProcess(CspWorker):
         then_marks = list()
 
         words = taker.peek_some_shards(2)
-        assert words[-1] and (words[1][-1] == "→")
+        assert words[-1] and (words[-1].chars == "→")
 
         while True:
 
             words = taker.peek_some_shards(2)
             if not words[-1]:
                 break
-            if words[1][-1] != "→":
+            if words[1].chars != "→":
                 break
 
             event_name = EventName.take_one(taker)
@@ -671,7 +674,7 @@ class EventThenProcess(CspWorker):
         assert event_names
 
         word = taker.peek_one_shard()
-        if word[-1] == "(":
+        if word.chars == "(":
             worker = OpenProcessClose.take_one(taker, after_mark="(", upto_mark=")")
         else:
             worker = Process.take_one(taker)
@@ -744,7 +747,7 @@ class DefineProcess(CspWorker):
         CspCommandLine.processes_by_name[process_name.name] = process_caller
 
         word = taker.peek_one_shard()
-        if word[-1] == "µ":
+        if word.chars == "µ":
             body = ProcessWithSuch.take_one(taker, process_caller)
         else:
             body = Process.take_one(taker)
@@ -784,7 +787,7 @@ class ProcessWithSuch(CspWorker):
         CspCommandLine.processes_by_name[process_name.name] = process_caller
 
         word = taker.peek_one_shard()
-        if word and (word[-1] != ":"):  # defer EOF into "with_alphabet_mark ="
+        if word and (word.chars != ":"):  # defer EOF into "with_alphabet_mark ="
             with_alphabet_mark = None
             alphabet = None
         else:
@@ -842,7 +845,7 @@ class CspAlphabet(CspWorker):
             words = taker.peek_some_shards(2)
             if not words:
                 break
-            if words[1][-1] != ",":
+            if words[1].chars != ",":
                 break
 
             event_name = EventName.take_one(taker)
@@ -909,8 +912,8 @@ class CspName(CspWorker):
     def take_one(self, taker):
 
         word = taker.peek_one_shard()
-        assert word[0] == "name"
-        name = word[-1]
+        assert word.kind == "name"
+        name = word.chars
         taker.take_one_shard()
 
         worker = CspName(name=name)
@@ -960,15 +963,15 @@ class CspMark(CspWorker):
     def take_one(self, taker, mark):
 
         word = taker.peek_one_shard()
-        assert word[0] == "mark"
-        assert word[-1] == mark
+        assert word.kind == "mark"
+        assert word.chars == mark
         taker.take_one_shard()
 
-        worker = CspMark(mark=word[-1])
+        worker = CspMark(mark=word.chars)
         return worker
 
 
-class CspWords(CspWorker):
+class SomeCspWords(CspWorker):
     """Take the remaining words"""
 
     def __call__(self):
@@ -988,15 +991,15 @@ class CspWords(CspWorker):
         workers = list()
         while taker.peek_more():
             word = taker.peek_one_shard()
-            if word[0] == "name":
+            if word.kind == "name":
                 worker = CspName.take_one(taker)
             else:
-                assert word[0] == "mark"
+                assert word.kind == "mark"
                 worker = CspMark.take_one(taker, mark=word[1])
 
             workers.append(worker)
 
-        worker = CspWords(workers=workers)
+        worker = SomeCspWords(workers=workers)
         return worker
 
 
