@@ -24,6 +24,9 @@ examples:
 
 see also:  python "import doctest"
 """
+# FIXME: defer failing the test till after all its output prints
+# FIXME: work up how to take all their changes from the code
+
 # FIXME: let '>' prompts of Bash continue '$' prompts of Bash
 # FIXME: learn the '<<-EOF' here docs, but accept blanks as tabs
 # FIXME: walk for exts

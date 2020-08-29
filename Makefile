@@ -36,7 +36,9 @@ test-once:
 	rm -fr ../pybashish/.local/share/grep/files/
 	bin/grep.py >/dev/null
 	:
-	: # catch up with:  bin/cspsh.py -f 2>&1 | sed 's,  *$$,,'  >tests/cspsh-f.txt
+	: catch up with
+	@echo 'bin/cspsh.py -f 2>&1 | sed '\''s,  *$$,,'\''  >tests/cspsh-f.txt'
+	:
 	bin/cspsh.py -fv >/dev/null 2>&1
 	bash -c 'diff -burp tests/cspsh-f.txt <(bin/cspsh.py -f 2>&1)'
 	:

@@ -23,13 +23,22 @@ examples:
   cspsh.py -i  # chat out one result at a time
   cspsh.py -f  # dump a large pile of results
 """
+# FIXME: bring in the maths unicode that doesn't copy-paste well from 1.4..1.10
+
 # FIXME: disentangle "passme.cspvm" from "def CspCommandLine"
 # FIXME: add labels into the trace as labels X: CLOCK: etc
 # FIXME: flush events to trace when they happen: stop delaying whole trace lines
 # FIXME: trace EventChoice sources indented as well as traces
+
+# FIXME: rename "-f, --force" to "-s, --self-test"? because "-fi" should cancel out?
 # FIXME: clean up the echo to interleave prompt and input, for paste of multiple input lines
 # FIXME: limit the trace of ProcessWithSuch to its alphabet
-# FIXME: all 5 of the f-i-x-m-e scattered far below
+
+# FIXME: test more of the book and/or chase into the parts of the book commented out of TEST_LINES
+# FIXME: compile CSP to Python, and run as Python, like for lazy eval of infinite mutual definitions
+# FIXME: such as CT[n+1] = (up → CT[n+2] | down → CT[n])
+
+# FIXME: all the f-i-x-m-e scattered far below
 
 
 import argparse
@@ -141,6 +150,10 @@ def pull_line(lines, stdin):
         if lines:
 
             stderr_print(prompt + lines[0].rstrip())
+
+            if not lines[0]:
+                if main.args.interact:
+                    lines[0] = "\n"  # mutate
 
         else:
 
@@ -590,7 +603,7 @@ class EventThenProcess(CspWorker):
 
 
 class ProcessCaller(CspWorker):
-    """Call a process by name"""
+    """Call a process by name"""  # a la Lisp Label
 
     def __call__(self):
 
@@ -1040,10 +1053,10 @@ def verbose_print(*args, **kwargs):
 #
 
 
-TEST_LINES = """
+BASIC_TEST_LINES = """
 
     #
-    # test examples from the help lines
+    # examples from the help lines
     #
 
     tick → STOP
@@ -1053,7 +1066,7 @@ TEST_LINES = """
 
 
     #
-    # test more examples from us
+    # more examples from us
     #
 
     CLOCK = µ X : {tick, tock} • (tick → tock → X)
@@ -1070,9 +1083,12 @@ TEST_LINES = """
     HER.WALTZ
     HIS.WALTZ
 
+"""
+
+CHAPTER_1_TEST_LINES = """
 
     #
-    # test examples from the textbook
+    # Chapter 1:  Processes
     #
 
 
@@ -1151,28 +1167,121 @@ TEST_LINES = """
 
     # 1.1.4 Mutual recursion
 
-    DD1 = (setorange → O1 | setlemon → L1)
-    O1 = (orange → O1 | setlemon → L1 | setorange → O1)
-    L1 = (lemon → L1 | setorange → O1 | setlemon → L1)
+    # αDD = αO = αL = {setorange, setlemon, orange, lemon}
 
-    O2 = (orange → O2 | setlemon → L2 | setorange → O2)
-    L2 = (lemon → L2 | setorange → O2 | setlemon → L2)
-    DD2 = (setorange → O2 | setlemon → L2)
+    DD = (setorange → O | setlemon → L)  # 1.1.4 X1
+    O = (orange → O | setlemon → L | setorange → O)
+    L = (lemon → L | setorange → O | setlemon → L)
 
-    L3 = (lemon → L3 | setorange → O3 | setlemon → L3)
-    O3 = (orange → O3 | setlemon → L3 | setorange → O3)
-    DD3 = (setlemon → L3 | setorange → O3)
+    DD
 
-    DD4 = (setorange → O4 | setlemon → L4)
-    L4 = (lemon → L4 | setorange → O4 | setlemon → L4)
-    O4 = (orange → O4 | setlemon → L4 | setorange → O4)
+    CT0 = (up → CT1 | around → CT0)  # 1.1.4 X2
+    CT1 = (up → CT2 | down → CT0)
+    CT2 = (up → CT3 | down → CT1)
 
-    DD1
-    DD2
-    DD3
-    DD4
+    CT0
 
-    """
+    CT0 = (around → CT0 | up → CT1)  # 1.1.4 X2  # Variation B
+    CT1 = (down → CT0 | up → CT2)
+    CT2 = (down → CT1 | up → CT3)
+
+    CT0
+
+    # CT[n+1] = (up → CT[n+2] | down → CT[n])
+
+
+    # 1.2 Pictures
+
+
+    # 1.3 Laws
+
+    # (x → P | y → Q) = (y → Q | x → P)  # but our traces of these are inequal
+    (x → P | y → Q)
+    (y → Q | x → P)
+
+    # (x → P) ≠ STOP
+    (x → P)
+    STOP
+
+    # L1    (x:A → P(x)) = (y:B → Q(y))  ≡  (A = B  ∧  ∀ x:A • P(x)=Q(x))
+    # L1A   STOP ≠ (d → P)
+    # L1B   (c → P) ≠ (d → Q)
+    # L1C   (c → P | d → Q) = (d → Q | c → P)
+    # L1D   (c → P) = (c → Q)  ≡  P = Q
+
+    # (coin → choc → coin → choc → STOP) ≠ (coin → STOP)  # 1.3 X1
+
+    # µ X • (coin → (choc → X | toffee → X ))  =  # 1.3 X2
+    #   µ X • (coin → (toffee → X | choc → X ))
+
+    # L2    (Y = F(Y))  ≡  (Y = µ X • F(X))  # <= FIXME: what is this??
+    # L2A   µ X • F(X) = F(µ X • F(X))  # <= FIXME: a la L2
+
+    VM1 = (coin → VM2)
+    VM2 = (choc → VM1)
+
+    VM1
+    VM2
+    VMS
+
+    # L3    if (∀ i:S • (Xi = F(i, X )  ∧  Yi = F(i, Y))) then X = Y  # <= FIXME: a la L2
+
+
+    # 1.4  Implementation of processes
+
+    # Bleep, Label, Choice2, Menu, Interact, Cons, Car
+
+
+    # 1.5 Traces
+
+    # first 4 events of VMS  # 1.5 X1
+    # first 3 events of VMS  # 1.5 X2
+    # first 0 events of any process, even STOP  # 1.5 X3
+    # all traces of <= 2 events at VMC  # 1.5 X4
+    # ⟨in1p, in1p, in1p⟩ ends the only trace it begins, because it STOP's  # 1.5 X5
+
+
+    # 1.6 Operations on traces
+
+    # 1.6.1 Catenation  # FIXME: math unicode that doesn't paste
+    # 1.6.2 Restriction
+    # 1.6.3 Head and tail
+    # 1.6.4 Star
+    # 1.6.5 Ordering
+    # 1.6.6 Length
+
+    # 1.7 Implementation of traces
+
+    # 1.8 Traces of a process
+    # 1.8.1 Laws [of traces]
+    # 1.8.2 Implementation
+
+    # 1.8.3 After
+
+    # 1.9 More operations on traces
+    # 1.9.1 Change of symbol
+    # 1.9.2 Catenation [continued from 1.6.1]
+    # 1.9.3 Interleaving
+    # 1.9.4 Subscription
+    # 1.9.5 Reversal
+    # 1.9.6 Selection
+    # 1.9.7 Composition
+
+    # 1.10 Specifications
+    # 1.10.1 Satisfaction
+    # 1.10.2 Proofs
+
+"""
+
+CHAPTER_2_TEST_LINES = """
+
+    #
+    # Chapter 2:  Concurrency
+    #
+
+"""
+
+TEST_LINES = BASIC_TEST_LINES + CHAPTER_1_TEST_LINES + CHAPTER_2_TEST_LINES
 
 
 if __name__ == "__main__":
