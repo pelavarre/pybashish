@@ -17,3 +17,5 @@ git status --ignored --short
 
 git apply -v ...'.patch'
 patch -p1 <...'.patch'  # silently drops new chmod ugo+x
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

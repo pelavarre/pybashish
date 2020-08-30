@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 
 """
-usage: watch.py [-h] [WORD [WORD ...]]
+usage: watch.py [-h] [-n SECS] [WORD [WORD ...]]
 
 repeat a Bash command every so often till Control+C, while deleting only duplicate outputs
 
 positional arguments:
-  WORD        word of command
+  WORD                  word of command
 
 optional arguments:
-  -h, --help  show this help message and exit
+  -h, --help            show this help message and exit
+  -n SECS, --interval SECS
+                        seconds to wait between updates (default: 0.2s)
+
+bugs:
+  doesn't default to the 2s intervals of the 1970s
 
 examples:
   watch.py
@@ -20,9 +25,7 @@ examples:
 
 see also:  man script, man watch
 """
-# FIXME: argdoc.py: optional nargs 1 should show up in the usage line
-# FIXME: -n INTERVAL, --interval INTERVAL seconds to wait between updates (default: FIXME)
-# FIXME: Arg Doc should accept -n SECS, --interval SECS
+
 
 from __future__ import print_function
 
@@ -39,8 +42,10 @@ def main(argv):
     args = argdoc.parse_args(argv[1:])
     main.args = args
 
-    print(args)
-    assert False  # FIXME: Tweak up "import argdoc" to accept "nargs" 1
+    stderr_print(args)
+    stderr_print(argdoc.format_usage().rstrip())
+    stderr_print("watch.py: error: not implemented")
+    sys.exit(2)  # exit 2 from rejecting usage
 
     main.era = datetime.datetime.now()
 
@@ -89,6 +94,13 @@ def check_transcript(shline):
 
 def shlex_join(argv):
     raise NotImplementedError()
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
+    sys.stdout.flush()
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":

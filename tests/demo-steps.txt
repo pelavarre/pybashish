@@ -55,3 +55,6 @@ Give it a try?  Call me?
 ⌘W iOS Blink > Close Window
 
 As of Tuesday, July 21st, 2020
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

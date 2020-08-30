@@ -13,18 +13,18 @@ optional arguments:
   -h, --help  show this help message and exit
 
 bugs:
-  searches "./" if called with no args, unlike Mac Bash
-  leads each hit inside "./" with "" not "./", unlike Bash
-  leads each hit inside "~/" with "~/" not "$PWD", unlike Bash
-  hits the realpath of each sym link, not abspath, unlike Bash
+  searches "./" if called with no args, unlike mac bash
+  leads each hit inside "./" with "" not with "./", unlike bash
+  leads each hit inside "~/" with "~/" not with "$PWD", unlike bash
+  hits the realpath of each sym link, not abspath, unlike bash
 
 examples:
-  find ~/bin/  # FIXME test old
+  find ~/bin/
   find ~/.bash_history  # file, not dir
   find /dev/null  # device, not dir
 """
-# FIXME: rethink bugs
-# FIXME FIXME: factor the yields out apart from the choice of what to do with them
+# FIXME: rethink "find.py" bugs
+
 
 from __future__ import print_function
 
@@ -67,29 +67,6 @@ def print_os_walk_minpaths(top):
 
 
 # deffed in many files  # missing from docs.python.org
-class BrokenPipeErrorSink(contextlib.ContextDecorator):
-    """Cut unhandled BrokenPipeError down to sys.exit(1)
-
-    More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
-    As per https://docs.python.org/3/library/signal.html#note-on-sigpipe
-    """
-
-    def __enter__(
-        self,
-    ):  # test with large Stdout cut sharply, such as:  find.py ~ | head
-        return self
-
-    def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
-        if isinstance(exc, BrokenPipeError):  # catch this one
-
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
-            os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
-
-            sys.exit(1)
-
-
-# deffed in many files  # missing from docs.python.org
 def os_path_homepath(path):
     """Return the ~/... relpath of a file or dir inside the Home, else the realpath"""
 
@@ -126,7 +103,7 @@ def os_walk_sorted_relpaths(top):
 
         for where_ in wheres:
             wherewhere = os.path.join(where, where_)
-            yield wherewhere  # FIXME: delay these till the walk starts into them
+            yield wherewhere  # FIXME: delay yield dir till the walk starts into the dir
 
 
 # deffed in many files  # missing from docs.python.org
@@ -151,6 +128,29 @@ def min_path_formatter(exemplar):
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
     print(*args, file=sys.stderr)
+
+
+# deffed in many files  # missing from docs.python.org
+class BrokenPipeErrorSink(contextlib.ContextDecorator):
+    """Cut unhandled BrokenPipeError down to sys.exit(1)
+
+    More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
+    As per https://docs.python.org/3/library/signal.html#note-on-sigpipe
+    """
+
+    def __enter__(
+        self,
+    ):  # test with large Stdout cut sharply, such as:  find.py ~ | head
+        return self
+
+    def __exit__(self, *exc_info):
+        (exc_type, exc, exc_traceback,) = exc_info
+        if isinstance(exc, BrokenPipeError):  # catch this one
+
+            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
+
+            sys.exit(1)
 
 
 if __name__ == "__main__":

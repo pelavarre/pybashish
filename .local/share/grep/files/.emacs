@@ -1,6 +1,6 @@
-#
-# files/.emacs:  Emacs configuration
-#
+;
+; files/.emacs:  Emacs configuration
+;
 
 ; ~/.emacs
 
@@ -30,3 +30,5 @@
         "Shell command on region: " nil nil nil (quote shell-command-history)))
     (shell-command-on-region (region-beginning) (region-end) string nil 'replace)
     )
+
+; copied from:  git clone https://github.com/pelavarre/pybashish.git

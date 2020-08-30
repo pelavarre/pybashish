@@ -9,6 +9,9 @@ emulate Python 3 inside of Python 2, well enough for now
 bugs:
   cd pybashish/ && make  # foolishly insists this docstring should be an argdoc
 """
+# FIXME: help find and review diffs among scattered forks of such shared defs
+# FIXME: rename "guess_stdout_columns" to "sys_stdout_guess_columns"
+
 
 from __future__ import print_function
 
@@ -53,9 +56,17 @@ def shlex_join(argv):
     return rep
 
 
+# FIXME: def str_removesuffix
+
+
 # deffed in many files  # since Sep/2015 Python 3.5
 def subprocess_run(*args, **kwargs):
-    """Emulate Python 3 "subprocess.run" """
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Leave in place the standard defaults of stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr
+    Although most callers mean to say stdin=subprocess.PIPE
+    """
 
     args_ = args[0] if args else kwargs["args"]
     kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
@@ -85,3 +96,6 @@ def stderr_print(*args):
 
 # deffed in many files  # since Oct/2019 Python 3.7  # since Dec/2016 CPython 3.6
 dict = collections.OrderedDict
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

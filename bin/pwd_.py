@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 
 """
-usage: pwd_.py [-h] [--brief] [--home] [-P]
+usage: pwd_.py [-h] [-P] [--brief] [--home]
 
-show the os.environ["HOME"], by default just its "os.path.abspath"
+show the os.environ["PWD"], by default just its "os.path.abspath"
 
 optional arguments:
   -h, --help      show this help message and exit
+  -P, --physical  show the "realpath"s, not "abspath"s, of sym links
   --brief         show the briefest abspath/ homepath/ realpath
   --home          show the ~/... relpath in place of abspath or realpath
-  -P, --physical  show the "realpath"s, not "abspath"s, of sym links
 
 bugs:
   defaults to "--home", in the spirit of Bash "dirs +0" and Zsh "dirs -p", unlike their "pwd"s
@@ -25,6 +25,7 @@ examples:
 """
 # FIXME: add "--verbose" a la "hostname"
 # FIXME: somehow remember we don't want to abbreviate down to colliding "-" the unconventional "--"
+
 
 from __future__ import print_function
 
@@ -43,8 +44,14 @@ def main(argv):
     abspath = os.path.abspath(pwd)
     realpath = os.path.realpath(pwd)
 
-    cwd = os.getcwd()
-    assert cwd == realpath
+    try:
+        gotcwd = os.getcwd()
+    except FileNotFoundError as exc:
+        print(pwd)
+        stderr_print("pwd.py: error: {}: {}".format(type(exc).__name__, exc))
+        sys.exit(1)  # FIXME: more robust "pwd" vs the current working dir deleted
+
+    assert gotcwd == realpath
 
     path = realpath if args.physical else abspath  # FIXME: count -L -P contradictions
     formatter = min_path_formatter_not_relpath(path)
@@ -92,6 +99,13 @@ def min_path_formatter_not_relpath(exemplar):
             formatter = formatter_
 
     return formatter
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
+    sys.stdout.flush()
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":

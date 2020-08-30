@@ -1,6 +1,6 @@
-#
-# files/.vimrc:  Vim configuration
-#
+"
+" files/.vimrc:  Vim configuration
+"
 
 " ~/.vimrc
 
@@ -15,7 +15,7 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 " :set number
 
 :set hlsearch
-:nnoremap <esc><esc> :noh<return>
+" :nnoremap <esc><esc> :noh<return>  " nope, corrupts multiple Esc
 " hlsearch, noh = toggle on/off highlighting of all hits of search
 " n-no-remap = remap in the normal (not-insert) mode except don't recurse thru other remaps
 
@@ -29,4 +29,6 @@ function! RStripEachLine()
     %s/\s\+$//e
     call cursor(with_line, with_col)
 endfun
-" RStripEachLine = delete the trailing whitespace from each line (not yet from file)
+" RStripEachLine = delete the trailing whitespace from each line (not from file)
+
+" copied from:  git clone https://github.com/pelavarre/pybashish.git

@@ -56,3 +56,6 @@ Empty the trash
 
     >>> _ = rm("-fr", "alef/", "alef.gz")
     >>>
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

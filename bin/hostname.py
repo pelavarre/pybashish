@@ -19,6 +19,7 @@ examples:
   hostname -f
 """
 
+
 from __future__ import print_function
 
 import collections
@@ -32,6 +33,7 @@ import argdoc
 def main():
 
     args = argdoc.parse_args()
+
     main.args = args
 
     platform_node = platform.node()
@@ -75,11 +77,12 @@ def calc_socket_canonname_else_none(socket_hostname):
     return canonname
 
 
-def verbose_print(*args):
-
-    message = "".join(str(a) for a in args)
+# deffed in many files  # missing from docs.python.org
+def verbose_print(*args, **kwargs):
+    sys.stdout.flush()
     if main.args.verbose:
-        print(message, file=sys.stderr)
+        print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # for when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

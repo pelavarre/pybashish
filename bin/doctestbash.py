@@ -3,14 +3,14 @@
 """
 usage: doctestbash.py [-h] [-b] [-q] [-v] [FILE [FILE ...]]
 
-Test if Bash behaves as the transcripts say it should
+test if bash behaves as the transcripts say it should
 
 positional arguments:
-  FILE                  Folders or files of '.typescript' files
+  FILE                  folders or files of '.typescript' files
 
 optional arguments:
   -h, --help            show this help message and exit
-  -b, --rip-bash-paste  copy the Bash input lines out of the transcript, but don't run them
+  -b, --rip-bash-paste  copy the bash input lines out of the transcript, but don't run them
   -q, --quiet           say less
   -v, --verbose         say more
 
@@ -22,12 +22,18 @@ examples:
   mkdir -p tests/
   cp -ip doctestbash.py tests/pybashish.typescript && ./doctestbash.py $PWD
 
-see also:  Python "import doctest"
+see also:  python "import doctest"
 """
+# FIXME: defer failing the test till after all its output prints
+# FIXME: work up how to take all their changes from the code
+
+# FIXME: let '>' prompts of Bash continue '$' prompts of Bash
+# FIXME: learn the '<<-EOF' here docs, but accept blanks as tabs
 # FIXME: walk for exts
 # FIXME: rip Bash paste distinguished only by repeated prompt ending in '$' or '#'
 # FIXME: rip Python '>>>' paste, and Makefile paste, and Zsh '%' paste, not just Bash paste
 # FIXME: think harder when no files chosen
+
 
 import doctest
 import os
@@ -46,6 +52,7 @@ def main(argv):
 
     if args.files != ["tests/"]:
         stderr_print("usage: doctestbash.py [-h] [-b] [-q] [-v] tests/")
+        stderr_print("doctestbash.py: error: more arbitrary arguments not implemented")
         sys.exit(2)  # exit 2 from rejecting usage
 
     main.args = args
@@ -56,11 +63,11 @@ def main(argv):
 
     file_dir = os.path.split(__file__)[0]
     tests_dir = os.path.join(file_dir, os.pardir, "tests")
-    args_file = os.path.join(tests_dir, "pybashish.typescript")
-    args_file = os.path.relpath(args_file)
+    tests_path = os.path.join(tests_dir, "pybashish.typescript")
+    path = os.path.relpath(tests_path)  # abbreviate as relpath for tracing later
 
-    with open(args_file) as incoming:
-        passes = _run_bash_test_doc(incoming, args_file=args_file)
+    with open(path) as incoming:
+        passes = _run_bash_test_doc(incoming, path=path)
 
     # Declare success
 
@@ -89,7 +96,7 @@ def _show_doctest_result(want="2.718"):
     doctest.run_docstring_examples(f, globs, optionflags=doctest.ELLIPSIS)
 
 
-def _run_bash_test_doc(incoming, args_file):
+def _run_bash_test_doc(incoming, path):
     """Run each test of a Bash Test Doc"""
 
     passes = 0
@@ -110,7 +117,6 @@ def _run_bash_test_doc(incoming, args_file):
 
         if main.args.rip_bash_paste:
             print(shline)
-            sys.stdout.flush()
             if shline:
                 passes += 1
             continue
@@ -132,7 +138,7 @@ def _run_bash_test_doc(incoming, args_file):
 
         # Require correct output
 
-        require_test_passed(args_file, passes=passes, gots=gots, dent=dent, wants=wants)
+        require_test_passed(path, passes=passes, gots=gots, dent=dent, wants=wants)
 
         # Count passed tests
 
@@ -141,13 +147,19 @@ def _run_bash_test_doc(incoming, args_file):
     return passes
 
 
-def str_splitdent(line):  # deffed by "doctestbash.py", "fmt.py
+# deffed in many files  # missing from docs.python.org
+def str_splitdent(line):
     """Split apart the indentation of a line, from the remainder of the line"""
 
-    len_dent = len(line) - len(line.lstrip())
-    dent = len_dent * " "
+    lstripped = line.lstrip()
+    len_dent = len(line) - len(lstripped)
 
-    tail = line[len(dent) :]
+    tail = lstripped
+    if not lstripped:  # see no chars, not all chars, as the indentation of a blank line
+        tail = line
+        len_dent = 0
+
+    dent = len_dent * " "
 
     return (
         dent,
@@ -245,7 +257,7 @@ def run_one_shline(shline):
     return gots
 
 
-def require_test_passed(args_file, passes, gots, dent, wants):
+def require_test_passed(path, passes, gots, dent, wants):
     """Raise exception, unless actual output roughly equals expected output"""
 
     max_len = max(len(wants), len(gots))
@@ -256,7 +268,7 @@ def require_test_passed(args_file, passes, gots, dent, wants):
         if got != want:
 
             try:
-                assert equal_but_for_ellipses(got, want)
+                assert equal_but_for_ellipses(want, got=got)
             except AssertionError:
 
                 vv_print()
@@ -286,7 +298,7 @@ def require_test_passed(args_file, passes, gots, dent, wants):
                 if main.args.vq < len("vv"):
                     reasons.append("try again with -vv")
                 reasons.append(
-                    "fix the code, and/or fix the test at:  vim {}".format(args_file)
+                    "fix the code, and/or fix the test at:  vim {}".format(path)
                 )
 
                 for reason in reasons:
@@ -297,7 +309,7 @@ def require_test_passed(args_file, passes, gots, dent, wants):
         vv_print(dent + got)
 
 
-def equal_but_for_ellipses(got, want):
+def equal_but_for_ellipses(want, got):
     """Compare two strings, but match "..." to zero or more characters"""
 
     ellipsis = "..."
@@ -309,6 +321,10 @@ def equal_but_for_ellipses(got, want):
         assert must in given
         must_at = given.index(must)
         given = given[must_at:][len(must) :]
+
+    if len(musts) > 1:
+        if not musts[-1]:
+            given = ""
 
     assert not given  # FIXME: incomplete equal_but_for_ellipses
 
@@ -322,7 +338,9 @@ def vv_print(*args):
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":

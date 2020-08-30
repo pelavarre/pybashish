@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
 
 """
-usage: bash.py [-h]
+usage: bash.py [-h] [-i]
 
 chat with people: prompt, then listen, then speak, and repeat
 
 optional arguments:
-  -h, --help  show this help message and exit
+  -h, --help      show this help message and exit
+  -i, --interact  ask more questions
 
 bugs:
+  returns exit status 0 after printing usage, if called with no arguments
   returns exit status 127, not 258, for ⌃D EOF pressed while ' or "" input quote open
-  zeroes exit status after next line of input, no matter if input is blank
-  lots more bugs not yet reported, please help us out
+  changes exit status after next line of input, no matter if input is blank
+  defines "--interact" to expand on "-i", whereas "bash" doesn't bother
+  leaves most of "bash" unimplemented
 
 examples:
-  bash.py  # chat till "exit", or ⌃D EOF pressed to quit, or Ssh drops, etc
+  bash.py  # chat till "exit", or ⌃D EOF pressed to quit, or ssh drops, etc
 """
 # FIXME: add --color=never|always|auto
 
@@ -33,9 +36,16 @@ import pwd_  # FIXME: packaging
 import read
 
 
+FILE_DIR = os.path.split(os.path.realpath(__file__))[0]  # sample before 1st "os.chdir"
+
+
 def main(argv):
 
-    argdoc.parse_args()
+    args = argdoc.parse_args()
+    if not args.interact:
+        stderr_print(argdoc.format_usage().rstrip())
+        stderr_print("bash.py: error: choose --interact")
+        sys.exit(2)  # exit 2 from rejecting usage
 
     # Print banner
 
@@ -44,7 +54,6 @@ def main(argv):
     stderr_print('Type "help" and press Return for more information.')
     stderr_print('Type "exit" and press Return to quit, or press ⌃D EOF to quit')
     stderr_print()
-    sys.stderr.flush()
 
     # Serve till exit
 
@@ -58,8 +67,7 @@ def main(argv):
         try:
             shline = read.readline(prompt)
         except KeyboardInterrupt:
-            sys.stderr.write("⌃C\r\n")
-            sys.stderr.flush()
+            stderr_print("⌃C", end="\r\n")
             continue
 
         # Exit at end-of-file
@@ -70,9 +78,7 @@ def main(argv):
 
         # Compile and execute the line
 
-        argv = _parse_shline(shline)
-        how = _compile_shline(shline, argv=argv)
-        returncode = how(argv)
+        returncode = compile_and_run_shline(shline)
 
         main.returncode = returncode
 
@@ -81,28 +87,142 @@ def main(argv):
             # FIXME: think into trace "shline" of nonzero "returncode", a la Zsh
 
 
-def builtin_pass(argv):  # FIXME FIXME FIXME: build in "-h" and "--help" without a verb
-    pass  # FIXME: stop zeroing last exit status "$?" at each blank input line
+def compile_and_run_shline(shline):
+
+    argv = _parse_shline(shline)
+    how = _compile_shline(shline, argv=argv)
+    returncode = how(argv)
+
+    return returncode
+
+
+#
+#
+#
+
+
+def builtin_cd(argv):
+    """Inject a change of working dir"""
+
+    ran = builtin_via_py("cd.py", argv)
+    returncode = ran.returncode
+
+    changing_dir = True
+
+    if (not ran.stdout) or len(ran.stdout.splitlines()) != 1:
+        changing_dir = False
+        if ran.stdout:
+            os.write(sys.stdout.fileno(), ran.stdout)
+
+    if ran.stderr:
+        sys.stdout.flush()
+        os.write(sys.stderr.fileno(), ran.stderr)
+        sys.stderr.flush()
+
+    if ran.returncode:
+        changing_dir = False
+
+    if changing_dir:
+
+        stdouts = ran.stdout.decode()
+        stdouts = stdouts.splitlines()
+
+        assert len(stdouts) == 1
+        realpath = stdouts[0]
+
+        returncode = os_chdir_path(path=realpath)
+
+    return returncode
+
+
+def os_chdir_path(path):
+    """Change the working dir of this process"""
+
+    # Sample cwd
+
+    try:
+        before_cwd = os.getcwd()
+    except FileNotFoundError:
+        before_cwd = None
+
+    if before_cwd is not None:
+        before_realpath = os.path.realpath(before_cwd)
+        os.environ[
+            "OLDPWD"
+        ] = before_realpath  # unneeded, unless this raises an exception
+
+    # Change cwd and resample cwd
+
+    try:
+        os.chdir(path)
+        after_cwd = os.getcwd()
+    except FileNotFoundError as exc:
+        stderr_print("cd.py: error: {}: {}".format(type(exc).__name__, exc))
+        return 1
+
+    after_realpath = os.path.realpath(after_cwd)
+    os.environ["PWD"] = after_realpath
+
+    ran = builtin_via_py("pwd_.py")
+    returncode = ran.returncode
+
+    if ran.stdout:
+        os.write(sys.stdout.fileno(), ran.stdout)
+
+    if ran.stderr:
+        sys.stdout.flush()
+        os.write(sys.stderr.fileno(), ran.stderr)
+        sys.stderr.flush()
+
+    return returncode
+
+
+def builtin_cd_back(argv):
+    implied_argv = ["cd", "-"] + argv[1:]
+    returncode = builtin_cd(implied_argv)
+    return returncode
+
+
+def builtin_cd_up(argv):
+    implied_argv = ["cd", ".."] + argv[1:]
+    returncode = builtin_cd(implied_argv)
+    return returncode
 
 
 def builtin_exit(argv):
     """Inject a choice of process returncode"""
 
-    file_dir = _calc_file_dir()
-    wherewhat = os.path.join(file_dir, "exit.py")
+    ran = builtin_via_py("exit.py", argv)
+
+    if ran.stdout:
+        os.write(sys.stdout.fileno(), ran.stdout)
+
+    if ran.stderr:
+        sys.stdout.flush()
+        os.write(sys.stderr.fileno(), ran.stderr)
+        sys.stderr.flush()
+
+    assert ran.returncode is not None
+    if (not ran.stdout) and (not ran.stderr):
+        sys.exit(ran.returncode)
+
+    return ran.returncode
+
+
+def builtin_via_py(what_py, argv=None):
+
+    wherewhat = os.path.join(FILE_DIR, what_py)
+    argv_tail = argv[1:] if argv else list()
 
     ran = subprocess.run(
-        [wherewhat] + argv[1:], stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        [wherewhat] + argv_tail, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     )
-    os.write(sys.stdout.fileno(), ran.stdout)
-    assert ran.returncode is not None
-    assert not ran.stderr  # because stderr=subprocess.STDOUT
 
-    returncode = ran.returncode
-    if not ran.stdout:
-        sys.exit(returncode)
+    return ran
 
-    return returncode
+
+def builtin_help(argv):
+    compile_and_run_shline("help")
 
 
 def builtin_history(argv):
@@ -123,12 +243,22 @@ def builtin_history(argv):
         _ = argdoc.parse_args(args=argv[1:], doc=doc)
     except SystemExit as exc:
         returncode = exc.code
+
         return returncode
 
     shlines = read.ShLineHistory.shlines  # couple less tightly  # add date/time-stamp's
     for (index, shline,) in enumerate(shlines):
         lineno = 1 + index
         print("{:5d}  {}".format(lineno, shline))
+
+
+def builtin_pass(argv):  # think more about  $ : --help
+    pass  # FIXME: stop zeroing last exit status "$?" at each blank input line
+
+
+#
+#
+#
 
 
 def _parse_shline(shline):
@@ -158,7 +288,7 @@ def _compile_shline(shline, argv):
 
     if argv is None:
 
-        how = _compile_log_error()
+        how = _compile_return_error()  # hope crash in _parse_shline printed a message
 
         return how
 
@@ -189,61 +319,91 @@ def _compile_shline(shline, argv):
     verb = argv[0]
     if ("/" in verb) or ("." in verb):
 
-        if os.path.exists(verb):
-            how = _compile_log_error(
-                "bash.py: warning: {}: No such file or directory in bash path".format(
-                    verb
-                )
-            )
-            return how
+        how = _compile_explicit_relpath(verb)
 
-        how = _compile_log_error(
-            "bash.py: warning: {}: No such file or directory".format(verb)
-        )
         return how
 
-    # Map plain verb to Py file
+    # Map one plain verb to each Py file
 
-    file_dir = _calc_file_dir()
-
-    what = f"{verb}_.py"
-    wherewhat = os.path.join(file_dir, what)
-    if not os.path.exists(wherewhat):
-        what = f"{verb}.py"
-        wherewhat = os.path.join(file_dir, what)
+    wherewhat = _calc_wherewhat(verb)
 
     # Plan to call a Py file that exists
 
     if os.path.exists(wherewhat):
 
         def how(argv):
-            ran = subprocess.run([wherewhat] + argv[1:])
+            try:
+                ran = subprocess.run([wherewhat] + argv[1:])
+            except PermissionError as exc:
+                stderr_print("bash.py: error: {}: {}".format(type(exc).__name__, exc))
+                ran.returncode = 126  # exit 126 from executable permission error
             return ran.returncode
 
         return how
 
-    # Plan to rejecy a verb that maps to a Py file that doesn't exist
+    # Plan to reject a verb that maps to a Py file that doesn't exist
 
     how = _compile_log_error("bash.py: warning: {}: command not found".format(verb))
+
     return how
 
 
-def _calc_file_dir():
-    file_dir = os.path.split(os.path.realpath(__file__))[0]
-    return file_dir
+def _compile_explicit_relpath(verb):
+    """Decline to map any explicit relpath to verb"""
+
+    assert ("/" in verb) or ("." in verb)
+
+    if os.path.exists(verb):
+        how = _compile_log_error(
+            "bash.py: warning: {}: No such file or directory in bash path".format(verb)
+        )
+
+        return how
+
+    how = _compile_log_error(
+        "bash.py: warning: {}: No such file or directory".format(verb)
+    )
+
+    return how
 
 
-def _compile_log_error(message=None):
+def _calc_wherewhat(verb):
+    """Map verb to file"""
+
+    what = f"{verb}_.py"
+    wherewhat = os.path.join(FILE_DIR, what)
+    if not os.path.exists(wherewhat):
+        if not verb.endswith("_"):
+            what = f"{verb}.py"
+            wherewhat = os.path.join(FILE_DIR, what)
+
+    return wherewhat
+
+
+def _compile_log_error(message):
+    """Plan to log an error message and return nonzero"""
+
     def how(argv):
-        return log_error(message)
+        return _log_error(message)
 
     return how
 
 
-def log_error(message):
-    if message is not None:
-        stderr_print(message)
-        sys.stderr.flush()
+def _compile_return_error():
+    """Plan to to return nonzero, as if error message already logged"""
+
+    def how(argv):
+        return 127
+
+    return how
+
+
+def _log_error(message):
+    """Log an error message and return nonzero"""
+
+    assert message
+    stderr_print(message)
+
     return 127
 
 
@@ -257,6 +417,7 @@ def calc_ps1():
 
     if hasattr(calc_ps1, "user"):
         ps1 = f"({env}) {mark} "
+
         return ps1
 
     # But first calculate a long prompt
@@ -266,8 +427,22 @@ def calc_ps1():
     calc_ps1.user = user
 
     user = calc_ps1.user
+
     hostname = platform.node()
-    where = pwd_.os_path_homepath(os.getcwd())
+    #
+    # FIXME: Noise to Stderr at "platform.node()" in such tests as:  mkdir foo/ && cd foo/ && rm -fr ../foo/
+    #
+    #   Linux => sh: 0: getcwd() failed: No such file or directory"
+    #   Mac => shell-init: error retrieving current directory: getcwd: cannot access parent directories: No such file or directory
+    #
+
+    gotcwd = os.environ["PWD"]
+    try:
+        gotcwd = os.getcwd()
+    except FileNotFoundError:
+        pass
+
+    where = pwd_.os_path_homepath(gotcwd)
 
     assert read.ESC_CHAR == "\x1B"
 
@@ -276,19 +451,30 @@ def calc_ps1():
     blue = "\x1B[00;34m"
 
     ps1 = f"{green}{user}@{hostname}{nocolor}:{blue}{where}{nocolor}{mark} \r\n({env}) {mark} "
+
     return ps1
 
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
-BUILTINS = dict()
-BUILTINS[":"] = builtin_pass
-BUILTINS["exit"] = builtin_exit
-BUILTINS["history"] = builtin_history
-# FIXME FIXME: implement BUILTINS["cd"]
+BUILTINS = {
+    "-": builtin_cd_back,
+    "--h": builtin_help,
+    "--he": builtin_help,
+    "--hel": builtin_help,
+    "--help": builtin_help,
+    "-h": builtin_help,
+    "..": builtin_cd_up,
+    ":": builtin_pass,
+    "cd": builtin_cd,
+    "exit": builtin_exit,
+    "history": builtin_history,
+}
 
 
 if __name__ == "__main__":

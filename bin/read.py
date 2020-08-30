@@ -22,14 +22,16 @@ bugs:
   doesn't delete \ backslashes
 
 examples:
-  echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | read.py  # Control Option Shift Command Arrows
+  echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | read.py  # Control Option Shift Command Arrows as ordered by Apple
   echo 'å é î ø ü' | read.py  # the accented vowels prominent in Mac ⌥ Option
-  read -e  # in Bash
+  echo '⋮' | read.py  # more favorite characters of mine
   read.py
   read.py --lines
+  read -e  # in Bash
   FOO=123; vared -e FOO  # in Zsh
 """
 # FIXME FIXME:  stop discarding history edits at ⌃N "_next_history"
+
 
 from __future__ import print_function
 
@@ -68,8 +70,7 @@ def main():
     prompt = "? "
 
     if args.lines:  # prompt even when Stdin is not Tty
-        sys.stderr.write("Press ⌃D EOF to quit\n")
-        sys.stderr.flush()
+        stderr_print("Press ⌃D EOF to quit")
 
     while True:
 
@@ -77,11 +78,9 @@ def main():
         try:
             shline = readline(prompt)
         except KeyboardInterrupt:
-            sys.stderr.write("⌃C\r\n")
-            sys.stderr.flush()
+            stderr_print("⌃C", end="\r\n")
 
         print(repr(shline))
-        sys.stdout.flush()
 
         if shline == "":
             break
@@ -160,6 +159,9 @@ class GlassTeletype(contextlib.ContextDecorator):
 
     def __enter__(self):
 
+        sys.stdout.flush()
+        sys.stderr.flush()
+
         if sys.stdin.isatty():
 
             self.fdin = sys.stdin.fileno()
@@ -168,9 +170,14 @@ class GlassTeletype(contextlib.ContextDecorator):
             when = termios.TCSADRAIN  # not termios.TCSAFLUSH
             tty.setraw(self.fdin, when)
 
+        # FIXME: testcases where isatty but want like not isatty
+
         return self
 
     def __exit__(self, *exc_info):
+
+        sys.stdout.flush()
+        sys.stderr.flush()
 
         if sys.stdin.isatty():
 
@@ -185,6 +192,9 @@ class GlassTeletype(contextlib.ContextDecorator):
         """Pull the next line of input, but let people edit the shline as it comes"""
 
         # Echo the prompt
+
+        sys.stdout.flush()
+        sys.stderr.flush()
 
         self.putch(prompt)
 
@@ -214,8 +224,7 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         if not sys.stdin.isatty():
             for echo in self.shadow.tty_lines:  # may include Ansi color codes
-                sys.stderr.write(echo + "\n")
-                sys.stderr.flush()
+                stderr_print(echo)
 
         # Keep this line of history
 
@@ -317,7 +326,6 @@ class GlassTeletype(contextlib.ContextDecorator):
             self.shadow.putch(ch)
             if self.with_termios:
                 sys.stdout.write(ch)
-                sys.stdout.flush()
 
     def _insert_chars(self, chars):
         """Add chars to the shline"""
@@ -502,6 +510,13 @@ class GlassTeletype(contextlib.ContextDecorator):
         """Ring the Terminal bell"""
 
         self.putch("\a")
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
+    sys.stdout.flush()
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":

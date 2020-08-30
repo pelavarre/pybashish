@@ -6,14 +6,14 @@ usage: cal.py [--help] [-h] [YMD]
 show what day it is, or was, of which year and month
 
 positional arguments:
-  YMD     print for another DD or MMDD or YYYYMMDD, akin to "cal -H YMD"
+  YMD     print for another %d|%m%d|%y%m%d|%Y%m%d, a la bash "cal -H yyyy-mm-dd"
 
 optional arguments:
   --help  show this help message and exit
-  -h      stop emphasizing one day
+  -h      stop coloring one day (default: color when stdout isatty)
 
 bugs:
-  starts each week on Monday, a la Linux "ncal -MC", as in England
+  starts each week on Monday, a la linux "ncal -MC", as in England
   doesn't pad every line with two blanks at the end
   doesn't fit well into a x25x80 terminal
 
@@ -26,6 +26,7 @@ examples:
 # FIXME: default to .us -S Sunday weeks, option .uk -M Monday weeks
 # FIXME: ~ cal  # inside "grep.py", for the England -M Monday weeks
 # FIXME: "uk" and "us" as hints on the command line
+
 
 import calendar as cal
 import datetime as dt
@@ -42,9 +43,15 @@ def main():
 
     args = argdoc.parse_args()
     args.color = sys.stdout.isatty() and not args.h
+    # FIXME: make --color=yes easy to say when not isatty
+
     main.args = args
 
-    today = misread_ymd_12n(args.ymd)
+    now = dt.datetime.now()
+    today = dt.datetime(now.year, now.month, now.day, 12, 00)  # duck 2am DST etc
+    if args.ymd:
+        today = misread_ymd_12n(args.ymd)
+
     two_weeks_back = today - dt.timedelta(weeks=2)
     two_weeks_ahead = today + dt.timedelta(weeks=2)
 
@@ -53,7 +60,7 @@ def main():
     month = week.month
     print_start_of_month(week.replace(day=1), week)
     if week.day > 1:
-        print("...".center(WIDTH))
+        print_rstripped("...".center(WIDTH))
 
     while week < two_weeks_ahead:
         end_of_week = week_last_day(week)
@@ -73,41 +80,16 @@ def main():
         week += dt.timedelta(weeks=1)
 
     if month == (end_of_week + dt.timedelta(days=1)).month:
-        print("...".center(WIDTH))
+        print_rstripped("...".center(WIDTH))
 
     print()
-
-
-def misread_ymd_12n(ymd):
-    """Guess what YYYY-MM-DD is meant, from briefer input"""
-
-    now = dt.datetime.now()
-
-    year = now.year
-    month = now.month
-    day = now.day
-
-    if ymd:
-        str_day = ymd[-2:]
-        day = int(str_day)
-        ymd = ymd[: -len(str_day)]
-        if ymd:
-            str_month = ymd[-2:]
-            month = int(str_month)
-            ymd = ymd[: -len(str_month)]
-            if ymd:
-                year = int(ymd)
-
-    today = dt.datetime(year, month, day, 12, 00)
-
-    return today
 
 
 def print_start_of_month(month, week):
     """Print the start of a month"""
 
     print()
-    print(month.strftime("%B %Y").center(WIDTH))
+    print_rstripped(month.strftime("%B %Y").center(WIDTH))
     print_day_column_names(week)
 
 
@@ -122,7 +104,7 @@ def print_day_column_names(week):
         stdouts.append(sep + ww)
         sep = " "
 
-    print("".join(stdouts))
+    print_rstripped("".join(stdouts))  # rstrip unneeded
 
 
 def print_week_in_month(week, month, today):
@@ -151,7 +133,7 @@ def print_week_in_month(week, month, today):
         stdouts.append(stdout)
         sep = " "
 
-    print("".join(stdouts))
+    print_rstripped("".join(stdouts).rstrip())
 
 
 def week_last_day(week):
@@ -160,6 +142,46 @@ def week_last_day(week):
     end_of_week = week + dt.timedelta(days=6)
 
     return end_of_week
+
+
+# deffed in many files  # missing from docs.python.org
+def misread_ymd_12n(ymd):
+    """Guess what YYYY-MM-DD 12:00:00 is meant, from briefer input"""
+
+    now = dt.datetime.now()
+
+    syntaxes = list()
+    syntaxes.append(["%d", "day"])
+    syntaxes.append(["%m%d", "month day".split()])
+    syntaxes.append(["%y%m%d", "year month day".split()])
+    syntaxes.append(["%Y%m%d", "year month day".split()])
+    # 19nn/20nn %y split varies by year maybe
+
+    parsed = None
+    for syntax in syntaxes:
+        (format_, keys,) = syntax
+        try:
+            parsed = dt.datetime.strptime(ymd, format_)
+            break
+        except ValueError:
+            if syntax == syntaxes[-1]:
+                raise
+
+    assert parsed and keys
+
+    today = dt.datetime(now.year, now.month, now.day, 12, 00)  # duck 2am DST etc
+    replaces = {k: getattr(parsed, k) for k in keys}
+    asif_today = today.replace(**replaces)
+
+    return asif_today
+
+
+# deffed in many files  # missing from docs.python.org
+def print_rstripped(*args):
+    """Like print, but end lines quickly:  don't pad with spaces past the end"""
+
+    reps = "".join(str(_) for _ in args)
+    print(reps.rstrip())
 
 
 # deffed in many files  # missing from docs.python.org

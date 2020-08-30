@@ -33,12 +33,12 @@ examples:
   subsh2.py echo 'Hello, Subsh2 World!'
   subsh2.py ls
 """
-# FIXME: block no args:  subsh2
-# FIXME: test:  subsh2 --
+# FIXME: more test of:  subsh.py -- bash -i
+# FIXME: think deeper into no args opening up a Bash subshell
+
 
 from __future__ import print_function
 
-import json
 import pprint
 import shlex
 import subprocess
@@ -60,12 +60,7 @@ def main(argv):
 
     verbed = verb(*words[1:])
 
-    dumpable = verbed.vars
-    dumpable = {
-        k: (v.decode() if isinstance(v, bytes) else v) for (k, v,) in dumpable.items()
-    }
-
-    pprint.pprint(json.dumps(dumpable))
+    pprint.pprint(verbed.vars)
 
     exit_status = verbed
     sys.exit(exit_status)
@@ -99,8 +94,6 @@ class ShVerb(object):
 
         kwargs__ = dict(kwargs_)
         kwargs__.update(kwargs)
-
-        # print(args__, kwargs__, file=sys.stderr)
 
         ran = pyish.subprocess_run(args__, **kwargs__)
         vars_ = vars(ran)

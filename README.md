@@ -1,6 +1,6 @@
 # pybashish
 
-Come here to read the unlicensed Python source code inside Bash
+Come here to patch the unlicensed Python source code inside Bash
 
 Take one source file and fork it, to meet your need instead
 

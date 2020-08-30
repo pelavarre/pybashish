@@ -30,3 +30,5 @@ pbpaste >p  # pb stash
 cat p | pbcopy  # pb stash pop
 
 uname
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

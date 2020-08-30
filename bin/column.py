@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: column [-h] [-t]
+usage: column.py [-h] [-t]
 
 align words of lines into columns
 
@@ -10,16 +10,20 @@ optional arguments:
   -t          print words, but separate columns by two spaces
 
 bugs:
-  acts like "column -h" if called with no args, unlike Bash
   aligns cells to the right when two-thirds or more contain decimal digits
-  doesn't offer the "-csx" of Mac, nor the "-censtx" of Linux
-  doesn't offer the "-csx" of Mac, nor the "-censtx" of Linux
+  doesn't offer to run without arguments a la mac and linux
+  doesn't offer the "-csx" of mac, nor the "-censtx" of linux
+
+bugs:
+  does prompt once for stdin, when stdin chosen as file "-" or by no file args, unlike bash "cat"
+  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
 examples:
   echo 'su per ca $ li fra gil $ is tic ex $ pi a li $ doc ious' | tr '$' '\n' | column -t
   echo '27 735 43 $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' | tr '$' '\n' | column -t
   echo 'su per ca $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' | tr '$' '\n' | column -t
 """
+
 
 import collections
 import random
@@ -36,7 +40,7 @@ def main():
 
     if not args.t:
         stderr_print(argdoc.format_usage().rstrip())
-        stderr_print("column.py: error: no arguments")
+        stderr_print("column.py: error: no arguments not implemented")
         sys.exit(2)  # exit 2 from rejecting usage
 
     # Fetch all of Stdin

@@ -4,6 +4,12 @@ default: black test-once
 	:
 	git status | grep -v '^$$'
 	:
+	: consider
+	:
+	@echo 'git clean -ffxdq'
+	@echo 'git commit --all --amend'
+	@echo 'git status'
+	:
 	: make: passed
 	:
 
@@ -27,16 +33,33 @@ black:
 
 test-once:
 	:
-	for F in bin/*.py; do bin/argdoc.py $$F >/dev/null && continue; echo "make: error:  python3 -m pdb bin/argdoc.py $$F" >&2; exit 1; done
-	: argdoc: tests passed
+	rm -fr ../pybashish/.local/share/grep/files/
+	bin/grep.py >/dev/null
+	:
+	: catch up with
+	@echo 'bin/cspsh.py -f 2>&1 | sed '\''s,  *$$,,'\''  >tests/cspsh-f.txt'
+	:
+	bin/cspsh.py -fv >/dev/null 2>&1
+	bash -c 'diff -burp tests/cspsh-f.txt <(bin/cspsh.py -f 2>&1)'
 	:
 	bin/doctestbash.py tests/ || (bin/doctestbash.py -vv tests/; exit 1)
+	:
+	for F in bin/*.py; do bin/argdoc.py $$F >/dev/null && continue; echo "make: error:  python3 -m pdb bin/argdoc.py $$F" >&2; exit 1; done
+	: argdoc: tests passed
 	:
 	(cd bin; python3 -m doctest -- ../tests/_test_subsh-typescript.txt)
 	: doctest: tests passed
 	:
 	tests/_test_subsh.py >/dev/null
 	: test_subsh: tests passed
+	:
+	rm -fr a b
+	git ls-files | grep -vE '(.gitignore|__init__.py|README.md|tests/cspsh-f.txt)' >a
+	git grep -l copied.from $$(git ls-files) >b
+	diff -burp a b
+	rm -fr a b
+	:
+	rm -fr ../pybashish/bin/pyish.pyc
 	:
 
 grep-fixme:

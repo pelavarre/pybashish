@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
 """
-usage: rm.py [-h]
+usage: rm.py [-h] [FILE [FILE ...]]
 
 move a file to the ../__jqd-trash/ dir
+
+positional arguments:
+  FILE        a file to trash
 
 optional arguments:
   -h, --help  show this help message and exit
@@ -15,12 +18,18 @@ examples:
   Oh no! No examples disclosed!! 💥 💔 💥
 """
 
+
+import sys
+
 import argdoc
 
 
 def main():
     args = argdoc.parse_args()
-    print(args)
+    sys.stderr.write("{}\n".format(args))
+    sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
+    sys.stderr.write("rm.py: error: not implemented\n")
+    sys.exit(2)  # exit 2 from rejecting usage
 
 
 if __name__ == "__main__":

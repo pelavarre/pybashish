@@ -15,12 +15,17 @@ examples:
   Oh no! No examples disclosed!! 💥 💔 💥
 """
 
+
+import sys
+
 import argdoc
 
 
 def main():
-    args = argdoc.parse_args()
-    print(args)
+    _ = argdoc.parse_args()
+    sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
+    sys.stderr.write("make.py: error: not implemented\n")
+    sys.exit(2)  # exit 2 from rejecting usage
 
 
 if __name__ == "__main__":
