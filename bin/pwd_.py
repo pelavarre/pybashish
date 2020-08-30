@@ -48,8 +48,7 @@ def main(argv):
         gotcwd = os.getcwd()
     except FileNotFoundError as exc:
         print(pwd)
-        sys.stdout.flush()
-        sys.stderr.write("pwd.py: error: {}: {}\n".format(type(exc).__name__, exc))
+        stderr_print("pwd.py: error: {}: {}".format(type(exc).__name__, exc))
         sys.exit(1)  # FIXME: more robust "pwd" vs the current working dir deleted
 
     assert gotcwd == realpath
@@ -100,6 +99,13 @@ def min_path_formatter_not_relpath(exemplar):
             formatter = formatter_
 
     return formatter
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
+    sys.stdout.flush()
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":

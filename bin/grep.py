@@ -87,6 +87,7 @@ examples:
 # FIXME: match trailing N patterns to 1 or more "..." as args, not just to themselves
 #
 # FIXME: add --color=yes|no|auto for "grep.py" when isatty and not
+# FIXME: add --color=unstable for flipping the defaults to where I like them
 #
 
 
@@ -161,8 +162,6 @@ def main(argv):
     # Search through lines
 
     exit_status = grep_lines(args, lines=files_lines, chosen_lines=chosen_lines)
-    sys.stdout.flush()
-
     verbose_print("grep.py: + exit {}".format(exit_status if exit_status else 0))
 
     sys.exit(exit_status)
@@ -594,13 +593,40 @@ def split_paragraphs(lines, keepends=False):
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 # deffed in many files  # missing from docs.python.org
 def verbose_print(*args):
+    sys.stdout.flush()
     if main.args.verbose:
         print(*args, file=sys.stderr)
+    sys.stderr.flush()
+
+
+# deffed in many files  # missing from docs.python.org
+class BrokenPipeErrorSink(contextlib.ContextDecorator):
+    """Cut unhandled BrokenPipeError down to sys.exit(1)
+
+    More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
+    As per https://docs.python.org/3/library/signal.html#note-on-sigpipe
+    """
+
+    def __enter__(
+        self,
+    ):  # test with large Stdout cut sharply, such as:  find.py ~ | head
+        return self
+
+    def __exit__(self, *exc_info):
+        (exc_type, exc, exc_traceback,) = exc_info
+        if isinstance(exc, BrokenPipeError):  # catch this one
+
+            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
+
+            sys.exit(1)
 
 
 FILES_CHARS = r"""
@@ -977,7 +1003,7 @@ FILES_CHARS = r"""
     " :set number
 
     :set hlsearch
-    :nnoremap <esc><esc> :noh<return>
+    " :nnoremap <esc><esc> :noh<return>  " nope, corrupts multiple Esc
     " hlsearch, noh = toggle on/off highlighting of all hits of search
     " n-no-remap = remap in the normal (not-insert) mode except don't recurse thru other remaps
 
@@ -1011,29 +1037,6 @@ FILES_CHARS = r"""
     cd -
 
 """
-
-
-# deffed in many files  # missing from docs.python.org
-class BrokenPipeErrorSink(contextlib.ContextDecorator):
-    """Cut unhandled BrokenPipeError down to sys.exit(1)
-
-    More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
-    As per https://docs.python.org/3/library/signal.html#note-on-sigpipe
-    """
-
-    def __enter__(
-        self,
-    ):  # test with large Stdout cut sharply, such as:  find.py ~ | head
-        return self
-
-    def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
-        if isinstance(exc, BrokenPipeError):  # catch this one
-
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
-            os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
-
-            sys.exit(1)
 
 
 if __name__ == "__main__":

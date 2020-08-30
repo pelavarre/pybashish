@@ -42,9 +42,9 @@ def main(argv):
     args = argdoc.parse_args(argv[1:])
     main.args = args
 
-    sys.stderr.write("{}\n".format(args))
-    sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
-    sys.stderr.write("watch.py: error: not implemented\n")
+    stderr_print(args)
+    stderr_print(argdoc.format_usage().rstrip())
+    stderr_print("watch.py: error: not implemented")
     sys.exit(2)  # exit 2 from rejecting usage
 
     main.era = datetime.datetime.now()
@@ -94,6 +94,13 @@ def check_transcript(shline):
 
 def shlex_join(argv):
     raise NotImplementedError()
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
+    sys.stdout.flush()
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":

@@ -70,8 +70,7 @@ def main():
     prompt = "? "
 
     if args.lines:  # prompt even when Stdin is not Tty
-        sys.stderr.write("Press ⌃D EOF to quit\n")
-        sys.stderr.flush()
+        stderr_print("Press ⌃D EOF to quit")
 
     while True:
 
@@ -79,11 +78,9 @@ def main():
         try:
             shline = readline(prompt)
         except KeyboardInterrupt:
-            sys.stderr.write("⌃C\r\n")
-            sys.stderr.flush()
+            stderr_print("⌃C", end="\r\n")
 
         print(repr(shline))
-        sys.stdout.flush()
 
         if shline == "":
             break
@@ -162,6 +159,9 @@ class GlassTeletype(contextlib.ContextDecorator):
 
     def __enter__(self):
 
+        sys.stdout.flush()
+        sys.stderr.flush()
+
         if sys.stdin.isatty():
 
             self.fdin = sys.stdin.fileno()
@@ -176,6 +176,9 @@ class GlassTeletype(contextlib.ContextDecorator):
 
     def __exit__(self, *exc_info):
 
+        sys.stdout.flush()
+        sys.stderr.flush()
+
         if sys.stdin.isatty():
 
             when = termios.TCSADRAIN
@@ -189,6 +192,9 @@ class GlassTeletype(contextlib.ContextDecorator):
         """Pull the next line of input, but let people edit the shline as it comes"""
 
         # Echo the prompt
+
+        sys.stdout.flush()
+        sys.stderr.flush()
 
         self.putch(prompt)
 
@@ -218,8 +224,7 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         if not sys.stdin.isatty():
             for echo in self.shadow.tty_lines:  # may include Ansi color codes
-                sys.stderr.write(echo + "\n")
-                sys.stderr.flush()
+                stderr_print(echo)
 
         # Keep this line of history
 
@@ -321,7 +326,6 @@ class GlassTeletype(contextlib.ContextDecorator):
             self.shadow.putch(ch)
             if self.with_termios:
                 sys.stdout.write(ch)
-                sys.stdout.flush()
 
     def _insert_chars(self, chars):
         """Add chars to the shline"""
@@ -506,6 +510,13 @@ class GlassTeletype(contextlib.ContextDecorator):
         """Ring the Terminal bell"""
 
         self.putch("\a")
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args):
+    sys.stdout.flush()
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":

@@ -158,7 +158,6 @@ def pull_line(lines, stdin):
         else:
 
             stderr_print(prompt, end="")
-            sys.stdout.flush()
             more = stdin.readline()
             if not stdin.isatty():
                 stderr_print(more.rstrip())

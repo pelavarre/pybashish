@@ -2264,11 +2264,13 @@ def str_splitword(chars, count=1):
     )
 
 
+# deffed in many files  # missing from docs.python.org
 def verbose_print(*args):
-
-    message = "".join(str(a) for a in args)
-    if main.args.verbose:
-        print(message, file=sys.stderr)
+    sys.stdout.flush()
+    if main.args.verbose:  # Python 2 requires "str_args" expanded explicitly
+        str_args = "".join(str(_) for _ in args)
+        print(str_args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 # call inline to define 'import argdoc' to require Python >= June/2019 Python 3.7

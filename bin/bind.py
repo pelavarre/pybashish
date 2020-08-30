@@ -110,9 +110,11 @@ def bind_repr(stdin):
     return repr_stdin
 
 
-# deffed in many files  # but not in docs.python.org
+# deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":

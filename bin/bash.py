@@ -54,7 +54,6 @@ def main(argv):
     stderr_print('Type "help" and press Return for more information.')
     stderr_print('Type "exit" and press Return to quit, or press ⌃D EOF to quit')
     stderr_print()
-    sys.stderr.flush()
 
     # Serve till exit
 
@@ -68,8 +67,7 @@ def main(argv):
         try:
             shline = read.readline(prompt)
         except KeyboardInterrupt:
-            sys.stderr.write("⌃C\r\n")
-            sys.stderr.flush()
+            stderr_print("⌃C", end="\r\n")
             continue
 
         # Exit at end-of-file
@@ -115,9 +113,9 @@ def builtin_cd(argv):
         changing_dir = False
         if ran.stdout:
             os.write(sys.stdout.fileno(), ran.stdout)
-            sys.stdout.flush()
 
     if ran.stderr:
+        sys.stdout.flush()
         os.write(sys.stderr.fileno(), ran.stderr)
         sys.stderr.flush()
 
@@ -159,7 +157,7 @@ def os_chdir_path(path):
         os.chdir(path)
         after_cwd = os.getcwd()
     except FileNotFoundError as exc:
-        sys.stderr.write("cd.py: error: {}: {}\n".format(type(exc).__name__, exc))
+        stderr_print("cd.py: error: {}: {}".format(type(exc).__name__, exc))
         return 1
 
     after_realpath = os.path.realpath(after_cwd)
@@ -170,9 +168,9 @@ def os_chdir_path(path):
 
     if ran.stdout:
         os.write(sys.stdout.fileno(), ran.stdout)
-        sys.stdout.flush()
 
     if ran.stderr:
+        sys.stdout.flush()
         os.write(sys.stderr.fileno(), ran.stderr)
         sys.stderr.flush()
 
@@ -198,9 +196,9 @@ def builtin_exit(argv):
 
     if ran.stdout:
         os.write(sys.stdout.fileno(), ran.stdout)
-        sys.stdout.flush()
 
     if ran.stderr:
+        sys.stdout.flush()
         os.write(sys.stderr.fileno(), ran.stderr)
         sys.stderr.flush()
 
@@ -252,7 +250,6 @@ def builtin_history(argv):
     for (index, shline,) in enumerate(shlines):
         lineno = 1 + index
         print("{:5d}  {}".format(lineno, shline))
-    sys.stdout.flush()
 
 
 def builtin_pass(argv):  # think more about  $ : --help
@@ -406,7 +403,6 @@ def _log_error(message):
 
     assert message
     stderr_print(message)
-    sys.stderr.flush()
 
     return 127
 
@@ -461,7 +457,9 @@ def calc_ps1():
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 BUILTINS = {

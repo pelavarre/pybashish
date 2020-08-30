@@ -117,7 +117,6 @@ def _run_bash_test_doc(incoming, path):
 
         if main.args.rip_bash_paste:
             print(shline)
-            sys.stdout.flush()
             if shline:
                 passes += 1
             continue
@@ -339,7 +338,9 @@ def vv_print(*args):
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":

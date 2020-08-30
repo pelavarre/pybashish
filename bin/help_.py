@@ -89,7 +89,6 @@ def main():
     stderr_print()
     stderr_print("Next try one of:")
     stderr_print()
-    sys.stderr.flush()
 
     #
 
@@ -101,7 +100,6 @@ def main():
     verbs.sort()
 
     print_cells(verbs, width=89)  # 89 columns is a 2020 Black terminal
-    sys.stdout.flush()
 
     stderr_print()
     stderr_print('Note: The "#" hash mark means ignore the following chars in the line')
@@ -110,7 +108,6 @@ def main():
     )
 
     stderr_print()
-    sys.stderr.flush()
 
 
 # deffed in many files  # missing from docs.python.org
@@ -143,7 +140,9 @@ def print_cells(cells, dent="    ", sep="  ", width=None):
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":
