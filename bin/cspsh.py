@@ -1036,7 +1036,7 @@ class ShardsTaker(argparse.Namespace):
 def stderr_print(*args, **kwargs):
     sys.stdout.flush()
     print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # for when kwargs["end"] != "\n"
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
@@ -1044,7 +1044,7 @@ def verbose_print(*args, **kwargs):
     sys.stdout.flush()
     if main.args.verbose:
         print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # for when kwargs["end"] != "\n"
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 #

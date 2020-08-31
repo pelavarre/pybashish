@@ -2217,7 +2217,10 @@ def require_sys_version_info(*min_info):
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
+    # print(*args, **kwargs, file=sys.stderr)  # SyntaxError in Python 2
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 # deffed in many files  # missing from docs.python.org
@@ -2267,9 +2270,9 @@ def str_splitword(chars, count=1):
 # deffed in many files  # missing from docs.python.org
 def verbose_print(*args):
     sys.stdout.flush()
-    if main.args.verbose:  # Python 2 requires "str_args" expanded explicitly
-        str_args = "".join(str(_) for _ in args)
-        print(str_args, file=sys.stderr)
+    if main.args.verbose:
+        # print(*args, **kwargs, file=sys.stderr)  # SyntaxError in Python 2
+        print(*args, file=sys.stderr)
     sys.stderr.flush()
 
 

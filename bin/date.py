@@ -156,9 +156,11 @@ def misread_ymdhms_linux(ymd):
     return asif_today
 
 
-# deffed in many files  # but not in docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

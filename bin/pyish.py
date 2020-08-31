@@ -89,9 +89,12 @@ def subprocess_run(*args, **kwargs):
     return ran
 
 
-# deffed in many files  # but not in docs.python.org
+# deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
+    # print(*args, **kwargs, file=sys.stderr)  # SyntaxError in Python 2
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 # deffed in many files  # since Oct/2019 Python 3.7  # since Dec/2016 CPython 3.6

@@ -140,9 +140,13 @@ def prompt_tty_stdin():
         stderr_print("Press ⌃D EOF to quit")
 
 
-# deffed in many files  # but not in docs.python.org
+# deffed in many files  # missing from docs.python.org
+# deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
+    # print(*args, **kwargs, file=sys.stderr)  # SyntaxError in Python 2
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":
