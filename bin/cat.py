@@ -16,9 +16,12 @@ optional arguments:
   -T, --show-tabs       show each "\t" tab as r"\t" backslash tee
   -t                    call for -T and -v
   -v, --show-nonprinting
-                        convert all but \n and \t and printable us-ascii r"[ -~]" to \ escapes
+                        convert all but \n and \t and printable ascii r"[ -~]" to \ escapes
 
 bugs:
+  shows \t as \t, not as classic ^I
+  shows \n as \n, not as classic $
+  does show all but printable ascii as nonprinting, unlike Mac "cat" at \u00A0 &nbsp; etc
   does stop copying at first ⌃D of stdin, even when last line not completed by "\n"
   does print hard b"\x09" tab after each line number, via "{:6}\t", same as bash "cat"
 
@@ -30,8 +33,11 @@ examples:
   cat -  # copy out each line of input
   cat - >/dev/null  # echo and discard each line of input
   cat - | grep . | cat.py -etv  # collect and echo some input, then echo it escaped
-  (echo a; echo b; echo c) | cat -n | cat -etv
-  pbpaste | cat.py -etv
+  echo a b c | tr ' ' '\n' | bin/cat.py -  # pass stdin through to stdout
+  (echo a; echo b; echo c) | cat -n | cat.py -etv  # show \t as \t and \n as \n
+  pbpaste | cat.py -etv  # show nonprinting in paste buffer
+  echo $'\x5A\xC2\xA0' | cat -tv  # Linux ok, but Mac shows &nbsp; Non-Break Space as space :-(
+  echo $'\x5A\xC2\xA0' | cat.py -tv  # do show even &nbsp; Non-Break Space as nonprinting
 """
 # FIXME: rewrite as Python 2 without contextlib.ContextDecorator
 
@@ -63,15 +69,13 @@ def main(argv):
         prompt_tty_stdin()
 
     for path in paths:
-        if path == "-":
-            cat_incoming(fd=sys.stdin.fileno(), args=args)
-        else:
-            try:
-                with open(path, "rb") as incoming:
-                    cat_incoming(fd=incoming.fileno(), args=args)
-            except FileNotFoundError as exc:
-                stderr_print("cat.py: error: {}: {}".format(type(exc).__name__, exc))
-                sys.exit(1)
+        openable = "/dev/stdin" if (path == "-") else path
+        try:
+            with open(openable, "rb") as incoming:
+                cat_incoming(fd=incoming.fileno(), args=args)
+        except FileNotFoundError as exc:
+            stderr_print("cat.py: error: {}: {}".format(type(exc).__name__, exc))
+            sys.exit(1)
 
 
 def cat_incoming(fd, args):
@@ -115,16 +119,12 @@ def cat_repr_byte(fd_byte, args):
     if fd_byte:
 
         if fd_byte == b"\n":
-            if args.show_ends:
-                rep = b"$" + fd_byte
-
-                return rep
+            rep = (br"\n" + b"\n") if args.show_ends else fd_byte
+            return rep
 
         if fd_byte == b"\t":
-            if args.show_tabs:
-                rep = br"\t"
-
-                return rep
+            rep = br"\t" if args.show_tabs else fd_byte
+            return rep
 
         if args.show_nonprinting:
             xx = ord(fd_byte)

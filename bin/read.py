@@ -193,10 +193,10 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         # Echo the prompt
 
+        self.putch(prompt)
+
         sys.stdout.flush()
         sys.stderr.flush()
-
-        self.putch(prompt)
 
         # Open the line
 

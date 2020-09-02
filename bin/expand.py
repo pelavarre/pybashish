@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 
 r"""
-usage: expand.py [-h] [--csv] [--plain] [--repr] [--wiki] [FILE [FILE ...]]
+usage: expand.py [-h] [--csv] [--repr] [--keep-tabs] [--wiki] [FILE [FILE ...]]
 
 replace tabs with spaces, replace cr with lf, strip leading and trailing empty lines
 
 positional arguments:
-  FILE        a file to copy out
+  FILE         a file to copy out
 
 optional arguments:
-  -h, --help  show this help message and exit
-  --csv       convert to a ".csv" table
-  --plain     replace smart quotes, smart dashes, and such with plain us-ascii " ' -
-  --repr      replace all but r"[\n\r\t]" and plain us-ascii with python \u escapes
-  --wiki      escape as html p of code nbsp br (fit for insertion into atlassian wiki)
+  -h, --help   show this help message and exit
+  --csv        convert to a ".csv" table
+  --repr       replace all but r"[\n\r\t]" and plain ascii with python \u escapes
+  --keep-tabs  don't replace tabs, smart quotes, smart dashes, and such with plain ascii " - etc
+  --wiki       escape as html p of code nbsp br (fit for insertion into atlassian wiki)
 
 bugs:
+  replaces tabs, smart quotes, smart dashes, and such: not just tabs
   doesn't accurately catenate binary files, unlike classic bash "expand"
   does strip leading and trailing empty lines, unlike bash "expand"
   does convert classic mac CR "\r" end-of-line to linux LF "\n", unlike bash "expand"
@@ -37,13 +38,13 @@ see also:
 
 examples:
   expand.py -
-  echo -n $'\xC0\x80' | expand.py | hexdump -C  # Linux preserves binary, Mac says 'illegal byte'
-  echo -n $'t\tr\rn\n' | expand.py | cat -etv
-  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | expand.py
+  echo -n $'\xC0\x80' | expand | hexdump  # Linux happy, but Mac says 'illegal byte sequence'
+  echo -n $'\xC0\x80' | expand.py | hexdump.py  # x EF BF BD = uFFFD = Unicode Replacement chars
+  echo -n $'t\tr\rn\n' | expand.py | cat.py -etv
+  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | expand.py  # no change
   echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | expand.py --repr  # such as "\u22EE" for "⋮" vertical ellipsis
-  echo $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | expand.py --plain
+  echo -n $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | expand.py | hexdump.py --chars  # common 'smart' chars
   echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | expand.py --wiki
-
 """
 
 
@@ -76,15 +77,13 @@ def main(argv):
         prompt_tty_stdin()
 
     for path in paths:
-        if path == "-":
-            expand_incoming(sys.stdin, args=args)
-        else:
-            try:
-                with open(path, "rt") as incoming:
-                    expand_incoming(incoming, args=args)
-            except FileNotFoundError as exc:
-                stderr_print("expand.py: error: {}: {}".format(type(exc).__name__, exc))
-                sys.exit(1)
+        openable = "/dev/stdin" if (path == "-") else path
+        try:
+            with open(openable, "rb") as incoming:
+                expand_incoming(incoming, args=args)
+        except FileNotFoundError as exc:
+            stderr_print("expand.py: error: {}: {}".format(type(exc).__name__, exc))
+            sys.exit(1)
 
 
 def expand_incoming(incoming, args):
@@ -97,7 +96,10 @@ def expand_incoming(incoming, args):
 
     while True:
 
-        line = incoming.readline()
+        line = incoming.readline().decode("utf-8", errors="replace")
+        # \uFFFD Replacement Character, in place of raising UnicodeDecodeError
+        # per https://unicode.org/charts/PDF/UFFF0.pdf
+
         lines = line.splitlines()
 
         if not line:
@@ -128,10 +130,12 @@ def expand_incoming(incoming, args):
 def expand_line(line, args):
     """Transform one line"""
 
-    expanded = line.expandtabs()
+    expanded = line
 
-    if args.plain:
-        expanded = dash_quote_as_ascii(expanded)
+    if not args.keep_tabs:
+        expanded = line.expandtabs()
+        if not (args.repr or args.wiki):
+            expanded = dash_quote_as_ascii(expanded)
 
     if args.repr:
         expanded = code_points_as_unicode_escapes(expanded)
@@ -210,7 +214,7 @@ def exit_csv(lines):
 
 # deffed in many files  # missing from docs.python.org
 def code_points_as_unicode_escapes(chars):
-    r"""Replace all but r"[\n\r\t]" and plain us-ascii with \uXXXX and \uxxxxXXXX escapes"""
+    r"""Replace all but r"[\n\r\t]" and plain Ascii with \uXXXX and \uxxxxXXXX escapes"""
 
     reps = ""
     for ch in chars:
@@ -234,7 +238,7 @@ def code_points_as_unicode_escapes(chars):
 
 # deffed in many files  # missing from docs.python.org
 def dash_quote_as_ascii(chars):
-    """Replace such as “ ’ ” – — ′ ″ ‴ with printable us-ascii"""
+    """Replace such as “ ’ ” – — ′ ″ ‴ with printable Ascii"""
 
     reps_by_ch = collections.defaultdict(type(None))
 

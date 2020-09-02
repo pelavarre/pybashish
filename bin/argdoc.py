@@ -525,6 +525,8 @@ class _ArgDocCoder(
 
         lines.append("#!/usr/bin/env python")
         lines.append("# -*- coding: utf-8 -*-")
+        # <= dashed "utf-8" slightly more standard than skidded "utf_8"
+        # per https://docs.python.org/3/library/codecs.html
 
         lines.append("import argparse")
         lines.append("import textwrap")

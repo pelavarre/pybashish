@@ -70,8 +70,8 @@ examples:
   ~~ gs  # print the one line hit most by "gs", not every line hit by "gs"
   ~ gs  # execute the one line found by:  ~~ gs
   ~ ruler  # count off the first hundred columns of a Terminal
-  ~ 0123  # print the printable us-ascii chars in code point order
-  ~ ascii  # print the printable us-ascii chars in code point order
+  ~ 0123  # print the printable ascii chars in code point order
+  ~ ascii  # print the printable ascii chars in code point order
   ~ vim  # print a Vim cheatsheet, a la Emacs, PbPaste, Screen, TMux, etc
   ~ quit vim  # remind us how to quit Vim
   ~ vim quit  # same hit, just found by another order
@@ -713,8 +713,8 @@ FILES_CHARS = r"""
     pbpaste | sed 's,^\(.*\)\([.][^.]*\)$,\1 \2,' | pbcopy  # splitext
     pbpaste | sed 's,^  *,,'  | sed 's,  *$,,' | pbcopy  # strip
     pbpaste | tr '[a-z]' '[A-Z]' | pbcopy  # upper
-    pbpaste | sed 's,[^ -~],?,g' | pbcopy  # us-ascii errors replace with "\x3F" question mark
-    pbpaste | sed 's,[^ -~],,g' | pbcopy  # us-ascii errors ignore
+    pbpaste | sed 's,[^ -~],?,g' | pbcopy  # ascii errors replace with "\x3F" question mark
+    pbpaste | sed 's,[^ -~],,g' | pbcopy  # ascii errors ignore
 
     pbpaste >p  # pb stash
     cat p | pbcopy  # pb stash pop
@@ -918,7 +918,7 @@ FILES_CHARS = r"""
     fmt.py --ruler  # Terminal column ruler
 
     #
-    # printable us-ascii chars: in full, compressed lossily with "-", and escaped for Bash Echo
+    # printable ascii chars: in full, compressed lossily with "-", and escaped for Bash Echo
     # !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~
     # !"#$%&'()*+,-./0-9:;<=>?@A-Z[\]^_`a-z{|}~
     # echo ' !"#$%&'\''()*+,-./0-9:;<=>?@A-Z[\]^_`a-z{|}~'
