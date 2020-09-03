@@ -178,14 +178,14 @@ def os_chdir_path(path):
 
 
 def builtin_cd_back(argv):
-    implied_argv = ["cd", "-"] + argv[1:]
-    returncode = builtin_cd(implied_argv)
+    cd_argv = ["cd", "-"] + argv[1:]
+    returncode = builtin_cd(cd_argv)
     return returncode
 
 
 def builtin_cd_up(argv):
-    implied_argv = ["cd", ".."] + argv[1:]
-    returncode = builtin_cd(implied_argv)
+    cd_argv = ["cd", ".."] + argv[1:]
+    returncode = builtin_cd(cd_argv)
     return returncode
 
 
@@ -212,11 +212,9 @@ def builtin_exit(argv):
 def builtin_via_py(what_py, argv=None):
 
     wherewhat = os.path.join(FILE_DIR, what_py)
-    argv_tail = argv[1:] if argv else list()
+    wherewhat_argv = [wherewhat] + argv[1:]
 
-    ran = subprocess.run(
-        [wherewhat] + argv_tail, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    ran = subprocess.run(wherewhat_argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     return ran
 

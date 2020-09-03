@@ -53,7 +53,7 @@ def main(argv):
     # Parse the command line
 
     fmt_argv_tail = list(argv[1:])
-    for (index, arg,) in enumerate(fmt_argv_tail):
+    for (index, arg,) in enumerate(argv[1:]):
         if re.match(r"^[-][0-9]+$", string=arg):
             fmt_argv_tail[index] = "-w{}".format(-int(arg))
 

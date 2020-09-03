@@ -95,11 +95,10 @@ def format_usage():
 def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
     """Parse args as helped by Module Doc"""
 
-    if args is None:
-        args = sys.argv[1:]
+    argdoc_argv_tail = sys.argv[1:] if (args is None) else args
 
     quiet = True
-    for arg in args:
+    for arg in argdoc_argv_tail:
         if (arg == "-h") or ((len(arg) >= len("--h")) and "--help".startswith(arg)):
             quiet = False
         # FIXME: fit quiet/not more tightly to apps that declare alternative help options
@@ -250,35 +249,45 @@ class _ArgDocApp:
     def parse_main_argv(self, argv):
         """Call the ArgParse "parse_args" but finish what it started"""
 
-        # Begin by calling the ArgParse "parse_args"
+        argdoc_argv_tail = argv[1:]
+        args = parse_args(argdoc_argv_tail)
+        args = self._complete_args_file(args, argv=argv)
+        self._complete_args_shred(args)
+        self._complete_args_args(args, argv=argv)
 
-        args = parse_args(argv[1:])
+        return args
 
-        if argv[1:] and (argv[1] == "--"):
-            if args.file:
-                assert args.file == argv[2]
+    def _complete_args_file(self, args, argv):
+        """Complete the FILE in usage: ... [FILE] [-- [ARG [ARG ...]]]"""
 
-                parseable_argv = list(argv)
-                parseable_argv[1:1] = [os.devnull]
-                args = parse_args(parseable_argv[1:])
+        #  Auto-correct the ArgV Tail to choose a FILE, if arg "--" given in place of FILE
 
-                assert args.file == os.devnull
+        if argv[1:] and (argv[1] == "--") and args.file:
 
-        # Notice if a list of zero or more ARG's follows the FILE in the command line
+            assert args.file == argv[2]
 
-        args.argv_separator = "--" if ("--" in argv[1:]) else None
+            argdoc_argv_tail = argv[1:]
+            completed_argv_tail = [os.devnull] + argdoc_argv_tail
+            args = parse_args(completed_argv_tail)  # call again, if needed
 
-        # Complete the FILE
+            assert args.file == os.devnull
 
-        args.file = args.file if args.file else os.devnull
+        # Supply the FILE if not given on the command line, and not supplied by auto-correction
 
-        # Complete the SHRED in --rip SHRED
+        args.file = os.devnull if (args.file is None) else args.file
+
+        # Succeed
+
+        return args
+
+    def _complete_args_shred(self, args):
+        """Complete the SHRED in usage: ... --rip SHRED"""
 
         shred = None
         if args.rip:
 
-            shreds = "argdoc argparse doc".split()
-            for shred_ in shreds:  # FIXME: declare a vocabulary of choices in Arg Doc
+            shreds = "argdoc argparse doc".split()  # FIXME: pull these from the arg doc
+            for shred_ in shreds:
                 if shred_.startswith(args.rip):
                     shred = shred_
                     break
@@ -293,17 +302,20 @@ class _ArgDocApp:
 
         args.shred = shred
 
-        # Fail fast if extra args appear before or in place of the "--" args argv_separator
-        # Speak of "unrecognized args", almost equal to conventional "unrecognized arguments"
+    def _complete_args_args(self, args, argv):
+        """Complete the ARGS in usage: ... [-- [ARG [ARG ...]]]"""
 
-        if args.args:
-            if (not args.argv_separator) or (shred and (shred != "argdoc")):
-                stderr_print(
-                    "argdoc.py: error: unrecognized args: {}".format(
-                        pyish_shlex_join(args.args)
-                    )
+        argdoc_argv_tail = argv[1:]
+        args.argv_separator = "--" if ("--" in argdoc_argv_tail) else None
+
+        if args.args and not args.argv_separator:
+            stderr_print(format_usage().rstrip())
+            stderr_print(  # a la standard error: unrecognized arguments
+                "argdoc.py: error: unrecognized args: {!r}, in place of {!r}".format(
+                    pyish_shlex_join(args.args), pyish_shlex_join(["--"] + args.args),
                 )
-                sys.exit(1)
+            )
+            sys.exit(2)  # exit 2 from rejecting usage
 
         return args
 

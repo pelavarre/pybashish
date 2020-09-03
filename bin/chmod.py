@@ -32,12 +32,12 @@ import argdoc
 
 def main(argv):
 
-    argv_tail = argv[1:]
-    if argv_tail:
-        if argv_tail[0].startswith("-") and not argv_tail[0].startswith("-R"):
-            argv_tail[0:0] = ["--"]
+    chmod_argv_tail = argv[1:]
+    if argv[1:]:
+        if argv[1].startswith("-") and not argv[1].startswith("-R"):
+            chmod_argv_tail[0:0] = ["--"]
 
-    args = argdoc.parse_args(argv_tail)
+    args = argdoc.parse_args(chmod_argv_tail)
 
     sys.stderr.write("{}\n".format(args))
     sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))

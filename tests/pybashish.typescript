@@ -187,9 +187,10 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
         main()
     $
 
-    $ bin/argdoc.py /dev/null xyz
-    argdoc.py: error: unrecognized args: xyz
-    + exit 1
+    $ bin/argdoc.py /dev/null x y z
+    usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- [ARG [ARG ...]]]
+    argdoc.py: error: unrecognized args: 'x y z', in place of '-- x y z'
+    + exit 2
     $
 
     $ rm -fr bin/p.py

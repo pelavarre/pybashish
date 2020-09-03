@@ -37,8 +37,8 @@ import argdoc
 
 def main(argv):
 
-    argv_tail = argv[1:] if argv[1:] else ["--home"]  # FIXME: more robust default
-    args = argdoc.parse_args(argv_tail)
+    pwd_argv_tail = argv[1:] if argv[1:] else ["--home"]  # FIXME: more robust default
+    args = argdoc.parse_args(pwd_argv_tail)
 
     pwd = os.environ["PWD"]
     abspath = os.path.abspath(pwd)

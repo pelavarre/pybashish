@@ -37,8 +37,8 @@ import argdoc
 
 def main(argv):
 
-    argv_tail = argv[1:] if argv[1:] else ["--unique-everseen", "--sort", ""]
-    args = argdoc.parse_args(argv_tail)
+    tr_argv_tail = argv[1:] if argv[1:] else ["--unique-everseen", "--sort", ""]
+    args = argdoc.parse_args(tr_argv_tail)
 
     args_charset = args.charset if args.charset else ""
 
