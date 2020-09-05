@@ -53,10 +53,13 @@ examples:
   argdoc.py argdoc.py -- --help         # parse the arg "--help" with the file's arg doc
   argdoc.py argdoc.py -- hi world       # parse the two args "hi world" with the file's arg doc
 '''
-# FIXME: option to push the autocorrection into the Arg Doc
+
+# FIXME: option (surely not default?) to push the autocorrection into the Arg Doc
 # FIXME: comment --rip argparse at colliding "dest"s from multiple args, such as "[--ymd YMD] [YMD]"
 # FIXME: parsed args whose names begin with a '_' skid shouldn't print, via argparse.SUPPRESS
 # FIXME: consider [FILE [FILE ...]] in usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- ...]
+
+# FIXME: think into who signs as author of ArgumentError log message: "argdoc.py" or the "prog"?
 
 
 from __future__ import print_function
@@ -141,7 +144,7 @@ def print_usage(file=None):
 # FIXME: class ArgumentParser
 def ArgumentParser(doc=None, doc_filename=None, quiet=False):
     """Compile the Doc into Parser Source, and exec that source to build the Parser"""
-    # FIXME: factor out overlap with the "def run_parsed_main_args" of _ArgDocApp
+    # FIXME: factor out overlap with the "def run_argdoc_app" of _ArgDocApp
 
     if not quiet:
         main.args.verbose += 1
@@ -234,19 +237,19 @@ class _ArgDocApp:
     def run_main_argv(self, argv):
         """Run from the command line, but trust the caller to interpret exceptions"""
 
-        args = self.parse_main_argv(argv)
+        args = self.parse_argdoc_argv(argv)
         args.verbose = True
 
         main.args = args
 
-        self.run_parsed_main_args(
+        self.run_argdoc_app(
             doc_filename=args.file,
             shred=args.shred,
             argv_separator=args.argv_separator,
             tail_argv=args.args,
         )
 
-    def parse_main_argv(self, argv):
+    def parse_argdoc_argv(self, argv):
         """Call the ArgParse "parse_args" but finish what it started"""
 
         argdoc_argv_tail = argv[1:]
@@ -319,7 +322,7 @@ class _ArgDocApp:
 
         return args
 
-    def run_parsed_main_args(self, doc_filename, shred, argv_separator, tail_argv):
+    def run_argdoc_app(self, doc_filename, shred, argv_separator, tail_argv):
         """Print the Arg Doc, or compile it, or run it"""
         # FIXME: factor out overlap with the "class ArgumentParser" of "argdoc.py"
 
@@ -367,6 +370,7 @@ class _ArgDocApp:
         # Run the parser source to build the parser, with an option to rip and quit
 
         parser = coder.exec_parser_source(parser_source)
+
         help_doc = parser.format_help()
         if file_doc.strip():
             self.compare_file_to_help_doc(
@@ -524,12 +528,13 @@ class _ArgDocCoder(
 
         self.parts = parts
 
-        # Compile the arguments, and construct a one line summary of usage
+        # Compile the arguments first, so as to construct a one line summary of usage
+        # Don't mention duplicate "add_argument" "dest"s  # FIXME: maybe someday?
 
         args_py_lines = self.emit_arguments()
         args_emitted_usage = self.emitted_usage
 
-        # Import dependencies and open a call to the Parser constructor
+        # Emit imports
 
         d = r"    "  # choose indentation
 
@@ -544,6 +549,8 @@ class _ArgDocCoder(
         lines.append("import textwrap")
         lines.append("")
 
+        # Open a call to the Parser constructor
+
         what = os.path.split(__file__)[-1]
         comment = "  # copied from {!r} by {!r}".format(doc_filename, what)
         lines.append("parser = argparse.ArgumentParser({}".format(comment))
@@ -555,13 +562,10 @@ class _ArgDocCoder(
         assert prog  # always give a prog name to ArgParse, don't let them guess
         repr_prog = black_repr(prog)
         lines.append(d + "prog={repr_prog},".format(repr_prog=repr_prog))
-
         # FIXME: think into {what} in place of {what}.py, and more unusual prog names
         # assert prog == os.path.split(doc_filename)[-1]
 
-        # Improve on the conventional Usage Line, when desperate
-
-        parts_usage = prog if (self.parts.usage is None) else self.parts.usage
+        # Construct a summary Usage Line from the Prog and the zero or more Argument Lines
 
         emitted_usage = prog if (args_emitted_usage is None) else args_emitted_usage
         if prog == "ls.py":  # FIXME FIXME: teach "argdoc.py" to emit multiline usage
@@ -574,9 +578,15 @@ class _ArgDocCoder(
             )
             emitted_usage = emitted_usage.replace("[-r] ", "[-r]{}".format(ls_split))
 
+        # Contrast the constructed summary with the given summary
+
+        parts_usage = prog if (self.parts.usage is None) else self.parts.usage
+
         if parts_usage.split() != emitted_usage.split():
             verbose_print("argdoc.py: warning: doc'ced usage: {}".format(parts_usage))
             verbose_print("argdoc.py: warning: emitted usage: {}".format(emitted_usage))
+
+        # Resort to bypassing the ArgParse constructor of Usage Lines, only when desperate
 
         if emitted_usage:
             if "..." in emitted_usage:
@@ -584,7 +594,7 @@ class _ArgDocCoder(
                     d + "usage={usage},".format(usage=black_repr(emitted_usage))
                 )
 
-        # Explain the App up front in one line, if possible
+        # Explain the App in one line, if possible
 
         description_line = parts.description_line
         if not doc:
@@ -618,7 +628,7 @@ class _ArgDocCoder(
 
         lines.append(d + "add_help={add_help},".format(add_help=add_help))
 
-        # Don't invite bots to incompetently resplit text
+        # Stop ArgParse from aggressively incompetently resplitting text
 
         lines.append(d + "formatter_class=argparse.RawTextHelpFormatter,")
 
@@ -636,6 +646,8 @@ class _ArgDocCoder(
         lines.append("")
 
         lines.extend(args_py_lines)
+
+        # Succeed
 
         parser_source = "\n".join(_.rstrip() for _ in lines)
         return parser_source
@@ -697,7 +709,7 @@ class _ArgDocCoder(
         nargs = positionals_declaration.arg_phrase.nargs
 
         usage_phrase = positionals_declaration.arg_phrase.format_usage_phrase()
-        arg_help_line = positionals_declaration.arg_line.arg_help_line
+        arg_help = positionals_declaration.arg_line.arg_help
 
         assert nargs in (None, "*", "?",)  # .ZERO_OR_MORE .OPTIONAL
 
@@ -719,7 +731,7 @@ class _ArgDocCoder(
         repr_dest = black_repr(dest)
         repr_metavar = black_repr(metavar)
         repr_nargs = black_repr(nargs)
-        repr_help = black_repr(arg_help_line).replace("%", "%%")
+        repr_help = black_repr(arg_help).replace("%", "%%")
 
         head_lines = [
             "parser.add_argument(",
@@ -780,7 +792,7 @@ class _ArgDocCoder(
         alt_metavar = optionals_declaration.arg_line.alt_metavar
 
         usage_phrase = optionals_declaration.arg_phrase.format_usage_phrase()
-        arg_help_line = optionals_declaration.arg_line.arg_help_line
+        arg_help = optionals_declaration.arg_line.arg_help
 
         assert option
         assert (not alt_metavar) or (alt_metavar == metavar)
@@ -826,7 +838,7 @@ class _ArgDocCoder(
                 if (
                     (concise == "-h")
                     and (mnemonic == "--help")
-                    and (arg_help_line == addable_help)
+                    and (arg_help == addable_help)
                     and (metavar is None)
                 ):
                     parts.add_help = True
@@ -853,9 +865,9 @@ class _ArgDocCoder(
         nargs = optionals_declaration.arg_line.nargs
         default = optionals_declaration.arg_line.default
 
-        arg_help_line = optionals_declaration.arg_line.arg_help_line
+        arg_help = optionals_declaration.arg_line.arg_help
 
-        repr_help = black_repr(arg_help_line).replace("%", "%%")
+        repr_help = black_repr(arg_help).replace("%", "%%")
 
         assert option
         assert (not alt_metavar) or (alt_metavar == metavar)
@@ -954,9 +966,9 @@ class _ArgDocCoder(
         global_vars = {}
         try:
             exec(parser_source, global_vars)
-        except Exception:
-            print(parser_source)
-            raise
+        except argparse.ArgumentError as exc:
+            stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
+            sys.exit(2)  # exit 2 from rejecting usage
 
         parser = global_vars["parser"]
         return parser
@@ -1573,44 +1585,40 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
 
     def __init__(self, argument_line):
 
+        self.arg_source = None
+        self.arg_help = None
+
         self.option = None
         self.metavar = None
         self.alt_option = None
         self.alt_metavar = None
         self.nargs = None
         self.default = None
-        self.arg_help_line = None
 
-        self._take_argument_line(argument_line)
+        accepted = self._accept_argument_line(argument_line)
+        if not accepted:
+            self._reject_argument_line(argument_line)
 
-        troubles = list()
-        troubles.append(not self.option and not self.metavar)
-        troubles.append(
-            self.metavar and self.alt_metavar and (self.metavar != self.alt_metavar)
-        )
-        troubles.append(self._format_argument_line().split() != argument_line.split())
-
-        stripped = argument_line.strip()
-        if any(troubles):
-            raise ArgDocError(
-                "want: {{[-c|--mnemonic] METAVAR, ...}} got:  {}".format(stripped)
-            )
-
-    def _take_argument_line(self, argument_line):
+    def _accept_argument_line(self, argument_line):
         """Pick attributes out of the argument line"""
 
         # Split off the help words
         # found past "  " in the first line, or found past the indentation of later lines
 
-        stripped = argument_line.strip()
-        index = stripped.find("  ")
+        arg_source = argument_line.strip()
+        arg_help = None
+
+        index = arg_source.find("  ")
         if index >= 0:
-            self.arg_help_line = stripped[index:].lstrip()
-            stripped = stripped[:index].rstrip()
+            arg_help = arg_source[index:].lstrip()
+            arg_source = arg_source[:index].rstrip()
 
-        # Reject too many words showing up before the help words
+        self.arg_source = arg_source
+        self.arg_help = arg_help
 
-        words = stripped.split()
+        # Take one, two, or four words presented before the first "  " double-blank, if any
+
+        words = arg_source.split()
 
         len_words = len(words)
         if len_words not in (1, 2, 4,):
@@ -1618,13 +1626,69 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
 
         self._take_1_2_4_argument_words(words)
 
+        # Take "[METAVAR]" in the argument line as meaning nargs = "?"  # argparse.OPTIONAL
+
         if self.metavar:
             if (self.alt_metavar is None) or (self.metavar == self.alt_metavar):
                 name = self.metavar.replace("[", "").replace("]", "")
                 if self.metavar == "[{}]".format(name):
                     self.metavar = name
-                    self.nargs = "?"  # argparse.OPTIONAL
+                    self.nargs = (
+                        "?"  # argparse.OPTIONAL  # for positional or optional argument
+                    )
                     self.default = False
+
+        # Require a positional metavar, or else the dash or dashes of an optional argument
+
+        if (not self.metavar) and (not self.option):
+            return
+
+        # Require consistent metavars, or else no metavars
+
+        if self.metavar and self.alt_metavar and (self.metavar != self.alt_metavar):
+            return
+
+        # Require emitted source output to match compiled source input, precisely
+
+        if self._format_argument_line().split() != argument_line.split():
+            return
+
+        # Succeed
+
+        return True
+
+    def _reject_argument_line(self, argument_line):
+        """Raise ArgDocError to reject the "argument_line" not taken"""
+
+        arg_source = self.arg_source
+
+        want = "[-c|--mnemonic] [METAVAR|[METAVAR]][,] ..."  # approximately
+        got = argument_line.strip()
+
+        if arg_source:  # true while no calls ArgumentLineSyntaxTaker on an empty line
+
+            words = arg_source.split()
+
+            got = " ".join(words)
+            if len(words) != 1:
+                got = "{} words {}".format(len(words), got)
+
+            if not words[0].startswith("-"):  # if more like a positional argument line
+
+                want = "METAVAR|[METAVAR]"
+                if len(words) != 1:
+                    want = "1 word of {}".format(want)
+
+            else:  # if more like an optional argument line
+
+                want = "4 words of -c METAVAR|[METAVAR], --optional METAVAR|[METAVAR]"
+                if len(words) < 3:
+                    want = "2 words of -c|--optional METAVAR|[METAVAR]"
+                    if len(words) < 2:
+                        want = "-c|--optional"
+
+        stderr_print("argdoc.py: error: want: {}".format(want))
+        raise ArgDocError("got: {}".format(got))
 
     def _take_1_2_4_argument_words(self, words):
         """Return the possible parses of one or two [-c|--mnemonic] [METAVAR] argument syntax"""
@@ -1693,9 +1757,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
 
         words = self._tuple_argument_line_words()
 
-        shards = (
-            (list(words) + ["", self.arg_help_line]) if self.arg_help_line else words
-        )
+        shards = (list(words) + ["", self.arg_help]) if self.arg_help else words
         joined = " ".join(str(_) for _ in shards)  # tolerate None's
 
         return joined

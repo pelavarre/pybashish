@@ -3,6 +3,7 @@
 from __future__ import print_function
 
 import os
+import signal
 import subprocess
 import sys
 
@@ -21,10 +22,14 @@ def main(argv):
     file_dir = os.path.split(os.path.realpath(__file__))[0]
     bin_dir = os.path.join(file_dir, "bin")
 
-    # Call Bash Py
+    # Call Bash Py, except don't take SIGINT KeyboardInterrupt's from it
 
     bin_bash_py = os.path.join(bin_dir, "bash.py")
-    ran = subprocess.run([bin_bash_py] + ["-i"] + argv[1:])
+    with_siginfo = signal.signal(signal.SIGINT, handler=signal.SIG_IGN)
+    try:
+        ran = subprocess.run([bin_bash_py] + ["-i"] + argv[1:])
+    finally:
+        signal.signal(signal.SIGINT, with_siginfo)
     sys.exit(ran.returncode)
 
 

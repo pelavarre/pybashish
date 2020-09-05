@@ -76,7 +76,7 @@ import argdoc
 
 def main(argv):
 
-    args = _parse_main_args(argv)
+    args = _parse_hexdump_argv(argv)
 
     # Write the bytes b"\x00" through b"\xFF" to Stdout, before doing more
 
@@ -107,7 +107,7 @@ def main(argv):
             sys.exit(1)
 
 
-def _parse_main_args(argv):
+def _parse_hexdump_argv(argv):
     """Parse the command line"""
 
     args = argdoc.parse_args(argv[1:])

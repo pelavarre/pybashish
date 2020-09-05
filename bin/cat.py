@@ -3,7 +3,7 @@
 r"""
 usage: cat.py [-h] [-E] [-e] [-n] [-T] [-t] [-v] [FILE [FILE ...]]
 
-copy binary (or text) files to standard output (by "cat"enating them)
+copy each line of input bytes (or chars) to output (as if "cat"enating them slowly)
 
 positional arguments:
   FILE                  a file to copy out

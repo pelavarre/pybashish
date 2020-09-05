@@ -47,14 +47,15 @@ Contents
 ++ 2.30 ) Pwd
 ++ 2.31 ) Read
 ++ 2.32 ) Rm
-++ 2.33 ) SubSh
-++ 2.34 ) Tail
-++ 2.35 ) Tar
-++ 2.36 ) Touch
-++ 2.37 ) Tr
-++ 2.38 ) Watch
-++ 2.39 ) Wc
-++ 2.40 ) XArgs
+++ 2.33 ) Sponge
+++ 2.34 ) SubSh
+++ 2.35 ) Tail
+++ 2.36 ) Tar
+++ 2.37 ) Touch
+++ 2.38 ) Tr
+++ 2.39 ) Watch
+++ 2.40 ) Wc
+++ 2.41 ) XArgs
 
 + 3 ) Additional tests
 
@@ -108,27 +109,24 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
     Python apps should introduce themselves well
 
-    Try typing the name of the app, and add " --h"
-    For instance, to learn more of "echo.py", try:
+    Try typing the name of the app, and adding " --help" or " -h"
+
+    For instance:
 
         echo --h
-
-    Many apps will say hello well if you type just one dash
-    For instance, try:
-
         grep -h | head
 
     Next try one of:
 
         -  ..  argdoc  bash  bind  cal  cat  cd  chmod  column  cp  cspsh  date  dd
         doctestbash  echo  exit  expand  find  fmt  grep  head  help  hexdump  history
-        hostname  jq  ls  make  mkdir  mv  pwd  read  rm  subsh  tail  tar  touch  tr  watch
-        wc  xargs
+        hostname  jq  ls  make  mkdir  mv  pwd  read  rm  sponge  subsh  tail  tar  touch
+        tr  watch  wc  xargs
 
     Note: The "#" hash mark means ignore the following chars in the line
     Note: The ":" colon as the first word means mostly ignore the following words in the line
 
-    (pybashish) $
+    (pybashish) $ ^D
     + exit 1
     $
 
@@ -246,6 +244,7 @@ Give help for the keystrokes of the "bin/read.py" command line editor
     "\C-h": drop-char
     "\C-u": drop-line
     "\C-d": drop-next-char
+    "\C-w": drop-word
     "":     end-input
     "\C-j": end-line
     "\C-m": end-line
@@ -790,7 +789,7 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
         2  echo def
         3  history
     (pybashish) $
-    (pybashish) $
+    (pybashish) $ ^D
     + exit 1
     $
 
@@ -1007,17 +1006,17 @@ Clean up
 
 ## 2.31 ) Read
 
-    $ bin/echo.py 'Hello, Line Editor' | bin/read.py
+    $ bin/echo.py 'Hello, Line Editor' | bin/read.py -e
     ? Hello, Line Editor
     'Hello, Line Editor\n'
     $
 
-    $ bin/echo.py 'Hello, ^ULine Editor' | sed 's,\^U,@,g' | tr '@' '\25' | bin/read.py
+    $ bin/echo.py 'Hello, ^ULine Editor' | sed 's,\^U,@,g' | tr '@' '\25' | bin/read.py -e
     ? Line Editor
     'Line Editor\n'
     $
 
-    $ bin/echo.py '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | tr -d '\n' | bin/read.py
+    $ bin/echo.py '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | tr -d '\n' | bin/read.py -e
     ? ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑
     '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑'
     $
@@ -1032,7 +1031,33 @@ Clean up
     $
 
 
-## 2.33 ) SubSh
+## 2.33 ) Sponge
+
+    $ rm -fr t.txt
+    $
+
+    $ echo one >t.txt && cat t.txt
+    one
+    $
+
+    $ echo two | bin/sponge.py t.txt && cat t.txt
+    two
+    $
+
+    $ cat t.txt | bin/sponge.py t.txt && cat t.txt
+    two
+    $
+
+    $ echo three | bin/sponge.py -a t.txt && cat t.txt
+    two
+    three
+    $
+
+    $ rm -fr t.txt
+    $
+
+
+## 2.34 ) SubSh
 
     $ bin/subsh.py echo 'Hello, Subsh World!'
     {'args': ['echo', 'Hello, Subsh World!'],
@@ -1049,7 +1074,7 @@ Clean up
     $
 
 
-## 2.34 ) Tail
+## 2.35 ) Tail
 
     $ bin/tail.py
     Namespace(F=None, files=[], follow=None, lines=None, retry=None)
@@ -1059,7 +1084,7 @@ Clean up
     $
 
 
-## 2.35 ) Tar
+## 2.36 ) Tar
 
     $ rm -fr tardir/ tardir.tgz
     $
@@ -1097,7 +1122,7 @@ Clean up
     $
 
 
-## 2.36 ) Touch
+## 2.37 ) Touch
 
     $ rm -fr x y z
     $
@@ -1116,7 +1141,7 @@ Clean up
     $
 
 
-## 2.37 ) Tr
+## 2.38 ) Tr
 
     $ bin/cat.py $(git ls-files | grep -v '^tests/') | bin/tr.py | awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
 
@@ -1128,7 +1153,7 @@ Clean up
     $
 
 
-## 2.38 ) Watch
+## 2.39 ) Watch
 
     $ bin/watch.py
     Namespace(interval=None, words=[])
@@ -1138,7 +1163,7 @@ Clean up
     $
 
 
-## 2.39 ) Wc
+## 2.40 ) Wc
 
     $ bin/wc.py
     Namespace(bytes=None, chars=None, files=[], lines=None, max_line_length=None)
@@ -1148,7 +1173,7 @@ Clean up
     $
 
 
-## 2.40 ) XArgs
+## 2.41 ) XArgs
 
 Join words of lines into one line
 

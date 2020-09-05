@@ -67,7 +67,6 @@ def main(argv):
         try:
             shline = read.readline(prompt)
         except KeyboardInterrupt:
-            stderr_print("⌃C", end="\r\n")
             continue
 
         # Exit at end-of-file

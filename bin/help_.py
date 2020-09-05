@@ -74,14 +74,11 @@ def main():
             """
             Python apps should introduce themselves well
 
-            Try typing the name of the app, and add " --h"
-            For instance, to learn more of "echo.py", try:
+            Try typing the name of the app, and adding " --help" or " -h"
+
+            For instance:
 
                 echo --h
-
-            Many apps will say hello well if you type just one dash
-            For instance, try:
-
                 grep -h | head
             """
         ).strip()

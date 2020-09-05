@@ -267,16 +267,27 @@ def require_test_passed(path, passes, gots, dent, wants):
     for (want, got,) in zip(wants + empties, gots + empties):
         if got != want:
 
-            try:
-                assert equal_but_for_ellipses(want, got=got)
-            except AssertionError:
+            eq = equal_but_for_ellipses(got, want=want)
+            if not eq:
+
+                tail_wants = list(wants)
+                tail_gots = list(gots)
+                for (want, got,) in zip(wants + empties, gots + empties):
+                    if got != want:
+                        if not equal_but_for_ellipses(got, want=want):
+                            break
+
+                    vv_print(dent + got)
+
+                    tail_wants = tail_wants[1:]
+                    tail_gots = tail_gots[1:]
 
                 vv_print()
                 vv_print()
 
-                vv_print("wants ......: {}".format(repr(wants)))
+                vv_print("wants ......: {}".format(repr(tail_wants)))
                 vv_print()
-                vv_print("but gots ...: {}".format(repr(gots)))
+                vv_print("but gots ...: {}".format(repr(tail_gots)))
                 vv_print()
                 vv_print()
 
@@ -309,24 +320,38 @@ def require_test_passed(path, passes, gots, dent, wants):
         vv_print(dent + got)
 
 
-def equal_but_for_ellipses(want, got):
+def equal_but_for_ellipses(got, want):
     """Compare two strings, but match "..." to zero or more characters"""
 
     ellipsis = "..."
 
+    # Cut trailing whitespace from the comparisons
+
     given = got.rstrip()
     musts = want.rstrip().split(ellipsis)
 
+    # Require each fragment between "..." ellipses, in order
+
     for must in musts:
-        assert must in given
-        must_at = given.index(must)
+
+        must_at = given.find(must)
+        if must_at < 0:
+            return False
+
         given = given[must_at:][len(must) :]
+
+    # Match endswith "..." ellipsis to all remaining text
 
     if len(musts) > 1:
         if not musts[-1]:
             given = ""
 
-    assert not given  # FIXME: incomplete equal_but_for_ellipses
+    # Fail if some text unmatched
+
+    if given:
+        return False
+
+    # Succeed here, if no failures above
 
     return True
 

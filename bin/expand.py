@@ -47,6 +47,9 @@ examples:
   echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | expand.py --wiki
 """
 
+# FIXME: think into the redundancy between incremental and sponging solutions to "def striplines()"
+# FIXME: learn more of how much the sponging slows and stresses hosts
+
 
 import collections
 import contextlib
@@ -65,9 +68,10 @@ def main(argv):
 
     args = argdoc.parse_args(argv[1:])
 
-    passme.print_lines = None
+    passme.sponging = False
+    passme.print_lines = list()
     if args.csv:
-        passme.print_lines = list()
+        passme.sponging = True
 
     # Expand each file
 
@@ -123,6 +127,10 @@ def expand_incoming(incoming, args):
     if passme.wiki_begun:
         asif_print("</p>")
 
+    printed = "\n".join(passme.print_lines) + "\n"
+    stripped = striplines(printed)
+    assert printed == stripped
+
     if args.csv:
         exit_csv(passme.print_lines)
 
@@ -175,14 +183,11 @@ def chars_as_wiki_html(chars):
 def asif_print(*args):
     """Print, or just collect, lines of output"""
 
-    if passme.print_lines is None:
+    line = " ".join(str(_) for _ in args)
+    passme.print_lines.append(line)
 
-        print(*args)
-
-    else:
-
-        line = " ".join(str(_) for _ in args)
-        passme.print_lines.append(line)
+    if not passme.sponging:
+        print(line)
 
 
 def exit_csv(lines):
@@ -272,6 +277,21 @@ def dash_quote_as_ascii(chars):
 def prompt_tty_stdin():
     if sys.stdin.isatty():
         stderr_print("Press ⌃D EOF to quit")
+
+
+# deffed in many files  # missing from docs.python.org
+def striplines(chars):
+    """Strip leading blank lines, trailing blank lines, and trailing blank spaces from every line"""
+
+    lines = chars.splitlines()
+    lines = list(_.rstrip() for _ in lines)
+    while lines and not lines[0]:
+        lines = lines[1:]
+    while lines and not lines[-1]:
+        lines = lines[:-1]
+
+    stripped = "\n".join(lines) + "\n"
+    return stripped
 
 
 # deffed in many files  # missing from docs.python.org

@@ -1,25 +1,28 @@
 #!/usr/bin/env python3
 
 r"""
-usage: read.py [-h] [--lines]
+usage: read.py [-h] [-e] [-p PROMPT] [-r] [-s] [--splat SPLAT] [--lines]
 
 read one line of standard input, and print it
 
 optional arguments:
-  -h, --help  show this help message and exit
-  --lines     keep on reading till EOF (such as Terminal Control+D)
+  -h, --help       show this help message and exit
+  -e               let people edit input and history
+  -p PROMPT        chars to print out before reading input (default: "? ")
+  -r               don't delete pairs of \ and \n that end lines
+  -s               just edit input, don't echo input
+  --splat [SPLAT]  chars to echo in place of input (default: "*")
+  --lines          keep on reading till EOF (such as Terminal Control+D)
 
 bugs:
   prompts with "? ", unlike the "" of Bash "read" with no "-p PROMPT"
   prompts and echoes, even when Stdin is not Tty, unlike Bash
-  lets people edit input and history, like Bash "read -e" or Zsh "vared"
-  undoes edits of input and history at Return or ⌃C, like Zsh
-  keeps blank lines in history, like Bash for non-empty blank lines
+  lets people edit input and history, like Bash "read -e" (missing from Dash) or Zsh "vared"
   defines ↑ ↓ up/down history review to skip over blank lines, like Zsh
+  undoes edits of input and history at Return or ⌃C, like Zsh
+  keeps blank lines in history, like Bash for non-empty blank lines (unstable feature?)
+  doesn't stuff the line into a Bash Environment Variable (unlike Dash requiring var)
   prints the received line as a Python Repr
-  doesn't stuff the line into a Bash Environment Variable
-  doesn't read another line after a line ends with \ backslash
-  doesn't delete \ backslashes
 
 examples:
   echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | read.py  # Control Option Shift Command Arrows as ordered by Apple
@@ -30,7 +33,10 @@ examples:
   read -e  # in Bash
   FOO=123; vared -e FOO  # in Zsh
 """
+
 # FIXME FIXME:  stop discarding history edits at ⌃N "_next_history"
+
+# FIXME: add -t TIMEOUT in seconds
 
 
 from __future__ import print_function
@@ -62,35 +68,75 @@ X20_LOWER_MASK = 0x20
 X20_UPPER_MASK = 0x20
 
 
-def main():
+def main(argv):
     """Run from the command line"""
 
-    args = argdoc.parse_args()
+    args = _parse_read_argv(argv)
 
-    prompt = "? "
-
-    if args.lines:  # prompt even when Stdin is not Tty
+    if args.lines:  # do prompt for ⌃D EOF, even when Stdin is not Tty
         stderr_print("Press ⌃D EOF to quit")
 
+    whole = ""
     while True:
 
         shline = None
         try:
-            shline = readline(prompt)
+            with GlassTeletype(
+                editing=args.e, silencing=args.s, splatter=args.splatter
+            ) as gt:
+                shline = gt.readline(args.prompting)
         except KeyboardInterrupt:
-            stderr_print("⌃C", end="\r\n")
+            pass  # trust GlassTeletype to log KeyboardInterrupt well
 
-        print(repr(shline))
+        if shline:
+            whole += shline
 
-        if shline == "":
+        continuation = "\\\n"
+        if shline and whole.endswith(continuation) and not args.r:
+            whole = whole[: -len(continuation)]
+            continue
+
+        print(repr(whole))
+        whole = ""
+
+        if shline == "":  # continue after ⌃C for "read.py --lines"
             break
 
         if not args.lines:
             break
 
 
+def _parse_read_argv(argv):
+    """Parse the command line"""
+
+    args = argdoc.parse_args()
+
+    # Default to no splatter, else Ascii splat "*" splatter, to show input length not choice
+
+    splatter = None
+    if args.splat is not False:
+        splatter = "*" if (args.splat is None) else args.splat
+
+    args.splatter = splatter
+
+    # Fail fast if wrongly called to silence or splatter while not in control of echoing
+
+    echoing = args.e or (not sys.stdin.isatty())
+    if not echoing:
+        # FIXME: learn to silence without -e when stdin is a tty
+        if args.s or splatter:
+            stderr_print("read.py: error: call for -es, not -s, when stdin is a tty")
+            sys.exit(2)  # exit 2 from rejecting usage
+
+    # Choose a prompt
+
+    args.prompting = "? " if (args.prompt is None) else args.prompt
+
+    return args
+
+
 def readline(prompt):
-    """Read one line of edited input"""
+    """Read one line of edited input, or raise KeyboardInterrupt"""
 
     with GlassTeletype() as gt:
         shline = gt.readline(prompt)
@@ -142,7 +188,11 @@ class GlassTeletype(contextlib.ContextDecorator):
     Compare Bash "bind -p", Zsh "bindkey", Bash "stty -a", and Unicode-Org U0000.pdf
     """
 
-    def __init__(self):
+    def __init__(self, editing=None, silencing=None, splatter=None):
+
+        self.editing = True if (editing is None) else editing
+        self.silencing = silencing
+        self.splatter = splatter
 
         self.inputs = ""  # buffer input to process later
 
@@ -162,7 +212,7 @@ class GlassTeletype(contextlib.ContextDecorator):
         sys.stdout.flush()
         sys.stderr.flush()
 
-        if sys.stdin.isatty():
+        if self.editing and sys.stdin.isatty():
 
             self.fdin = sys.stdin.fileno()
             self.with_termios = termios.tcgetattr(self.fdin)
@@ -170,16 +220,22 @@ class GlassTeletype(contextlib.ContextDecorator):
             when = termios.TCSADRAIN  # not termios.TCSAFLUSH
             tty.setraw(self.fdin, when)
 
-        # FIXME: testcases where isatty but want like not isatty
-
         return self
 
     def __exit__(self, *exc_info):
 
+        (_, exc, _,) = exc_info
+
         sys.stdout.flush()
         sys.stderr.flush()
 
-        if sys.stdin.isatty():
+        if isinstance(exc, KeyboardInterrupt):
+            if self.with_termios:
+                sys.stderr.write("⌃C\r\n")
+            else:
+                sys.stderr.write("\n")
+
+        if self.with_termios:
 
             when = termios.TCSADRAIN
             attributes = self.with_termios
@@ -191,22 +247,17 @@ class GlassTeletype(contextlib.ContextDecorator):
     def readline(self, prompt):
         """Pull the next line of input, but let people edit the shline as it comes"""
 
-        # Echo the prompt
+        # Open the line with flushes and the prompt
 
-        self.putch(prompt)
+        self._open_line(prompt)
 
-        sys.stdout.flush()
-        sys.stderr.flush()
-
-        # Open the line
+        # Block to fetch next char of paste, next keystroke, or empty end-of-input
 
         quitting = None
         while quitting is None:
 
-            # Block to fetch next char of paste, next keystroke, or empty end-of-input
-
             stdin = self.getch()
-            assert stdin or not sys.stdin.isatty()
+            assert stdin or not self.with_termios
 
             # Deal with these bytes as Control, else Data, else Log
 
@@ -220,11 +271,9 @@ class GlassTeletype(contextlib.ContextDecorator):
 
             quitting = bot(stdin)
 
-        # Forward the shadow prompt and line only after the lines closes, if Stdin is not a Tty
+        # Close the line with input echoes, "\r", and/or "\n", as needed
 
-        if not sys.stdin.isatty():
-            for echo in self.shadow.tty_lines:  # may include Ansi color codes
-                stderr_print(echo)
+        self._close_line(quitting)
 
         # Keep this line of history
 
@@ -235,6 +284,43 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         result = shline + quitting
         return result
+
+    def _open_line(self, prompt):
+        """Open the line with flushes and the prompt"""
+
+        if self.with_termios:
+            self.putch(prompt)  # FIXME: think into write "with_termios" to "stderr"
+
+        if self.silencing or not self.with_termios:
+            sys.stderr.write(prompt)
+            sys.stderr.flush()
+
+    def _close_line(self, quitting):
+        """Close the line with input echoes, "\r", and/or "\n", as needed"""
+
+        # Close the prompt if Stdin is Tty, or if all input echoes silenced
+
+        if self.with_termios:
+
+            if self.silencing:
+                if not quitting:
+                    sys.stderr.write("^D")  # FIXME: first of two "^D"
+                sys.stderr.write("\r\n")
+                sys.stderr.flush()
+
+        else:
+
+            if sys.stdin.isatty():
+                if not quitting:  # if no input echoed
+                    stderr_print()
+            elif self.silencing:
+                stderr_print()
+            else:
+
+                # Echo the input now, not earlier, if Stdin is not Tty and echoes not silenced
+
+                for echo in self.shadow.tty_lines:  # may include Ansi color codes
+                    stderr_print(echo)
 
     def getch(self):
         """Block to fetch next char of paste, next keystroke, or empty end-of-input"""
@@ -276,29 +362,28 @@ class GlassTeletype(contextlib.ContextDecorator):
         # Block to fetch one more byte (or fetch no bytes at end of input when Stdin is not Tty)
 
         stdin = os.read(sys.stdin.fileno(), 1)
+        assert stdin or not self.with_termios
 
         # Call for more, while available, while line not closed, if Stdin is or is not Tty
         # Trust no multibyte character encoding contains b"\r" or b"\n", as is true for UTF-8
         # (Solving the case of this trust violated will never be worthwhile?)
 
-        stdin_isatty = sys.stdin.isatty()
-
         calls = 1
-        while (b"\r" not in stdin) and (b"\n" not in stdin):
+        while stdin and (b"\r" not in stdin) and (b"\n" not in stdin):
 
-            if stdin_isatty:
+            if self.with_termios:
                 if not self.kbhit():
                     break
 
             more = os.read(sys.stdin.fileno(), 1)
             if not more:
-                assert not stdin_isatty
+                assert not self.with_termios
                 break
 
             stdin += more
             calls += 1
 
-        assert calls <= len(stdin) if stdin_isatty else (len(stdin) + 1)
+        assert calls <= len(stdin) if self.with_termios else (len(stdin) + 1)
 
         if False:  # FIXME: configure logging
             with open("trace.txt", "a") as appending:
@@ -324,8 +409,10 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         for ch in chars:
             self.shadow.putch(ch)
-            if self.with_termios:
-                sys.stdout.write(ch)
+            if self.with_termios and not self.silencing:
+                sys.stderr.write(ch)
+
+        sys.stderr.flush()
 
     def _insert_chars(self, chars):
         """Add chars to the shline"""
@@ -338,7 +425,11 @@ class GlassTeletype(contextlib.ContextDecorator):
 
             self.chars.append(ch)
             self.echoes.append(echo)
-            self.putch(echo)
+            if self.splatter:
+                splatter = len(echo) * self.splatter
+                self.putch(splatter[: len(echo)])
+            else:
+                self.putch(echo)
 
     def _calc_bots_by_stdin(self):
         """Enlist some bots to serve many kinds of keystrokes"""
@@ -363,6 +454,8 @@ class GlassTeletype(contextlib.ContextDecorator):
         # XOFF, aka ⌃S, aka 19
         bots_by_stdin[b"\x15"] = self._drop_line  # NAK, aka ⌃U, aka 21
         bots_by_stdin[b"\x16"] = self._quoted_insert  # ACK, aka ⌃V, aka 22
+        bots_by_stdin[b"\x17"] = self._drop_word  # ETB, aka ⌃W, aka 23
+
         bots_by_stdin[b"\x7F"] = self._drop_char  # DEL, classically aka ⌃?, aka 127
         # SUB, aka ⌃Z, aka 26
         # FS, aka ⌃\, aka 28
@@ -400,6 +493,10 @@ class GlassTeletype(contextlib.ContextDecorator):
     def _drop_line(self, stdin):  # aka Stty "kill" many, aka Bind "unix-line-discard"
         """Undo all the inserts of chars since the start of line"""
 
+        if not self.echoes:
+            self._ring_bell(stdin)
+            return
+
         while self.echoes:
             self._drop_char(stdin)
 
@@ -413,10 +510,26 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         self._ring_bell(stdin)
 
+    def _drop_word(self, stdin):  # aka Stty "werase" many, aka Bind "unix-word-rubout"
+        """Undo all the inserts of chars since the start of the last word"""
+
+        if not self.echoes:
+            self._ring_bell(stdin)
+            return
+
+        while self.echoes and self.echoes[-1] == " ":
+            self._drop_char(stdin)
+
+        while self.echoes and self.echoes[-1] != " ":
+            self._drop_char(stdin)
+
     def _end_input(self, stdin):
         """End the input and the shline"""
 
-        self.putch("\r\n")  # not "^D" here
+        if not self.echoes:
+            self.putch("^D")  # FIXME: second of two "^D"
+
+        self.putch("\r\n")
 
         quitting = ""  # not "\n" there
         return quitting
@@ -520,7 +633,7 @@ def stderr_print(*args, **kwargs):
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git
