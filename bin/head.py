@@ -6,7 +6,7 @@ usage: head.py [-h] [-n COUNT] [FILE [FILE ...]]
 show just the leading lines of a file
 
 positional arguments:
-  FILE                  the file to drop trailing lines from
+  FILE                  the file to drop trailing lines from (default: stdin)
 
 optional arguments:
   -h, --help            show this help message and exit

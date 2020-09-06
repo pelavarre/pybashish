@@ -25,6 +25,8 @@ examples:
   cd ..  # go up
 """
 
+# FIXME: accept cd to file as meaning cd to dir of file
+
 
 import os
 import sys

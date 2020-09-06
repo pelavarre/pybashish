@@ -6,7 +6,7 @@ usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE [FILE ...]]
 show just the trailing lines of a file
 
 positional arguments:
-  FILE                  the file to drop leading lines from
+  FILE                  the file to drop leading lines from (default: stdin)
 
 optional arguments:
   -h, --help            show this help message and exit

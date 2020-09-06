@@ -19,7 +19,9 @@ bugs:
 examples:
   bash.py  # chat till "exit", or ⌃D EOF pressed to quit, or ssh drops, etc
 """
+
 # FIXME: add --color=never|always|auto
+# FIXME: mark history with returncode, absolute start/stop time, copies of out/err, ...
 
 from __future__ import print_function
 

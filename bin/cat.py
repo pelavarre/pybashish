@@ -6,7 +6,7 @@ usage: cat.py [-h] [-E] [-e] [-n] [-T] [-t] [-v] [FILE [FILE ...]]
 copy each line of input bytes (or chars) to output (as if "cat"enating them slowly)
 
 positional arguments:
-  FILE                  a file to copy out
+  FILE                  a file to copy out (default: stdin)
 
 optional arguments:
   -h, --help            show this help message and exit

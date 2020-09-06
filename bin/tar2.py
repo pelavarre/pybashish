@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """
-usage: tar2.py [-h] [-x] [-t] [-v] [-k] [-f FILE]
+usage: tar2.py [-h] [-t] [-x] [-v] [-k] [-f FILE]
 
 walk the files and dirs found inside a top dir compressed as Tgz
 
 optional arguments:
   -h, --help  show this help message and exit
-  -x          extract every file
-  -t          say it loud, you have not chosen -x
+  -t          list every file, without writing any files
+  -x          write out a copy of every file
   -v          trace each file or dir name found inside to Stderr
   -k          decline to replace pre-existing output files
   -f FILE     name the file to uncompress

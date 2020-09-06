@@ -6,7 +6,7 @@ usage: doctestbash.py [-h] [-b] [-q] [-v] [FILE [FILE ...]]
 test if bash behaves as the transcripts say it should
 
 positional arguments:
-  FILE                  folders or files of '.typescript' files
+  FILE                  folders or files of '.typescript' files (default: cwd)
 
 optional arguments:
   -h, --help            show this help message and exit

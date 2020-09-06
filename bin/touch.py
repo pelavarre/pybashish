@@ -6,7 +6,7 @@ usage: touch.py [-h] [FILE [FILE ...]]
 mark a file as modified, or create a new empty file
 
 positional arguments:
-  FILE        a file to mark as modified
+  FILE        a file to mark as modified (default: copies zero bytes from latest in cwd)
 
 optional arguments:
   -h, --help  show this help message and exit

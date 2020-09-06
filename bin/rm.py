@@ -6,7 +6,7 @@ usage: rm.py [-h] [FILE [FILE ...]]
 move a file to the ../__jqd-trash/ dir
 
 positional arguments:
-  FILE        a file to trash
+  FILE        a file to trash (default: last modified of cwd)
 
 optional arguments:
   -h, --help  show this help message and exit

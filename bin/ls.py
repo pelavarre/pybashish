@@ -61,6 +61,8 @@ examples:
   ls.py -C | tee as-wide-as-tty.txt
   (mkdir foo && cd foo/ && echo hi>x && rm -fr ../foo/ && ls.py .)
 """
+
+# FIXME: add the --color that's missing at Mac
 # FIXME: tell us about sym links that don't resolve
 # FIXME FIXME:  -x               print by filling multiple rows
 # FIXME: add -R recursive walk

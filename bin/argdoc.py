@@ -165,6 +165,7 @@ def ArgumentParser(doc=None, doc_filename=None, quiet=False):
         file_doc = doc
 
         help_doc = parser.format_help()
+
         if file_doc.strip():
             app.compare_file_to_help_doc(
                 file_doc, doc_filename=doc_filename, help_doc=help_doc
@@ -370,8 +371,8 @@ class _ArgDocApp:
         # Run the parser source to build the parser, with an option to rip and quit
 
         parser = coder.exec_parser_source(parser_source)
-
         help_doc = parser.format_help()
+
         if file_doc.strip():
             self.compare_file_to_help_doc(
                 file_doc, doc_filename=doc_filename, help_doc=help_doc
@@ -441,7 +442,10 @@ class _ArgDocApp:
         diff_urp_hline = "diff -urp a b"
 
         stderr_print(
-            "argdoc.py: warning: doc vs help diffs at:  {} && {} && {}".format(
+            "argdoc.py: warning: doc vs help diffs at: {}".format(doc_filename)
+        )
+        stderr_print(
+            "argdoc.py: diff details at:  {} && {} && {}".format(
                 file_doc_shline, doc_help_shline, diff_urp_hline
             )
         )
@@ -871,6 +875,7 @@ class _ArgDocCoder(
 
         assert option
         assert (not alt_metavar) or (alt_metavar == metavar)
+        assert nargs in (None, "?",)  # .OPTIONAL  # FIXME: add "*" .ZERO_OR_MORE
 
         # Emit Python source
 
@@ -1187,7 +1192,7 @@ class _ArgDocTaker(argparse.Namespace):
         self, arg_keys, phrases_by_arg_key, lines_by_arg_key, startswith_dash,
     ):
 
-        declarations_by_arg_key = collections.OrderedDict()  # as if Python 3 "dict"
+        declarations_by_arg_key = collections.OrderedDict()  # till Dec/2016 CPython 3.6
         for arg_key in arg_keys:
 
             if arg_key in declarations_by_arg_key.keys():
@@ -1226,7 +1231,7 @@ class _ArgDocTaker(argparse.Namespace):
     def _index_phrases_by_arg_key(self, arg_phrases):
         """Calculate words comparable between Usage Phrases and Argument Declaration Lines"""
 
-        phrases_by_arg_key = collections.OrderedDict()  # as if Python 3 "dict"
+        phrases_by_arg_key = collections.OrderedDict()  # till Dec/2016 CPython 3.6
         for arg_phrase in arg_phrases:
 
             # FIXME: detect multiple phrase declarations earlier
@@ -1246,7 +1251,7 @@ class _ArgDocTaker(argparse.Namespace):
     def _index_lines_by_arg_key(self, argument_lines):
         """Calculate words comparable between Argument Declaration Lines and Usage Phrase"""
 
-        lines_by_arg_key = collections.OrderedDict()  # as if Python 3 "dict"
+        lines_by_arg_key = collections.OrderedDict()  # till Dec/2016 CPython 3.6
         for argument_line in argument_lines:
 
             arg_line = ArgumentLineSyntaxTaker(argument_line)
@@ -1650,7 +1655,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
 
         # Require emitted source output to match compiled source input, precisely
 
-        if self._format_argument_line().split() != argument_line.split():
+        if self.format_argument_line().split() != argument_line.split():
             return
 
         # Succeed
@@ -1752,17 +1757,18 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
             mnemonic,
         )
 
-    def _format_argument_line(self):
+    def format_argument_line(self):
         """Format as a line of optional or positional argument declaration in an Arg Doc"""
 
-        words = self._tuple_argument_line_words()
+        source_words = list(self.format_argument_line__source_words())
 
-        shards = (list(words) + ["", self.arg_help]) if self.arg_help else words
-        joined = " ".join(str(_) for _ in shards)  # tolerate None's
+        words = (source_words + ["", self.arg_help]) if self.arg_help else source_words
+        assert None not in words
 
+        joined = " ".join(str(_) for _ in words)
         return joined
 
-    def _tuple_argument_line_words(self):
+    def format_argument_line__source_words(self):
         """Format as the first 1, 2, or 4 words of an argument declaration line in an Arg Doc"""
 
         metavar = self.metavar
@@ -1855,6 +1861,7 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
         concise = words[0] if not words[0].startswith("--") else None
         mnemonic = words[0] if words[0].startswith("--") else None
         metavar = words[1] if words[1:] else None
+        optional = metavar and ("[" in argument_phrase.split()[1])
 
         # Publish results
 
@@ -1862,6 +1869,7 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
         self.mnemonic = mnemonic
         self.dashdash = dashdash
         self.metavar = metavar
+        self.nargs = "?" if optional else None  # argparse.OPTIONAL
 
         # Require emitted usage equals usage source
 
@@ -1882,11 +1890,14 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
             )
 
     def format_usage_phrase(self):
-        """Format as a phrase of a Usage Line in an Arg Doc"""
+        """Format optional arg line as a phrase of a Usage Line in an Arg Doc"""
 
-        joined = "[{}]".format(" ".join(self._calc_arg_key()))
-        # .nargs and .default stand alone in the Arg Line, do not change the Usage Phrase
+        words = list(self._calc_arg_key())
+        if self.nargs == "?":  # argparse.OPTIONAL  # FIXME
+            assert words[-1] == self.metavar
+            words[-1] = "[{}]".format(self.metavar)
 
+        joined = "[{}]".format(" ".join(words))
         return joined
 
     def _calc_arg_key(self):
@@ -1975,7 +1986,7 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
             )
 
     def format_usage_phrase(self):
-        """Format as a phrase of a Usage Line in an Arg Doc"""
+        """Format positional arg line as a phrase of a Usage Line in an Arg Doc"""
 
         if self.nargs == "*":  # "*" argparse.ZERO_OR_MORE
             joined = "[{} [{} ...]]".format(self.metavar, self.metavar)
@@ -2115,7 +2126,12 @@ def black_repr(chars):
         if '"' not in chars:
             # FIXME: these chars can be simply quoted, and how many more?
             if all((ord(" ") <= ord(_) <= ord("~")) for _ in chars):
-                rep = '"{}"'.format(chars)
+                if chars and (chars[-1] == "\\"):
+                    pass
+                elif "\\" in chars:
+                    rep = 'r"{}"'.format(chars)
+                else:
+                    rep = '"{}"'.format(chars)
 
     return rep
 

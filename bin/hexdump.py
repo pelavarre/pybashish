@@ -6,7 +6,7 @@ usage: hexdump.py [-h] [-C] [--bytes BYTES] [--charset CHARSET] [--dump-byteset]
 show bytes as nybbles and more
 
 positional arguments:
-  FILE                 a file to copy out
+  FILE                 a file to copy out (default: stdin)
 
 optional arguments:
   -h, --help           show this help message and exit

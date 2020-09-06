@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: read.py [-h] [-e] [-p PROMPT] [-r] [-s] [--splat SPLAT] [--lines]
+usage: read.py [-h] [-e] [-p PROMPT] [-r] [-s] [--splat [SPLAT]] [--lines]
 
 read one line of standard input, and print it
 
@@ -34,8 +34,9 @@ examples:
   FOO=123; vared -e FOO  # in Zsh
 """
 
+# FIXME: somehow bookmark '⌘ ⇧⌘ ⇧ ⌥⇧ ⌥⇧⌘ ⌥⌘ ⌥ ⌃⌥ ⌃⌥⌘ ⌃⌥⇧⌘ ⌃⌥⇧ ⌃⇧ ⌃⇧⌘ ⌃⌘ ⌃'
+# FIXME FIXME: bind an undo key such as ⌃_
 # FIXME FIXME:  stop discarding history edits at ⌃N "_next_history"
-
 # FIXME: add -t TIMEOUT in seconds
 
 

@@ -1,23 +1,28 @@
 #!/usr/bin/env python3
 
 """
-usage: mv.py [-h] [-i] FILE
+usage: mv.py [-h] [-i] [FILE]
 
-rename a file
+rename a file (make it not found)
 
 positional arguments:
-  FILE        the file to rename
+  FILE        the file to rename (default: last modified in cwd)
 
 optional arguments:
   -h, --help  show this help message and exit
   -i          ask before replacing some other file
 
 bugs:
-  acts like "mv -h" if called without "-i" arg, unlike Bash "mv"
-  runs ahead and work with you, without mandating that you spell out the new name, unlike Bash "mv"
+  runs ahead and works, without making you spell out the new name, unlike Bash "mv"
+  increments the name:  such as "touch it~41 && touch it && mv.py" makes "~41" and "~42"
+  requires two args to rename files that aren't files or dirs below the root dir
 
 examples:
-  mv stdin~9  # changes the name of this file to "stdin~10"
+  mv.py  # renames the last modified file of cwd (makes it not found)
+  mv.py -  # waits for stdin, then does nothing (a la cat >/dev/null)
+  mv.py itself  # renames the file to "itself~1", etc
+  mv.py /dev/null  # fails because insufficient privilege
+  mv.py /  # fails because insufficient privilege
 """
 
 

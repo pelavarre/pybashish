@@ -7,7 +7,7 @@ walk the json at standard input
 
 positional arguments:
   FILTER      filter coded as jq
-  FILE        a file of data coded as json, such as "/dev/stdin"
+  FILE        a file of json, or lines of text (default: json at stdin)
 
 optional arguments:
   -h, --help  show this help message and exit
@@ -23,10 +23,39 @@ see also:
   https://stedolan.github.io/jq/tutorial/
   https://stedolan.github.io/jq/manual/
 
+early guesses:
+  jq '.'  # Restyle the Json, after checking it for syntax errors
+  jq '.[index]'  # Take value from list if present - a la Python [index:][:1]
+  jq '. []'  # Take a value from each index of list
+  jq '.[] .key'  # Take one column by name
+  jq '.[] [.key1, .key2]'  # Take values, drop keys - like to List of Lists from List of Dicts
+  jq ".[] | keys"  # Take keys, drop values, without making you type out all the values
+  jq '.[] | {newkey1:.key1, newkey2:.key2}'  # Rename columns
+  jq '.[] | [.key1, .key2] | @csv'  # Format List of Lists as Csv
+  jq '.[] | keys'  # Take keys and sort them, drop values
+  jq '.[] | .key1 + " " + .key2'  # Join the values in each Dict
+  jq '.[] | .slot_digits | tonumber'  # Strip the quotes from a numeric column
+  jq '.[] | [.key1, .key2] | @sh'  # Add another layer of quotes
+  jq --raw-input . | jq .  # Add the first layer of quotes
+  jq --raw-output '.[] | [.key1, .key2]'  # Drop a layer of keys and quotes
+
 examples:
   echo '["aa", "cc", "bb"]' | jq .
   jq . <(echo '[12, 345, 6789]')
 """
+
+# FIXME: refresh "def main" instantiation of usage: FILE [FILE ...]]
+
+# guesses:
+#
+#   Null is to JQ as None is to Python
+#   Array is to JQ as List is to Python
+#   Object is to JQ as Dict is to Python
+#
+
+# capture my fresh 6/Sep cheat sheet in the examples
+# tweet my cheat sheet with a link to GitHub
+# emphasize respecting the order of dicts
 
 
 import json

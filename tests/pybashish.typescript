@@ -3,6 +3,7 @@ Welcome to testing PyBashIsh
 
 // FIXME: remake this into a ".md" Markdown file
 // FIXME: pull the examples from help lines, run them, see changed output as regression
+// FIXME: add tests of the untested new verbs
 
 
 Contents
@@ -120,8 +121,8 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
         -  ..  argdoc  bash  bind  cal  cat  cd  chmod  column  cp  cspsh  date  dd
         doctestbash  echo  exit  expand  find  fmt  grep  head  help  hexdump  history
-        hostname  jq  ls  make  mkdir  mv  pwd  read  rm  sponge  subsh  tail  tar  touch
-        tr  watch  wc  xargs
+        hostname  jq  ls  make  mkdir  mv  paste  pq  pwd  read  rm  sponge  subsh  tail
+        tar  touch  tr  watch  wc  xargs
 
     Note: The "#" hash mark means ignore the following chars in the line
     Note: The ":" colon as the first word means mostly ignore the following words in the line
@@ -387,14 +388,15 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 ## 2.8 ) Cp
 
     $ bin/cp.py
-    usage: cp.py [-h] [-i] [-p] [-R] FILE
-    cp.py: error: the following arguments are required: FILE
+    Namespace(R=None, file=None, i=None, p=None)
+    usage: cp.py [-h] [-i] [-p] [-R] [FILE]
+    cp.py: error: not implemented
     + exit 2
     $
 
     $ bin/cp.py f.file
     Namespace(R=None, file='f.file', i=None, p=None)
-    usage: cp.py [-h] [-i] [-p] [-R] FILE
+    usage: cp.py [-h] [-i] [-p] [-R] [FILE]
     cp.py: error: not implemented
     + exit 2
     $
@@ -978,14 +980,15 @@ Clean up
 ## 2.29 ) Mv
 
     $ bin/mv.py
-    usage: mv.py [-h] [-i] FILE
-    mv.py: error: the following arguments are required: FILE
+    Namespace(file=None, i=None)
+    usage: mv.py [-h] [-i] [FILE]
+    mv.py: error: not implemented
     + exit 2
     $
 
     $ bin/mv.py f.file
     Namespace(file='f.file', i=None)
-    usage: mv.py [-h] [-i] FILE
+    usage: mv.py [-h] [-i] [FILE]
     mv.py: error: not implemented
     + exit 2
     $
@@ -1020,6 +1023,7 @@ Clean up
     ? ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑
     '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑'
     $
+
 
 ## 2.32 ) Rm
 

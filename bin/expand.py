@@ -6,7 +6,7 @@ usage: expand.py [-h] [--csv] [--repr] [--keep-tabs] [--wiki] [FILE [FILE ...]]
 replace tabs with spaces, replace cr with lf, strip leading and trailing empty lines
 
 positional arguments:
-  FILE         a file to copy out
+  FILE         a file to copy out (default: stdin)
 
 optional arguments:
   -h, --help   show this help message and exit
@@ -47,6 +47,7 @@ examples:
   echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | expand.py --wiki
 """
 
+# FIXME: option to sponge or not to sponge
 # FIXME: think into the redundancy between incremental and sponging solutions to "def striplines()"
 # FIXME: learn more of how much the sponging slows and stresses hosts
 
