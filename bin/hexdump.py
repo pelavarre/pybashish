@@ -98,9 +98,9 @@ def main(argv):
         prompt_tty_stdin()
 
     for path in paths:
-        openable = "/dev/stdin" if (path == "-") else path
+        readable = "/dev/stdin" if (path == "-") else path
         try:
-            with open(openable, "rb") as incoming:
+            with open(readable, "rb") as incoming:
                 dumper.dump_incoming(incoming)
         except FileNotFoundError as exc:
             stderr_print("hexdump.py: error: {}: {}".format(type(exc).__name__, exc))

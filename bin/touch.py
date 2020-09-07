@@ -15,7 +15,7 @@ bugs:
   runs ahead and works with me, without mandating that I spell out the new name, unlike Bash "touch"
 
 examples:
-  touch  # creates "touch~1", then "touch~2", etc
+  touch  # creates "touch~1~", then "touch~2~", etc
 """
 
 import os

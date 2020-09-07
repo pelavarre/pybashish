@@ -18,7 +18,7 @@ bugs:
   says "dir exists", not traditional "file exists", if dir exists already
 
 examples:
-  mkdir  # creates "mkdir~1", then "mkdir~2", etc
+  mkdir  # creates "mkdir~1~", then "mkdir~2~", etc
 """
 
 

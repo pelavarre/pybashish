@@ -53,10 +53,10 @@ def main(argv):
         sponge = incoming.read()
 
     for path in paths:
-        openable = "/dev/stdout" if (path == "-") else path
+        writable = "/dev/stdout" if (path == "-") else path
         try:
             awb_mode = "ab" if args.append else "wb"
-            with open(openable, awb_mode) as outgoing:
+            with open(writable, awb_mode) as outgoing:
                 os.write(outgoing.fileno(), sponge)
         except FileNotFoundError as exc:
             stderr_print("sponge.py: error: {}: {}".format(type(exc).__name__, exc))

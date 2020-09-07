@@ -14,13 +14,13 @@ optional arguments:
 
 bugs:
   runs ahead and works, without making you spell out the new name, unlike Bash "mv"
-  increments the name:  such as "touch it~41 && touch it && mv.py" makes "~41" and "~42"
+  increments the name, such as:  touch it~41~ && touch it && mv.py  # it~41~ it~42~
   requires two args to rename files that aren't files or dirs below the root dir
 
 examples:
   mv.py  # renames the last modified file of cwd (makes it not found)
   mv.py -  # waits for stdin, then does nothing (a la cat >/dev/null)
-  mv.py itself  # renames the file to "itself~1", etc
+  mv.py itself  # renames the file to "itself~1~", etc
   mv.py /dev/null  # fails because insufficient privilege
   mv.py /  # fails because insufficient privilege
 """

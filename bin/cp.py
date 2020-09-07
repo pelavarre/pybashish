@@ -16,13 +16,13 @@ optional arguments:
 
 bugs:
   runs ahead and works, without making you name the duplicate, unlike bash "cp"
-  increments the name:  such as "touch it~41 && touch it && cp.py" makes "~41" and "it" and "~42"
+  increments the name, such as:  touch it~41~ && touch it && cp.py  # it~41~ it it~42~
 
 examples:
   cp.py  # backs up last modified file of cwd (makes it found twice)
-  cp.py -  # creates copy of Stdin named "stdin~1", then "stdin~2", etc
-  cp.py /dev/null  # creates empty file named "null~1", etc
-  cp.py itself  # creates backup named "itself~1", etc
+  cp.py -  # creates copy of Stdin named "stdin~1~", then "stdin~2~", etc
+  cp.py /dev/null  # creates empty file named "null~1~", etc
+  cp.py itself  # creates backup named "itself~1~", etc
 """
 # FIXME: also copy from (FILE | HOSTNAME:FILE) to here, like Bash "scp" would
 # FIXME: think about "cp SOURCE TARGET" vs "cp TARGET SOURCE" vs line-editor's
