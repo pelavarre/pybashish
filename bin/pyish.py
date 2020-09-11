@@ -74,7 +74,7 @@ def subprocess_run(*args, **kwargs):
     if ("input" in kwargs) and ("stdin" in kwargs):
         raise ValueError("stdin and input arguments may not both be used.")
 
-    if "input" in kwargs:
+    if "input" in kwargs:  # FIXME FIXME FIXME: this doesn't work??
         del kwargs_["input"]
         kwargs_["stdin"] = io.StringIO(kwargs["input"])
 

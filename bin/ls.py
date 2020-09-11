@@ -767,7 +767,7 @@ def os_path_isdir_deleted(top):  # FIXME: solve this without calling:  bash /dev
     ran = subprocess.run(
         "bash /dev/null".split(),
         cwd=top,
-        stdin=subprocess.PIPE,
+        stdin=subprocess.PIPE,  # FIXME FIXME: how often should .run.stdin be PIPE?
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )

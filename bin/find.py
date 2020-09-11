@@ -83,7 +83,8 @@ def os_path_homepath(path):
 
 # deffed in many files  # missing from docs.python.org
 def os_walk_sorted_relpaths(top):
-    """Walk the dirs and files in a top dir, in alphabetical order, returning their relpath's"""
+    """Walk the dirs and files in a top dir, returning their relpath's, sorted"""
+    # FIXME: change to relpath closer to log messages
 
     top_ = "." if (top is None) else top
     top_realpath = os.path.realpath(top_)

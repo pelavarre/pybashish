@@ -48,6 +48,8 @@ examples:
 #
 # see also:
 #
+# Python3 UnicodeDecodeError "invalid start byte" for (all?) overlong encodings
+#
 # Unicode-org:  Control Chars of C0/C1, and Data Chars of Latin Basic/ Supplement/ Extended A/B
 # https://unicode.org/charts/PDF/U0000.pdf
 # https://unicode.org/charts/PDF/U0080.pdf

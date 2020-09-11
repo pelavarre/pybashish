@@ -15,6 +15,22 @@ examples:
   echo a b c d e f g | xargs.py -n 1  # split words of lines into one word per line
 """
 
+_ = """  # FIXME: say/code something about sed 's,  *, ,g' rejoin of split words
+
+(black) % cat a | tail -n +3 | xargs -n 5
+2020-08-22 | 19669 | 34606
+2020-08-23 | 19752 | 36006
+2020-08-24 | 19576 | 36185
+2020-08-25 | 18057 | 27863
+2020-08-26 | 17139 | 24816
+2020-08-27 | 17533 | 26120
+2020-08-28 | 19157 | 31485
+2020-08-29 | 19749 | 33650
+(black) %
+
+
+"""
+
 
 import sys
 

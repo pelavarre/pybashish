@@ -26,17 +26,53 @@ unsurprising bugs:
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
 examples:
-  pq.py lower
-  pq.py lstrip
-  pq.py strip
-  pq.py title
-  pq.py upper
+
+  pq.py len  # len of str of line
+  pq.py lower  # str.lower
+  pq.py lstrip  # str.lstrip
+  pq.py strip  # str.strip
+  pq.py title  # str.title
+  pq.py upper  # str.upper
+
+  pq.py words.3  # 3rd word else empty = "".join(line.split()[3:][:1])
+
+  pq.py '*' len  # more explicit, same as:  pq.py len
+
+  pq.py . len  # len of list of lines
+  pq.py . join  # " ".join(lines)
+
+  pq.py .. len  # len of chars of file
+  pq.py .. strip  # strip leading/ trailing lines of file, lstrip first, rstrip last
+  pq.py .. textwrap.dedent  # lstrip the whitespace common to every line
+  pq.py .. split join  # " ".join(chars.split())
+  pq.py .. split join." "  # more explicit, same as: pq.py .. split join
+  pq.py .. split join."/"  # "/".join(chars.split())
+
+  pq.py ../.. len  # len of bytes of file
+
+  pq.py ../../.. read decode."latin_1" # alt decoding of file (not utf_8")
+
+  pq.py dedent  # ... | sed -E 's,^ ? ? ? ?,,g'
+  pq.py dent  # ... | sed 's,^,    ,'
+  pq.py eval  # __builtins__.eval
+
 """
+
+# FIXME: --rip py  to produce the python that we're running, to invite copy-edit
+
+# FIXME: pq.py len  # len of each line, of all lines, of all chars, of all splits
+# FIXME: pq.py 'split [3]'
 
 # FIXME: pq.py with no args
 # FIXME: pq.py -e json.loads -e json.dumps
 # FIXME: option to sponge or not to sponge
 # FIXME: more than one input file, more than one output file
+
+# FIXME:  pq.py sort  # ... | sort
+# FIXME:  pq.py uniq  # ... | uniq
+# FIXME:  pq.py uniqc  # ... | uniq -c
+
+# FIXME: split to lines
 
 
 import glob
@@ -50,9 +86,10 @@ import sys
 import argdoc
 
 
-def main():
+def main(argv):
 
-    args = argdoc.parse_args()
+    tail_pq_argv = argv[1:] if argv[1:] else "-v".split()
+    args = argdoc.parse_args(tail_pq_argv)
 
     main.args = args
 
@@ -231,7 +268,13 @@ def autocorrect_py_filters(filters):
                 func = vars_module[filter_]
 
                 if func is str.join:
-                    func = like_str_join
+                    func = str_join
+
+        if func is None:
+            if filter_ == "dent":
+                func = str_dent
+            elif filter_ == "dedent":
+                func = str_dedent
 
         funcs.append(func)
 
@@ -240,7 +283,31 @@ def autocorrect_py_filters(filters):
     return funcs
 
 
-def like_str_join(iterable):
+def str_dedent(line):
+    """Call str.join, but give it its default separator of one " " space"""
+
+    dedented = line
+
+    len_dent = len(line.rstrip()) - len(line.strip())
+    dent = len_dent * " "
+
+    dedented = line
+    if line.startswith(dent):  # true when all the indentation is " "
+        len_dedent = min(len(dent), 4)
+        if len_dedent:
+            dedented = line[len_dedent:]
+
+    return dedented
+
+
+def str_dent(line):
+    """Call str.join, but give it its default separator of one " " space"""
+
+    dented = "    " + line
+    return dented
+
+
+def str_join(iterable):
     """Call str.join, but give it its default separator of one " " space"""
 
     joined = " ".join(iterable)
@@ -348,7 +415,7 @@ def stderr_print(*args, **kwargs):
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git
