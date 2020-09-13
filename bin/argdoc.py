@@ -527,6 +527,10 @@ class _ArgDocCoder(
     def compile_parser_source_from(self, doc, doc_filename):
         """Compile an Arg Doc into Parse Source"""
 
+        # Patch up the outliers with nothing so permanent as a temporary workaround
+
+        ls_py_outlier = "ls.py"
+
         # Parse the Arg Doc
 
         parts = _ArgDocSyntax()
@@ -575,7 +579,7 @@ class _ArgDocCoder(
         # Construct a summary Usage Line from the Prog and the zero or more Argument Lines
 
         emitted_usage = prog if (args_emitted_usage is None) else args_emitted_usage
-        if prog == "ls.py":  # FIXME FIXME: teach "argdoc.py" to emit multiline usage
+        if prog == ls_py_outlier:  # FIXME FIXME: emit multiline usage
             ls_split = "\n{}".format(13 * (" "))
             emitted_usage = emitted_usage.replace(
                 "[-F] ", "[-F]{}".format(ls_split)
@@ -697,7 +701,7 @@ class _ArgDocCoder(
 
         # Construct a one line summary of usage
 
-        emitted_usage = None  # FIXME: think more about py_phrases when not parts.prog
+        emitted_usage = None  # FIXME: py_phrases when not parts.prog
         if parts.prog:
             emitted_usage = " ".join(
                 [parts.prog] + optionals_py_phrases + positionals_py_phrases
@@ -737,8 +741,12 @@ class _ArgDocCoder(
 
         repr_dest = black_repr(dest)
         repr_metavar = black_repr(metavar)
-        repr_nargs = black_repr(nargs)
         repr_help = black_repr(arg_help).replace("%", "%%")
+
+        repr_nargs = black_repr(nargs)
+        if False:  # FIXME: "*" argparse.ZERO_OR_MORE vs "..." argparse.REMAINDER
+            if nargs == "*":
+                repr_nargs = black_repr("...")
 
         head_lines = [
             "parser.add_argument(",
