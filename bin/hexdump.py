@@ -45,6 +45,8 @@ examples:
   hexdump.py /dev/null  # visibly empty
 """
 
+# FIXME: default to:  hexdump.py --dump-byteset | hexdump.py --chars
+
 #
 # see also:
 #
@@ -410,6 +412,11 @@ class HexDumper:
             reps += sep
 
         return reps
+
+
+#
+# Git-track some Python idioms here
+#
 
 
 # deffed in many files  # missing from docs.python.org

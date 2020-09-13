@@ -142,6 +142,11 @@ def fmt_one_paragraph(dent, para, width):
         print((dent + line).rstrip())
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def guess_stdout_columns(*hints):
     """

@@ -68,6 +68,11 @@ def main(argv):
     sys.stdout.write("".join(stdouts))
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def str_unique_everseen(chars):
     """Delete all duplicates of any char"""

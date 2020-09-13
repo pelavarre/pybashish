@@ -39,9 +39,13 @@ examples:
   pq.py '*' len  # more explicit, same as:  pq.py len
 
   pq.py . len  # len of list of lines
-  pq.py . join  # " ".join(lines)
+  pq.py . join  # " ".join(lines)  # la bash ... | xargs
+  pq.py . set Counter  # collections.Counter(set(lines))  # a la bash ... | uniq -c
+  pq.py . set sorted  # sorted(set(lines))  # a la bash ... | uniq c
+  pq.py . sorted  # sorted(lines)  # a la bash ... | sort
 
   pq.py .. len  # len of chars of file
+  pq.py .. split  # chars.split()  # a la bash ... | xargs -n 1
   pq.py .. strip  # strip leading/ trailing lines of file, lstrip first, rstrip last
   pq.py .. textwrap.dedent  # lstrip the whitespace common to every line
   pq.py .. split join  # " ".join(chars.split())
@@ -49,16 +53,25 @@ examples:
   pq.py .. split join."/"  # "/".join(chars.split())
 
   pq.py ../.. len  # len of bytes of file
+  pq.py ../.. len, .. len, .. split len, . len  # count bytes, chars, words, lines
+  pq.py -b len, -c len, -w len, -l len  # same, but more mnemonic, less algebraic
 
-  pq.py ../../.. read decode."latin_1" # alt decoding of file (not utf_8")
+  pq.py ../../.. read decode."latin_1"  # alt decoding of file (not utf_8")
+  pq.py t.txt ../../.. .name os.path.realpath  # read from file, disclose the realpath of its name
+  pq.py t.txt ../../.. os.stat  # dump the last-modified time, byte size, etc of a file
 
-  pq.py dedent  # ... | sed -E 's,^ ? ? ? ?,,g'
-  pq.py dent  # ... | sed 's,^,    ,'
-  pq.py eval  # __builtins__.eval
+  pq.py dedent  # a la bash ... | sed -E 's,^ ? ? ? ?,,g'
+  pq.py dent  # a la bash ... | sed 's,^,    ,'
+  pq.py eval  # __builtins__.eval  # a la bash ... | sed 's,^,echo ' | bash
 
 """
 
+# FIXME: add in the "expand.py" idea of plain text (vs nbsp etc)
+
 # FIXME: --rip py  to produce the python that we're running, to invite copy-edit
+
+# FIXME: figure out how to loop over .. splitlines.True like to repr each
+# pq.py .. splitlines.True 'repr for' ?
 
 # FIXME: pq.py len  # len of each line, of all lines, of all chars, of all splits
 # FIXME: pq.py 'split [3]'
@@ -68,11 +81,9 @@ examples:
 # FIXME: option to sponge or not to sponge
 # FIXME: more than one input file, more than one output file
 
-# FIXME:  pq.py sort  # ... | sort
-# FIXME:  pq.py uniq  # ... | uniq
-# FIXME:  pq.py uniqc  # ... | uniq -c
-
-# FIXME: split to lines
+# FIXME: splits = "hello word world".split()
+# FIXME: sum(splits)  # TypeError: unsupported operand type(s) for +: 'int' and 'str'
+# FIXME: "".join(splits)   # 'hellowordworld'
 
 
 import glob
@@ -315,9 +326,8 @@ def str_join(iterable):
 
 
 #
+# Git-track some Python idioms here
 #
-#
-
 
 # deffed in many files  # missing from docs.python.org
 def check_shell_stdout(shline, exit_statuses=(0,)):

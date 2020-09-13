@@ -463,6 +463,11 @@ def stats_items_sorted(stats_by_name, by, order):
     return items
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def looser_comparable_version(vstring):
     """Workaround TypeError in LooseVersion comparisons between int and str"""

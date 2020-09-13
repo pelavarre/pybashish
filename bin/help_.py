@@ -107,6 +107,11 @@ def main():
     stderr_print()
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def print_cells(cells, dent="    ", sep="  ", width=None):
     """

@@ -60,6 +60,11 @@ def main():
     print(stdout)
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def misread_ymdhms_mac(ymd):
     """Guess what YYYY-MM-DD HH:MM:SS is meant, from briefer input"""

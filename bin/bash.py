@@ -454,6 +454,11 @@ def calc_ps1():
     return ps1
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args, **kwargs):
     sys.stdout.flush()

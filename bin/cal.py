@@ -144,6 +144,11 @@ def week_last_day(week):
     return end_of_week
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def misread_ymd_12n(ymd):
     """Guess what YYYY-MM-DD 12:00:00 is meant, from briefer input"""

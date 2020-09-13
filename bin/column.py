@@ -146,6 +146,11 @@ def pick_some_digits():
     return digits  # '2773543517856402339162146190028809' in my Mar/2019 Python 3.7.3
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def prompt_tty_stdin():
     if sys.stdin.isatty():

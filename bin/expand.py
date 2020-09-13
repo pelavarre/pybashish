@@ -16,7 +16,7 @@ optional arguments:
   --wiki       escape as html p of code nbsp br (fit for insertion into atlassian wiki)
 
 bugs:
-  replaces tabs, smart quotes, smart dashes, and such: not just tabs
+  defaults to replace tabs, smart quotes, dashes, etc: not just tabs, but not also emoji
   doesn't accurately catenate binary files, unlike classic bash "expand"
   does strip leading and trailing empty lines, unlike bash "expand"
   does convert classic mac CR "\r" end-of-line to linux LF "\n", unlike bash "expand"
@@ -46,6 +46,8 @@ examples:
   echo -n $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | expand.py | hexdump.py --chars  # common 'smart' chars
   echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | expand.py --wiki
 """
+
+# note: the five chars "💔💥😊😠😢" are ": broken_heart : boom : blush : angry : cry :" in Slack 2020
 
 # FIXME: option to sponge or not to sponge
 # FIXME: think into the redundancy between incremental and sponging solutions to "def striplines()"
@@ -218,6 +220,14 @@ def exit_csv(lines):
     print(len(lines))  # FIXME: finish implementing "--csv"
 
 
+#
+# Git-track some Python idioms here
+#
+
+
+#
+# Copy-paste some "def"s from elsewhere
+#
 # deffed in many files  # missing from docs.python.org
 def code_points_as_unicode_escapes(chars):
     r"""Replace all but r"[\n\r\t]" and plain Ascii with \uXXXX and \uxxxxXXXX escapes"""

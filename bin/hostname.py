@@ -77,6 +77,27 @@ def calc_socket_canonname_else_none(socket_hostname):
     return canonname
 
 
+#
+# Git-track some Python idioms here
+#
+
+
+# FIXME: demo is_numeric_hostname
+# deffed in many files  # missing from docs.python.org
+def is_numeric_hostname(hostname):
+    """Say if a hostname feels much like IPv6 hextets or IPv4 octets"""
+
+    numeric = False
+    if hostname.count(":"):
+        if not (set(hostname.lower()) - set("0123456789abcdef:")):
+            numeric = True
+    if hostname.count("."):
+        if not (set(hostname.lower()) - set("0123456789.")):
+            numeric = True
+
+    return numeric
+
+
 # deffed in many files  # missing from docs.python.org
 def verbose_print(*args, **kwargs):
     sys.stdout.flush()

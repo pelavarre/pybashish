@@ -24,6 +24,11 @@ import subprocess
 import sys
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # since Oct/2019 Python 3.7  # much too meta to pass Flake8 review
 def f(formattable):
     """Emulate f"string"s"""

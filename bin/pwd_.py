@@ -67,6 +67,11 @@ def main(argv):
     print(printable)
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def os_path_homepath(path):
     """Return the ~/... relpath of a file or dir inside the Home, else the realpath"""

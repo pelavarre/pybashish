@@ -15,14 +15,16 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 " :set number
 
 :set hlsearch
-" :nnoremap <esc><esc> :noh<return>  " nope, corrupts multiple Esc
-" hlsearch, noh = toggle on/off highlighting of all hits of search
-" n-no-remap = remap in the normal (not-insert) mode except don't recurse thru other remaps
+" :set hlsearch  " highlight all hits of search
+" /$$  " turn the highlights off by failing a search
+" :noh  " turn the highlights off by command
+" :nnoremap <esc><esc> :noh<return>  " nope, fails tests of multiple Esc
 
 :highlight RedLight ctermbg=red
 :call matchadd('RedLight', '\s\+$')
 
 :nnoremap <Bslash>w :call RStripEachLine()<return>
+" n-no-remap = remap in the normal (not-insert) mode except don't recurse thru other remaps
 function! RStripEachLine()
     let with_line = line(".")
     let with_col = col(".")

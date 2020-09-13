@@ -937,8 +937,9 @@ class SomeCspWords(CspWorker):
 
 
 #
-# Divide a source line into words
+# Git-track some Python idioms here
 #
+
 
 # deffed in many files  # missing from docs.python.org
 class ShardsTaker(argparse.Namespace):
@@ -1025,11 +1026,6 @@ class ShardsTaker(argparse.Namespace):
             shards.append(shard)
 
         return shards
-
-
-#
-# Copy-paste some "def"s from elsewhere
-#
 
 
 # deffed in many files  # missing from docs.python.org

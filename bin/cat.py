@@ -137,6 +137,11 @@ def cat_repr_byte(fd_byte, args):
     return fd_byte
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def prompt_tty_stdin():
     if sys.stdin.isatty():

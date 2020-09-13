@@ -112,6 +112,11 @@ class SigInfoHandler(contextlib.ContextDecorator):
             signal.signal(signal.SIGUSR1, with_siginfo)
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args, **kwargs):
     sys.stdout.flush()

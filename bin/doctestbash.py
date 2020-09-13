@@ -147,6 +147,11 @@ def _run_bash_test_doc(incoming, path):
     return passes
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def str_splitdent(line):
     """Split apart the indentation of a line, from the remainder of the line"""

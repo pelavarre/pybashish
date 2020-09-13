@@ -54,6 +54,9 @@ examples:
   argdoc.py argdoc.py -- hi world       # parse the two args "hi world" with the file's arg doc
 '''
 
+# FIXME: --rip .txt, .py, .py2 for doc, argdoc, argparse
+# FIXME: save to path, not stdout, if more path provided, not just the .ext or ext
+
 # FIXME: option (surely not default?) to push the autocorrection into the Arg Doc
 # FIXME: comment --rip argparse at colliding "dest"s from multiple args, such as "[--ymd YMD] [YMD]"
 # FIXME: parsed args whose names begin with a '_' skid shouldn't print, via argparse.SUPPRESS
@@ -2006,6 +2009,11 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
         words = (self.metavar,)
 
         return words
+
+
+#
+# Git-track some Python idioms here
+#
 
 
 # deffed in many files  # missing from docs.python.org

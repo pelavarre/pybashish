@@ -494,6 +494,11 @@ def grep_lines(args, lines, chosen_lines):  # FIXME FIXME  # noqa C901
     return exit_status
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def min_path_formatter(exemplar):
     """Choose the def that abbreviates this path most sharply: abs, real, rel, or home"""
@@ -1003,14 +1008,16 @@ FILES_CHARS = r"""
     " :set number
 
     :set hlsearch
-    " :nnoremap <esc><esc> :noh<return>  " nope, corrupts multiple Esc
-    " hlsearch, noh = toggle on/off highlighting of all hits of search
-    " n-no-remap = remap in the normal (not-insert) mode except don't recurse thru other remaps
+    " :set hlsearch  " highlight all hits of search
+    " /$$  " turn the highlights off by failing a search
+    " :noh  " turn the highlights off by command
+    " :nnoremap <esc><esc> :noh<return>  " nope, fails tests of multiple Esc
 
     :highlight RedLight ctermbg=red
     :call matchadd('RedLight', '\s\+$')
 
     :nnoremap <Bslash>w :call RStripEachLine()<return>
+    " n-no-remap = remap in the normal (not-insert) mode except don't recurse thru other remaps
     function! RStripEachLine()
         let with_line = line(".")
         let with_col = col(".")
