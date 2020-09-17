@@ -11,10 +11,10 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   no implementation
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "fmt"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 

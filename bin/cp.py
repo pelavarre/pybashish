@@ -14,7 +14,7 @@ optional arguments:
   -p          copy the permissions of the file too, not just its bytes
   -R          copy the dirs and files inside a dir too, don't just give up on it
 
-bugs:
+quirks:
   runs ahead and works, without making you name the duplicate, unlike bash "cp"
   increments the name, such as:  touch it~41~ && touch it && cp.py  # it~41~ it it~42~
 

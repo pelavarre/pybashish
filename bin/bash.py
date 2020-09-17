@@ -9,7 +9,7 @@ optional arguments:
   -h, --help      show this help message and exit
   -i, --interact  ask more questions
 
-bugs:
+quirks:
   returns exit status 0 after printing usage, if called with no arguments
   returns exit status 127, not 258, for ⌃D EOF pressed while ' or "" input quote open
   changes exit status after next line of input, no matter if input is blank

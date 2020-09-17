@@ -13,7 +13,7 @@ optional arguments:
   -h, --help       show this help message and exit
   -R, --recursive  change the dirs and files inside of top dirs, not just the top dir
 
-bugs:
+quirks:
   doesn't implement the more arcane choices
 
 examples:

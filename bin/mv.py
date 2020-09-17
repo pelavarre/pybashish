@@ -12,7 +12,7 @@ optional arguments:
   -h, --help  show this help message and exit
   -i          ask before replacing some other file
 
-bugs:
+quirks:
   runs ahead and works, without making you spell out the new name, unlike Bash "mv"
   increments the name, such as:  touch it~41~ && touch it && mv.py  # it~41~ it~42~
   requires two args to rename files that aren't files or dirs below the root dir

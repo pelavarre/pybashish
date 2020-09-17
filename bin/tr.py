@@ -14,7 +14,7 @@ optional arguments:
   --sort             sort the characters
   --unique-everseen  delete all duplicates of any char
 
-bugs:
+quirks:
   chokes except when called for -d '[^ -~]\t\r\n'
   runs as "--unique-everseen --sort" when called with no args, unlike Mac and Linux "tr" choking
 

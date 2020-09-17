@@ -6,7 +6,7 @@ usage: pyish.py
 
 emulate Python 3 inside of Python 2, well enough for now
 
-bugs:
+quirks:
   cd pybashish/ && make  # foolishly insists this docstring should be an argdoc
 """
 # FIXME: help find and review diffs among scattered forks of such shared defs

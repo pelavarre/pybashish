@@ -9,12 +9,12 @@ optional arguments:
   -h, --help  show this help message and exit
   -t          print words, but separate columns by two spaces
 
-bugs:
+quirks:
   aligns cells to the right when two-thirds or more contain decimal digits
   doesn't offer to run without arguments a la mac and linux
   doesn't offer the "-csx" of mac, nor the "-censtx" of linux
 
-bugs:
+quirks:
   does prompt once for stdin, when stdin chosen as file "-" or by no file args, unlike bash "cat"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 

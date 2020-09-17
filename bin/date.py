@@ -10,7 +10,7 @@ optional arguments:
   -j YMD      test a time other than now in mac tradition, such as -j 123123591970.59
   --date YMD  test a time other than now in linux tradition, such as --date '1970-12-31 23:59:59'
 
-bugs:
+quirks:
   formats the date as yyyy-mm-dd hh:mm:ss.ffffff, not localised, not rounded down to :ss
   doesn't calculate difference, product, and quotient of elapsed times
   doesn't diff timestamps

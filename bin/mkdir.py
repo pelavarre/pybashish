@@ -12,7 +12,7 @@ optional arguments:
   -h, --help     show this help message and exit
   -p, --parents  create the dir, its parent dir, and ancestors, if need be
 
-bugs:
+quirks:
   says "dir exists" when
   runs ahead and works with me, without mandating that I spell out the new name, unlike Bash "mkdir"
   says "dir exists", not traditional "file exists", if dir exists already

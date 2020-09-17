@@ -37,10 +37,10 @@ usage as a ~/.bashrc (or ~/.zshrc) history-recall extension:
     rm "$sourceable"
   }
 
-bugs in the syntax:
+quirks in the syntax:
   welcomes only more patterns, makes you push if you want more dirs or more files
 
-bugs in the defaults:
+quirks in the defaults:
   creates (and seeds) the ~/.local/share/grep/files/ dir, if it doesn't exist
   searches ~/.local/share/grep/files/ dir when no files chosen, not the classic /dev/stdin
   searches the files and dirs in the dir, doesn't give the classic "is a directory" rejection
@@ -53,14 +53,14 @@ bugs in the defaults:
   understands patterns as python "import re" defines them, not as classic grep -G/-E/-P defines them
   understands patterns as case-insensitive, unless given in mixed or upper case, a la Emacs
 
-other bugs:
+other quirks:
   doesn't implement most of classic grep
   splits lines like python does, not like classic grep does
   spends whole milliseconds to fetch hits, when classic grep would spend just microseconds
   strips the patterns that start the hit from the hit, but fails if they do
   fails if not precisely one hit found, vs classic grep failing if not one or more hits found
 
-bugs in examples:
+quirks in examples:
   cases of ~ gs, ~ ascii
 
 examples:
@@ -634,6 +634,8 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
             sys.exit(1)
 
 
+# FIXME: sort the files here by name
+# FIXME: then cross-ref bash to mac, emacs to emacs, vim to vim, etc
 FILES_CHARS = r"""
 
     #
@@ -681,6 +683,7 @@ FILES_CHARS = r"""
     rename 's,[.]csv$,-csv.txt,' *.csv  # replace ext, at Perl Linux
 
     sed -e $'3i\\\n...' | tee >(head -3) >(tail -2) >/dev/null  # first two, ellipsis, last two
+    sed -i~ 's,STALE,FRESH,' *.json  # global edit find search replace
 
     ssh -G ...
     ssh -vvv ...
@@ -691,6 +694,8 @@ FILES_CHARS = r"""
 
     tar kxf ...  # FIXME: test CACHEDIR.TAG
     tar zcf ... ...
+
+    # !?memo  # feeling lucky enough to authorize find and run again
 
 
     #

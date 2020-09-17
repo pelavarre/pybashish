@@ -10,14 +10,14 @@ optional arguments:
   -w WIDTH    width to split at or before (default: don't print into last column of terminal)
   --ruler     show a ruler to count off the columns
 
-bugs:
+quirks:
   buffers whole paragraphs, not just lines, but takes each blank line as its own paragraph
   joins and splits all lines, not just lines that don't begin with an nroff "." dot
   defaults to fit inside terminal width, not to the prefer 65 within max 75 of bash "fmt"
   guesses -w terminal width from "COLUMNS", else sys.stdout, else "/dev/tty", else guesses 80
   prints '_' skids onto the ruler to mark the tabsize=8 tab stops:  1, 9, 17, ...
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "fmt"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
   does accept "-" as meaning "/dev/stdin", like linux "fmt -", unlike mac "fmt -"

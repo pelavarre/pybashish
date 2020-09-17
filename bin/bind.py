@@ -9,7 +9,7 @@ optional arguments:
   -h, --help  show this help message and exit
   -p          print what each keystroke means
 
-bugs:
+quirks:
   floods the terminal when called with no args, same as zsh "bindkey", unlike bash "bind" no-op
   prints "drop-next-char" as the binding for ⌃D, but ⌃D at flush left ends input
   prints "end-input" as the binding for empty "" input, unlike no mention in bash / zsh

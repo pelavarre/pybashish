@@ -14,7 +14,7 @@ optional arguments:
   --splat [SPLAT]  chars to echo in place of input (default: "*")
   --lines          keep on reading till EOF (such as Terminal Control+D)
 
-bugs:
+quirks:
   prompts with "? ", unlike the "" of Bash "read" with no "-p PROMPT"
   prompts and echoes, even when Stdin is not Tty, unlike Bash
   lets people edit input and history, like Bash "read -e" (missing from Dash) or Zsh "vared"

@@ -13,7 +13,7 @@ optional arguments:
   -n          print just the words, don't add an end-of-line
   --verbose   print the "shlex.split" to "sys.stderr"
 
-bugs:
+quirks:
   understand "-n" like bash or zsh echo, unlike sh echo
 
 examples:

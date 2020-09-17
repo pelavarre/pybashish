@@ -31,11 +31,11 @@ optional arguments:
   --descending     sort descending:  newest to oldest, largest to smallest, etc
   -r               reverse the default sorts by size ascending, time ascending, name descending, etc
 
-temporary bugs:
+temporary quirks:
   doesn't sort the files before the dirs when given both files and dirs as tops
   shows only first failure to list a top and quit, should show all failures and successes
 
-bugs:
+quirks:
   doesn't show owner and group
   doesn't show size for dirs, nor for links
   lists --full-time as to the microsecond, not to the nanosecond, and without timezone

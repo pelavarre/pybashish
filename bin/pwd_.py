@@ -11,7 +11,7 @@ optional arguments:
   --brief         show the briefest abspath/ homepath/ realpath
   --home          show the ~/... relpath in place of abspath or realpath
 
-bugs:
+quirks:
   defaults to "--home", in the spirit of Bash "dirs +0" and Zsh "dirs -p", unlike their "pwd"s
   offers "--brief" and "--home", unlike Bash anywhere
   offers "--physical" like Linux, not just "-P" like Mac

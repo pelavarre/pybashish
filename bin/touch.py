@@ -11,7 +11,7 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   runs ahead and works with me, without mandating that I spell out the new name, unlike Bash "touch"
 
 examples:

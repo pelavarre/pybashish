@@ -11,7 +11,7 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   prints the working dir found as a dry run, doesn't change the working dir in the calling process
   fails "cd -" if old dir is same as new dir, unlike bash
   fails "cd -" if called before some other "cd" backs up a dir name as $OLDPWD, unlike zsh

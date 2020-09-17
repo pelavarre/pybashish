@@ -12,7 +12,7 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   searches "./" if called with no args, unlike mac bash
   leads each hit inside "./" with "" not with "./", unlike bash
   leads each hit inside "~/" with "~/" not with "$PWD", unlike bash
@@ -23,7 +23,7 @@ examples:
   find ~/.bash_history  # file, not dir
   find /dev/null  # device, not dir
 """
-# FIXME: rethink "find.py" bugs
+# FIXME: rethink "find.py" quirks
 
 
 from __future__ import print_function

@@ -11,7 +11,7 @@ optional arguments:
   -f, --fqdn     print the hostname and its domain
   -v, --verbose  say more
 
-bugs:
+quirks:
   Fqdn falls back to Short, if need be, and still returns exit status zero
 
 examples:

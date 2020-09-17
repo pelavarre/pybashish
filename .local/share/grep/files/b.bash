@@ -43,6 +43,7 @@ python3 -m pdb p.py
 rename 's,[.]csv$,-csv.txt,' *.csv  # replace ext, at Perl Linux
 
 sed -e $'3i\\\n...' | tee >(head -3) >(tail -2) >/dev/null  # first two, ellipsis, last two
+sed -i~ 's,STALE,FRESH,' *.json  # global edit find search replace
 
 ssh -G ...
 ssh -vvv ...
@@ -53,5 +54,7 @@ stat ...
 
 tar kxf ...  # FIXME: test CACHEDIR.TAG
 tar zcf ... ...
+
+# !?memo means feeling lucky enough to say find the last "memo" command and run it
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

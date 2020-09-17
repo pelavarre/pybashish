@@ -11,7 +11,7 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   don't rush to reclaim disk space, like Bash "rm" does
 
 examples:

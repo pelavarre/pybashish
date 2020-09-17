@@ -12,7 +12,7 @@ optional arguments:
   -h, --help    show this help message and exit
   -a, --append  append to each file, rather than replacing each file
 
-bugs:
+quirks:
   writes more than one output, unlike classic "moreutils" "sponge"
   accepts "--a", "--ap", "--app", ... "--append" in place of classic "-a"
   doesn't preserve the permissions of replaced output files
@@ -20,7 +20,7 @@ bugs:
   doesn't first write a copy to a temporary file
   fails if more input than free memory
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "cat" and "cat -"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 

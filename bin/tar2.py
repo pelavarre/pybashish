@@ -14,7 +14,7 @@ optional arguments:
   -k          decline to replace pre-existing output files
   -f FILE     name the file to uncompress
 
-bugs:
+quirks:
   accepts only -tvf and -tvkf as options
   lets you type out just "tvf" or "tvkf" without their leading "-" dash
   prints only the name for -tvf, not all the "ls -al" columns
@@ -22,7 +22,7 @@ bugs:
   prints names found inside to stderr, not to classic stdout
   extracts always to stdout, never to the name found inside
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", a la linux "tar ztvf -", unlike mac "tar tvf -"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 

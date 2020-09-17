@@ -14,7 +14,7 @@ optional arguments:
   -q, --quiet           say less
   -v, --verbose         say more
 
-bugs:
+quirks:
   always test only the files at "tests/"
   only find "tests/pybashish.typescript" when searching "tests/"
 

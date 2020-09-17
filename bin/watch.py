@@ -13,7 +13,7 @@ optional arguments:
   -n SECS, --interval SECS
                         seconds to wait between updates (default: 0.2s)
 
-bugs:
+quirks:
   doesn't default to the 2s intervals of the 1970s
 
 examples:

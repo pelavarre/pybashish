@@ -11,7 +11,7 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   don't just pick out printables from binaries, in the way of the classic "strings" app
 
 examples:

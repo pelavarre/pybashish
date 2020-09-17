@@ -15,7 +15,7 @@ optional arguments:
   --charset [CHARSET]  show bytes as decoded by a charset (default: "utf-8")
   --dump-byteset       write the bytes b"\x00" through b"\xff" to stdout
 
-bugs:
+quirks:
   too many emoji don't do monospace, and passing through arbitrary unicode has arbitrary effects
   shows terminal control (not data) characters of \u0000..\u00ff as \u0100..\u01ff
   shows utf-8 emoji as themselves, followed by as many spaces as they have bytes
@@ -26,7 +26,7 @@ bugs:
   ends each line when it ends, doesn't pad some with spaces
   doesn't (yet?) compress duplicate lines of hex
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "hexdump"
   accepts only the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
   does accept "-" as meaning "/dev/stdin", unlike mac and linux

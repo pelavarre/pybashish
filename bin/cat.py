@@ -18,14 +18,14 @@ optional arguments:
   -v, --show-nonprinting
                         convert all but \n and \t and printable ascii r"[ -~]" to \ escapes
 
-bugs:
+quirks:
   shows \t as \t, not as classic ^I
   shows \n as \n, not as classic $
   does show all but printable ascii as nonprinting, unlike Mac "cat" at \u00A0 &nbsp; etc
   does stop copying at first ⌃D of stdin, even when last line not completed by "\n"
   does print hard b"\x09" tab after each line number, via "{:6}\t", same as bash "cat"
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "cat" and "cat -"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
@@ -39,6 +39,7 @@ examples:
   echo $'\x5A\xC2\xA0' | cat -tv  # Linux ok, but Mac shows &nbsp; Non-Break Space as space :-(
   echo $'\x5A\xC2\xA0' | cat.py -tv  # do show even &nbsp; Non-Break Space as nonprinting
 """
+# FIXME: let cat -n=0 mean count up from zero
 # FIXME: rewrite as Python 2 without contextlib.ContextDecorator
 
 

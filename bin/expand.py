@@ -15,7 +15,7 @@ optional arguments:
   --keep-tabs  don't replace tabs, smart quotes, smart dashes, and such with plain ascii " - etc
   --wiki       escape as html p of code nbsp br (fit for insertion into atlassian wiki)
 
-bugs:
+quirks:
   defaults to replace tabs, smart quotes, dashes, etc: not just tabs, but not also emoji
   doesn't accurately catenate binary files, unlike classic bash "expand"
   does strip leading and trailing empty lines, unlike bash "expand"
@@ -26,7 +26,7 @@ bugs:
   doesn't implement linux -i, --initial for keeping tabs in line after first nonwhite
   doesn't implement mac unexpand -a for compressing files maximally by replacing spaces with tabs
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "expand"
   accepts only the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
   does accept "-" as meaning "/dev/stdin", like linux "expand -", unlike mac "expand -"

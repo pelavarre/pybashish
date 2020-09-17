@@ -29,14 +29,14 @@ usage as a python import:
     args = argdoc.parse_args()
     print(args)
 
-bugs:
+quirks:
   to see review comments pop up to work with you, you must damage an arg doc and run it
   long option and metavar names split their line and spill their words of help onto the next line
   you lose your "-h" and "--help" options if you drop all "optional arguments:" from an arg doc
   you get only english plural "dest"s for plural args, such as "[top [top ..]]" goes to "args.tops"
   you get only simple argparses unless you rip and edit, you can't mix your python into the arg doc
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin when called as "argdoc -", like bash "grep -R", unlike bash "cat -"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
@@ -53,6 +53,10 @@ examples:
   argdoc.py argdoc.py -- --help         # parse the arg "--help" with the file's arg doc
   argdoc.py argdoc.py -- hi world       # parse the two args "hi world" with the file's arg doc
 '''
+
+# FIXME: take a whole file without """ and without ''' as a whole argdoc
+# FIXME: teach --rip argparse to take epilog from sys.modules[__name__].__doc__
+# FIXME: teach --rip argparse to "def main" and "if __name__ ...: ... main(sys.argv) ..."
 
 # FIXME: --rip .txt, .py, .py2 for doc, argdoc, argparse
 # FIXME: save to path, not stdout, if more path provided, not just the .ext or ext
@@ -297,6 +301,7 @@ class _ArgDocApp:
             for shred_ in shreds:
                 if shred_.startswith(args.rip):
                     shred = shred_
+
                     break
 
             if not shred:
@@ -438,6 +443,7 @@ class _ArgDocApp:
         """Show the Help Doc printed by an Arg Doc file calling Arg Parse"""
 
         if file_doc.strip() == help_doc.strip():
+
             return
 
         file_doc_shline = "argdoc.py --rip doc {} >a".format(doc_filename)
@@ -576,7 +582,7 @@ class _ArgDocCoder(
         # FIXME: think into {what} in place of {what}.py, and more unusual prog names
         # assert prog == os.path.split(doc_filename)[-1]
 
-        # Construct a summary Usage Line from the Prog and the zero or more Argument Lines
+        # Construct Usage from Prog and zero or more Broken Argument Lines
 
         emitted_usage = prog if (args_emitted_usage is None) else args_emitted_usage
         if prog == ls_py_outlier:  # FIXME FIXME: emit multiline usage
@@ -661,6 +667,7 @@ class _ArgDocCoder(
         # Succeed
 
         parser_source = "\n".join(_.rstrip() for _ in lines)
+
         return parser_source
 
     def emit_arguments(self):
@@ -866,6 +873,7 @@ class _ArgDocCoder(
         lines = self.emit_optional_as_python(
             optionals_declaration, mnemonic=mnemonic, dest=dest
         )
+
         return lines
 
     def emit_optional_as_python(self, optionals_declaration, mnemonic, dest):
@@ -987,6 +995,7 @@ class _ArgDocCoder(
             sys.exit(2)  # exit 2 from rejecting usage
 
         parser = global_vars["parser"]
+
         return parser
 
 
@@ -1085,7 +1094,9 @@ class _ArgDocTaker(argparse.Namespace):
                 line = taker.peek_one_shard()
                 if line.strip():
                     if line.startswith(" "):
+
                         continue
+
             break
 
         usage_chars = "\n".join(usage_lines)
@@ -1124,7 +1135,7 @@ class _ArgDocTaker(argparse.Namespace):
 
         self.parts.positionals_declarations = self.accept_tabulated_arguments(
             "positional arguments:",
-            startswith_dash="",
+            marked_optional="",  # encoded as empty "", because unmarked
             arg_phrases=self.parts.uses.positionals_phrases,
         )
 
@@ -1133,11 +1144,11 @@ class _ArgDocTaker(argparse.Namespace):
 
         self.parts.optionals_declarations = self.accept_tabulated_arguments(
             "optional arguments:",
-            startswith_dash="-",
+            marked_optional="-",
             arg_phrases=self.parts.uses.optionals_phrases,
         )
 
-    def accept_tabulated_arguments(self, tagline, startswith_dash, arg_phrases):
+    def accept_tabulated_arguments(self, tagline, marked_optional, arg_phrases):
         """Take the Positional or Optional arguments led by a tagline followed by dented lines"""
 
         arg_declarations = None
@@ -1154,9 +1165,11 @@ class _ArgDocTaker(argparse.Namespace):
                 taker.take_one_shard()
                 taker.accept_blank_shards()
 
-                argument_lines = self.accept_argument_lines(tagline=tagline)
+                broken_argument_lines = self.accept_broken_argument_lines(
+                    tagline=tagline
+                )
 
-                if not argument_lines:
+                if not broken_argument_lines:
                     verbose_print(
                         "argdoc.py: warning: no arguments declared inside {!r}".format(
                             tagline
@@ -1164,24 +1177,24 @@ class _ArgDocTaker(argparse.Namespace):
                     )
 
                 arg_declarations = self.reconcile_arg_lines_phrases(
-                    argument_lines,
+                    broken_argument_lines,
                     tagline=tagline,
-                    startswith_dash=startswith_dash,
+                    marked_optional=marked_optional,
                     arg_phrases=arg_phrases,
                 )
 
         return arg_declarations
 
     def reconcile_arg_lines_phrases(
-        self, argument_lines, tagline, startswith_dash, arg_phrases
+        self, broken_argument_lines, tagline, marked_optional, arg_phrases
     ):
 
         self._disentangle_optionals_positionals(
-            argument_lines, tagline=tagline, startswith_dash=startswith_dash
+            broken_argument_lines, tagline=tagline, marked_optional=marked_optional
         )
 
         phrases_by_arg_key = self._index_phrases_by_arg_key(arg_phrases)
-        lines_by_arg_key = self._index_lines_by_arg_key(argument_lines)
+        lines_by_arg_key = self._index_lines_by_arg_key(broken_argument_lines)
 
         phrase_arg_keys = list(phrases_by_arg_key.keys())
         line_arg_keys = list(lines_by_arg_key.keys())
@@ -1194,19 +1207,20 @@ class _ArgDocTaker(argparse.Namespace):
             arg_keys,
             phrases_by_arg_key=phrases_by_arg_key,
             lines_by_arg_key=lines_by_arg_key,
-            startswith_dash=startswith_dash,
+            marked_optional=marked_optional,
         )
 
         return arg_declarations
 
     def _reconcile_arg_declarations(
-        self, arg_keys, phrases_by_arg_key, lines_by_arg_key, startswith_dash,
+        self, arg_keys, phrases_by_arg_key, lines_by_arg_key, marked_optional,
     ):
 
         declarations_by_arg_key = collections.OrderedDict()  # till Dec/2016 CPython 3.6
         for arg_key in arg_keys:
 
             if arg_key in declarations_by_arg_key.keys():
+
                 continue
 
             arg_phrase = phrases_by_arg_key.get(arg_key)
@@ -1223,7 +1237,7 @@ class _ArgDocTaker(argparse.Namespace):
                 arg_line.alt_metavar == arg_phrase.metavar
             )
 
-            if not startswith_dash:  # positional argument
+            if not marked_optional:  # positional argument
                 assert arg_phrase.nargs in (None, "*", "?",)  # .ZERO_OR_MORE .OPTIONAL
                 assert arg_phrase.metavar and arg_line.metavar
             else:  # optional argument
@@ -1237,6 +1251,7 @@ class _ArgDocTaker(argparse.Namespace):
             declarations_by_arg_key[arg_key] = arg_declaration
 
         arg_declarations = declarations_by_arg_key.values()
+
         return arg_declarations
 
     def _index_phrases_by_arg_key(self, arg_phrases):
@@ -1259,13 +1274,13 @@ class _ArgDocTaker(argparse.Namespace):
 
         return phrases_by_arg_key
 
-    def _index_lines_by_arg_key(self, argument_lines):
+    def _index_lines_by_arg_key(self, broken_argument_lines):
         """Calculate words comparable between Argument Declaration Lines and Usage Phrase"""
 
         lines_by_arg_key = collections.OrderedDict()  # till Dec/2016 CPython 3.6
-        for argument_line in argument_lines:
+        for broken_argument_line in broken_argument_lines:
 
-            arg_line = ArgumentLineSyntaxTaker(argument_line)
+            arg_line = ArgumentLineSyntaxTaker(broken_argument_line)
             # call ArgumentLineSyntaxTaker as early as the two PhraseSyntaxTaker's
             # FIXME: detect multiple line declarations earlier
 
@@ -1282,19 +1297,20 @@ class _ArgDocTaker(argparse.Namespace):
         return lines_by_arg_key
 
     def _disentangle_optionals_positionals(
-        self, argument_lines, tagline, startswith_dash
+        self, broken_argument_lines, tagline, marked_optional
     ):
         """Require Positionals declared strictly apart from Optionals, and vice versa"""
 
-        for argument_line in argument_lines:
-            stripped = argument_line.strip()
+        for broken_argument_line in broken_argument_lines:
+            bb = "  "
+            stripped = bb.join(broken_argument_line.splitlines()).strip()
 
-            doc_startswith_dash = "-" if stripped.startswith("-") else ""
-            if doc_startswith_dash != startswith_dash:
+            doc_marked_optional = "-" if stripped.startswith("-") else ""
+            if doc_marked_optional != marked_optional:
 
                 raise ArgDocError(
                     "{!r} != {!r} inside {!r} at:  {}".format(
-                        doc_startswith_dash, startswith_dash, tagline, argument_line
+                        doc_marked_optional, marked_optional, tagline, stripped
                     )
                 )
 
@@ -1324,17 +1340,18 @@ class _ArgDocTaker(argparse.Namespace):
 
         assert bool(arg_phrase.concise) ^ bool(arg_phrase.mnemonic)
 
-        argument_line = ""
+        broken_argument_line = ""
         if arg_phrase.concise:
-            argument_line += arg_phrase.concise
+            broken_argument_line += arg_phrase.concise
         if arg_phrase.mnemonic:
-            argument_line += arg_phrase.mnemonic
+            broken_argument_line += arg_phrase.mnemonic
         if arg_phrase.metavar:
-            argument_line += " "
-            argument_line += arg_phrase.metavar
-            # an arg phrase alone can't imply an arg line of:  --mnemonic [OPTIONAL_METAVAR]
+            broken_argument_line += " "
+            broken_argument_line += arg_phrase.metavar
+            # arg phrase alone can't imply:  --mnemonic [OPTIONAL_METAVAR]
+            # FIXME: challenge this, I jittered over how lifted up the [] are
 
-        arg_line = ArgumentLineSyntaxTaker(argument_line)
+        arg_line = ArgumentLineSyntaxTaker(broken_argument_line)
 
         return arg_line
 
@@ -1375,39 +1392,42 @@ class _ArgDocTaker(argparse.Namespace):
                     )
                 )
 
-    def accept_argument_lines(self, tagline):
+    def accept_broken_argument_lines(self, tagline):
         """Take zero or more dented lines as defining Positional or Optional arguments"""
 
         taker = self.taker
         taker.accept_blank_shards()
 
-        argument_lines = list()
-        dent = None
+        broken_argument_lines = list()
+        denting = None
         while taker.peek_more():
-            argument_line = taker.peek_one_shard()
-            if not argument_line.startswith(" "):
-                break
-            assert argument_line.startswith(" ")
 
-            denting = dent
-            dent = str_splitdent(argument_line)
-            if denting and (denting[0] < dent[0]):
-                argument_lines[-1] += "\n" + argument_line  # FIXME: mutation
+            argument_shard = taker.peek_one_shard()
+            if not argument_shard.startswith(" "):
+
+                break
+
+            dent = str_splitdent(argument_shard)[0]
+            if denting and (denting < dent):  # later guess  # FIXME: mutation
+                broken_argument_lines[-1] += "\n" + argument_shard
             else:
-                argument_lines.append(argument_line)
+                broken_argument_line = argument_shard  # first guess
+                broken_argument_lines.append(broken_argument_line)
+                denting = dent  # not much tested <= was misplaced
 
             taker.take_one_shard()
 
-            taker.accept_blank_shards()
+        taker.accept_blank_shards()  # not much tested <= was wrongly indented
 
-        return argument_lines
+        return broken_argument_lines
 
     def accept_doc_remains(self):
         """
         Take zero or more trailing lines, as if they must be the Epilog
 
         Aggressively take whatever trailing lines exist as arbitrary epilog:
-        like let them "optional args:", or "positional arguments", or blank, whatever
+        like let them be reserved lines of  "optional" or "positional arguments:"
+        like let them be blank or indented randomly
         """
 
         taker = self.taker
@@ -1537,7 +1557,7 @@ class _UsagePhrasesTaker(argparse.Namespace):
         while taker.peek_more():
 
             startswith_bracket_dash = taker.peek_equal_shards("[-")
-            startswith_bracket_dash_dash_blank = taker.peek_equal_shards("[-- ")
+            startswith_bracket_dash_dash_space = taker.peek_equal_shards("[-- ")
             # FIXME: simplify the syntax differences between optionals and positionals
 
             argument_phrase = self.accept_one_arg_phrase()
@@ -1545,7 +1565,7 @@ class _UsagePhrasesTaker(argparse.Namespace):
             # Accept [-h] or [--help] or [-w WIDTH] and such, and
             # accept FILE or [FILE] or [FILE [FILE ...]] and such
 
-            if startswith_bracket_dash and not startswith_bracket_dash_dash_blank:
+            if startswith_bracket_dash and not startswith_bracket_dash_dash_space:
                 optional_phrase = OptionalPhraseSyntaxTaker(argument_phrase)
                 uses.optionals_phrases.append(optional_phrase)
             else:
@@ -1599,9 +1619,9 @@ class _UsagePhrasesTaker(argparse.Namespace):
 class ArgumentLineSyntaxTaker(argparse.Namespace):
     """Parse one line of Arg Doc argument declaration"""
 
-    def __init__(self, argument_line):
+    def __init__(self, broken_argument_line):
 
-        self.arg_source = None
+        self.arg_source_left = None
         self.arg_help = None
 
         self.option = None
@@ -1611,79 +1631,90 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
         self.nargs = None
         self.default = None
 
-        accepted = self._accept_argument_line(argument_line)
+        accepted = self._accept_broken_argument_line(broken_argument_line)
+        # sys.stderr.write("{}\n".format(self))
         if not accepted:
-            self._reject_argument_line(argument_line)
+            self._reject_broken_argument_line(broken_argument_line)
 
-    def _accept_argument_line(self, argument_line):
-        """Pick attributes out of the argument line"""
+    def _accept_broken_argument_line(self, broken_argument_line):
+        """Pick attributes out of the broken argument line"""
 
         # Split off the help words
-        # found past "  " in the first line, or found past the indentation of later lines
+        # found past "  " in the first line, or past the indentation of later lines
 
-        arg_source = argument_line.strip()
+        bb = "  "
+        stripped = bb.join(broken_argument_line.splitlines()).strip()
+
+        arg_source_left = stripped
         arg_help = None
 
-        index = arg_source.find("  ")
+        index = stripped.find("  ")
         if index >= 0:
-            arg_help = arg_source[index:].lstrip()
-            arg_source = arg_source[:index].rstrip()
 
-        self.arg_source = arg_source
+            arg_help = stripped[index:].lstrip()
+            arg_source_left = stripped[:index].rstrip()
+
+        self.arg_source_left = arg_source_left
         self.arg_help = arg_help
 
-        # Take one, two, or four words presented before the first "  " double-blank, if any
+        # Take 1, 2, or 4 words presented before the first "  " double-blank, if any
 
-        words = arg_source.split()
+        words = arg_source_left.split()
 
         len_words = len(words)
         if len_words not in (1, 2, 4,):
+
             return
 
         self._take_1_2_4_argument_words(words)
 
-        # Take "[METAVAR]" in the argument line as meaning nargs = "?"  # argparse.OPTIONAL
+        # Take "[METAVAR]" in the line as meaning nargs = "?"  # argparse.OPTIONAL
 
         if self.metavar:
             if (self.alt_metavar is None) or (self.metavar == self.alt_metavar):
                 name = self.metavar.replace("[", "").replace("]", "")
                 if self.metavar == "[{}]".format(name):
                     self.metavar = name
-                    self.nargs = (
-                        "?"  # argparse.OPTIONAL  # for positional or optional argument
-                    )
+                    self.nargs = "?"  # argparse.OPTIONAL
                     self.default = False
 
-        # Require a positional metavar, or else the dash or dashes of an optional argument
+        # Require a positional metavar, or else the dash/ dashes of an optional argument
 
         if (not self.metavar) and (not self.option):
+
             return
 
         # Require consistent metavars, or else no metavars
 
         if self.metavar and self.alt_metavar and (self.metavar != self.alt_metavar):
+
             return
 
-        # Require emitted source output to match compiled source input, precisely
+        # Require emitted source output to match compiled source input, precisely,
+        # except don't check the width of single space " " or double "  ", etc
 
-        if self.format_argument_line().split() != argument_line.split():
+        if self.format_broken_argument_line().split() != stripped.split():
+
             return
 
         # Succeed
 
         return True
 
-    def _reject_argument_line(self, argument_line):
-        """Raise ArgDocError to reject the "argument_line" not taken"""
+    def _reject_broken_argument_line(self, broken_argument_line):
+        """Raise ArgDocError to reject the "broken_argument_line" not taken"""
 
-        arg_source = self.arg_source
+        arg_source_left = self.arg_source_left
 
         want = "[-c|--mnemonic] [METAVAR|[METAVAR]][,] ..."  # approximately
-        got = argument_line.strip()
 
-        if arg_source:  # true while no calls ArgumentLineSyntaxTaker on an empty line
+        bb = "  "
+        stripped = bb.join(broken_argument_line.splitlines()).strip()
+        got = stripped
 
-            words = arg_source.split()
+        if arg_source_left:  # false only if ArgumentLineSyntaxTaker took an empty line
+
+            words = arg_source_left.split()
 
             got = " ".join(words)
             if len(words) != 1:
@@ -1707,7 +1738,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
         raise ArgDocError("got: {}".format(got))
 
     def _take_1_2_4_argument_words(self, words):
-        """Return the possible parses of one or two [-c|--mnemonic] [METAVAR] argument syntax"""
+        """Return possible parses of [-c|--mnemonic] [METAVAR] argument syntax"""
 
         # Take the 1 word of --mnemonic, -c, or METAVAR
 
@@ -1768,19 +1799,20 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
             mnemonic,
         )
 
-    def format_argument_line(self):
-        """Format as a line of optional or positional argument declaration in an Arg Doc"""
+    def format_broken_argument_line(self):
+        """Format as a line of optional or positional argument declaration"""
 
-        source_words = list(self.format_argument_line__source_words())
+        source_words = list(self.format_arg_source_left_words())
 
         words = (source_words + ["", self.arg_help]) if self.arg_help else source_words
         assert None not in words
 
         joined = " ".join(str(_) for _ in words)
+
         return joined
 
-    def format_argument_line__source_words(self):
-        """Format as the first 1, 2, or 4 words of an argument declaration line in an Arg Doc"""
+    def format_arg_source_left_words(self):
+        """Format as the first 1, 2, or 4 words of an argument declaration line"""
 
         metavar = self.metavar
         alt_metavar = self.alt_metavar
@@ -1909,6 +1941,7 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
             words[-1] = "[{}]".format(self.metavar)
 
         joined = "[{}]".format(" ".join(words))
+
         return joined
 
     def _calc_arg_key(self):
@@ -2056,6 +2089,7 @@ class ShardsTaker(argparse.Namespace):
         """Return the next shard, without consuming it"""
 
         if self.shards:  # infinitely many None's past the end
+
             return self.shards[0]
 
     def peek_some_shards(self, count):
@@ -2071,6 +2105,7 @@ class ShardsTaker(argparse.Namespace):
 
         some = self.peek_some_shards(len(hopes))
         if some == list(hopes):
+
             return True
 
     def take_beyond_shards(self):
@@ -2082,12 +2117,14 @@ class ShardsTaker(argparse.Namespace):
         """Return True while shards remain"""
 
         more = bool(self.shards)
+
         return more
 
     def peek_more_shards(self):
         """List remaining shards """
 
         more_shards = list(self.shards)
+
         return more_shards
 
     def accept_blank_shards(self):
@@ -2095,8 +2132,10 @@ class ShardsTaker(argparse.Namespace):
 
         while self.peek_more():
             shard = self.peek_one_shard()
-            if shard.strip():
+            if shard.strip():  # break if not blank = break if not empty when stripped
+
                 break
+
             self.take_one_shard()
 
     def peek_upto_blank_shard(self):
@@ -2105,7 +2144,9 @@ class ShardsTaker(argparse.Namespace):
         shards = list()
         for shard in self.shards:
             if not shard.strip():
+
                 break
+
             shards.append(shard)
 
         return shards
@@ -2206,6 +2247,7 @@ def read_docstring_from(relpath):
         sys.exit(1)
 
     doc = _eval_scraped_docstring(texts, raw, qqq, len_lines, relpath)
+
     return doc
 
 
@@ -2226,6 +2268,7 @@ def _scrape_docstring_from(reading):
         if texts or text:
             if not text.strip().startswith("#"):
                 if not qqq:
+
                     if '"""' in text:
                         qqq = '"""'
                         raw = 'r"""' in text
@@ -2234,9 +2277,13 @@ def _scrape_docstring_from(reading):
                         raw = "r'''" in text
                     else:
                         pass
+
                 elif qqq in text:
+
                     break
+
                 else:
+
                     texts.append(text)
 
     return (
@@ -2277,6 +2324,7 @@ def _eval_scraped_docstring(texts, raw, qqq, len_lines, relpath):
     exec(doc_source, global_vars)
 
     doc = global_vars["doc"]
+
     return doc
 
 
@@ -2295,11 +2343,14 @@ def pyish_shlex_join(argv):
     if '"' not in rep:  # like don't guess what "'$foo'" means
         try:
             if shlex.split(rep) == argv:
+
                 return rep
+
         except ValueError:
             pass
 
     rep = repr(argv)
+
     return rep
 
 
@@ -2362,6 +2413,7 @@ def str_splitword(chars, count=1):
             tail = tail[tail.index(word) :][len(word) :]
 
     if not tail:
+
         return (
             chars,
             "",

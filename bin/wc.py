@@ -16,10 +16,10 @@ optional arguments:
   -m, --chars           count characters
   -c, --bytes           count bytes
 
-bugs:
+quirks:
   acts like "wc -L -l" if called without args, unlike Bash "wc"
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "fmt"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
