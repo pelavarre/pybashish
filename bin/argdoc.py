@@ -54,9 +54,16 @@ examples:
   argdoc.py argdoc.py -- hi world       # parse the two args "hi world" with the file's arg doc
 '''
 
+# FIXME: clean up after the "--rip argparse" hackathon
+
+# FIXME: argdoc default action="count" should be also default=0
+# FIXME: opt arg with METAVAR - work out when to take singular, vs append to plural dest
+# FIXME: could be:  argdoc.complete_action(args, dest="alphas", action="store")
+# FIXME: could be:  argdoc.complete_action(args, dest="bravo", action="store_true")
+# FIXME: vs argdoc default action="append", action="count"
+# FIXME: custom help-opts should be action="help"
+
 # FIXME: take a whole file without """ and without ''' as a whole argdoc
-# FIXME: teach --rip argparse to take epilog from sys.modules[__name__].__doc__
-# FIXME: teach --rip argparse to "def main" and "if __name__ ...: ... main(sys.argv) ..."
 
 # FIXME: --rip .txt, .py, .py2 for doc, argdoc, argparse
 # FIXME: save to path, not stdout, if more path provided, not just the .ext or ext
@@ -372,7 +379,19 @@ class _ArgDocApp:
         assert joined_help_options.split() == help_options
 
         if shred == "argparse":
-            self.rip_argparse(parser_source, joined_help_options)
+
+            fileish_doc = file_doc
+            if not file_doc.strip():
+                parser = coder.exec_parser_source(parser_source)
+                help_doc = parser.format_help()
+                fileish_doc = help_doc
+
+            self.rip_argparse(
+                fileish_doc,
+                parser_source=parser_source,
+                joined_help_options=joined_help_options,
+                epilog=coder.parts.epilog_chars,
+            )
 
             return
 
@@ -409,35 +428,84 @@ class _ArgDocApp:
 
         print(black_triple_quote_repr(file_doc.strip()))
 
-    def rip_argparse(self, parser_source, joined_help_options):
+    def rip_argparse(self, file_doc, parser_source, joined_help_options, epilog):
         """Show how the file calls Arg Parse"""
 
-        two_imports = "import argparse\nimport textwrap"
-        assert two_imports in parser_source
-
-        patched = parser_source
-        if joined_help_options:
-            three_imports = "import argparse\nimport sys\nimport textwrap"
-            patched = parser_source.replace(two_imports, three_imports)
-
-        print(patched.rstrip())
-        print()
+        epilog_key = "examples:"
+        if epilog:
+            epilog_key = epilog.strip().splitlines()[0]  # FIXME: question the strips
+        repr_epilog_key = black_repr(epilog_key)
 
         d = r"    "  # choose indentation
-        print("args = parser.parse_args()")
+
+        two_top_marks = "#!/usr/bin/env python\n# -*- coding: utf-8 -*-\n"
+        print(two_top_marks.rstrip())
+        print()
+
+        print(black_triple_quote_repr(file_doc.strip()))
+        print()
+        print()
+
+        print(
+            textwrap.dedent(
+                """
+            import argparse
+            import sys
+            import textwrap
+
+
+            def main(argv):
+
+                main_module = sys.modules["__main__"]
+                doc = main_module.__doc__
+                epilog_at = doc.index($repr_epilog_key)
+                epilog = doc[epilog_at:]
+            """.replace(
+                    "$repr_epilog_key", repr_epilog_key
+                )
+            ).strip()
+        )
+
+        patched = parser_source.strip()  # FIXME
+        #
+        assert two_top_marks in patched
+        patched = patched.replace(two_top_marks, "")
+        #
+        two_imports = "import argparse\nimport textwrap\n"
+        assert two_imports in patched
+        patched = patched.replace(two_imports, "")
+
+        for line in patched.splitlines():
+            print(d + line)
+
+        print()
+        print(d + "args = parser.parse_args()")
+        print()
+        print(d + "print(args)")
+
         if joined_help_options:
             # FIXME: reduce this down to:  if args.help or args.h or ...:
             # FIXME: by way of choosing the "add_argument" "dest" correctly, eg, at --x -y
             print(
-                "if any(vars(args).get(_) for _ in {}.split()):".format(
+                d
+                + "if any(vars(args).get(_) for _ in {}.split()):".format(
                     black_repr(joined_help_options)
                 )
             )
-            print(d + "parser.print_help()")
-            print(d + "sys.exit(0)  # exit zero from printing help")
+            print(d + d + "parser.print_help()")
+            print(d + d + "sys.exit(0)  # exit zero from printing help")
+
+        print()
         print()
 
-        print("print(args)")
+        print(
+            textwrap.dedent(
+                """
+                if __name__ == "__main__":
+                    sys.exit(main(sys.argv))
+                """
+            ).strip()
+        )
 
     def compare_file_to_help_doc(self, file_doc, doc_filename, help_doc):
         """Show the Help Doc printed by an Arg Doc file calling Arg Parse"""

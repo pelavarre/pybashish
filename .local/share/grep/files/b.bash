@@ -55,6 +55,6 @@ stat ...
 tar kxf ...  # FIXME: test CACHEDIR.TAG
 tar zcf ... ...
 
-# !?memo means feeling lucky enough to say find the last "memo" command and run it
+# !?memo  # feeling lucky enough to authorize find and run again
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git
