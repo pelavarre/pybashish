@@ -390,6 +390,7 @@ class _ArgDocApp:
                 fileish_doc,
                 parser_source=parser_source,
                 joined_help_options=joined_help_options,
+                prog=coder.emitted_prog,
                 epilog=coder.parts.epilog_chars,
             )
 
@@ -428,7 +429,7 @@ class _ArgDocApp:
 
         print(black_triple_quote_repr(file_doc.strip()))
 
-    def rip_argparse(self, file_doc, parser_source, joined_help_options, epilog):
+    def rip_argparse(self, file_doc, parser_source, joined_help_options, prog, epilog):
         """Show how the file calls Arg Parse"""
 
         epilog_key = "examples:"
@@ -457,6 +458,7 @@ class _ArgDocApp:
             def main(argv):
 
                 main_module = sys.modules["__main__"]
+
                 doc = main_module.__doc__
                 epilog_at = doc.index($repr_epilog_key)
                 epilog = doc[epilog_at:]
@@ -476,13 +478,10 @@ class _ArgDocApp:
         patched = patched.replace(two_imports, "")
 
         for line in patched.splitlines():
-            print(d + line)
+            print((d + line).rstrip())
 
         print()
         print(d + "args = parser.parse_args()")
-        print()
-        print(d + "print(args)")
-
         if joined_help_options:
             # FIXME: reduce this down to:  if args.help or args.h or ...:
             # FIXME: by way of choosing the "add_argument" "dest" correctly, eg, at --x -y
@@ -494,6 +493,21 @@ class _ArgDocApp:
             )
             print(d + d + "parser.print_help()")
             print(d + d + "sys.exit(0)  # exit zero from printing help")
+
+        lines = textwrap.dedent(
+                r"""
+                sys.stderr.write("{}\n".format(args))
+
+                main.args = args
+
+                sys.stderr.write("{}\n".format(parser.format_usage().rstrip()))
+                sys.stderr.write("$prog: error: not implemented\n")
+                sys.exit(2)  # exit 2 from rejecting usage
+                """
+            ).replace("$prog", prog).strip().splitlines()
+
+        for line in lines:
+            print((d + line).rstrip())
 
         print()
         print()
@@ -643,6 +657,7 @@ class _ArgDocCoder(
         # Name the app
 
         prog = parts.prog if parts.prog else os.path.split(doc_filename)[-1]
+        self.emitted_prog = prog
 
         assert prog  # always give a prog name to ArgParse, don't let them guess
         repr_prog = black_repr(prog)
