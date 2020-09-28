@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-usage: pq.py [-h] [-b] [-c] [-l] [-p] [-t] [-w] [DOT [DOT ...]]
+usage: pq.py [-h] [-b] [-c] [-i] [-l] [-p] [-t] [-w] [DOT [DOT ...]]
 
 produce output from input by way of read, reread, reshape, zip, for, if, and/or pipe
 

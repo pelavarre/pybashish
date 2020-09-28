@@ -147,13 +147,14 @@ ArgDoc compiles standard Python Arg Docs into standard Python ArgParser Parsers
 Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     $ bin/argdoc.py -ijk
-    usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- [ARG [ARG ...]]]
+    usage: argdoc.py [-h] [-q] [-v] [--rip SHRED] [FILE] [-- [WORD [WORD ...]]]
     argdoc.py: error: unrecognized arguments: -ijk
     + exit 2
     $
 
     $ bin/argdoc.py
-    #!/usr/bin/env python3
+    #!/usr/bin/env python
+    # -*- coding: utf-8 -*-
 
     """
     usage: null [-h]
@@ -168,26 +169,46 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
     """
 
 
+    import argparse
     import sys
 
-    import argdoc
 
+    def main(argv):
+        """Run a command line"""
 
-    def main():
-        args = argdoc.parse_args()
-        main.args = args
+        main_module = sys.modules["__main__"]
+        doc = main_module.__doc__
+
+        prog = doc.strip().splitlines()[0].split()[1]
+        description = list(_ for _ in doc.strip().splitlines() if _)[1]
+        epilog_at = doc.index("examples:")
+        epilog = doc[epilog_at:]
+
+        parser = argparse.ArgumentParser(  # copied from '/dev/null' by 'argdoc.py'
+            prog=prog,
+            description=description,
+            add_help=True,
+            formatter_class=argparse.RawTextHelpFormatter,
+            epilog=epilog,
+        )
+
+        args = parser.parse_args(argv[1:])
         sys.stderr.write("{}\n".format(args))
-        sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
-        sys.stderr.write("/dev/null: error: not implemented\n")
+
+        main.args = args
+        main.parser = parser
+
+        sys.stderr.write("{}\n".format(parser.format_usage().rstrip()))
+        sys.stderr.write("null: error: not implemented\n")
         sys.exit(2)  # exit 2 from rejecting usage
 
 
-    if __name__ == '__main__':
-        main()
+    if __name__ == "__main__":
+        sys.exit(main(sys.argv))
     $
 
     $ bin/argdoc.py /dev/null x y z
-    usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- [ARG [ARG ...]]]
+    usage: argdoc.py [-h] [-q] [-v] [--rip SHRED] [FILE] [-- [WORD [WORD ...]]]
     argdoc.py: error: unrecognized args: 'x y z', in place of '-- x y z'
     + exit 2
     $
@@ -202,13 +223,16 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
     $ python3 bin/p.py
     Namespace()
     usage: null [-h]
-    /dev/null: error: not implemented
+    null: error: not implemented
     + exit 2
     $
 
     $ bin/argdoc.py --rip argparse /dev/null >bin/p.py
     $ python3 bin/p.py
     Namespace()
+    usage: null [-h]
+    null: error: not implemented
+    + exit 2
     $
 
     $ rm -fr bin/p.py
@@ -364,21 +388,21 @@ Give help for the keystrokes of the "bin/read.py" command line editor
     $
 
     $ bin/chmod.py -rw /dev/null
-    Namespace(mode='-rw', recursive=None, tops=['/dev/null'])
+    Namespace(mode='-rw', recursive=0, tops=['/dev/null'])
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py +rw /dev/null
-    Namespace(mode='+rw', recursive=None, tops=['/dev/null'])
+    Namespace(mode='+rw', recursive=0, tops=['/dev/null'])
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py =rw /dev/null
-    Namespace(mode='=rw', recursive=None, tops=['/dev/null'])
+    Namespace(mode='=rw', recursive=0, tops=['/dev/null'])
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
@@ -388,14 +412,14 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 ## 2.8 ) Cp
 
     $ bin/cp.py
-    Namespace(R=None, file=None, i=None, p=None)
+    Namespace(R=0, file=None, i=0, p=0)
     usage: cp.py [-h] [-i] [-p] [-R] [FILE]
     cp.py: error: not implemented
     + exit 2
     $
 
     $ bin/cp.py f.file
-    Namespace(R=None, file='f.file', i=None, p=None)
+    Namespace(R=0, file='f.file', i=0, p=0)
     usage: cp.py [-h] [-i] [-p] [-R] [FILE]
     cp.py: error: not implemented
     + exit 2
@@ -980,14 +1004,14 @@ Clean up
 ## 2.29 ) Mv
 
     $ bin/mv.py
-    Namespace(file=None, i=None)
+    Namespace(file=None, i=0)
     usage: mv.py [-h] [-i] [FILE]
     mv.py: error: not implemented
     + exit 2
     $
 
     $ bin/mv.py f.file
-    Namespace(file='f.file', i=None)
+    Namespace(file='f.file', i=0)
     usage: mv.py [-h] [-i] [FILE]
     mv.py: error: not implemented
     + exit 2
@@ -1081,7 +1105,7 @@ Clean up
 ## 2.35 ) Tail
 
     $ bin/tail.py
-    Namespace(F=None, files=[], follow=None, lines=None, retry=None)
+    Namespace(F=0, files=[], follow=0, lines=None, retry=0)
     usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE [FILE ...]]
     tail.py: error: not implemented
     + exit 2
@@ -1170,7 +1194,7 @@ Clean up
 ## 2.40 ) Wc
 
     $ bin/wc.py
-    Namespace(bytes=None, chars=None, files=[], lines=None, max_line_length=None)
+    Namespace(bytes=0, chars=0, files=[], lines=0, max_line_length=0)
     usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE [FILE ...]]
     wc.py: error: not implemented
     + exit 2
@@ -1283,8 +1307,8 @@ else exit status 2 from being stubbed out
     $ bin/xargs.py </dev/null >/dev/null 2>&1
     $
 
-Test optional argument help of "show this help message and exit"
-spelled differently than:  -h, --help
+Test an optional argument spelled differently than:  -h, --help
+that still calls for automagic "show this help message and exit"
 
     $ rm -fr bin/p.py
     $
@@ -1292,17 +1316,20 @@ spelled differently than:  -h, --help
     $ bin/argdoc.py --rip doc bin/cal.py >/dev/null
     $
 
-    $ bin/argdoc.py --rip argdoc bin/cal.py >bin/p.py
+    $ bin/argdoc.py --rip argparse bin/cal.py >bin/p.py
     $ python3 bin/p.py
-    Namespace(h=None, help=None, ymd=None)
+    Namespace(h=0, help=0, ymd=None)
     usage: cal.py [--help] [-h] [YMD]
-    bin/cal.py: error: not implemented
+    cal.py: error: not implemented
     + exit 2
     $
 
-    $ bin/argdoc.py --rip argparse bin/cal.py >bin/p.py
+    $ bin/argdoc.py --rip argdoc bin/cal.py >bin/p.py
     $ python3 bin/p.py
-    Namespace(h=None, help=None, ymd=None)
+    Namespace(h=0, help=0, ymd=None)
+    usage: cal.py [--help] [-h] [YMD]
+    cal.py: error: not implemented
+    + exit 2
     $
 
     $ rm -fr bin/p.py

@@ -120,15 +120,15 @@ def expand_incoming(incoming, args):
             else:
 
                 if stripped:
-                    asif_print((stripped - 1) * "\n")
+                    as_print((stripped - 1) * "\n")
                     stripped = 0
 
-                asif_print(expanded)
+                as_print(expanded)
 
                 begun = True
 
     if passme.wiki_begun:
-        asif_print("</p>")
+        as_print("</p>")
 
     printed = "\n".join(passme.print_lines) + "\n"
     stripped = striplines(printed)
@@ -160,7 +160,7 @@ def expand_line(line, args):
         if args.wiki:
             if not passme.wiki_begun:
                 passme.wiki_begun = True
-                asif_print("<p>")
+                as_print("<p>")
 
     return expanded
 
@@ -183,7 +183,7 @@ def chars_as_wiki_html(chars):
     return reps
 
 
-def asif_print(*args):
+def as_print(*args):
     """Print, or just collect, lines of output"""
 
     line = " ".join(str(_) for _ in args)

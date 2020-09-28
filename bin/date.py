@@ -102,9 +102,9 @@ def misread_ymdhms_mac(ymd):
 
     today = dt.datetime(now.year, now.month, now.day, 12, 00)  # duck 2am DST etc
     replaces = {k: getattr(parsed, k) for k in keys}
-    asif_today = today.replace(**replaces)
+    as_today = today.replace(**replaces)
 
-    return asif_today
+    return as_today
 
 
 # deffed in many files  # missing from docs.python.org
@@ -156,9 +156,9 @@ def misread_ymdhms_linux(ymd):
 
     today = dt.datetime(now.year, now.month, now.day, 12, 00)  # duck 2am DST etc
     replaces = {k: getattr(parsed, k) for k in keys}
-    asif_today = today.replace(**replaces)
+    as_today = today.replace(**replaces)
 
-    return asif_today
+    return as_today
 
 
 # deffed in many files  # missing from docs.python.org

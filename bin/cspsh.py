@@ -73,7 +73,7 @@ def main():
     args = argdoc.parse_args()
     main.args = args
 
-    if all((_ is None) for _ in vars(args).values()):
+    if (args.force, args.interact) == (0, 0):
         stderr_print(argdoc.format_usage().rstrip())
         stderr_print("cspsh.py: error: choose --force or --interact")
         sys.exit(2)  # exit 2 from rejecting usage

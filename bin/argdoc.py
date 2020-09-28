@@ -1,79 +1,51 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-'''
-usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- [ARG [ARG ...]]]
+"""
+usage: argdoc.py [-h] [-q] [-v] [--rip SHRED] [FILE] [-- [WORD [WORD ...]]]
 
-parse command line args precisely as helped by module doc
+parse command line args as doc'ced by a top-of-file arg docstring of help lines
 
 positional arguments:
-  FILE         where the arg doc is (default: os.devnull)
-  ARG          an arg to parse as per the arg doc
+  FILE           the file begun by an arg docstring (often your main py file)
+  WORD           an arg to parse for the file, or a word of a line of arg docstring
 
 optional arguments:
-  -h, --help   show this help message and exit
-  --rip SHRED  one of doc|argparse|argdoc
-
-usage as a python import:
-
-  r"""
-  usage: ... [-h]
-
-  optional arguments:
-    -h, --help  show this help message and exit
-  """
-
-  import argdoc
-
-  if __name__ == '__main__':
-    args = argdoc.parse_args()
-    print(args)
+  -h, --help     show this help message and exit
+  -q, --quiet    say less
+  -v, --verbose  say more
+  --rip SHRED    rip to stdout one of doc|argparse|helpdoc|argdoc|args|patch
 
 quirks:
-  to see review comments pop up to work with you, you must damage an arg doc and run it
-  long option and metavar names split their line and spill their words of help onto the next line
-  you lose your "-h" and "--help" options if you drop all "optional arguments:" from an arg doc
-  you get only english plural "dest"s for plural args, such as "[top [top ..]]" goes to "args.tops"
-  you get only simple argparses unless you rip and edit, you can't mix your python into the arg doc
+  only the "doc" is the input, the other things you can rip are outputs
+  plural args go to an english plural key, such as "[top [top ..]]" to ".tops"
+  you lose your "-h" and "--help" options if you drop all "optional arguments:"
+  you don't see review comments coming to work with you, till you try a damaged arg doc
+  you can't mix more python into your argparse by inserting it into your arg doc
 
 unsurprising quirks:
   does prompt once for stdin when called as "argdoc -", like bash "grep -R", unlike bash "cat -"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
 examples:
+
   argdoc.py -h                          # show this help message and exit
-  argdoc.py                             # show a template doc and how to call arg doc
-  argdoc.py argdoc.py                   # show the file doc and how to call (same as --rip argdoc)
+  argdoc.py                             # same as:  argdoc.py --rip argparse
 
-  argdoc.py --rip doc argdoc.py         # show just the docstring (by reading without importing)
-  argdoc.py --rip argparse argdoc.py    # show how the file calls arg parse
-  argdoc.py --rip argdoc argdoc.py      # show how the file could call arg doc
+  argdoc.py --rip argparse              # show an example argparse prog, don't run it
+  argdoc.py --rip argdoc                # show an example argdoc prog, don't run it
 
-  argdoc.py argdoc.py --                # parse no arg with the file's arg doc
-  argdoc.py argdoc.py -- --help         # parse the arg "--help" with the file's arg doc
-  argdoc.py argdoc.py -- hi world       # parse the two args "hi world" with the file's arg doc
-'''
+  argdoc.py p.py                        # same as:  argdoc.py --rip argparse p.py
+  argdoc.py --rip doc p.py              # rip and print the doc, don't run it
 
-# FIXME: clean up after the "--rip argparse" hackathon
+  argdoc.py --  -x, --extra  'do more'  # show the patch to add an optional counted arg
+  argdoc.py --  -a ARG                  # show the patch to add an optional taken arg
+  argdoc.py --  ARG                     # show the patch to add a positional arg
 
-# FIXME: argdoc default action="count" should be also default=0
-# FIXME: opt arg with METAVAR - work out when to take singular, vs append to plural dest
-# FIXME: could be:  argdoc.complete_action(args, dest="alphas", action="store")
-# FIXME: could be:  argdoc.complete_action(args, dest="bravo", action="store_true")
-# FIXME: vs argdoc default action="append", action="count"
-# FIXME: custom help-opts should be action="help"
-
-# FIXME: take a whole file without """ and without ''' as a whole argdoc
-
-# FIXME: --rip .txt, .py, .py2 for doc, argdoc, argparse
-# FIXME: save to path, not stdout, if more path provided, not just the .ext or ext
-
-# FIXME: option (surely not default?) to push the autocorrection into the Arg Doc
-# FIXME: comment --rip argparse at colliding "dest"s from multiple args, such as "[--ymd YMD] [YMD]"
-# FIXME: parsed args whose names begin with a '_' skid shouldn't print, via argparse.SUPPRESS
-# FIXME: consider [FILE [FILE ...]] in usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- ...]
-
-# FIXME: think into who signs as author of ArgumentError log message: "argdoc.py" or the "prog"?
+  argdoc.py --rip args p.py --          # parse no arg with the file's arg doc
+  argdoc.py --rip args p.py --  --help  # parse the arg "--help" with the file's arg doc
+  argdoc.py --rip args p.py --  hi you  # parse "hi you" with the file's arg doc
+"""
 
 
 from __future__ import print_function
@@ -81,538 +53,774 @@ from __future__ import print_function
 import argparse
 import collections
 import os
+import pprint
 import re
 import shlex
 import sys
 import textwrap
 
 
-DEFAULT_EPILOG = textwrap.dedent(
-    """
-    examples:
-      Oh no! No examples disclosed!! 💥 💔 💥
-    """
-).strip()  # style with "Oh no! ... 💥 💔 💥" to rhyme with failures of the Black auto-styling app
-
-
-#
-# Serve as an importable module
-#
-
-
-def format_usage():
-    """Sum the usage into a line of text closed by an end-of-line char"""
-
-    parser = ArgumentParser()
-    usage_chars = parser.format_usage()
-
-    return usage_chars
-
-
-def parse_args(args=None, namespace=None, doc=None, doc_filename=None):
-    """Parse args as helped by Module Doc"""
-
-    argdoc_argv_tail = sys.argv[1:] if (args is None) else args
-
-    quiet = True
-    for arg in argdoc_argv_tail:
-        if (arg == "-h") or ((len(arg) >= len("--h")) and "--help".startswith(arg)):
-            quiet = False
-        # FIXME: fit quiet/not more tightly to apps that declare alternative help options
-
-    try:
-        parser = ArgumentParser(doc, doc_filename=doc_filename, quiet=quiet)
-    except ArgDocError as exc:
-        stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
-        sys.exit(1)
-
-    args_ = parser.parse_args(args, namespace=namespace)
-    help_options = scrape_help_options(doc=parser.format_help())
-
-    joined_help_options = " ".join(help_options)
-    assert joined_help_options.split() == help_options
-
-    if any(vars(args_).get(_) for _ in help_options):
-        parser.print_help()
-        sys.exit(0)  # exit zero from printing help
-
-    return args_
-
-
-def print_help(file=None):
-    """Print the help lines to the file, else to Stdout"""
-
-    file_ = file if file else sys.stdout
-    parser = ArgumentParser()
-    parser.print_help(file=file_)
-
-
-def print_usage(file=None):
-    """Print the usage line to the file, else to Stdout"""
-
-    file_ = file if file else sys.stdout
-    parser = ArgumentParser()
-    parser.print_usage(file=file_)
-
-
-# FIXME: class ArgumentParser
-def ArgumentParser(doc=None, doc_filename=None, quiet=False):
-    """Compile the Doc into Parser Source, and exec that source to build the Parser"""
-    # FIXME: factor out overlap with the "def run_argdoc_app" of _ArgDocApp
-
-    if not quiet:
-        main.args.verbose += 1
-
-    main_module = sys.modules["__main__"]
-    if doc is None:
-        doc = main_module.__doc__
-    if doc_filename is None:
-        doc_filename = main_module.__file__
-
-    coder = _ArgDocCoder()
-    parser_source = coder.compile_parser_source_from(doc, doc_filename=doc_filename)
-    parser = coder.exec_parser_source(parser_source)
-
-    if not quiet:
-
-        app = _ArgDocApp()
-        file_doc = doc
-
-        help_doc = parser.format_help()
-
-        if file_doc.strip():
-            app.compare_file_to_help_doc(
-                file_doc, doc_filename=doc_filename, help_doc=help_doc
-            )
-
-    return parser
-
-
-def scrape_help_options(doc):
-    """Print help and exit zero, if an option parsed is doc'ced as print help"""
-
-    help_lines = doc.splitlines()
-
-    help_options = list()
-    while help_lines and (help_lines[0] != "optional arguments:"):
-        help_lines = help_lines[1:]
-    if help_lines and (help_lines[0] == "optional arguments:"):
-        help_lines = help_lines[1:]
-
-        while help_lines and (
-            help_lines[0].startswith(" ") or not help_lines[0].strip()
-        ):
-            words = help_lines[0].split()
-            help_lines = help_lines[1:]
-
-            if words and words[0].startswith("-"):
-                options = words[:1]
-                help_words = words[1:]
-                if words[0].endswith(","):
-                    options = words[:2]
-                    help_words = words[2:]
-
-                if "show this help message and exit" == " ".join(help_words):
-                    help_options.extend(_.lstrip("-").rstrip(",") for _ in options)
-
-    return help_options
-
-
-#
-# Run from the command line
-#
-
-
 class ArgDocError(Exception):
     pass
 
 
-def main(argv):
-    """Run from the command line"""
+#
+# Run as a command line:  ./argdoc.py ...
+#
 
-    shline = pyish_shlex_join(argv)
-    app = _ArgDocApp()
+
+def main(argv):
+    """Run a command line"""
+
+    # Parse the command line
+
+    taker = _CommandLineSyntaxTaker(argv)
+
+    shred = taker.args.shred
+    verbose = taker.args.verbose
+
+    path = taker.args.file
+    if taker.args.file == "-":
+        path = "/dev/stdin"
+        prompt_tty_stdin()
+
+    # Pick apart one Arg Doc to produce one ArgumentParser Parser
+    # except do obey "--rip doc|argparse|argdoc" commands to exit early
+
+    ripper = ArgDocRipper(verbose=verbose)
 
     try:
-        app.run_main_argv(argv)
+        parser = ripper.make_argument_parser(doc=None, path=path)
     except ArgDocError as exc:
         stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
         sys.exit(1)
     except Exception:
-        stderr_print("argdoc.py: error: unhandled exception at:  {}".format(shline))
+        stderr_print(
+            "argdoc.py: error: unhandled exception at:  {}".format(taker.shline)
+        )
         raise
 
+    # Rip one thing or another
 
-main.args = argparse.Namespace(verbose=0)
+    if shred == "doc":
+        sys.stdout.write(ripper.repr_file_doc + "\n")
+    elif shred == "argparse":
+        sys.stdout.write(ripper.ripped_argparse_py + "\n")
+    elif shred == "helpdoc":
+        sys.stdout.write(ripper.repr_help_doc + "\n")
+    elif shred == "argdoc":
+        sys.stdout.write(ripper.ripped_argdoc_py + "\n")
+
+    elif shred == "args":
+        argv = [ripper.file_path] + taker.args.words
+        stderr_print("+ {}".format(shlex_join(argv)))
+
+        args = parser.parse_args(argv[1:])
+        pprint.pprint(vars(args))  # sorts "args" like "argparse.Namespace.str"
+
+    # Else rip diff from parsing without new arg declaration, to with new arg
+
+    else:
+        assert shred == "patch"  # per other if-elif-shred
+
+        next_ripper = ripper.take_next_words(taker.args.words)
+
+        diffed_files = ripper.rip_diff_argparse_py_files(next_ripper)
+        sys.stdout.write(diffed_files + "\n")
 
 
-class _ArgDocApp:
-    """Bundle some command-line services"""
+class _CommandLineSyntaxTaker(argparse.Namespace):
+    """Parse an ArgDoc command line"""
 
-    def run_main_argv(self, argv):
-        """Run from the command line, but trust the caller to interpret exceptions"""
+    def __init__(self, argv):
+        """Call an ArgParse "parse_args" and then finish what it started"""
 
-        args = self.parse_argdoc_argv(argv)
-        args.verbose = True
+        # Name the client calling us
 
-        main.args = args
+        self.shline = shlex_join(argv)
 
-        self.run_argdoc_app(
-            doc_filename=args.file,
-            shred=args.shred,
-            argv_separator=args.argv_separator,
-            tail_argv=args.args,
-        )
+        # Option to comment in bootstrap
 
-    def parse_argdoc_argv(self, argv):
-        """Call the ArgParse "parse_args" but finish what it started"""
+        # rip = "doc"
+        # rip = "argparse"
+        # rip = "argdoc"
+        # rip = "args"
+        # rip = "patch"
+        # args = argparse.Namespace(file=None, rip=rip, quiet=0, verbose=0, words=[])
 
-        argdoc_argv_tail = argv[1:]
-        args = parse_args(argdoc_argv_tail)
-        args = self._complete_args_file(args, argv=argv)
-        self._complete_args_shred(args)
-        self._complete_args_args(args, argv=argv)
+        # Begin to parse the command line
 
-        return args
+        args = parse_args(argv[1:])  # as if calling argdoc.parse_args
 
-    def _complete_args_file(self, args, argv):
-        """Complete the FILE in usage: ... [FILE] [-- [ARG [ARG ...]]]"""
+        self.args = args
 
-        #  Auto-correct the ArgV Tail to choose a FILE, if arg "--" given in place of FILE
+        # Complete the parse of the command line
 
-        if argv[1:] and (argv[1] == "--") and args.file:
-
-            assert args.file == argv[2]
-
-            argdoc_argv_tail = argv[1:]
-            completed_argv_tail = [os.devnull] + argdoc_argv_tail
-            args = parse_args(completed_argv_tail)  # call again, if needed
-
-            assert args.file == os.devnull
-
-        # Supply the FILE if not given on the command line, and not supplied by auto-correction
+        args.verbose = args.verbose - args.quiet  # mutating
+        args.verbose += 1  # mutating
+        del args.quiet  # mutating
 
         args.file = os.devnull if (args.file is None) else args.file
+        args.argv_separator = "--" if ("--" in argv[1:]) else None
 
-        # Succeed
+        self._complete_args_file(argv=argv)
+        self._complete_args_words(argv=argv)
+        self._complete_args_shred()
 
-        return args
+    def _complete_args_file(self, argv):
+        """Fix "args" when the arg "--" taken in place of FILE at [FILE] [-- ..."""
 
-    def _complete_args_shred(self, args):
-        """Complete the SHRED in usage: ... --rip SHRED"""
+        args = self.args
 
-        shred = None
-        if args.rip:
+        if argv[1:] and (argv[1] == "--") and args.file:
+            assert args.file == argv[2]  # postcondition
 
-            shreds = "argdoc argparse doc".split()  # FIXME: pull these from the arg doc
-            for shred_ in shreds:
-                if shred_.startswith(args.rip):
-                    shred = shred_
+            args.words = [args.file] + args.words  # mutating
+            args.file = None
 
-                    break
+    def _complete_args_words(self, argv):
+        """Complete the WORDS in usage: ... [-- [WORD [WORD ...]]]"""
 
-            if not shred:
-                stderr_print(
-                    "argdoc.py: error: choose --rip from {}, do not choose {!r}".format(
-                        shreds, args.rip
-                    )
-                )
-                sys.exit(1)
+        args = self.args
 
-        args.shred = shred
-
-    def _complete_args_args(self, args, argv):
-        """Complete the ARGS in usage: ... [-- [ARG [ARG ...]]]"""
-
-        argdoc_argv_tail = argv[1:]
-        args.argv_separator = "--" if ("--" in argdoc_argv_tail) else None
-
-        if args.args and not args.argv_separator:
+        if args.words and not args.argv_separator:
             stderr_print(format_usage().rstrip())
             stderr_print(  # a la standard error: unrecognized arguments
                 "argdoc.py: error: unrecognized args: {!r}, in place of {!r}".format(
-                    pyish_shlex_join(args.args), pyish_shlex_join(["--"] + args.args),
+                    shlex_join(args.words), shlex_join(["--"] + args.words),
                 )
             )
             sys.exit(2)  # exit 2 from rejecting usage
 
         return args
 
-    def run_argdoc_app(self, doc_filename, shred, argv_separator, tail_argv):
-        """Print the Arg Doc, or compile it, or run it"""
-        # FIXME: factor out overlap with the "class ArgumentParser" of "argdoc.py"
+    def _complete_args_shred(self):
+        """Complete the SHRED in usage: ... --rip SHRED"""
 
-        coder = _ArgDocCoder()
+        args = self.args
 
-        # Fetch the Arg Doc, compile it, and hope it doesn't crash the compiler
+        shred = None
+        if not args.rip:
 
-        relpath = doc_filename
-        if doc_filename == "-":
-            relpath = "/dev/stdin"
-            prompt_tty_stdin()
+            shred = "patch" if args.argv_separator else "argparse"
 
-        # Read the module doc from the file, with an option to rip and quit
+        else:
 
-        file_doc = read_docstring_from(relpath).strip()
+            str_shreds = "doc|argparse|helpdoc|argdoc|args|patch"
+            shreds = str_shreds.split("|")
 
-        if shred == "doc":
-            self.rip_doc(file_doc)
+            matching_shreds = list()
+            for shred in shreds:
+                if shred.startswith(args.rip):
+                    matching_shreds.append(shred)
 
-            return
+            if len(matching_shreds) == 1:
+                shred = matching_shreds[0]
 
-        # Compile the file doc, with an option to rip and quit
+            if shred is None:
+                stderr_print(
+                    "argdoc.py: error: choose from --rip {}, do not choose {!r}".format(
+                        str_shreds, args.rip
+                    )
+                )
 
-        parser_source = coder.compile_parser_source_from(
-            file_doc, doc_filename=doc_filename
-        )
+                sys.exit(2)  # exit 2 from rejecting usage
 
-        help_options = list()
-        if file_doc:
-            help_options = scrape_help_options(file_doc)
-            if coder.coder_added_help:
-                assert "help" in help_options
-                assert "h" in help_options
-                del help_options[help_options.index("help")]
-                del help_options[help_options.index("h")]
+        args.shred = shred
 
-        joined_help_options = " ".join(help_options)
-        assert joined_help_options.split() == help_options
 
-        if shred == "argparse":
+#
+# Run as an imported module:  import argdoc
+#
 
-            fileish_doc = file_doc
-            if not file_doc.strip():
-                parser = coder.exec_parser_source(parser_source)
-                help_doc = parser.format_help()
-                fileish_doc = help_doc
 
-            self.rip_argparse(
-                fileish_doc,
-                parser_source=parser_source,
-                joined_help_options=joined_help_options,
-                prog=coder.emitted_prog,
-                epilog=coder.parts.epilog_chars,
-            )
+# "argdoc.format_help()" like to ArgParse "parser.format_help()"
+def format_help():
+    """Return the Arg Doc as a string of lines"""
+    parser = ArgDocRipper(verbose=1).make_argument_parser()
+    doc = parser.format_help()
+    return doc
 
-            return
 
-        # Run the parser source to build the parser, with an option to rip and quit
+# "argdoc.format_usage()" like to ArgParse "parser.format_usage()"
+def format_usage():
+    """Return the Usage Line of the Arg Doc, including its trailing Line Sep"""
+    parser = ArgDocRipper().make_argument_parser()
+    usage = parser.format_usage()
+    return usage
+
+
+# "argdoc.parse_args" like to ArgParse "parser.parse_args(args, namespace)"
+def parse_args(args=None, namespace=None, doc=None, path=None):
+    """Parse Command Line Args as helped by a top-of-file Arg Docstring of Help Lines"""
+
+    argv_tail = args  # accept argv[1:] from caller, else encode sys.argv[1:] as None
+
+    ripper = ArgDocRipper(verbose=0)
+    try:
+        parser = ripper.make_argument_parser(doc, path=path)
+    except ArgDocError as exc:
+        stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
+        sys.exit(1)
+
+    try:
+        named_args = parser.parse_args(argv_tail, namespace=namespace)
+        if not parser.add_help:
+            if ripper.asking_for_help(named_args):
+                parser.print_help()
+                sys.exit(0)  # exit zero from printing help
+    except SystemExit:
+        ArgDocRipper(verbose=1).make_argument_parser(doc, path=path)
+        raise
+
+    return named_args
+
+
+# "argdoc.print_help" like to ArgParse "parser.print_help(file)"
+def print_help(file=None):
+    """Print the Arg Doc to file, else to Stdout"""
+    parser = ArgDocRipper(verbose=1).make_argument_parser()
+    parser.print_help(file=file)
+
+
+# "argdoc.print_usage" like to ArgParse "parser.print_usage(file)"
+def print_usage(file=None):
+    """Print the usage line to the file, else to Stdout"""
+    parser = ArgDocRipper().make_argument_parser()
+    parser.print_usage(file=file)
+
+
+# "argdoc.ArgumentParser" like to ArgParse "ArgumentParser(description, epilog, ...)"
+# FIXME FIXME: make this "class" not "def"
+def ArgumentParser(doc=None, path=None):
+    """Construct the ArgumentParser but don't run it now"""
+    parser = ArgDocRipper().make_argument_parser()
+    return parser
+
+
+#
+# Rip doc, or argparse parser source, or parser, or parsed args, or parser source diff
+#
+
+
+class ArgDocRipper(argparse.Namespace):
+    """Parse Command Line Args as doc'ced by a top-of-file Arg Docstring of Help Lines"""
+
+    def __init__(self, verbose=0):
+
+        self.coder = _ArgDocCoder(verbose=verbose)
+        self.verbose = verbose
+
+    def make_argument_parser(self, doc=None, path=None):
+        """Don't format help differently when Env Var COLUMNS=1 etc"""
+
+        with_columns = os.environ.get("COLUMNS")
+        if with_columns is None:
+            parser = self._make_argument_parser(doc=doc, path=path)
+        else:
+            del os.environ["COLUMNS"]
+            try:
+                parser = self._make_argument_parser(doc=doc, path=path)
+            finally:
+                os.environ["COLUMNS"] = with_columns
+
+        return parser
+
+    def _make_argument_parser(self, doc=None, path=None):
+        "Make an ArgumentParser from Arg Doc" ""
+
+        coder = self.coder
+
+        # Fetch the Arg Doc from Arg else from Path else from Main Module
+
+        file_doc = self.fetch_file_doc(doc, path=path)
+        file_path = self.file_path  # initted alongside .file_doc by .fetch_file_doc
+
+        repr_file_doc = black_triple_quote_repr(file_doc.strip() + "\n")
+        self.repr_file_doc = repr_file_doc
+
+        # Translate the ripped Arg Doc to Python Source Calling ArgParse
+        # Race ahead to run the Python Source to compare the bot's Help Doc to input
+
+        parser_source = self.code_as_argparse(file_doc, file_path=file_path)
 
         parser = coder.exec_parser_source(parser_source)
         help_doc = parser.format_help()
+        repr_help_doc = black_triple_quote_repr(help_doc.strip() + "\n")
+
+        self.parser = parser
+        self.help_doc = help_doc
+        self.repr_help_doc = repr_help_doc
 
         if file_doc.strip():
             self.compare_file_to_help_doc(
-                file_doc, doc_filename=doc_filename, help_doc=help_doc
+                file_doc, help_doc=help_doc, file_path=file_path
             )
 
-        if (shred == "argdoc") or not argv_separator:
-            self.rip_argdoc(help_doc, doc_filename=doc_filename)
+        # Translate the Arg Doc to whole example Python programs
 
-            return
+        parser_doc = file_doc
+        if not file_doc.strip():
+            parser_doc = help_doc
 
-        # Run the parser, and rip the args that result (except when printing help and exiting zero)
-        # Trace the args prefaced by "+ ", as if prefaced by Bash PS4
+        ripped_argparse_py = self.rip_argparse_py(
+            parser_source, parser_doc=parser_doc, file_path=file_path
+        )
 
-        print("+ {}".format(pyish_shlex_join([doc_filename] + tail_argv)))
+        ripped_argdoc_py = self.rip_argdoc_py(help_doc, file_path=file_path)
 
-        args = parser.parse_args(tail_argv)
+        self.ripped_argparse_py = ripped_argparse_py
+        self.ripped_argdoc_py = ripped_argdoc_py
 
-        if any(vars(args).get(_) for _ in help_options):
-            parser.print_help()
-            sys.exit(0)  # exit zero from printing help
+        # Succeed
 
-        self.rip_args(args)
+        return parser
 
-    def rip_doc(self, file_doc):
-        """Show just the docstring"""
+    def fetch_file_doc(self, doc, path):
+        """Fetch the Arg Doc from Arg else from Path else from Main Module"""
 
-        print(black_triple_quote_repr(file_doc.strip()))
+        main_module = sys.modules["__main__"]
+        main_module_doc = main_module.__doc__
+        main_module_file = main_module.__file__
 
-    def rip_argparse(self, file_doc, parser_source, joined_help_options, prog, epilog):
-        """Show how the file calls Arg Parse"""
+        file_doc = doc
+        file_path = path
 
-        epilog_key = "examples:"
-        if epilog:
-            epilog_key = epilog.strip().splitlines()[0]  # FIXME: question the strips
+        if doc is not None:
+            if path is None:
+                file_path = os.devnull
+        else:
+            if path is None:
+                file_doc = main_module_doc if main_module_doc else ""
+                file_path = main_module_file
+            else:
+                file_doc = self.read_eval_docstring_from(path)
+                file_path = path
+
+        assert file_doc is not None
+        assert file_path is not None
+
+        self.file_doc = file_doc
+        self.file_path = file_path
+
+        return file_doc
+
+    def read_eval_docstring_from(self, path):
+        """Fetch the leading Docstring from a file of Python source"""
+
+        try:
+            with open(path, "rt") as incoming:
+                chars = incoming.read()  # TODO: read what's needed, not whole file
+        except IOError as exc:  # such as Python 3 FileNotFoundError
+            stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
+            sys.exit(1)
+
+        stripped_repr_doc = take_docstring_of(chars).strip()
+
+        if chars:
+
+            if not stripped_repr_doc:
+                qqq1 = '"""'
+                qqq2 = "'''"
+                verbose_print(
+                    self.verbose,
+                    "argdoc.py: warning: found no {} and found no {} in {}".format(
+                        qqq1, qqq2, path
+                    ),
+                )
+
+            if stripped_repr_doc and not stripped_repr_doc.startswith("r"):
+                if "\\" in stripped_repr_doc:
+                    qqq = stripped_repr_doc[:3]
+                    verbose_print(
+                        self.verbose,
+                        "argdoc.py: warning: "
+                        "docstring of backslash led by {} not by r{} in {}".format(
+                            qqq, qqq, path
+                        ),
+                    )
+
+        doc = ""
+        if stripped_repr_doc:
+            doc = eval(stripped_repr_doc)
+
+        return doc
+
+    def code_as_argparse(self, file_doc, file_path):
+        """Rip the argparse source to make the parser"""
+
+        coder = self.coder
+        parser_source = coder.compile_parser_source_from(file_doc, file_path=file_path)
+
+        self.parser_source = parser_source
+
+        return parser_source
+
+    def rip_argparse_py(self, parser_source, parser_doc, file_path):
+        """Say how to call ArgParse to parse Args in the way of the Arg Doc"""
+
+        lines_by_key = collections.defaultdict(list)
+
+        # Pick apart the Example Source
+
+        self._split_argparse_example(lines_by_key)
+
+        # Pick apart the Parser Doc
+
+        key = "parser_doc"
+        repr_parser_doc = black_triple_quote_repr(parser_doc.strip())
+        lines_by_key[key].extend(repr_parser_doc.splitlines())
+
+        # Pick apart the Parser Source  # FIXME: less brittle
+
+        self._split_parser_source(lines_by_key, parser_source=parser_source)
+
+        # Adapt the Example Parser  # FIXME: less brittle
+
+        self._merge_parsers(lines_by_key)
+
+        # Pick and choose the sourcelines to keep
+
+        lines = list()
+        # lines.append("--".join(lines_by_key.keys()).upper())
+        # lines.append("<<HEAD>>")
+        lines.extend(lines_by_key["head"])
+        # lines.append("<<PARSER_DOC>>")
+        lines.extend(lines_by_key["parser_doc"])
+        # lines.append("<<MIDDLE>>")
+        lines.extend(lines_by_key["middle"])
+        # lines.append("<<MERGED_PARSER>>")
+        lines.extend(lines_by_key["merged_parser"])
+        # lines.append("<<MADE_TAIL>>")
+        lines.extend(lines_by_key["made_tail"])
+        # lines.append("<<TAIL>>")
+        lines.extend(lines_by_key["tail"])
+        # lines.append("<<EOF>>")
+
+        # Succeed
+
+        joined_lines = "\n".join(lines) + "\n"
+
+        prog = parser_doc.strip().splitlines()[0].split()[1]  # usage: prog ...
+        repl = "{}:".format(prog)
+        ripped_argparse_py = joined_lines.replace("null:", repl)
+
+        self.ripped_argparse_py = ripped_argparse_py
+
+        return ripped_argparse_py
+
+    def _split_argparse_example(self, lines_by_key):
+        '''Feed the ArgParse Example into "lines_by_key"'''
+
+        coder = self.coder
+
+        epilog = coder.epilog
+        epilog_key = epilog.strip().splitlines()[0]  # FIXME: what about empty epilogs
         repr_epilog_key = black_repr(epilog_key)
 
-        d = r"    "  # choose indentation
+        d4 = r"    "
 
-        two_top_marks = "#!/usr/bin/env python\n# -*- coding: utf-8 -*-\n"
-        print(two_top_marks.rstrip())
-        print()
+        key = "head"
+        for line in ARGPARSE_EXAMPLE.strip().splitlines():
+            stripped = line.strip()
 
-        print(black_triple_quote_repr(file_doc.strip()))
-        print()
-        print()
+            if stripped.startswith(r'"""'):
+                if key == "head":
+                    key = "example_docstring"
+                else:
+                    lines_by_key[key].append(line)
+                    key = "middle"
+                    continue
+            elif stripped.startswith(r"epilog_at = "):
+                merged_line = r"epilog_at = doc.index({})".format(repr_epilog_key)
+                lines_by_key[key].append((d4 + merged_line).rstrip())
+                continue
+            elif stripped.startswith(r"parser = argparse.ArgumentParser("):
+                key = "example_parser"
+            elif stripped == r")":
+                lines_by_key[key].append(line)
+                key = "tail"
+                continue
 
-        print(
-            textwrap.dedent(
-                """
-            import argparse
-            import sys
-            import textwrap
+            lines_by_key[key].append(line)
 
+    def _split_parser_source(self, lines_by_key, parser_source):
+        '''Feed the Parse Source into "lines_by_key"'''
 
-            def main(argv):
+        d4 = r"    "
 
-                main_module = sys.modules["__main__"]
+        key = "made_head"
+        for line in parser_source.strip().splitlines():
+            stripped = line.strip()
 
-                doc = main_module.__doc__
-                epilog_at = doc.index($repr_epilog_key)
-                epilog = doc[epilog_at:]
-            """.replace(
-                    "$repr_epilog_key", repr_epilog_key
+            if stripped.startswith(r"parser = argparse.ArgumentParser"):
+                key = "made_parser"
+            elif stripped == r")":
+                lines_by_key[key].append((d4 + line).rstrip())
+                key = "made_tail"
+                continue
+
+            lines_by_key[key].append((d4 + line).rstrip())
+
+    def _merge_parsers(self, lines_by_key):
+        '''Merge the "made_parser" into the "example_parser"'''
+
+        to_key = "merged_parser"
+        made_parser_lines = lines_by_key["made_parser"]
+
+        parser_eqs = 0
+        progs = 0
+        add_helps = 0
+
+        for (index, line,) in enumerate(lines_by_key["example_parser"]):
+            stripped = line.strip()
+
+            merged_line = line
+
+            if stripped.startswith(r"parser = argparse.ArgumentParser("):
+                parser_eqs += 1
+
+                merged_line = self._find_one_startswith(
+                    made_parser_lines, leftmost=r"parser = argparse.ArgumentParser(",
                 )
-            ).strip()
-        )
 
-        patched = parser_source.strip()  # FIXME
-        #
-        assert two_top_marks in patched
-        patched = patched.replace(two_top_marks, "")
-        #
-        two_imports = "import argparse\nimport textwrap\n"
-        assert two_imports in patched
-        patched = patched.replace(two_imports, "")
+                assert merged_line  # for the 'copied from' comment
 
-        for line in patched.splitlines():
-            print((d + line).rstrip())
+            elif stripped.startswith(r"add_help="):
+                add_helps += 1
 
-        print()
-        print(d + "args = parser.parse_args()")
-        if joined_help_options:
-            # FIXME: reduce this down to:  if args.help or args.h or ...:
-            # FIXME: by way of choosing the "add_argument" "dest" correctly, eg, at --x -y
-            print(
-                d
-                + "if any(vars(args).get(_) for _ in {}.split()):".format(
-                    black_repr(joined_help_options)
+                merged_line = self._find_one_startswith(
+                    made_parser_lines, leftmost=r"add_help="
                 )
-            )
-            print(d + d + "parser.print_help()")
-            print(d + d + "sys.exit(0)  # exit zero from printing help")
 
-        lines = textwrap.dedent(
-                r"""
-                sys.stderr.write("{}\n".format(args))
+                assert merged_line
 
-                main.args = args
+            lines_by_key[to_key].append(merged_line)
 
-                sys.stderr.write("{}\n".format(parser.format_usage().rstrip()))
-                sys.stderr.write("$prog: error: not implemented\n")
-                sys.exit(2)  # exit 2 from rejecting usage
-                """
-            ).replace("$prog", prog).strip().splitlines()
+            if stripped.startswith(r"prog="):
+                progs += 1
 
-        for line in lines:
-            print((d + line).rstrip())
+                made_line = self._find_one_startswith(
+                    made_parser_lines, leftmost=r"usage="
+                )
 
-        print()
-        print()
+                if made_line:
+                    lines_by_key[to_key].append(made_line)
 
-        print(
-            textwrap.dedent(
-                """
-                if __name__ == "__main__":
-                    sys.exit(main(sys.argv))
-                """
-            ).strip()
-        )
+        assert parser_eqs == 1
+        assert progs == 1
+        assert add_helps <= 1
 
-    def compare_file_to_help_doc(self, file_doc, doc_filename, help_doc):
+    def _find_one_startswith(self, iterable, leftmost):
+        """Find one, or None, but never more"""
+
+        some = list(_ for _ in iterable if _.strip().startswith(leftmost))
+
+        if not some:
+            return None
+
+        assert len(some) == 1
+        one = some[0]
+        return one
+
+    def rip_argdoc_py(self, help_doc, file_path):
+        """Say how to call ArgDoc to parse Args in the way of the Arg Doc"""
+
+        lines_by_key = collections.defaultdict(list)
+
+        # Pick apart the Example Source
+
+        key = "head"
+        for line in ARGDOC_EXAMPLE.strip().splitlines():
+            stripped = line.strip()
+
+            if stripped.startswith(r'"""'):
+                if key == "head":
+                    key = "example_docstring"
+                else:
+                    lines_by_key[key].append(line)
+                    key = "tail"
+                    continue
+
+            lines_by_key[key].append(line)
+
+        # Pick apart the Help Doc
+
+        key = "help_doc"
+        repr_help_doc = black_triple_quote_repr(help_doc.strip())
+        lines_by_key[key].extend(repr_help_doc.splitlines())
+
+        # Pick and choose the sourcelines to keep
+
+        lines = list()
+        lines.extend(lines_by_key["head"])
+        lines.extend(lines_by_key["help_doc"])
+        lines.extend(lines_by_key["tail"])
+
+        # Succeed
+
+        joined_lines = "\n".join(lines) + "\n"
+
+        prog = help_doc.strip().splitlines()[0].split()[1]  # usage: prog ...
+        repl = "{}:".format(prog)
+        ripped_argdoc_py = joined_lines.replace("null:", repl)
+
+        self.ripped_argdoc_py = ripped_argdoc_py
+
+        return ripped_argdoc_py
+
+    def compare_file_to_help_doc(self, file_doc, file_path, help_doc):
         """Show the Help Doc printed by an Arg Doc file calling Arg Parse"""
 
         if file_doc.strip() == help_doc.strip():
 
             return
 
-        file_doc_shline = "argdoc.py --rip doc {} >a".format(doc_filename)
-        doc_help_shline = "argdoc.py --rip argdoc {} >b".format(doc_filename)
+        file_doc_shline = "argdoc.py --rip doc {} >a".format(file_path)
+        doc_help_shline = "argdoc.py --rip helpdoc {} >b".format(file_path)
         diff_urp_hline = "diff -urp a b"
 
-        stderr_print(
-            "argdoc.py: warning: doc vs help diffs at: {}".format(doc_filename)
+        verbose_print(
+            self.verbose,
+            "argdoc.py: warning: doc vs help diffs at: {}".format(file_path),
         )
-        stderr_print(
+        verbose_print(
+            self.verbose,
             "argdoc.py: diff details at:  {} && {} && {}".format(
                 file_doc_shline, doc_help_shline, diff_urp_hline
-            )
+            ),
         )
 
-    def rip_argdoc(self, help_doc, doc_filename):
-        """Show how the file could call Arg Doc"""
+    def asking_for_help(self, args):
+        '''Count args asking to "show this help message and exit"'''
 
-        print(
-            textwrap.dedent(
-                """
-                #!/usr/bin/env python3
-                """
-            ).strip()
+        coder = self.coder
+
+        asks = list(
+            v for (k, v,) in vars(args).items() if (k in coder.help_dests) and v
         )
-        print()
+        asked = len(asks)
 
-        print(black_triple_quote_repr(help_doc.strip()))
-        print()
-        print()  # suggest two blank lines between docstring and first import
-
-        print(
-            textwrap.dedent(
-                r"""
-                import sys
-
-                import argdoc
+        return asked
 
 
-                def main():
-                    args = argdoc.parse_args()
-                    main.args = args
-                    sys.stderr.write("{}\n".format(args))
-                    sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
-                    sys.stderr.write("$prog: error: not implemented\n")
-                    sys.exit(2)  # exit 2 from rejecting usage
+#
+# Style some templates for ArgDoc and for ArgParse
+#
 
 
-                if __name__ == '__main__':
-                    main()
-                """.replace(
-                    "$prog", doc_filename  # "$prog" a la "string.Template"s
-                )
-            ).strip()
+ARGDOC_EXAMPLE = textwrap.dedent(
+    r'''
+    #!/usr/bin/env python
+    # -*- coding: utf-8 -*-
+
+    """
+    usage: null [-h]
+
+    do good stuff
+
+    optional arguments:
+      -h, --help  show this help message and exit
+
+    examples:
+      Oh no! No examples disclosed!! 💥 💔 💥
+    """  # : boom : broken_heart : boom :
+
+
+    import sys
+
+    import argdoc
+
+
+    args = argdoc.parse_args()
+    sys.stderr.write("{}\n".format(args))
+
+    sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
+    sys.stderr.write("null: error: not implemented\n")
+    sys.exit(2)  # exit 2 from rejecting usage
+    '''
+).strip()
+
+
+ARGPARSE_EXAMPLE = textwrap.dedent(
+    r'''
+    #!/usr/bin/env python
+    # -*- coding: utf-8 -*-
+
+    """
+    usage: null [-h]
+
+    do good stuff
+
+    optional arguments:
+      -h, --help  show this help message and exit
+
+    examples:
+      Oh no! No examples disclosed!! 💥 💔 💥
+    """  # : boom : broken_heart : boom :
+
+
+    import argparse
+    import sys
+
+
+    def main(argv):
+        """Run a command line"""
+
+        main_module = sys.modules["__main__"]
+        doc = main_module.__doc__
+
+        prog = doc.strip().splitlines()[0].split()[1]
+        description = list(_ for _ in doc.strip().splitlines() if _)[1]
+        epilog_at = doc.index("examples:")
+        epilog = doc[epilog_at:]
+
+        parser = argparse.ArgumentParser(  # copied from '/dev/null' by 'argdoc.py'
+            prog=prog,
+            description=description,
+            add_help=True,
+            formatter_class=argparse.RawTextHelpFormatter,
+            epilog=epilog,
         )
 
-    def rip_args(self, args):
-        """Show the results of parsing the args with the Arg Doc"""
+        args = parser.parse_args(argv[1:])
+        sys.stderr.write("{}\n".format(args))
 
-        for (k, v,) in sorted(vars(args).items()):
-            if not k.startswith("_"):
-                print("{k}={v!r}".format(k=k, v=v))
+        main.args = args
+        main.parser = parser
 
-
-# add class ArgParseAuthor to wrap around _ArgDocCoder
-#
-# develop some good way to patch up the Python, such as
-#
-#   author = ArgParseAuthor()  # move  [TOP [TOP ...]] to args.cimas
-#
-#   author.ArgumentParser.add_help = False
-#   author.add_argument(metavar="TOP").metavar = "cimas"
-#   author.add_argument(dest="width").type = int
-#   author.add_argument("--verbose").action = "store_true"
-#
-#   assert author.parser.add_help == False
-#
-#   args = author.parse_args()
-#
+        sys.stderr.write("{}\n".format(parser.format_usage().rstrip()))
+        sys.stderr.write("null: error: not implemented\n")
+        sys.exit(2)  # exit 2 from rejecting usage
 
 
-class _ArgDocCoder(
-    argparse.Namespace
-):  # FIXME: test how black'ened its emitted style is
+    if __name__ == "__main__":
+        sys.exit(main(sys.argv))
+        '''
+).strip()
+
+
+DEFAULT_EPILOG = textwrap.dedent(
+    """
+    examples:
+      Oh no! No examples disclosed!! 💥 💔 💥
+    """  # : boom : broken_heart : boom :
+).strip()
+
+assert DEFAULT_EPILOG in ARGDOC_EXAMPLE
+assert DEFAULT_EPILOG in ARGPARSE_EXAMPLE
+# TODO: pull DEFAULT_EPILOG from there
+
+
+# TODO: test how black'ened its emitted style is
+class _ArgDocCoder(argparse.Namespace):
     """Work up an ArgumentParser to match its Arg Doc"""
 
-    def compile_parser_source_from(self, doc, doc_filename):
+    def __init__(self, verbose):
+
+        self.verbose = verbose
+
+    def compile_parser_source_from(self, file_doc, file_path):
         """Compile an Arg Doc into Parse Source"""
 
         # Patch up the outliers with nothing so permanent as a temporary workaround
@@ -622,10 +830,12 @@ class _ArgDocCoder(
         # Parse the Arg Doc
 
         parts = _ArgDocSyntax()
-        taker = _ArgDocTaker(parts, doc=doc)
+        taker = _ArgDocTaker(parts, doc=file_doc, verbose=self.verbose)
         taker.take_arg_doc_into(parts=parts)
 
         self.parts = parts
+
+        self.help_dests = list()
 
         # Compile the arguments first, so as to construct a one line summary of usage
         # Don't mention duplicate "add_argument" "dest"s  # FIXME: maybe someday?
@@ -635,35 +845,35 @@ class _ArgDocCoder(
 
         # Emit imports
 
-        d = r"    "  # choose indentation
+        d4 = r"    "  # choose indentation
 
         lines = list()
 
-        lines.append("#!/usr/bin/env python")
-        lines.append("# -*- coding: utf-8 -*-")
+        lines.append(r"#!/usr/bin/env python")
+        lines.append(r"# -*- coding: utf-8 -*-")
         # <= dashed "utf-8" slightly more standard than skidded "utf_8"
         # per https://docs.python.org/3/library/codecs.html
 
-        lines.append("import argparse")
-        lines.append("import textwrap")
-        lines.append("")
+        lines.append(r"import argparse")
+        lines.append(r"import textwrap")
+        lines.append(r"")
 
         # Open a call to the Parser constructor
 
         what = os.path.split(__file__)[-1]
-        comment = "  # copied from {!r} by {!r}".format(doc_filename, what)
-        lines.append("parser = argparse.ArgumentParser({}".format(comment))
+        comment = r"  # copied from {!r} by {!r}".format(file_path, what)
+        lines.append(r"parser = argparse.ArgumentParser({}".format(comment))
 
         # Name the app
 
-        prog = parts.prog if parts.prog else os.path.split(doc_filename)[-1]
+        prog = parts.prog if parts.prog else os.path.split(file_path)[-1]
         self.emitted_prog = prog
 
         assert prog  # always give a prog name to ArgParse, don't let them guess
         repr_prog = black_repr(prog)
-        lines.append(d + "prog={repr_prog},".format(repr_prog=repr_prog))
+        lines.append(d4 + r"prog={repr_prog},".format(repr_prog=repr_prog))
         # FIXME: think into {what} in place of {what}.py, and more unusual prog names
-        # assert prog == os.path.split(doc_filename)[-1]
+        # assert prog == os.path.split(file_path)[-1]
 
         # Construct Usage from Prog and zero or more Broken Argument Lines
 
@@ -683,36 +893,43 @@ class _ArgDocCoder(
         parts_usage = prog if (self.parts.usage is None) else self.parts.usage
 
         if parts_usage.split() != emitted_usage.split():
-            verbose_print("argdoc.py: warning: doc'ced usage: {}".format(parts_usage))
-            verbose_print("argdoc.py: warning: emitted usage: {}".format(emitted_usage))
+            verbose_print(
+                self.verbose,
+                "argdoc.py: warning: doc'ced usage: {}".format(parts_usage),
+            )
+            verbose_print(
+                self.verbose,
+                "argdoc.py: warning: emitted usage: {}".format(emitted_usage),
+            )
 
         # Resort to bypassing the ArgParse constructor of Usage Lines, only when desperate
 
         if emitted_usage:
             if "..." in emitted_usage:
                 lines.append(
-                    d + "usage={usage},".format(usage=black_repr(emitted_usage))
+                    d4 + r"usage={usage},".format(usage=black_repr(emitted_usage))
                 )
 
         # Explain the App in one line, if possible
 
         description_line = parts.description_line
-        if not doc:
+        if not file_doc:
             assert not parts.usage
             assert not parts.description_line
             description_line = "do good stuff"
 
         if parts.usage and not parts.description_line:
-            stderr_print(
+            verbose_print(
+                self.verbose,
                 "argdoc.py: warning: no one line description explains prog {!r}".format(
                     prog
-                )
+                ),
             )
 
         if description_line:
             lines.append(
-                d
-                + "description={repr_description},".format(
+                d4
+                + r"description={repr_description},".format(
                     repr_description=black_repr(description_line)
                 )
             )
@@ -720,25 +937,27 @@ class _ArgDocCoder(
         # Explicitly override the conventional help optional argument, or explicitly don't
 
         add_help = bool(parts.add_help)
-        if not doc:
+        if not file_doc:
             assert parts.add_help is None
             add_help = True
 
         self.coder_added_help = add_help
 
-        lines.append(d + "add_help={add_help},".format(add_help=add_help))
+        lines.append(d4 + r"add_help={add_help},".format(add_help=add_help))
 
         # Stop ArgParse from aggressively incompetently resplitting text
 
-        lines.append(d + "formatter_class=argparse.RawTextHelpFormatter,")
+        lines.append(d4 + r"formatter_class=argparse.RawTextHelpFormatter,")
 
         # Nudge people to give examples to explain how to call the App well
 
         epilog = DEFAULT_EPILOG if (parts.epilog_chars is None) else parts.epilog_chars
-        lines.append(d + "epilog=textwrap.dedent(")
+        self.epilog = epilog
+
+        lines.append(d4 + r"epilog=textwrap.dedent(")
         for line in black_triple_quote_repr(epilog).splitlines():
-            lines.append(d + d + line)
-        lines.append(d + "),")
+            lines.append(d4 + d4 + line)
+        lines.append(d4 + r"),")
 
         # Close the constructor
 
@@ -827,7 +1046,7 @@ class _ArgDocCoder(
 
         # Emit Python source
 
-        d = r"    "  # choose indentation
+        d4 = r"    "  # choose indentation
 
         repr_dest = black_repr(dest)
         repr_metavar = black_repr(metavar)
@@ -846,11 +1065,11 @@ class _ArgDocCoder(
 
             if dest == metavar:
                 mid_lines = [
-                    d + "{repr_dest},".format(repr_dest=repr_dest),
+                    d4 + r"{repr_dest},".format(repr_dest=repr_dest),
                 ]
             else:
                 mid_lines = [
-                    d
+                    d4
                     + "{repr_dest}, metavar={repr_metavar},".format(
                         repr_dest=repr_dest, repr_metavar=repr_metavar
                     ),
@@ -860,14 +1079,14 @@ class _ArgDocCoder(
 
             if dest == metavar:
                 mid_lines = [
-                    d
+                    d4
                     + "{repr_dest}, nargs={repr_nargs},".format(
                         repr_dest=repr_dest, repr_nargs=repr_nargs
                     ),
                 ]
             else:
                 mid_lines = [
-                    d
+                    d4
                     + "{repr_dest}, metavar={repr_metavar}, nargs={repr_nargs},".format(
                         repr_dest=repr_dest,
                         repr_metavar=repr_metavar,
@@ -876,8 +1095,8 @@ class _ArgDocCoder(
                 ]
 
         tail_lines = [
-            d + "help={repr_help}".format(repr_help=repr_help),
-            d + ")",
+            d4 + r"help={repr_help}".format(repr_help=repr_help),
+            d4 + r")",
         ]
 
         lines = head_lines + mid_lines + tail_lines
@@ -921,12 +1140,12 @@ class _ArgDocCoder(
         # Go with the mnemonic option, else the metavar, else the concise option
 
         if mnemonic:
-            dest = mnemonic.lower()
+            dest = mnemonic.lstrip("-").lower()
         elif metavar:
             dest = metavar.lower()
         else:
             assert concise
-            dest = concise.lower()
+            dest = concise.lstrip("-").lower()
 
         # Emit usage phrase
 
@@ -979,9 +1198,15 @@ class _ArgDocCoder(
         assert (not alt_metavar) or (alt_metavar == metavar)
         assert nargs in (None, "?",)  # .OPTIONAL  # FIXME: add "*" .ZERO_OR_MORE
 
+        # Collect help dests
+
+        addable_help = "show this help message and exit"
+        if arg_help == addable_help:
+            self.help_dests.append(dest)
+
         # Emit Python source
 
-        d = r"    "  # choose indentation
+        d4 = r"    "  # choose indentation
 
         repr_option = black_repr(option)
         repr_alt = black_repr(alt_option)
@@ -991,46 +1216,48 @@ class _ArgDocCoder(
         repr_nargs = None if (nargs is None) else black_repr(nargs)
 
         head_lines = [
-            "parser.add_argument(",
+            r"parser.add_argument(",
         ]
 
         if not metavar:
 
-            action = "count"
-            repr_action = black_repr(action)
+            assert '"count"' == black_repr("count")
+            repr_kwargs = r"""action="count", default=0"""
 
             if not alt_option:
-                assert dest == option.lower()
+                assert dest == option.lstrip("-").lower()
                 mid_lines = [
-                    d
-                    + "{repr_option}, action={repr_action},".format(
-                        repr_option=repr_option, repr_action=repr_action
+                    d4
+                    + r"{repr_option}, {repr_kwargs},".format(
+                        repr_option=repr_option, repr_kwargs=repr_kwargs,
                     )
                 ]
             else:
-                assert dest == mnemonic.lower()
+                assert dest == mnemonic.lstrip("-").lower()
                 mid_lines = [
-                    d
-                    + "{repr_option}, {repr_alt}, action={repr_action},".format(
+                    d4
+                    + r"{repr_option}, {repr_alt}, {repr_kwargs},".format(
                         repr_option=repr_option,
                         repr_alt=repr_alt,
-                        repr_action=repr_action,
+                        repr_kwargs=repr_kwargs,
                     )
                 ]
 
         else:
 
-            suffixes = ""
+            suffixes = r""
             if nargs is not None:
-                suffixes += " nargs={repr_nargs},".format(repr_nargs=repr_nargs)
+                suffixes += r" nargs={repr_nargs},".format(repr_nargs=repr_nargs)
             if default is not None:
-                suffixes += " default={repr_default},".format(repr_default=repr_default)
+                suffixes += r" default={repr_default},".format(
+                    repr_default=repr_default
+                )
 
             if not alt_option:
-                if dest == option.lower():
+                if dest == option.lstrip().lower():
                     mid_lines = [
-                        d
-                        + "{repr_option}, metavar={repr_var},{suffixes}".format(
+                        d4
+                        + r"{repr_option}, metavar={repr_var},{suffixes}".format(
                             repr_option=repr_option,
                             repr_var=repr_var,
                             suffixes=suffixes,
@@ -1038,8 +1265,8 @@ class _ArgDocCoder(
                     ]
                 else:
                     mid_lines = [
-                        d
-                        + "{repr_option}, metavar={repr_var}, dest={repr_dest},{suffixes}".format(
+                        d4
+                        + r"{repr_option}, metavar={repr_var}, dest={repr_dest},{suffixes}".format(
                             repr_option=repr_option,
                             repr_var=repr_var,
                             repr_dest=repr_dest,
@@ -1047,10 +1274,10 @@ class _ArgDocCoder(
                         )
                     ]
             else:
-                assert dest == mnemonic.lower()
+                assert dest == mnemonic.lstrip("-").lower()
                 mid_lines = [
-                    d
-                    + "{repr_option}, {repr_alt}, metavar={repr_var},{suffixes}".format(
+                    d4
+                    + r"{repr_option}, {repr_alt}, metavar={repr_var},{suffixes}".format(
                         repr_option=repr_option,
                         repr_alt=repr_alt,
                         repr_var=repr_var,
@@ -1059,8 +1286,8 @@ class _ArgDocCoder(
                 ]
 
         tail_lines = [
-            d + "help={repr_help}".format(repr_help=repr_help),
-            ")",
+            d4 + r"help={repr_help}".format(repr_help=repr_help),
+            r")",
         ]
 
         lines = head_lines + mid_lines + tail_lines
@@ -1070,16 +1297,17 @@ class _ArgDocCoder(
     def exec_parser_source(self, parser_source):
         """Run the parser source to build the Parser"""
 
-        global_vars = {}
+        global_vars = dict()
+
         try:
             exec(parser_source, global_vars)
         except argparse.ArgumentError as exc:
             stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
             sys.exit(2)  # exit 2 from rejecting usage
 
-        parser = global_vars["parser"]
+        as_parser = global_vars["parser"]
 
-        return parser
+        return as_parser
 
 
 class _ArgDocSyntax(argparse.Namespace):
@@ -1110,9 +1338,10 @@ class _ArgDocTaker(argparse.Namespace):
         r"^usage:",
     )
 
-    def __init__(self, parts, doc):
+    def __init__(self, parts, doc, verbose):
 
         self.parts = None  # the fragments of source matched by this parser
+        self.verbose = verbose
 
         tabsize_8 = 8
         doc_chars = textwrap.dedent(doc.expandtabs(tabsize_8)).strip()
@@ -1156,7 +1385,8 @@ class _ArgDocTaker(argparse.Namespace):
                 self.accept_positionals_declarations()
                 if "positional arguments:" in self.parts.taglines:
                     verbose_print(
-                        "argdoc.py: warning: optionals declared before positionals"
+                        self.verbose,
+                        "argdoc.py: warning: optionals declared before positionals",
                     )
 
             self.accept_doc_remains()
@@ -1194,9 +1424,10 @@ class _ArgDocTaker(argparse.Namespace):
 
         if uses.remains:  # FIXME: does this never happen?
             verbose_print(
+                self.verbose,
                 "argdoc.py: warning: meaningless (late?) usage phrases:  {}".format(
                     uses.remains
-                )
+                ),
             )
 
     def accept_description(self):
@@ -1254,9 +1485,10 @@ class _ArgDocTaker(argparse.Namespace):
 
                 if not broken_argument_lines:
                     verbose_print(
+                        self.verbose,
                         "argdoc.py: warning: no arguments declared inside {!r}".format(
                             tagline
-                        )
+                        ),
                     )
 
                 arg_declarations = self.reconcile_arg_lines_phrases(
@@ -1348,9 +1580,10 @@ class _ArgDocTaker(argparse.Namespace):
             arg_key = arg_phrase._calc_arg_key()
             if arg_key in phrases_by_arg_key.keys():
                 verbose_print(
+                    self.verbose,
                     "argdoc.py: warning: multiple phrase declarations of {}".format(
                         arg_key
-                    )
+                    ),
                 )
 
             phrases_by_arg_key[arg_key] = arg_phrase
@@ -1370,9 +1603,10 @@ class _ArgDocTaker(argparse.Namespace):
             arg_key = arg_line._calc_arg_key()
             if arg_key in lines_by_arg_key.keys():
                 verbose_print(
+                    self.verbose,
                     "argdoc.py: warning: multiple line declarations of {}".format(
                         arg_key
-                    )
+                    ),
                 )
 
             lines_by_arg_key[arg_key] = arg_line
@@ -1432,7 +1666,7 @@ class _ArgDocTaker(argparse.Namespace):
             broken_argument_line += " "
             broken_argument_line += arg_phrase.metavar
             # arg phrase alone can't imply:  --mnemonic [OPTIONAL_METAVAR]
-            # FIXME: challenge this, I jittered over how lifted up the [] are
+            # FIXME FIXME: challenge this, I jittered over how lifted up the [] are
 
         arg_line = ArgumentLineSyntaxTaker(broken_argument_line)
 
@@ -1453,26 +1687,32 @@ class _ArgDocTaker(argparse.Namespace):
         if phrase_arg_keys != line_arg_keys:
 
             verbose_print(
+                self.verbose,
                 "argdoc.py: warning: usage via phrases:  {}".format(
                     usage_phrase_arg_keys
-                )
+                ),
             )
             verbose_print(
-                "argdoc.py: warning: vs usage at lines:  {}".format(usage_line_arg_keys)
+                self.verbose,
+                "argdoc.py: warning: vs usage at lines:  {}".format(
+                    usage_line_arg_keys
+                ),
             )
             # FIXME: suggest multiple usage lines when too wide for one usage line
 
             if set(phrase_arg_keys) == set(line_arg_keys):
                 verbose_print(
+                    self.verbose,
                     "argdoc.py: warning: same sets, different orders, as usage and as {}".format(
                         tagline.rstrip(":")
-                    )
+                    ),
                 )
             else:
                 verbose_print(
+                    self.verbose,
                     "argdoc.py: warning: different sets of words as usage and as {}".format(
                         tagline.rstrip(":")
-                    )
+                    ),
                 )
 
     def accept_broken_argument_lines(self, tagline):
@@ -1542,7 +1782,7 @@ class _UsagePhrasesSyntax(argparse.Namespace):
         self.prog_phrase = None  # the 2nd word of the Usage line
 
         self.optionals_phrases = None  # the [-h] or [--help] or [-w WIDTH] and such
-        self.positionals_phrases = None  # the FILE or [FILE] or [FILE [FILE ...]] or [-- [ARG [ARG ...]] and such
+        self.positionals_phrases = None  # the FILE or [FILE] or [FILE [FILE ...]] or [-- [WORD [WORD ...]] and such
 
 
 class _UsagePhrasesTaker(argparse.Namespace):
@@ -2051,7 +2291,7 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
 
 
 class PositionalPhraseSyntaxTaker(argparse.Namespace):
-    """Parse one of FILE or [FILE] or [FILE [FILE ...]] or [-- [ARG [ARG ...]] and such"""
+    """Parse one of FILE or [FILE] or [FILE [FILE ...]] or [-- [WORD [WORD ...]] and such"""
 
     def __init__(self, argument_phrase):
 
@@ -2235,6 +2475,7 @@ class ShardsTaker(argparse.Namespace):
         return shards
 
 
+# deffed in many files  # missing from docs.python.org
 def black_triple_quote_repr(chars):
     '''Quote the chars like Black, with triple quotes, preferring triple '"""' double quotes'''
     # FIXME:  Fix leading trailing whitespace, other corner cases
@@ -2256,6 +2497,7 @@ def black_triple_quote_repr(chars):
     return rep
 
 
+# deffed in many files  # missing from docs.python.org
 def black_repr(chars):
     """Quote chars or None like Black, preferring " double quotes over ' single quotes"""
     # FIXME: does this agree with the Black autostyling app? Agrees always?
@@ -2276,6 +2518,7 @@ def black_repr(chars):
     return rep
 
 
+# deffed in many files  # missing from docs.python.org
 def plural_en(word):  # FIXME: make this easy to override
     """Guess the English plural of a word"""
 
@@ -2314,101 +2557,52 @@ def _plural_en_test():
     assert guesses == plurals
 
 
-def read_docstring_from(relpath):
+# deffed in many files  # missing from docs.python.org
+def take_docstring_of(chars):
     """
-    Read the docstring from a python file without importing the rest of it
-
-    Specifically read the first lines from triple-quote to triple-quote \"\"\" or ''',
-    but ignore leading lines begun with a hash #
+    Take the lines between the first triple-quote and the next,
+    such as from \"\"\" to \"\"\", or from \'\'\' to \'\'\'
+    but ignore empty lines and ignore leading lines begun with a hash #
     """
 
-    try:
-        with open(relpath, "rt") as reading:
-            (texts, raw, qqq, len_lines,) = _scrape_docstring_from(reading)
-    except IOError as exc:  # such as Python 3 FileNotFoundError
-        stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
-        sys.exit(1)
-
-    doc = _eval_scraped_docstring(texts, raw, qqq, len_lines, relpath)
-
-    return doc
-
-
-def _scrape_docstring_from(reading):
-    """Scrap sourcelines of docstring from source of module"""
-    # FIXME: correctly forward the leading and trailing whitespace
-
-    texts = list()
-    raw = None
     qqq = None
-    len_lines = 0
 
-    for line in reading.readlines():
-        len_lines += 1
+    lines = list()
+    for line in chars.splitlines():
+        stripped = line.rstrip()
 
-        text = line.rstrip()
+        if qqq is None:
 
-        if texts or text:
-            if not text.strip().startswith("#"):
-                if not qqq:
+            if not stripped:
+                continue
 
-                    if '"""' in text:
-                        qqq = '"""'
-                        raw = 'r"""' in text
-                    elif "'''" in text:
-                        qqq = "'''"
-                        raw = "r'''" in text
-                    else:
-                        pass
+            if stripped.startswith("#"):
+                continue
 
-                elif qqq in text:
+            if stripped.startswith('"""'):
+                qqq = '"""'
+            elif stripped.startswith("'''"):
+                qqq = "'''"
+            elif stripped.startswith('r"""'):
+                qqq = '"""'
+            elif stripped.startswith("r'''"):
+                qqq = "'''"
 
-                    break
+            else:
 
-                else:
+                break
 
-                    texts.append(text)
+        elif qqq in stripped:
 
-    return (
-        texts,
-        raw,
-        qqq,
-        len_lines,
-    )
+            qqq_at = stripped.index(qqq)
+            lines.append(stripped[:qqq_at] + qqq)
+            break
 
+        lines.append(line)
 
-def _eval_scraped_docstring(texts, raw, qqq, len_lines, relpath):
-    """Convert to string from sourcelines of module docstring"""
-    # FIXME: see the quoted text as r""" only when explicitly marked as "r"
+    repr_doc = "\n".join(lines) + "\n"
 
-    if len_lines and (qqq is None):
-        qqq1 = '"""'
-        qqq2 = "'''"
-        stderr_print(
-            "argdoc.py: warning: no {} found and no {} found in {}".format(
-                qqq1, qqq2, relpath
-            )
-        )
-
-    if not raw:
-        fuzzes = list(_ for _ in texts if "\\" in _)
-        if fuzzes:
-            stderr_print(
-                "argdoc.py: warning: docstring of backslash led by {} not by r{} in {}".format(
-                    qqq, qqq, relpath
-                )
-            )
-
-    repr_doc = black_triple_quote_repr("\n".join(texts))
-
-    doc_source = "doc = " + repr_doc
-
-    global_vars = {}
-    exec(doc_source, global_vars)
-
-    doc = global_vars["doc"]
-
-    return doc
+    return repr_doc
 
 
 # deffed in many files  # missing from docs.python.org
@@ -2418,7 +2612,7 @@ def prompt_tty_stdin():
 
 
 # deffed in many files  # since Oct/2019 Python 3.8
-def pyish_shlex_join(argv):
+def shlex_join(argv):
     """Undo enough of the "shlex.split" to log its work reasonably well"""
 
     rep = " ".join((repr(_) if (" " in _) else _) for _ in argv)
@@ -2511,12 +2705,9 @@ def str_splitword(chars, count=1):
 
 
 # deffed in many files  # missing from docs.python.org
-def verbose_print(*args):
-    sys.stdout.flush()
-    if main.args.verbose:
-        # print(*args, **kwargs, file=sys.stderr)  # SyntaxError in Python 2
-        print(*args, file=sys.stderr)
-    sys.stderr.flush()
+def verbose_print(verbose, *args):
+    if verbose:
+        stderr_print(*args)
 
 
 # call inline to define 'import argdoc' to require Python >= June/2019 Python 3.7
@@ -2537,5 +2728,45 @@ if __name__ == "__main__":
 # https://jeffreykegler.github.io/personal/timeline_v3
 #
 
+# FIXME: AssertionError at pos arg of -a A, --aaa A, yah  hmm
+
+# FIXME: argdoc default action="count" should be also default=0
+# FIXME: opt arg with METAVAR - work out when to take singular, vs append to plural dest
+# FIXME: could be:  argdoc.complete_action(args, dest="alphas", action="store")
+# FIXME: could be:  argdoc.complete_action(args, dest="bravo", action="store_true")
+# FIXME: vs argdoc default action="append", action="count"
+# FIXME: custom help-opts should be action="help"
+
+# FIXME: take a whole file without """ and without ''' as a whole argdoc
+
+# FIXME: --rip .txt, .py, .py2 for doc, argdoc, argparse
+# FIXME: save to path, not stdout, if more path provided, not just the .ext or ext
+
+# FIXME: option (surely not default?) to push the autocorrection into the Arg Doc
+# FIXME: comment --rip argparse at colliding "dest"s from multiple args, such as "[--ymd YMD] [YMD]"
+# FIXME: parsed args whose names begin with a '_' skid shouldn't print, via argparse.SUPPRESS
+# FIXME: consider [FILE [FILE ...]] in usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- ...]
+
+# FIXME: think into who signs as author of ArgumentError log message: "argdoc.py" or the "prog"?
+
+# FIXME: "argparse.Parser.add_argument" does already have an ' action="help" '
+# FIXME: so likewise, it should have an ' action="raise" ' to raise NotImplementedError
+# FIXME: even when called to do so by ' parser.set_defaults '
+
+# add class ArgParseAuthor to wrap around _ArgDocCoder
+#
+# develop some good way to patch up the Python, such as
+#
+#   author = ArgParseAuthor()  # move  [TOP [TOP ...]] to args.cimas
+#
+#   author.ArgumentParser.add_help = False
+#   author.add_argument(metavar="TOP").metavar = "cimas"
+#   author.add_argument(dest="width").type = int
+#   author.add_argument("--verbose").action = "store_true"
+#
+#   assert author.parser.add_help == False
+#
+#   args = author.parse_args()
+#
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

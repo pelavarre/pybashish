@@ -32,6 +32,7 @@ import platform
 import shlex
 import subprocess
 import sys
+import textwrap
 
 import argdoc
 
@@ -239,7 +240,7 @@ def builtin_history(argv):
       history
     """
 
-    doc = builtin_history.__doc__
+    doc = textwrap.dedent(builtin_history.__doc__).strip()
     try:
         _ = argdoc.parse_args(args=argv[1:], doc=doc)
     except SystemExit as exc:
