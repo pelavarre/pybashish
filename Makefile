@@ -56,10 +56,13 @@ test-once:
 	rm -fr a b
 	git ls-files | grep -vE '(.gitignore|__init__.py|README.md|tests/cspsh-f.txt)' >a
 	git grep -l copied.from $$(git ls-files) >b
-	diff -burp a b
+	diff -burp a b || :
 	rm -fr a b
 	:
+	rm -fr ../pybashish/__pycache__
 	rm -fr ../pybashish/bin/pyish.pyc
+	rm -fr ../pybashish/bin/__pycache__
+	git status --short --ignored
 	:
 
 grep-fixme:

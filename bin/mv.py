@@ -25,6 +25,10 @@ examples:
   mv.py /  # fails because insufficient privilege
 """
 
+# FIXME: add mv -u, --update for move if new or fresher
+# FIXME: except mv.py from outside this dir should mean mv -i to this dir
+# FIXME: coordinate well across chmod.py cp.py mv.py rm.py touch.py ...
+
 
 import sys
 

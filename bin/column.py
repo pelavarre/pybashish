@@ -91,7 +91,7 @@ def justify_cells_in_rows(rows):
     left = collections.defaultdict(int)
     right = collections.defaultdict(int)
     for row in strung_rows:
-        for (index, cell,) in enumerate(row):
+        for (index, cell) in enumerate(row):
             if re.search(
                 r"[0-9]", string=cell
             ):  # vote right once if one or more decimal digits
@@ -114,7 +114,7 @@ def justify_cells_in_rows(rows):
     for row in completed_rows:
 
         justified_row = list()
-        for (index, cell,) in enumerate(row):
+        for (index, cell) in enumerate(row):
 
             voters = left[index] + right[index]
             if right[index] >= ((2 * voters) / 3):  # require 2/3's vote to go right

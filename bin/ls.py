@@ -284,7 +284,7 @@ def _decide_sort_order_args(args):
 
 def print_one_top_walk(tops, index, args):
 
-    (top, names, args_directory,) = _plan_one_top_walk(tops, index=index, args=args)
+    (top, names, args_directory) = _plan_one_top_walk(tops, index=index, args=args)
 
     _run_one_top_walk(
         tops,
@@ -434,7 +434,7 @@ def mark_name(name, wherewhat, stats):
 
 
 def stats_items_sorted(stats_by_name, by, order):
-    """Return list of (key, value,) but sorted as requested"""
+    """Return list of (key, value) but sorted as requested"""
 
     items = list(stats_by_name.items())
 
@@ -455,7 +455,7 @@ def stats_items_sorted(stats_by_name, by, order):
         items.sort(key=lambda sw: sw[-1].st_mtime, reverse=py_sort_reverse)
     elif by == "version":
         items.sort(
-            key=lambda sw: looser_comparable_version(sw[0]), reverse=py_sort_reverse,
+            key=lambda sw: looser_comparable_version(sw[0]), reverse=py_sort_reverse
         )
     else:
         assert False
@@ -472,7 +472,7 @@ def stats_items_sorted(stats_by_name, by, order):
 def looser_comparable_version(vstring):
     """Workaround TypeError in LooseVersion comparisons between int and str"""
     words = distutils.version.LooseVersion(vstring).version
-    diffables = [([_], [],) if isinstance(_, int) else ([], [_],) for _ in words]
+    diffables = [([_], []) if isinstance(_, int) else ([], [_]) for _ in words]
     return diffables
 
 
@@ -529,10 +529,10 @@ def print_as_rows_of_detail(
             row = "chmods links owner group size stamp name".split()
             rows.append(row)
 
-    for (name, stats,) in items:
+    for (name, stats) in items:
 
         chmods = ""
-        for (char, mask,) in zip(chmod_chars, chmod_masks):
+        for (char, mask) in zip(chmod_chars, chmod_masks):
             chmods += char if (stats.st_mode & mask) else "-"
 
         links = str_none
@@ -600,7 +600,7 @@ def left_justify_cells_in_rows(rows):
     for row in completed_rows:
 
         justified_row = list()
-        for (index, cell,) in enumerate(row):
+        for (index, cell) in enumerate(row):
             if index == 4:  # FIXME: inconceivable hack
                 justified_cell = cell.rjust(max_column_widths[index])
             else:
@@ -657,7 +657,7 @@ def spill_cells(cells, columns, sep):  # FIXME FIXME FIXME  # noqa C901
 
         widths = collections.defaultdict(int)
         for floor in floors:
-            for (shaft_index, str_cell,) in enumerate(floor):
+            for (shaft_index, str_cell) in enumerate(floor):
                 widths[shaft_index] = max(widths[shaft_index], len(str_cell))
 
         # Take the first matrix that fits, else the last matrix tried
@@ -675,7 +675,7 @@ def spill_cells(cells, columns, sep):  # FIXME FIXME FIXME  # noqa C901
     rows = list()
     for floor in floors:
         row = list()
-        for (shaft_index, str_cell,) in enumerate(floor):
+        for (shaft_index, str_cell) in enumerate(floor):
             padded_str_cell = str_cell.ljust(widths[shaft_index])
             row.append(padded_str_cell)
         rows.append(row)
@@ -693,7 +693,7 @@ def guess_stdout_columns(*hints):
     To fail fast, call for all the guesses always, while still returning only the first that works
     """
 
-    chosen_hints = hints if hints else ("COLUMNS", sys.stdout, "/dev/tty", 80,)
+    chosen_hints = hints if hints else ("COLUMNS", sys.stdout, "/dev/tty", 80)
     # FIXME: port to "/dev/tty" outside of Mac and Linux
 
     terminal_widths = list()
@@ -716,7 +716,7 @@ def guess_stdout_columns(*hints):
 
 # deffed in many files  # missing from docs.python.org
 def guess_stdout_columns_os(hint):
-    """Try "os.get_terminal_size", and slap back "shutil.get_terminal_size" pushing (80, 24,)"""
+    """Try "os.get_terminal_size", and slap back "shutil.get_terminal_size" pushing (80, 24)"""
 
     showing = None
     fd = None

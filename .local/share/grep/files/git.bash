@@ -13,7 +13,8 @@ git branch --all
 git checkout -  # for toggling between two branches
 
 git status  # gs gs
-git status --ignored --short
+git status --short --ignored
+git status --short --ignored | wc -l | grep '^ *0$'
 
 git apply -v ...'.patch'
 patch -p1 <...'.patch'  # silently drops new chmod ugo+x

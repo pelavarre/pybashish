@@ -124,7 +124,7 @@ def print_week_in_month(week, month, today):
         printing = week + dt.timedelta(days=days)
         if printing.month == month:
             pad = (len("  ") - len(str(printing.day))) * " "
-            if (printing.month, printing.day,) == (today.month, today.day,):
+            if (printing.month, printing.day) == (today.month, today.day):
                 stdout = "{}{}{}{}{}".format(sep, pad, wild, printing.day, calm)
             else:
                 stdout = "{}{:2d}".format(sep, printing.day)
@@ -164,7 +164,7 @@ def misread_ymd_12n(ymd):
 
     parsed = None
     for syntax in syntaxes:
-        (format_, keys,) = syntax
+        (format_, keys) = syntax
         try:
             parsed = dt.datetime.strptime(ymd, format_)
             break

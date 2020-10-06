@@ -25,6 +25,9 @@ export PS1="$PS1"'\n\$ '
 
 find . -not \( -path './.git' -prune \)  # akin to:  git ls-files
 
+if false; then echo y; else echo n; fi
+if true; then echo y; else echo n; fi
+
 last | head
 
 ls *.csv | sed 's,[.]csv$,,' | xargs -I{} mv -i {}.csv {}.txt  # demo replace ext

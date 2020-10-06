@@ -105,9 +105,9 @@ def _run_bash_test_doc(incoming, path):
     while line:
 
         # Take one more test, else break
-        # FIXME: collections.namedtuple for (line_, dent, shline, doc_lines, wants,)
+        # FIXME: collections.namedtuple for (line_, dent, shline, doc_lines, wants)
 
-        (line_, dent, shline, doc_lines, wants,) = take_one_test(incoming, line)
+        (line_, dent, shline, doc_lines, wants) = take_one_test(incoming, line)
 
         line = line_  # FIXME: don't so much hack up a stream with one line of lookahead
 
@@ -166,10 +166,7 @@ def str_splitdent(line):
 
     dent = len_dent * " "
 
-    return (
-        dent,
-        tail,
-    )
+    return (dent, tail)
 
 
 def take_one_test(incoming, line):
@@ -187,7 +184,7 @@ def take_one_test(incoming, line):
 
     while line:
 
-        (dent, text,) = str_splitdent(line.rstrip())
+        (dent, text) = str_splitdent(line.rstrip())
         vv_print(dent + text)
 
         if not text.startswith(prompt) and text != prompt.strip():
@@ -198,13 +195,7 @@ def take_one_test(incoming, line):
 
     if not line:
 
-        return (
-            line,
-            dent,
-            shline,
-            doc_lines,
-            wants,
-        )
+        return (line, dent, shline, doc_lines, wants)
 
     # Take input
 
@@ -216,7 +207,7 @@ def take_one_test(incoming, line):
     doc_lines = list()
 
     while line:
-        (dent_, text_,) = str_splitdent(line.rstrip())
+        (dent_, text_) = str_splitdent(line.rstrip())
 
         wanted = False
         if not text_:
@@ -237,13 +228,7 @@ def take_one_test(incoming, line):
 
     wants = "\n".join(doc_lines).strip().splitlines()
 
-    return (
-        line,
-        dent,
-        shline,
-        doc_lines,
-        wants,
-    )
+    return (line, dent, shline, doc_lines, wants)
 
 
 def run_one_shline(shline):
@@ -269,7 +254,7 @@ def require_test_passed(path, passes, gots, dent, wants):
     min_len = min(len(wants), len(gots))
     empties = (max_len - min_len) * [""]
 
-    for (want, got,) in zip(wants + empties, gots + empties):
+    for (want, got) in zip(wants + empties, gots + empties):
         if got != want:
 
             eq = equal_but_for_ellipses(got, want=want)
@@ -277,7 +262,7 @@ def require_test_passed(path, passes, gots, dent, wants):
 
                 tail_wants = list(wants)
                 tail_gots = list(gots)
-                for (want, got,) in zip(wants + empties, gots + empties):
+                for (want, got) in zip(wants + empties, gots + empties):
                     if got != want:
                         if not equal_but_for_ellipses(got, want=want):
                             break

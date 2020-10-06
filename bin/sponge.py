@@ -49,14 +49,14 @@ def main(argv):
 
     prompt_tty_stdin()
 
-    with open("/dev/stdin", "rb") as incoming:
+    with open("/dev/stdin", mode="rb") as incoming:
         sponge = incoming.read()
 
     for path in paths:
         writable = "/dev/stdout" if (path == "-") else path
         try:
             awb_mode = "ab" if args.append else "wb"
-            with open(writable, awb_mode) as outgoing:
+            with open(writable, mode=awb_mode) as outgoing:
                 os.write(outgoing.fileno(), sponge)
         except FileNotFoundError as exc:
             stderr_print("sponge.py: error: {}: {}".format(type(exc).__name__, exc))
@@ -95,10 +95,10 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
+        (exc_type, exc, exc_traceback) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            null_fileno = os.open(os.devnull, flags=os.O_WRONLY)
             os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
 
             sys.exit(1)

@@ -104,7 +104,7 @@ def main(argv):
     for path in paths:
         readable = "/dev/stdin" if (path == "-") else path
         try:
-            with open(readable, "rb") as incoming:
+            with open(readable, mode="rb") as incoming:
                 dumper.dump_incoming(incoming)
         except FileNotFoundError as exc:
             stderr_print("hexdump.py: error: {}: {}".format(type(exc).__name__, exc))
@@ -262,7 +262,7 @@ class HexDumper:
 
         args = self.args
 
-        if args.codec in ("ascii", "latin-1",):
+        if args.codec in ("ascii", "latin-1"):
             return 1
 
         assert args.codec == "utf-8"
@@ -270,7 +270,7 @@ class HexDumper:
         xx = self.incomings[0]
 
         masks = [0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFF]
-        for (index, left, right,) in zip(range(len(masks)), masks, masks[1:]):
+        for (index, left, right) in zip(range(len(masks)), masks, masks[1:]):
             if (xx & right) == left:
                 if left <= 0x80:
                     return 1  # one leading 0b1000_0000 is already not decodable
@@ -446,10 +446,10 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
+        (exc_type, exc, exc_traceback) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            null_fileno = os.open(os.devnull, flags=os.O_WRONLY)
             os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
 
             sys.exit(1)

@@ -46,7 +46,7 @@ def main():
     bots_by_stdin = gt._bots_by_stdin  # peek inside
 
     sortables = list()
-    for (stdin, bot,) in bots_by_stdin.items():
+    for (stdin, bot) in bots_by_stdin.items():
 
         str_bot = bot.__name__
         str_bot = "self-insert" if (str_bot == "_insert_stdin") else str_bot
@@ -55,15 +55,12 @@ def main():
 
         repr_stdin = bind_repr(stdin)
 
-        sortable = (
-            str_bot,
-            repr_stdin,
-        )
+        sortable = (str_bot, repr_stdin)
 
         sortables.append(sortable)
 
     for sortable in sorted(sortables):  # FIXME: column -t the "bind -p" output
-        (str_bot, repr_stdin,) = sortable
+        (str_bot, repr_stdin) = sortable
         print("{:7} {}".format((repr_stdin + ":"), str_bot))
 
 

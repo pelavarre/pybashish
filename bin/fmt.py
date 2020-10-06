@@ -53,7 +53,7 @@ def main(argv):
     # Parse the command line
 
     fmt_argv_tail = list(argv[1:])
-    for (index, arg,) in enumerate(argv[1:]):
+    for (index, arg) in enumerate(argv[1:]):
         if re.match(r"^[-][0-9]+$", string=arg):
             fmt_argv_tail[index] = "-w{}".format(-int(arg))
 
@@ -105,7 +105,7 @@ def fmt_paragraphs_of_stdin(width):
                 fmt_one_paragraph(para_dent, para=para, width=width)
             break
 
-        (str_dent, text,) = str_splitdent(line)
+        (str_dent, text) = str_splitdent(line)
 
         rstripped = text.rstrip()
         dent = str_dent if rstripped else None
@@ -157,7 +157,7 @@ def guess_stdout_columns(*hints):
     To fail fast, call for all the guesses always, while still returning only the first that works
     """
 
-    chosen_hints = hints if hints else ("COLUMNS", sys.stdout, "/dev/tty", 80,)
+    chosen_hints = hints if hints else ("COLUMNS", sys.stdout, "/dev/tty", 80)
 
     terminal_widths = list()
     for hint in chosen_hints:
@@ -179,7 +179,7 @@ def guess_stdout_columns(*hints):
 
 # deffed in many files  # missing from docs.python.org
 def guess_stdout_columns_os(hint):
-    """Try "os.get_terminal_size", and slap back "shutil.get_terminal_size" pushing (80, 24,)"""
+    """Try "os.get_terminal_size", and slap back "shutil.get_terminal_size" pushing (80, 24)"""
 
     showing = None
     fd = None
@@ -250,10 +250,7 @@ def str_splitdent(line):
 
     dent = len_dent * " "
 
-    return (
-        dent,
-        tail,
-    )
+    return (dent, tail)
 
 
 # deffed in many files  # missing from docs.python.org

@@ -72,7 +72,7 @@ def main(argv):
     for path in paths:
         readable = "/dev/stdin" if (path == "-") else path
         try:
-            with open(readable, "rb") as incoming:
+            with open(readable, mode="rb") as incoming:
                 cat_incoming(fd=incoming.fileno(), args=args)
         except FileNotFoundError as exc:
             stderr_print("cat.py: error: {}: {}".format(type(exc).__name__, exc))
@@ -170,10 +170,10 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
+        (exc_type, exc, exc_traceback) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            null_fileno = os.open(os.devnull, flags=os.O_WRONLY)
             os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
 
             sys.exit(1)

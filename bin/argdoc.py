@@ -187,7 +187,7 @@ class _CommandLineSyntaxTaker(argparse.Namespace):
             stderr_print(format_usage().rstrip())
             stderr_print(  # a la standard error: unrecognized arguments
                 "argdoc.py: error: unrecognized args: {!r}, in place of {!r}".format(
-                    shlex_join(args.words), shlex_join(["--"] + args.words),
+                    shlex_join(args.words), shlex_join(["--"] + args.words)
                 )
             )
             sys.exit(2)  # exit 2 from rejecting usage
@@ -409,7 +409,7 @@ class ArgDocRipper(argparse.Namespace):
         """Fetch the leading Docstring from a file of Python source"""
 
         try:
-            with open(path, "rt") as incoming:
+            with open(path) as incoming:
                 chars = incoming.read()  # TODO: read what's needed, not whole file
         except IOError as exc:  # such as Python 3 FileNotFoundError
             stderr_print("argdoc.py: error: {}: {}".format(type(exc).__name__, exc))
@@ -572,7 +572,7 @@ class ArgDocRipper(argparse.Namespace):
         progs = 0
         add_helps = 0
 
-        for (index, line,) in enumerate(lines_by_key["example_parser"]):
+        for (index, line) in enumerate(lines_by_key["example_parser"]):
             stripped = line.strip()
 
             merged_line = line
@@ -581,7 +581,7 @@ class ArgDocRipper(argparse.Namespace):
                 parser_eqs += 1
 
                 merged_line = self._find_one_startswith(
-                    made_parser_lines, leftmost=r"parser = argparse.ArgumentParser(",
+                    made_parser_lines, leftmost=r"parser = argparse.ArgumentParser("
                 )
 
                 assert merged_line  # for the 'copied from' comment
@@ -696,9 +696,7 @@ class ArgDocRipper(argparse.Namespace):
 
         coder = self.coder
 
-        asks = list(
-            v for (k, v,) in vars(args).items() if (k in coder.help_dests) and v
-        )
+        asks = list(v for (k, v) in vars(args).items() if (k in coder.help_dests) and v)
         asked = len(asks)
 
         return asked
@@ -1031,7 +1029,7 @@ class _ArgDocCoder(argparse.Namespace):
         usage_phrase = positionals_declaration.arg_phrase.format_usage_phrase()
         arg_help = positionals_declaration.arg_line.arg_help
 
-        assert nargs in (None, "*", "?",)  # .ZERO_OR_MORE .OPTIONAL
+        assert nargs in (None, "*", "?")  # .ZERO_OR_MORE .OPTIONAL
 
         # Name the attribute for this positional option in the namespace built by "parse_args"
         # Go with the metavar, else guess the English plural of the metavar
@@ -1123,10 +1121,7 @@ class _ArgDocCoder(argparse.Namespace):
 
         # Separate concise and mnemonic options
 
-        options = (
-            option,
-            alt_option,
-        )
+        options = (option, alt_option)
 
         concise_options = list(_ for _ in options if _ and not _.startswith("--"))
         assert len(concise_options) <= 1
@@ -1196,7 +1191,7 @@ class _ArgDocCoder(argparse.Namespace):
 
         assert option
         assert (not alt_metavar) or (alt_metavar == metavar)
-        assert nargs in (None, "?",)  # .OPTIONAL  # FIXME: add "*" .ZERO_OR_MORE
+        assert nargs in (None, "?")  # .OPTIONAL  # FIXME: add "*" .ZERO_OR_MORE
 
         # Collect help dests
 
@@ -1229,7 +1224,7 @@ class _ArgDocCoder(argparse.Namespace):
                 mid_lines = [
                     d4
                     + r"{repr_option}, {repr_kwargs},".format(
-                        repr_option=repr_option, repr_kwargs=repr_kwargs,
+                        repr_option=repr_option, repr_kwargs=repr_kwargs
                     )
                 ]
             else:
@@ -1528,7 +1523,7 @@ class _ArgDocTaker(argparse.Namespace):
         return arg_declarations
 
     def _reconcile_arg_declarations(
-        self, arg_keys, phrases_by_arg_key, lines_by_arg_key, marked_optional,
+        self, arg_keys, phrases_by_arg_key, lines_by_arg_key, marked_optional
     ):
 
         declarations_by_arg_key = collections.OrderedDict()  # till Dec/2016 CPython 3.6
@@ -1545,15 +1540,15 @@ class _ArgDocTaker(argparse.Namespace):
             if not arg_line:
                 arg_line = self._fabricate_arg_line(arg_phrase)
 
-            assert arg_phrase.concise in (arg_line.option, arg_line.alt_option, None,)
-            assert arg_phrase.mnemonic in (arg_line.option, arg_line.alt_option, None,)
+            assert arg_phrase.concise in (arg_line.option, arg_line.alt_option, None)
+            assert arg_phrase.mnemonic in (arg_line.option, arg_line.alt_option, None)
             assert arg_line.metavar == arg_phrase.metavar
             assert (not arg_line.alt_metavar) or (
                 arg_line.alt_metavar == arg_phrase.metavar
             )
 
             if not marked_optional:  # positional argument
-                assert arg_phrase.nargs in (None, "*", "?",)  # .ZERO_OR_MORE .OPTIONAL
+                assert arg_phrase.nargs in (None, "*", "?")  # .ZERO_OR_MORE .OPTIONAL
                 assert arg_phrase.metavar and arg_line.metavar
             else:  # optional argument
                 assert arg_phrase.concise or arg_phrase.mnemonic
@@ -1985,7 +1980,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
         words = arg_source_left.split()
 
         len_words = len(words)
-        if len_words not in (1, 2, 4,):
+        if len_words not in (1, 2, 4):
 
             return
 
@@ -2065,7 +2060,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
 
         # Take the 1 word of --mnemonic, -c, or METAVAR
 
-        (word0, metavar0, concise0, mnemonic0,) = self._take_argument_word(words[0])
+        (word0, metavar0, concise0, mnemonic0) = self._take_argument_word(words[0])
 
         if word0.startswith("--"):
             self.option = mnemonic0
@@ -2078,7 +2073,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
 
         if words[1:]:
 
-            (word1, metavar1, concise1, mnemonic1,) = self._take_argument_word(words[1])
+            (word1, metavar1, concise1, mnemonic1) = self._take_argument_word(words[1])
 
             if word1.startswith("--"):
                 self.alt_option = mnemonic1
@@ -2092,8 +2087,8 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
 
             if words[2:]:
 
-                (word2, _, concise2, mnemonic2,) = self._take_argument_word(words[2])
-                (word3, metavar3, _, _,) = self._take_argument_word(words[3])
+                (word2, _, concise2, mnemonic2) = self._take_argument_word(words[2])
+                (word3, metavar3, _, _) = self._take_argument_word(words[3])
 
                 if word2.startswith("--"):
                     self.alt_option = mnemonic2
@@ -2115,12 +2110,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
             concise = "-{}".format(n)
             mnemonic = "--{}".format(name)
 
-        return (
-            word,
-            metavar,
-            concise,
-            mnemonic,
-        )
+        return (word, metavar, concise, mnemonic)
 
     def format_broken_argument_line(self):
         """Format as a line of optional or positional argument declaration"""
@@ -2152,17 +2142,9 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
         elif self.option and self.alt_option:
 
             if not metavar:
-                words = (
-                    (self.option + ","),
-                    self.alt_option,
-                )
+                words = ((self.option + ","), self.alt_option)
             else:
-                words = (
-                    self.option,
-                    (metavar + ","),
-                    self.alt_option,
-                    alt_metavar,
-                )
+                words = (self.option, (metavar + ","), self.alt_option, alt_metavar)
 
         else:
             assert self.option and not self.alt_option
@@ -2170,10 +2152,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
             if not metavar:
                 words = (self.option,)
             else:
-                words = (
-                    self.option,
-                    metavar,
-                )
+                words = (self.option, metavar)
 
         return words
 
@@ -2188,10 +2167,7 @@ class ArgumentLineSyntaxTaker(argparse.Namespace):
             ):  # self.option shuts out self.alt_option from Usage Line
                 words = (self.option,)
             else:
-                words = (
-                    self.option,
-                    self.metavar,
-                )
+                words = (self.option, self.metavar)
 
         return words
 
@@ -2277,15 +2253,9 @@ class OptionalPhraseSyntaxTaker(argparse.Namespace):
                 words = (self.mnemonic,)
         else:
             if self.concise:
-                words = (
-                    self.concise,
-                    self.metavar,
-                )
+                words = (self.concise, self.metavar)
             elif self.mnemonic:
-                words = (
-                    self.mnemonic,
-                    self.metavar,
-                )
+                words = (self.mnemonic, self.metavar)
 
         return words
 
@@ -2635,7 +2605,7 @@ def shlex_join(argv):
 def require_sys_version_info(*min_info):
     """Decline to test Python older than the chosen version"""
 
-    min_info_ = min_info if min_info else (3, 7,)  # June/2019 Python 3.7
+    min_info_ = min_info if min_info else (3, 7)  # June/2019 Python 3.7
 
     str_min_info = ".".join(str(i) for i in min_info_)
     str_sys_info = "/ ".join(sys.version.splitlines())
@@ -2673,10 +2643,7 @@ def str_splitdent(line):
 
     dent = len_dent * " "
 
-    return (
-        dent,
-        tail,
-    )
+    return (dent, tail)
 
 
 # deffed in many files  # missing from docs.python.org
@@ -2691,17 +2658,11 @@ def str_splitword(chars, count=1):
 
     if not tail:
 
-        return (
-            chars,
-            "",
-        )
+        return (chars, "")
 
     head = chars[: -len(tail)]
 
-    return (
-        head,
-        tail,
-    )
+    return (head, tail)
 
 
 # deffed in many files  # missing from docs.python.org

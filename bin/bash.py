@@ -249,7 +249,7 @@ def builtin_history(argv):
         return returncode
 
     shlines = read.ShLineHistory.shlines  # couple less tightly  # add date/time-stamp's
-    for (index, shline,) in enumerate(shlines):
+    for (index, shline) in enumerate(shlines):
         lineno = 1 + index
         print("{:5d}  {}".format(lineno, shline))
 
@@ -275,7 +275,7 @@ def _parse_shline(shline):
     argv = None
     if split_argv is not None:
         argv = list(split_argv)
-        for (index, arg,) in enumerate(split_argv):
+        for (index, arg) in enumerate(split_argv):
             if arg.startswith("#"):
                 argv = split_argv[:index]  # drop "#..." hash comment till end of shline
                 break

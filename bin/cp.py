@@ -24,6 +24,7 @@ examples:
   cp.py /dev/null  # creates empty file named "null~1~", etc
   cp.py itself  # creates backup named "itself~1~", etc
 """
+# FIXME: except cp.py from outside this dir should mean cp -ip to this dir
 # FIXME: also copy from (FILE | HOSTNAME:FILE) to here, like Bash "scp" would
 # FIXME: think about "cp SOURCE TARGET" vs "cp TARGET SOURCE" vs line-editor's
 

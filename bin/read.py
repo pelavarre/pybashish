@@ -25,7 +25,7 @@ quirks:
   prints the received line as a Python Repr
 
 examples:
-  echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | read.py  # Control Option Shift Command Arrows as ordered by Apple
+  echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | read.py  # Control Option Shift Command Arrows at Mac
   echo 'å é î ø ü' | read.py  # the accented vowels prominent in Mac ⌥ Option
   echo '⋮' | read.py  # more favorite characters of mine
   read.py
@@ -34,7 +34,9 @@ examples:
   FOO=123; vared -e FOO  # in Zsh
 """
 
-# FIXME: somehow bookmark '⌘ ⇧⌘ ⇧ ⌥⇧ ⌥⇧⌘ ⌥⌘ ⌥ ⌃⌥ ⌃⌥⌘ ⌃⌥⇧⌘ ⌃⌥⇧ ⌃⇧ ⌃⇧⌘ ⌃⌘ ⌃'
+# FIXME: read.py --file  # invite lots of paste, capture it to file
+
+# FIXME: somehow bookmark permutations '⌘ ⇧⌘ ⇧ ⌥⇧ ⌥⇧⌘ ⌥⌘ ⌥ ⌃⌥ ⌃⌥⌘ ⌃⌥⇧⌘ ⌃⌥⇧ ⌃⇧ ⌃⇧⌘ ⌃⌘ ⌃'
 # FIXME FIXME: bind an undo key such as ⌃_
 # FIXME FIXME:  stop discarding history edits at ⌃N "_next_history"
 # FIXME: add -t TIMEOUT in seconds
@@ -225,7 +227,7 @@ class GlassTeletype(contextlib.ContextDecorator):
 
     def __exit__(self, *exc_info):
 
-        (_, exc, _,) = exc_info
+        (_, exc, _) = exc_info
 
         sys.stdout.flush()
         sys.stderr.flush()
@@ -387,7 +389,7 @@ class GlassTeletype(contextlib.ContextDecorator):
         assert calls <= len(stdin) if self.with_termios else (len(stdin) + 1)
 
         if False:  # FIXME: configure logging
-            with open("trace.txt", "a") as appending:
+            with open("trace.txt", mode="a") as appending:
                 appending.write("read._pull_stdin: {} {}\n".format(calls, repr(stdin)))
 
         return stdin
@@ -400,7 +402,7 @@ class GlassTeletype(contextlib.ContextDecorator):
         xlist = list()
         timeout = 0
         selected = select.select(rlist, wlist, xlist, timeout)
-        (rlist_, wlist_, xlist_,) = selected
+        (rlist_, wlist_, xlist_) = selected
 
         if rlist_ == rlist:
             return True

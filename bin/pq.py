@@ -71,6 +71,8 @@ more examples
   pq.py + csv  # parse as lines of words, print as csv
 """
 
+# FIXME: work with files and dirs too
+
 import os
 import re
 import shlex

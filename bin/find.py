@@ -95,7 +95,7 @@ def os_walk_sorted_relpaths(top):
     top_realpath = os.path.realpath(top_)
 
     walker = os.walk(top_realpath)
-    for (where, wheres, whats,) in walker:  # (dirpath, dirnames, filenames,)
+    for (where, wheres, whats) in walker:  # (dirpath, dirnames, filenames)
 
         wheres[:] = sorted(wheres)  # sort these now, yield these later
 
@@ -142,20 +142,20 @@ def stderr_print(*args, **kwargs):
 class BrokenPipeErrorSink(contextlib.ContextDecorator):
     """Cut unhandled BrokenPipeError down to sys.exit(1)
 
+    Test with large Stdout cut sharply, such as:  find.py ~ | head
+
     More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
     As per https://docs.python.org/3/library/signal.html#note-on-sigpipe
     """
 
-    def __enter__(
-        self,
-    ):  # test with large Stdout cut sharply, such as:  find.py ~ | head
+    def __enter__(self):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
+        (exc_type, exc, exc_traceback) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            null_fileno = os.open(os.devnull, flags=os.O_WRONLY)
             os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
 
             sys.exit(1)

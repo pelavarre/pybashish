@@ -49,6 +49,8 @@ examples:
 
 # note: the five chars "💔💥😊😠😢" are ": broken_heart : boom : blush : angry : cry :" in Slack 2020
 
+# FIXME: convert \u|\U to \u005C\u0075|55 to make --repr reversible, and option to reverse it
+
 # FIXME: option to sponge or not to sponge
 # FIXME: think into the redundancy between incremental and sponging solutions to "def striplines()"
 # FIXME: learn more of how much the sponging slows and stresses hosts
@@ -196,13 +198,13 @@ def as_print(*args):
 def exit_csv(lines):
     """Convert to Csv from PSql today, and maybe to Csv from messier sources tomorrow"""
 
-    for (index, line,) in enumerate(lines):
+    for (index, line) in enumerate(lines):
 
-        bars = list(_ for (_, ch,) in enumerate(line) if ch == "|")
+        bars = list(_ for (_, ch) in enumerate(line) if ch == "|")
         if index == 0:
             bars0 = bars
         elif bars != bars0:
-            plusses = list(_ for (_, ch,) in enumerate(line) if ch == "+")
+            plusses = list(_ for (_, ch) in enumerate(line) if ch == "+")
             if index == 1:
                 assert plusses == bars0
             elif (not line) and (index == (len(lines) - 1)):
@@ -326,10 +328,10 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
+        (exc_type, exc, exc_traceback) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            null_fileno = os.open(os.devnull, flags=os.O_WRONLY)
             os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
 
             sys.exit(1)

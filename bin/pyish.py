@@ -84,11 +84,11 @@ def subprocess_run(*args, **kwargs):
         kwargs_["stdin"] = io.StringIO(kwargs["input"])
 
     sub = subprocess.Popen(*args, **kwargs_)
-    (stdout, stderr,) = sub.communicate()
+    (stdout, stderr) = sub.communicate()
     returncode = sub.poll()
 
     ran = argparse.Namespace(
-        args=args_, stdout=stdout, stderr=stderr, returncode=returncode,
+        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
     )
 
     return ran

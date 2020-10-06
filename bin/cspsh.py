@@ -202,10 +202,7 @@ def csp_pick_open_marks(string):
             close_mark = CLOSE_MARK_REGEX[OPEN_MARK_REGEX.index(ch)]
             assert (open_mark + close_mark) in "() [] {}".split()
 
-            pair = (
-                open_mark,
-                close_mark,
-            )
+            pair = (open_mark, close_mark)
             pairs.append(pair)
 
         elif pairs and (ch == pairs[-1][-1]):
@@ -314,7 +311,7 @@ class CspCommandLine(CspWorker):
 
         while trace and (trace[0] != "⟩"):
             event = trace[0]
-            if chars not in ("", "⟨",):
+            if chars not in ("", "⟨"):
                 chars += ", "
             chars += str(event)
             trace = trace[1:]
@@ -399,10 +396,10 @@ class CspCommandLine(CspWorker):
                 raise
 
             matches = shards_match.groupdict().items()
-            matches = list((k, v,) for (k, v,) in matches if v)
+            matches = list((k, v) for (k, v) in matches if v)
 
             assert len(matches) == 1
-            (kind, chars,) = matches[0]
+            (kind, chars) = matches[0]
             csp_word = CspWord(kind=kind, chars=chars)
 
             assert text.startswith(csp_word.chars)
@@ -453,7 +450,7 @@ class OpenProcessClose(CspWorker):
         upto_close = CspCloseMark.take_one(taker, upto_mark)
 
         opc = OpenProcessClose(
-            open_after=open_after, process=process, upto_close=upto_close,
+            open_after=open_after, process=process, upto_close=upto_close
         )
         return opc
 
@@ -467,7 +464,7 @@ class EventChoice(CspWorker):
             choice()
         else:
             last_index = len(self.choices) - 1
-            for (index, choice,) in enumerate(self.choices):
+            for (index, choice) in enumerate(self.choices):
                 crossing = index < last_index
                 CspCommandLine.cspvm.trace_open(crossing)
                 choice()
@@ -480,7 +477,7 @@ class EventChoice(CspWorker):
 
         choice = choices[0]
         chars = str(choice)
-        for (bar, choice,) in zip(bars, choices[1:]):
+        for (bar, choice) in zip(bars, choices[1:]):
             chars += str(bar)
             chars += str(choice)
 
@@ -591,7 +588,7 @@ class EventThenProcess(CspWorker):
 
         event_then_process = None
         pairs = zip(event_names, then_marks)
-        for (event_name, then_mark,) in reversed(list(pairs)):
+        for (event_name, then_mark) in reversed(list(pairs)):
             event_then_process = EventThenProcess(
                 event_name=event_name, then_mark=then_mark, worker=worker
             )
@@ -645,7 +642,7 @@ class ProcessCaller(CspWorker):
             inner_process_caller = CspCommandLine.process_callers_by_name[name]
             process = inner_process_caller
 
-        process_caller = ProcessCaller(process_name=process_name, process=process,)
+        process_caller = ProcessCaller(process_name=process_name, process=process)
         process_caller.name = name
 
         return process_caller

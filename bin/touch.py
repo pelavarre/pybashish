@@ -36,7 +36,7 @@ def main():
     for file_ in args.files:
 
         if not os.path.exists(file_):
-            with open(file_, "w"):
+            with open(file_, mode="w"):
                 pass
             continue
 

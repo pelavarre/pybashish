@@ -90,7 +90,7 @@ def misread_ymdhms_mac(ymd):
 
     parsed = None
     for syntax in syntaxes:
-        (format_, keys,) = syntax
+        (format_, keys) = syntax
         try:
             parsed = dt.datetime.strptime(ymd, format_)
             break
@@ -144,7 +144,7 @@ def misread_ymdhms_linux(ymd):
 
     parsed = None
     for syntax in syntaxes:
-        (format_, keys,) = syntax
+        (format_, keys) = syntax
         try:
             parsed = dt.datetime.strptime(ymd, format_)
             break
