@@ -53,5 +53,8 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 # vim  :set syntax=whitespace
 # vim  :set list
 #
+# see also:  https://cheat.sh/vim
+# FIXME:  :%s/foo/bar/gc
+#
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

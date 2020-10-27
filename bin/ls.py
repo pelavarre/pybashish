@@ -90,7 +90,7 @@ def main():
     """Interpret a command line"""
 
     stdout_isatty = sys.stdout.isatty()
-    stdout_columns = guess_stdout_columns()
+    stdout_columns = sys_stdout_guess_tty_columns()
     # stderr_print("stdout_columns={}".format(stdout_columns))
 
     args = argdoc.parse_args()
@@ -684,7 +684,7 @@ def spill_cells(cells, columns, sep):  # FIXME FIXME FIXME  # noqa C901
 
 
 # deffed in many files  # missing from docs.python.org
-def guess_stdout_columns(*hints):
+def sys_stdout_guess_tty_columns(*hints):
     """
     Run all the searches offered, accept the first result found if any, else return None
 
@@ -699,11 +699,11 @@ def guess_stdout_columns(*hints):
     terminal_widths = list()
     for hint in chosen_hints:
 
-        terminal_width = guess_stdout_columns_os(hint)
+        terminal_width = sys_stdout_guess_tty_columns_os(hint)
         if terminal_width is None:
-            terminal_width = guess_stdout_columns_os_environ_int(hint)
+            terminal_width = sys_stdout_guess_tty_columns_os_environ_int(hint)
         else:
-            _ = guess_stdout_columns_os_environ_int(hint)
+            _ = sys_stdout_guess_tty_columns_os_environ_int(hint)
 
         if terminal_width is not None:
             terminal_widths.append(terminal_width)
@@ -715,7 +715,7 @@ def guess_stdout_columns(*hints):
 
 
 # deffed in many files  # missing from docs.python.org
-def guess_stdout_columns_os(hint):
+def sys_stdout_guess_tty_columns_os(hint):
     """Try "os.get_terminal_size", and slap back "shutil.get_terminal_size" pushing (80, 24)"""
 
     showing = None
@@ -744,7 +744,7 @@ def guess_stdout_columns_os(hint):
 
 
 # deffed in many files  # missing from docs.python.org
-def guess_stdout_columns_os_environ_int(hint):
+def sys_stdout_guess_tty_columns_os_environ_int(hint):
     """Pull digits from "os.environ" via the hint as key, else from the hint itself"""
 
     digits = hint

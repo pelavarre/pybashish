@@ -2689,6 +2689,8 @@ if __name__ == "__main__":
 # https://jeffreykegler.github.io/personal/timeline_v3
 #
 
+# FIXME: Get the /dev/null template to mention the : boom : broken_heart : boom : decode
+
 # FIXME: AssertionError at pos arg of -a A, --aaa A, yah  hmm
 
 # FIXME: argdoc default action="count" should be also default=0

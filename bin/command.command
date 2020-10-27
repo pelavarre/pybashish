@@ -58,8 +58,6 @@ The workaround for that one is
 """
 
 
-#!/usr/bin/env python3
-
 import collections
 import difflib
 import os

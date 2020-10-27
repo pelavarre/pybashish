@@ -36,6 +36,8 @@ examples:
   : # 5678_0123456_8901234_6789012_4567890 2345678_0123456_8901234_6789012  # the 72-column ruler
 """
 
+# FIXME: -h25 -w79 to help shrink a G Cloud Shell that far
+
 
 import os
 import re
@@ -48,7 +50,7 @@ import argdoc
 def main(argv):
     """Run from the command line"""
 
-    stdout_columns = guess_stdout_columns()
+    stdout_columns = sys_stdout_guess_tty_columns()
 
     # Parse the command line
 
@@ -131,15 +133,15 @@ def fmt_one_paragraph(dent, para, width):
     text = "\n".join(para)
 
     fill_width = (width - len(dent)) if (len(dent) < width) else 1
-    chars = textwrap.fill(
+    fill_chars = textwrap.fill(
         text, width=fill_width, break_on_hyphens=False, break_long_words=False
     )
-    lines = chars.splitlines()
+    fill_lines = fill_chars.splitlines()
 
-    assert lines
+    assert fill_lines  # TODO: think some more here
 
-    for line in chars.splitlines():
-        print((dent + line).rstrip())
+    for fill_line in fill_chars.splitlines():
+        print((dent + fill_line).rstrip())
 
 
 #
@@ -148,7 +150,7 @@ def fmt_one_paragraph(dent, para, width):
 
 
 # deffed in many files  # missing from docs.python.org
-def guess_stdout_columns(*hints):
+def sys_stdout_guess_tty_columns(*hints):
     """
     Run all the searches offered, accept the first result found if any, else return None
 
@@ -162,11 +164,11 @@ def guess_stdout_columns(*hints):
     terminal_widths = list()
     for hint in chosen_hints:
 
-        terminal_width = guess_stdout_columns_os(hint)
+        terminal_width = sys_stdout_guess_tty_columns_os(hint)
         if terminal_width is None:
-            terminal_width = guess_stdout_columns_os_environ_int(hint)
+            terminal_width = sys_stdout_guess_tty_columns_os_environ_int(hint)
         else:
-            _ = guess_stdout_columns_os_environ_int(hint)
+            _ = sys_stdout_guess_tty_columns_os_environ_int(hint)
 
         if terminal_width is not None:
             terminal_widths.append(terminal_width)
@@ -178,7 +180,7 @@ def guess_stdout_columns(*hints):
 
 
 # deffed in many files  # missing from docs.python.org
-def guess_stdout_columns_os(hint):
+def sys_stdout_guess_tty_columns_os(hint):
     """Try "os.get_terminal_size", and slap back "shutil.get_terminal_size" pushing (80, 24)"""
 
     showing = None
@@ -207,7 +209,7 @@ def guess_stdout_columns_os(hint):
 
 
 # deffed in many files  # missing from docs.python.org
-def guess_stdout_columns_os_environ_int(hint):
+def sys_stdout_guess_tty_columns_os_environ_int(hint):
     """Pull digits from "os.environ" via the hint as key, else from the hint itself"""
 
     digits = hint

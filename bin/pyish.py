@@ -9,8 +9,8 @@ emulate Python 3 inside of Python 2, well enough for now
 quirks:
   cd pybashish/ && make  # foolishly insists this docstring should be an argdoc
 """
-# FIXME: help find and review diffs among scattered forks of such shared defs
-# FIXME: rename "guess_stdout_columns" to "sys_stdout_guess_columns"
+
+# FIXME: help find and review diffs among scattered forks of shared defs
 
 
 from __future__ import print_function

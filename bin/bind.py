@@ -11,6 +11,7 @@ optional arguments:
 
 quirks:
   floods the terminal when called with no args, same as zsh "bindkey", unlike bash "bind" no-op
+  lies when "ssh" redefines "~?" or "stty" redefines ⌃S and ⌃W, etc
   prints "drop-next-char" as the binding for ⌃D, but ⌃D at flush left ends input
   prints "end-input" as the binding for empty "" input, unlike no mention in bash / zsh
   prints none as the encoding for "self-insert", unlike bash / zsh leaving much unicode unmentioned

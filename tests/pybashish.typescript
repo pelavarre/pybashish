@@ -120,9 +120,9 @@ PyBashIsh does a few things much much better, some things just as well, and many
     Next try one of:
 
         -  ..  argdoc  bash  bind  cal  cat  cd  chmod  column  cp  cspsh  date  dd
-        doctestbash  echo  exit  expand  find  fmt  grep  head  help  hexdump  history
-        hostname  jq  ls  make  mkdir  mv  paste  pq  pwd  read  rm  sort  sponge  subsh
-        tail  tar  touch  tr  watch  wc  xargs
+        doctestbash  echo  exit  expand  find  fmt  grep  head  hearme  help  hexdump
+        history  hostname  jq  ls  make  mkdir  mv  paste  pq  pwd  read  rm  sort  sponge
+        subsh  tail  tar  touch  tr  watch  wc  xargs
 
     Note: The "#" hash mark means ignore the following chars in the line
     Note: The ":" colon as the first word means mostly ignore the following words in the line

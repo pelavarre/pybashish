@@ -871,6 +871,10 @@ FILES_CHARS = r"""
     git apply -v ...'.patch'
     patch -p1 <...'.patch'  # silently drops new chmod ugo+x
 
+    git log --pretty=format:"%h %an%x09%cd %s" -G regex file.ext  # grep changes
+    git log --pretty=format:"%h %an%x09%cd %s" -S regex  # "pickaxe" grep insert/delete
+    git log --pretty=format:"%h %an%x09%cd %s" --grep regex
+
 
     #
     # files/screen.bash:  Screen
@@ -994,6 +998,9 @@ FILES_CHARS = r"""
     # vim  :syntax on
     # vim  :set syntax=whitespace
     # vim  :set list
+    #
+    # see also:  https://cheat.sh/vim
+    # FIXME:  :%s/foo/bar/gc
     #
 
 
