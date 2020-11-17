@@ -178,8 +178,10 @@ def add_awk_hint(awk, hint):  # FIXME FIXME  # noqa C901
                 awk_value = "${}".format(1 + j_index)
             elif j_index == 0:
                 awk_value = "$0"
+            elif j_index == 1:
+                awk_value = "$NF"
             else:
-                awk_value = "$(NF + 1 - {})".format(j_index)
+                awk_value = "$(NF - {})".format(j_index - 1)
 
             if len(shards) == 1:
                 awk.prints.append(awk_value)
