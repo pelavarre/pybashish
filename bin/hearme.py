@@ -93,7 +93,7 @@ def main(argv):  # FIXME FIXME  # noqa C901
         awk_print_line = "print " + ", ".join(awk.prints)
         awk_lines = awk.lines + [awk_print_line.rstrip()]
     else:
-        awk_lines.append('print')
+        awk_lines.append("print")
 
     shline += "awk '"
     shline += "//{"
