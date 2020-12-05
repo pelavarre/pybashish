@@ -92,6 +92,8 @@ def main(argv):  # FIXME FIXME  # noqa C901
     if awk.prints or not awk.lines:
         awk_print_line = "print " + ", ".join(awk.prints)
         awk_lines = awk.lines + [awk_print_line.rstrip()]
+    else:
+        awk_lines.append('print')
 
     shline += "awk '"
     shline += "//{"
