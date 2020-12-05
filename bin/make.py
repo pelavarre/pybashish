@@ -8,7 +8,7 @@ figure out how to make more things from some things
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   don't understand most of what the real "make" knows
 
 examples:

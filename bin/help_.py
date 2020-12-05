@@ -74,14 +74,11 @@ def main():
             """
             Python apps should introduce themselves well
 
-            Try typing the name of the app, and add " --h"
-            For instance, to learn more of "echo.py", try:
+            Try typing the name of the app, and adding " --help" or " -h"
+
+            For instance:
 
                 echo --h
-
-            Many apps will say hello well if you type just one dash
-            For instance, try:
-
                 grep -h | head
             """
         ).strip()
@@ -108,6 +105,11 @@ def main():
     )
 
     stderr_print()
+
+
+#
+# Git-track some Python idioms here
+#
 
 
 # deffed in many files  # missing from docs.python.org
@@ -139,10 +141,10 @@ def print_cells(cells, dent="    ", sep="  ", width=None):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
+def stderr_print(*args, **kwargs):
     sys.stdout.flush()
-    print(*args, file=sys.stderr)
-    sys.stderr.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

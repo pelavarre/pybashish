@@ -9,7 +9,7 @@ optional arguments:
   -h, --help      show this help message and exit
   -i, --interact  ask more questions
 
-bugs:
+quirks:
   returns exit status 0 after printing usage, if called with no arguments
   returns exit status 127, not 258, for ⌃D EOF pressed while ' or "" input quote open
   changes exit status after next line of input, no matter if input is blank
@@ -19,7 +19,11 @@ bugs:
 examples:
   bash.py  # chat till "exit", or ⌃D EOF pressed to quit, or ssh drops, etc
 """
+
+# FIXME: add brace expansion:  echo a{B,C{d1,d2}E,F}g{H,I}j
+
 # FIXME: add --color=never|always|auto
+# FIXME: mark history with returncode, absolute start/stop time, copies of out/err, ...
 
 from __future__ import print_function
 
@@ -28,6 +32,7 @@ import platform
 import shlex
 import subprocess
 import sys
+import textwrap
 
 import argdoc
 
@@ -67,7 +72,6 @@ def main(argv):
         try:
             shline = read.readline(prompt)
         except KeyboardInterrupt:
-            stderr_print("⌃C", end="\r\n")
             continue
 
         # Exit at end-of-file
@@ -178,14 +182,14 @@ def os_chdir_path(path):
 
 
 def builtin_cd_back(argv):
-    implied_argv = ["cd", "-"] + argv[1:]
-    returncode = builtin_cd(implied_argv)
+    cd_argv = ["cd", "-"] + argv[1:]
+    returncode = builtin_cd(cd_argv)
     return returncode
 
 
 def builtin_cd_up(argv):
-    implied_argv = ["cd", ".."] + argv[1:]
-    returncode = builtin_cd(implied_argv)
+    cd_argv = ["cd", ".."] + argv[1:]
+    returncode = builtin_cd(cd_argv)
     return returncode
 
 
@@ -212,11 +216,9 @@ def builtin_exit(argv):
 def builtin_via_py(what_py, argv=None):
 
     wherewhat = os.path.join(FILE_DIR, what_py)
-    argv_tail = argv[1:] if argv else list()
+    wherewhat_argv = [wherewhat] + argv[1:]
 
-    ran = subprocess.run(
-        [wherewhat] + argv_tail, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    ran = subprocess.run(wherewhat_argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     return ran
 
@@ -238,7 +240,7 @@ def builtin_history(argv):
       history
     """
 
-    doc = builtin_history.__doc__
+    doc = textwrap.dedent(builtin_history.__doc__).strip()
     try:
         _ = argdoc.parse_args(args=argv[1:], doc=doc)
     except SystemExit as exc:
@@ -247,7 +249,7 @@ def builtin_history(argv):
         return returncode
 
     shlines = read.ShLineHistory.shlines  # couple less tightly  # add date/time-stamp's
-    for (index, shline,) in enumerate(shlines):
+    for (index, shline) in enumerate(shlines):
         lineno = 1 + index
         print("{:5d}  {}".format(lineno, shline))
 
@@ -273,7 +275,7 @@ def _parse_shline(shline):
     argv = None
     if split_argv is not None:
         argv = list(split_argv)
-        for (index, arg,) in enumerate(split_argv):
+        for (index, arg) in enumerate(split_argv):
             if arg.startswith("#"):
                 argv = split_argv[:index]  # drop "#..." hash comment till end of shline
                 break
@@ -455,11 +457,16 @@ def calc_ps1():
     return ps1
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
+def stderr_print(*args, **kwargs):
     sys.stdout.flush()
-    print(*args, file=sys.stderr)
-    sys.stderr.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 BUILTINS = {

@@ -8,19 +8,19 @@ copy from input stream to output stream
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   does forward interactive input lines immediately, unlike bash
   crashes "pybashish" shell if called from there, at ⌃C SIGINT
   implements mac SIGINFO as linux SIGUSR1
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "dd"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
 examples:
   dd  # run demo of ⌃T SIGINFO and ⌃C SIGINT, till ⌃D EOF or ⌃\ SIGQUIT
 """
-# FIXME: fix "dd" bugs
+# FIXME: fix "dd" quirks
 
 
 from __future__ import print_function
@@ -112,9 +112,16 @@ class SigInfoHandler(contextlib.ContextDecorator):
             signal.signal(signal.SIGUSR1, with_siginfo)
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ optional arguments:
   -j YMD      test a time other than now in mac tradition, such as -j 123123591970.59
   --date YMD  test a time other than now in linux tradition, such as --date '1970-12-31 23:59:59'
 
-bugs:
+quirks:
   formats the date as yyyy-mm-dd hh:mm:ss.ffffff, not localised, not rounded down to :ss
   doesn't calculate difference, product, and quotient of elapsed times
   doesn't diff timestamps
@@ -60,6 +60,11 @@ def main():
     print(stdout)
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def misread_ymdhms_mac(ymd):
     """Guess what YYYY-MM-DD HH:MM:SS is meant, from briefer input"""
@@ -85,7 +90,7 @@ def misread_ymdhms_mac(ymd):
 
     parsed = None
     for syntax in syntaxes:
-        (format_, keys,) = syntax
+        (format_, keys) = syntax
         try:
             parsed = dt.datetime.strptime(ymd, format_)
             break
@@ -97,9 +102,9 @@ def misread_ymdhms_mac(ymd):
 
     today = dt.datetime(now.year, now.month, now.day, 12, 00)  # duck 2am DST etc
     replaces = {k: getattr(parsed, k) for k in keys}
-    asif_today = today.replace(**replaces)
+    as_today = today.replace(**replaces)
 
-    return asif_today
+    return as_today
 
 
 # deffed in many files  # missing from docs.python.org
@@ -139,7 +144,7 @@ def misread_ymdhms_linux(ymd):
 
     parsed = None
     for syntax in syntaxes:
-        (format_, keys,) = syntax
+        (format_, keys) = syntax
         try:
             parsed = dt.datetime.strptime(ymd, format_)
             break
@@ -151,14 +156,16 @@ def misread_ymdhms_linux(ymd):
 
     today = dt.datetime(now.year, now.month, now.day, 12, 00)  # duck 2am DST etc
     replaces = {k: getattr(parsed, k) for k in keys}
-    asif_today = today.replace(**replaces)
+    as_today = today.replace(**replaces)
 
-    return asif_today
+    return as_today
 
 
-# deffed in many files  # but not in docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

@@ -12,13 +12,13 @@ optional arguments:
   -h, --help     show this help message and exit
   -p, --parents  create the dir, its parent dir, and ancestors, if need be
 
-bugs:
+quirks:
   says "dir exists" when
   runs ahead and works with me, without mandating that I spell out the new name, unlike Bash "mkdir"
   says "dir exists", not traditional "file exists", if dir exists already
 
 examples:
-  mkdir  # creates "mkdir~1", then "mkdir~2", etc
+  mkdir  # creates "mkdir~1~", then "mkdir~2~", etc
 """
 
 
@@ -59,9 +59,16 @@ def main():
     sys.exit(exit_status)
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

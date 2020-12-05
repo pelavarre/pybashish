@@ -14,7 +14,7 @@ optional arguments:
   --sort             sort the characters
   --unique-everseen  delete all duplicates of any char
 
-bugs:
+quirks:
   chokes except when called for -d '[^ -~]\t\r\n'
   runs as "--unique-everseen --sort" when called with no args, unlike Mac and Linux "tr" choking
 
@@ -37,8 +37,8 @@ import argdoc
 
 def main(argv):
 
-    argv_tail = argv[1:] if argv[1:] else ["--unique-everseen", "--sort", ""]
-    args = argdoc.parse_args(argv_tail)
+    tr_argv_tail = argv[1:] if argv[1:] else ["--unique-everseen", "--sort", ""]
+    args = argdoc.parse_args(tr_argv_tail)
 
     args_charset = args.charset if args.charset else ""
 
@@ -68,6 +68,11 @@ def main(argv):
     sys.stdout.write("".join(stdouts))
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def str_unique_everseen(chars):
     """Delete all duplicates of any char"""
@@ -84,8 +89,10 @@ def str_unique_everseen(chars):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

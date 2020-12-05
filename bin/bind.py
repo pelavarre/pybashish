@@ -9,8 +9,9 @@ optional arguments:
   -h, --help  show this help message and exit
   -p          print what each keystroke means
 
-bugs:
+quirks:
   floods the terminal when called with no args, same as zsh "bindkey", unlike bash "bind" no-op
+  lies when "ssh" redefines "~?" or "stty" redefines ⌃S and ⌃W, etc
   prints "drop-next-char" as the binding for ⌃D, but ⌃D at flush left ends input
   prints "end-input" as the binding for empty "" input, unlike no mention in bash / zsh
   prints none as the encoding for "self-insert", unlike bash / zsh leaving much unicode unmentioned
@@ -46,7 +47,7 @@ def main():
     bots_by_stdin = gt._bots_by_stdin  # peek inside
 
     sortables = list()
-    for (stdin, bot,) in bots_by_stdin.items():
+    for (stdin, bot) in bots_by_stdin.items():
 
         str_bot = bot.__name__
         str_bot = "self-insert" if (str_bot == "_insert_stdin") else str_bot
@@ -55,15 +56,12 @@ def main():
 
         repr_stdin = bind_repr(stdin)
 
-        sortable = (
-            str_bot,
-            repr_stdin,
-        )
+        sortable = (str_bot, repr_stdin)
 
         sortables.append(sortable)
 
     for sortable in sorted(sortables):  # FIXME: column -t the "bind -p" output
-        (str_bot, repr_stdin,) = sortable
+        (str_bot, repr_stdin) = sortable
         print("{:7} {}".format((repr_stdin + ":"), str_bot))
 
 
@@ -110,11 +108,16 @@ def bind_repr(stdin):
     return repr_stdin
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
+def stderr_print(*args, **kwargs):
     sys.stdout.flush()
-    print(*args, file=sys.stderr)
-    sys.stderr.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

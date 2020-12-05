@@ -23,8 +23,8 @@ pbpaste | sed 's,  *, ,g' | tr ' ' '\n' | pbcopy  # split
 pbpaste | sed 's,^\(.*\)\([.][^.]*\)$,\1 \2,' | pbcopy  # splitext
 pbpaste | sed 's,^  *,,'  | sed 's,  *$,,' | pbcopy  # strip
 pbpaste | tr '[a-z]' '[A-Z]' | pbcopy  # upper
-pbpaste | sed 's,[^ -~],?,g' | pbcopy  # us-ascii errors replace with "\x3F" question mark
-pbpaste | sed 's,[^ -~],,g' | pbcopy  # us-ascii errors ignore
+pbpaste | sed 's,[^ -~],?,g' | pbcopy  # ascii errors replace with "\x3F" question mark
+pbpaste | sed 's,[^ -~],,g' | pbcopy  # ascii errors ignore
 
 pbpaste >p  # pb stash
 cat p | pbcopy  # pb stash pop

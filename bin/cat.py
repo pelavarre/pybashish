@@ -3,10 +3,10 @@
 r"""
 usage: cat.py [-h] [-E] [-e] [-n] [-T] [-t] [-v] [FILE [FILE ...]]
 
-copy binary (or text) files to standard output (by "cat"enating them)
+copy each line of input bytes (or chars) to output (as if "cat"enating them slowly)
 
 positional arguments:
-  FILE                  a file to copy out
+  FILE                  a file to copy out (default: stdin)
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -16,13 +16,16 @@ optional arguments:
   -T, --show-tabs       show each "\t" tab as r"\t" backslash tee
   -t                    call for -T and -v
   -v, --show-nonprinting
-                        convert all but \n and \t and printable us-ascii r"[ -~]" to \ escapes
+                        convert all but \n and \t and printable ascii r"[ -~]" to \ escapes
 
-bugs:
+quirks:
+  shows \t as \t, not as classic ^I
+  shows \n as \n, not as classic $
+  does show all but printable ascii as nonprinting, unlike Mac "cat" at \u00A0 &nbsp; etc
   does stop copying at first ⌃D of stdin, even when last line not completed by "\n"
   does print hard b"\x09" tab after each line number, via "{:6}\t", same as bash "cat"
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "cat" and "cat -"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
@@ -30,9 +33,13 @@ examples:
   cat -  # copy out each line of input
   cat - >/dev/null  # echo and discard each line of input
   cat - | grep . | cat.py -etv  # collect and echo some input, then echo it escaped
-  (echo a; echo b; echo c) | cat -n | cat -etv
-  pbpaste | cat.py -etv
+  echo a b c | tr ' ' '\n' | bin/cat.py -  # pass stdin through to stdout
+  (echo a; echo b; echo c) | cat -n | cat.py -etv  # show \t as \t and \n as \n
+  pbpaste | cat.py -etv  # show nonprinting in paste buffer
+  echo $'\x5A\xC2\xA0' | cat -tv  # Linux ok, but Mac shows &nbsp; Non-Break Space as space :-(
+  echo $'\x5A\xC2\xA0' | cat.py -tv  # do show even &nbsp; Non-Break Space as nonprinting
 """
+# FIXME: let cat -n=0 mean count up from zero
 # FIXME: rewrite as Python 2 without contextlib.ContextDecorator
 
 
@@ -63,15 +70,13 @@ def main(argv):
         prompt_tty_stdin()
 
     for path in paths:
-        if path == "-":
-            cat_incoming(fd=sys.stdin.fileno(), args=args)
-        else:
-            try:
-                with open(path, "rb") as incoming:
-                    cat_incoming(fd=incoming.fileno(), args=args)
-            except FileNotFoundError as exc:
-                stderr_print("cat.py: error: {}: {}".format(type(exc).__name__, exc))
-                sys.exit(1)
+        readable = "/dev/stdin" if (path == "-") else path
+        try:
+            with open(readable, mode="rb") as incoming:
+                cat_incoming(fd=incoming.fileno(), args=args)
+        except FileNotFoundError as exc:
+            stderr_print("cat.py: error: {}: {}".format(type(exc).__name__, exc))
+            sys.exit(1)
 
 
 def cat_incoming(fd, args):
@@ -115,16 +120,12 @@ def cat_repr_byte(fd_byte, args):
     if fd_byte:
 
         if fd_byte == b"\n":
-            if args.show_ends:
-                rep = b"$" + fd_byte
-
-                return rep
+            rep = (br"\n" + b"\n") if args.show_ends else fd_byte
+            return rep
 
         if fd_byte == b"\t":
-            if args.show_tabs:
-                rep = br"\t"
-
-                return rep
+            rep = br"\t" if args.show_tabs else fd_byte
+            return rep
 
         if args.show_nonprinting:
             xx = ord(fd_byte)
@@ -137,6 +138,11 @@ def cat_repr_byte(fd_byte, args):
     return fd_byte
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def prompt_tty_stdin():
     if sys.stdin.isatty():
@@ -144,8 +150,10 @@ def prompt_tty_stdin():
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
@@ -162,10 +170,10 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
+        (exc_type, exc, exc_traceback) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            null_fileno = os.open(os.devnull, flags=os.O_WRONLY)
             os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
 
             sys.exit(1)

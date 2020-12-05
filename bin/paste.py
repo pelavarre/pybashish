@@ -1,23 +1,18 @@
 #!/usr/bin/env python3
 
 """
-usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE [FILE ...]]
+usage: paste.py [-h] [FILE [FILE ...]]
 
-count lines and words and characters and bytes
+copy each file into place as a column
 
 positional arguments:
-  FILE                  a file to examine (default: stdin)
+  FILE        a file to copy (default: stdin)
 
 optional arguments:
-  -h, --help            show this help message and exit
-  -L, --max-line-length
-                        count max characters per line
-  -l, --lines           count lines
-  -m, --chars           count characters
-  -c, --bytes           count bytes
+  -h, --help  show this help message and exit
 
 quirks:
-  acts like "wc -L -l" if called without args, unlike Bash "wc"
+  no implementation
 
 unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "fmt"
@@ -26,6 +21,10 @@ unsurprising quirks:
 examples:
   Oh no! No examples disclosed!! 💥 💔 💥
 """
+
+# FIXME: left-justify, right-justify, center, with and without sponging
+# FIXME: options to add column names and separators
+# FIXME: options to take column names as a first row or as a column
 
 
 import sys

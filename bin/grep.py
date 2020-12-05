@@ -37,10 +37,10 @@ usage as a ~/.bashrc (or ~/.zshrc) history-recall extension:
     rm "$sourceable"
   }
 
-bugs in the syntax:
+quirks in the syntax:
   welcomes only more patterns, makes you push if you want more dirs or more files
 
-bugs in the defaults:
+quirks in the defaults:
   creates (and seeds) the ~/.local/share/grep/files/ dir, if it doesn't exist
   searches ~/.local/share/grep/files/ dir when no files chosen, not the classic /dev/stdin
   searches the files and dirs in the dir, doesn't give the classic "is a directory" rejection
@@ -53,14 +53,14 @@ bugs in the defaults:
   understands patterns as python "import re" defines them, not as classic grep -G/-E/-P defines them
   understands patterns as case-insensitive, unless given in mixed or upper case, a la Emacs
 
-other bugs:
+other quirks:
   doesn't implement most of classic grep
   splits lines like python does, not like classic grep does
   spends whole milliseconds to fetch hits, when classic grep would spend just microseconds
   strips the patterns that start the hit from the hit, but fails if they do
   fails if not precisely one hit found, vs classic grep failing if not one or more hits found
 
-bugs in examples:
+quirks in examples:
   cases of ~ gs, ~ ascii
 
 examples:
@@ -70,8 +70,8 @@ examples:
   ~~ gs  # print the one line hit most by "gs", not every line hit by "gs"
   ~ gs  # execute the one line found by:  ~~ gs
   ~ ruler  # count off the first hundred columns of a Terminal
-  ~ 0123  # print the printable us-ascii chars in code point order
-  ~ ascii  # print the printable us-ascii chars in code point order
+  ~ 0123  # print the printable ascii chars in code point order
+  ~ ascii  # print the printable ascii chars in code point order
   ~ vim  # print a Vim cheatsheet, a la Emacs, PbPaste, Screen, TMux, etc
   ~ quit vim  # remind us how to quit Vim
   ~ vim quit  # same hit, just found by another order
@@ -157,7 +157,7 @@ def main(argv):
 
     # Fetch and tag lines
 
-    (files_lines, chosen_lines,) = _ext_files_readlines(BASH_EXT, files=realpaths)
+    (files_lines, chosen_lines) = _ext_files_readlines(BASH_EXT, files=realpaths)
 
     # Search through lines
 
@@ -262,7 +262,7 @@ def _format_one_file(wherewhat, lines, file_word_0):
 
     if file_word_0:
 
-        for (index, write,) in enumerate(writes):
+        for (index, write) in enumerate(writes):
             if write:
                 word0 = write.split()[0]
                 if word0 != "#":
@@ -270,7 +270,7 @@ def _format_one_file(wherewhat, lines, file_word_0):
 
                 writes[index] = file_word_0 + write[len("#") :]
 
-        for (index, write,) in reversed(list(enumerate(writes))):
+        for (index, write) in reversed(list(enumerate(writes))):
             if write:
                 word0 = write.split()[0]
                 if word0 != "#":
@@ -293,7 +293,7 @@ def _export_one_file(wherewhat, chars):
     if os.path.exists(wherewhat):  # create, no replace, as in "tar xvkf"
         stderr_print("grep.py: {}: Cannot open: File exists".format(wherewhat))
     else:
-        with open(wherewhat, "w") as outgoing:
+        with open(wherewhat, mode="w") as outgoing:
             outgoing.write(chars)
 
 
@@ -312,8 +312,8 @@ def _ext_files_readlines(ext, files):
     files_lines = list()
     for file_ in files:
 
-        (where, what,) = os.path.split(file_)
-        (name, ext_,) = os.path.splitext(what)
+        (where, what) = os.path.split(file_)
+        (name, ext_) = os.path.splitext(what)
 
         with open(file_) as incoming:  # FIXME: odds on errors="surrogateescape" someday
             chars = incoming.read()
@@ -334,10 +334,7 @@ def _ext_files_readlines(ext, files):
 
         files_lines.extend(file_lines)
 
-    return (
-        files_lines,
-        chosen_lines,
-    )
+    return (files_lines, chosen_lines)
 
 
 def grep_lines(args, lines, chosen_lines):  # FIXME FIXME  # noqa C901
@@ -434,7 +431,7 @@ def grep_lines(args, lines, chosen_lines):  # FIXME FIXME  # noqa C901
     if len(file_hits) != 1:
         exit_status = exit_status if exit_status else 2
 
-    for (index, hit,) in enumerate(file_hits):
+    for (index, hit) in enumerate(file_hits):
         # print((20 * "-"), index, (20 * "-"))
 
         hit_lines = hit
@@ -494,6 +491,11 @@ def grep_lines(args, lines, chosen_lines):  # FIXME FIXME  # noqa C901
     return exit_status
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def min_path_formatter(exemplar):
     """Choose the def that abbreviates this path most sharply: abs, real, rel, or home"""
@@ -546,7 +548,7 @@ def os_walk_sorted_relfiles(top):
     top_realpath = os.path.realpath(top_)
 
     walker = os.walk(top_realpath)
-    for (where, wheres, whats,) in walker:  # (dirpath, dirnames, filenames,)
+    for (where, wheres, whats) in walker:  # (dirpath, dirnames, filenames)
 
         wheres[:] = sorted(wheres)  # sort these now, yield them never
 
@@ -592,43 +594,45 @@ def split_paragraphs(lines, keepends=False):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
+def stderr_print(*args, **kwargs):
     sys.stdout.flush()
-    print(*args, file=sys.stderr)
-    sys.stderr.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
-def verbose_print(*args):
+def verbose_print(*args, **kwargs):
     sys.stdout.flush()
     if main.args.verbose:
-        print(*args, file=sys.stderr)
-    sys.stderr.flush()
+        print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
 class BrokenPipeErrorSink(contextlib.ContextDecorator):
     """Cut unhandled BrokenPipeError down to sys.exit(1)
 
+    Test with large Stdout cut sharply, such as:  find.py ~ | head
+
     More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
     As per https://docs.python.org/3/library/signal.html#note-on-sigpipe
     """
 
-    def __enter__(
-        self,
-    ):  # test with large Stdout cut sharply, such as:  find.py ~ | head
+    def __enter__(self):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
+        (exc_type, exc, exc_traceback) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            null_fileno = os.open(os.devnull, flags=os.O_WRONLY)
             os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
 
             sys.exit(1)
 
 
+# FIXME: sort the files here by name
+# FIXME: then cross-ref bash to mac, emacs to emacs, vim to vim, etc
 FILES_CHARS = r"""
 
     #
@@ -658,6 +662,9 @@ FILES_CHARS = r"""
 
     find . -not \( -path './.git' -prune \)  # akin to:  git ls-files
 
+    if false; then echo y; else echo n; fi
+    if true; then echo y; else echo n; fi
+
     last | head
 
     ls *.csv | sed 's,[.]csv$,,' | xargs -I{} mv -i {}.csv {}.txt  # demo replace ext
@@ -676,6 +683,7 @@ FILES_CHARS = r"""
     rename 's,[.]csv$,-csv.txt,' *.csv  # replace ext, at Perl Linux
 
     sed -e $'3i\\\n...' | tee >(head -3) >(tail -2) >/dev/null  # first two, ellipsis, last two
+    sed -i~ 's,STALE,FRESH,' *.json  # global edit find search replace
 
     ssh -G ...
     ssh -vvv ...
@@ -686,6 +694,8 @@ FILES_CHARS = r"""
 
     tar kxf ...  # FIXME: test CACHEDIR.TAG
     tar zcf ... ...
+
+    # !?memo  # feeling lucky enough to authorize find and run again
 
 
     #
@@ -713,8 +723,8 @@ FILES_CHARS = r"""
     pbpaste | sed 's,^\(.*\)\([.][^.]*\)$,\1 \2,' | pbcopy  # splitext
     pbpaste | sed 's,^  *,,'  | sed 's,  *$,,' | pbcopy  # strip
     pbpaste | tr '[a-z]' '[A-Z]' | pbcopy  # upper
-    pbpaste | sed 's,[^ -~],?,g' | pbcopy  # us-ascii errors replace with "\x3F" question mark
-    pbpaste | sed 's,[^ -~],,g' | pbcopy  # us-ascii errors ignore
+    pbpaste | sed 's,[^ -~],?,g' | pbcopy  # ascii errors replace with "\x3F" question mark
+    pbpaste | sed 's,[^ -~],,g' | pbcopy  # ascii errors ignore
 
     pbpaste >p  # pb stash
     cat p | pbcopy  # pb stash pop
@@ -855,10 +865,15 @@ FILES_CHARS = r"""
     git checkout -  # for toggling between two branches
 
     git status  # gs gs
-    git status --ignored --short
+    git status --short --ignored
+    git status --short --ignored | wc -l | grep '^ *0$'
 
     git apply -v ...'.patch'
     patch -p1 <...'.patch'  # silently drops new chmod ugo+x
+
+    git log --pretty=format:"%h %an%x09%cd %s" -G regex file.ext  # grep changes
+    git log --pretty=format:"%h %an%x09%cd %s" -S regex  # "pickaxe" grep insert/delete
+    git log --pretty=format:"%h %an%x09%cd %s" --grep regex
 
 
     #
@@ -918,7 +933,7 @@ FILES_CHARS = r"""
     fmt.py --ruler  # Terminal column ruler
 
     #
-    # printable us-ascii chars: in full, compressed lossily with "-", and escaped for Bash Echo
+    # printable ascii chars: in full, compressed lossily with "-", and escaped for Bash Echo
     # !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~
     # !"#$%&'()*+,-./0-9:;<=>?@A-Z[\]^_`a-z{|}~
     # echo ' !"#$%&'\''()*+,-./0-9:;<=>?@A-Z[\]^_`a-z{|}~'
@@ -984,6 +999,9 @@ FILES_CHARS = r"""
     # vim  :set syntax=whitespace
     # vim  :set list
     #
+    # see also:  https://cheat.sh/vim
+    # FIXME:  :%s/foo/bar/gc
+    #
 
 
     #
@@ -1003,14 +1021,16 @@ FILES_CHARS = r"""
     " :set number
 
     :set hlsearch
-    " :nnoremap <esc><esc> :noh<return>  " nope, corrupts multiple Esc
-    " hlsearch, noh = toggle on/off highlighting of all hits of search
-    " n-no-remap = remap in the normal (not-insert) mode except don't recurse thru other remaps
+    " :set hlsearch  " highlight all hits of search
+    " /$$  " turn the highlights off by failing a search
+    " :noh  " turn the highlights off by command
+    " :nnoremap <esc><esc> :noh<return>  " nope, fails tests of multiple Esc
 
     :highlight RedLight ctermbg=red
     :call matchadd('RedLight', '\s\+$')
 
     :nnoremap <Bslash>w :call RStripEachLine()<return>
+    " n-no-remap = remap in the normal (not-insert) mode except don't recurse thru other remaps
     function! RStripEachLine()
         let with_line = line(".")
         let with_col = col(".")

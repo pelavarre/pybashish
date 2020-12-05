@@ -13,6 +13,7 @@ optional arguments:
 examples:
   echo 'a  b  c$  d  e$$f  g$' | tr '$' '\n' | xargs.py  # join words of lines into one line
   echo a b c d e f g | xargs.py -n 1  # split words of lines into one word per line
+  expand.py | xargs.py -n 1  # convert &nbsp; to spaces, etc, before trying to split it
 """
 
 
@@ -27,13 +28,16 @@ def main():
     args = argdoc.parse_args()
 
     stdin = sys.stdin.read()
+
     words = stdin.split()
     len_words = len(words)
     words_per_line = len_words if (args.max_args is None) else int(args.max_args)
 
     if len_words:
         for index in range(0, len_words, words_per_line):
+
             argv_tail = words[index:][:words_per_line]
+
             stdout = "{}\n".format(" ".join(argv_tail))
             sys.stdout.write(stdout)
 

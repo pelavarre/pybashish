@@ -12,7 +12,7 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   searches "./" if called with no args, unlike mac bash
   leads each hit inside "./" with "" not with "./", unlike bash
   leads each hit inside "~/" with "~/" not with "$PWD", unlike bash
@@ -23,7 +23,7 @@ examples:
   find ~/.bash_history  # file, not dir
   find /dev/null  # device, not dir
 """
-# FIXME: rethink "find.py" bugs
+# FIXME: rethink "find.py" quirks
 
 
 from __future__ import print_function
@@ -66,6 +66,11 @@ def print_os_walk_minpaths(top):
         print(formatter(realpath))
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def os_path_homepath(path):
     """Return the ~/... relpath of a file or dir inside the Home, else the realpath"""
@@ -83,13 +88,14 @@ def os_path_homepath(path):
 
 # deffed in many files  # missing from docs.python.org
 def os_walk_sorted_relpaths(top):
-    """Walk the dirs and files in a top dir, in alphabetical order, returning their relpath's"""
+    """Walk the dirs and files in a top dir, returning their relpath's, sorted"""
+    # FIXME: change to relpath closer to log messages
 
     top_ = "." if (top is None) else top
     top_realpath = os.path.realpath(top_)
 
     walker = os.walk(top_realpath)
-    for (where, wheres, whats,) in walker:  # (dirpath, dirnames, filenames,)
+    for (where, wheres, whats) in walker:  # (dirpath, dirnames, filenames)
 
         wheres[:] = sorted(wheres)  # sort these now, yield these later
 
@@ -126,28 +132,30 @@ def min_path_formatter(exemplar):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
 class BrokenPipeErrorSink(contextlib.ContextDecorator):
     """Cut unhandled BrokenPipeError down to sys.exit(1)
 
+    Test with large Stdout cut sharply, such as:  find.py ~ | head
+
     More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
     As per https://docs.python.org/3/library/signal.html#note-on-sigpipe
     """
 
-    def __enter__(
-        self,
-    ):  # test with large Stdout cut sharply, such as:  find.py ~ | head
+    def __enter__(self):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
+        (exc_type, exc, exc_traceback) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            null_fileno = os.open(os.devnull, flags=os.O_WRONLY)
             os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
 
             sys.exit(1)

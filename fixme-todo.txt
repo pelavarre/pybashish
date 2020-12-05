@@ -1,0 +1,20 @@
+==== Some Fixme's are more equal than others
+
+
+Get farther with "bin/pq.py"
+
+
+Raise exceptions, first deployed imprecisely as asserts
++ TypeError
++ ValueError
++ NameError
++ SyntaxError
+
+
+Comment asserts as
++ "give me" preconditions
++ "because X" invariants
++ "write once" enforcements of single assignment style
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

@@ -1,6 +1,11 @@
 Welcome to testing PyBashIsh
 
 
+// FIXME: remake this into a ".md" Markdown file
+// FIXME: pull the examples from help lines, run them, see changed output as regression
+// FIXME: add tests of the untested new verbs
+
+
 Contents
 ========
 
@@ -43,14 +48,15 @@ Contents
 ++ 2.30 ) Pwd
 ++ 2.31 ) Read
 ++ 2.32 ) Rm
-++ 2.33 ) SubSh
-++ 2.34 ) Tail
-++ 2.35 ) Tar
-++ 2.36 ) Touch
-++ 2.37 ) Tr
-++ 2.38 ) Watch
-++ 2.39 ) Wc
-++ 2.40 ) XArgs
+++ 2.33 ) Sponge
+++ 2.34 ) SubSh
+++ 2.35 ) Tail
+++ 2.36 ) Tar
+++ 2.37 ) Touch
+++ 2.38 ) Tr
+++ 2.39 ) Watch
+++ 2.40 ) Wc
+++ 2.41 ) XArgs
 
 + 3 ) Additional tests
 
@@ -104,27 +110,24 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
     Python apps should introduce themselves well
 
-    Try typing the name of the app, and add " --h"
-    For instance, to learn more of "echo.py", try:
+    Try typing the name of the app, and adding " --help" or " -h"
+
+    For instance:
 
         echo --h
-
-    Many apps will say hello well if you type just one dash
-    For instance, try:
-
         grep -h | head
 
     Next try one of:
 
         -  ..  argdoc  bash  bind  cal  cat  cd  chmod  column  cp  cspsh  date  dd
-        doctestbash  echo  exit  expand  find  fmt  grep  head  help  hexdump  history
-        hostname  jq  ls  make  mkdir  mv  pwd  read  rm  subsh  tail  tar  touch  tr  watch
-        wc  xargs
+        doctestbash  echo  exit  expand  find  fmt  grep  head  hearme  help  hexdump
+        history  hostname  jq  ls  make  mkdir  mv  paste  pq  pwd  read  rm  sort  sponge
+        subsh  tail  tar  touch  tr  watch  wc  xargs
 
     Note: The "#" hash mark means ignore the following chars in the line
     Note: The ":" colon as the first word means mostly ignore the following words in the line
 
-    (pybashish) $
+    (pybashish) $ ^D
     + exit 1
     $
 
@@ -144,13 +147,14 @@ ArgDoc compiles standard Python Arg Docs into standard Python ArgParser Parsers
 Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     $ bin/argdoc.py -ijk
-    usage: argdoc.py [-h] [--rip SHRED] [FILE] [-- [ARG [ARG ...]]]
+    usage: argdoc.py [-h] [-q] [-v] [--rip SHRED] [FILE] [-- [WORD [WORD ...]]]
     argdoc.py: error: unrecognized arguments: -ijk
     + exit 2
     $
 
     $ bin/argdoc.py
-    #!/usr/bin/env python3
+    #!/usr/bin/env python
+    # -*- coding: utf-8 -*-
 
     """
     usage: null [-h]
@@ -165,27 +169,48 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
     """
 
 
+    import argparse
     import sys
 
-    import argdoc
 
+    def main(argv):
+        """Run a command line"""
 
-    def main():
-        args = argdoc.parse_args()
-        main.args = args
+        main_module = sys.modules["__main__"]
+        doc = main_module.__doc__
+
+        prog = doc.strip().splitlines()[0].split()[1]
+        description = list(_ for _ in doc.strip().splitlines() if _)[1]
+        epilog_at = doc.index("examples:")
+        epilog = doc[epilog_at:]
+
+        parser = argparse.ArgumentParser(  # copied from '/dev/null' by 'argdoc.py'
+            prog=prog,
+            description=description,
+            add_help=True,
+            formatter_class=argparse.RawTextHelpFormatter,
+            epilog=epilog,
+        )
+
+        args = parser.parse_args(argv[1:])
         sys.stderr.write("{}\n".format(args))
-        sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
-        sys.stderr.write("/dev/null: error: not implemented\n")
+
+        main.args = args
+        main.parser = parser
+
+        sys.stderr.write("{}\n".format(parser.format_usage().rstrip()))
+        sys.stderr.write("null: error: not implemented\n")
         sys.exit(2)  # exit 2 from rejecting usage
 
 
-    if __name__ == '__main__':
-        main()
+    if __name__ == "__main__":
+        sys.exit(main(sys.argv))
     $
 
-    $ bin/argdoc.py /dev/null xyz
-    argdoc.py: error: unrecognized args: xyz
-    + exit 1
+    $ bin/argdoc.py /dev/null x y z
+    usage: argdoc.py [-h] [-q] [-v] [--rip SHRED] [FILE] [-- [WORD [WORD ...]]]
+    argdoc.py: error: unrecognized args: 'x y z', in place of '-- x y z'
+    + exit 2
     $
 
     $ rm -fr bin/p.py
@@ -198,13 +223,16 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
     $ python3 bin/p.py
     Namespace()
     usage: null [-h]
-    /dev/null: error: not implemented
+    null: error: not implemented
     + exit 2
     $
 
     $ bin/argdoc.py --rip argparse /dev/null >bin/p.py
     $ python3 bin/p.py
     Namespace()
+    usage: null [-h]
+    null: error: not implemented
+    + exit 2
     $
 
     $ rm -fr bin/p.py
@@ -241,6 +269,7 @@ Give help for the keystrokes of the "bin/read.py" command line editor
     "\C-h": drop-char
     "\C-u": drop-line
     "\C-d": drop-next-char
+    "\C-w": drop-word
     "":     end-input
     "\C-j": end-line
     "\C-m": end-line
@@ -283,10 +312,20 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 
 ## 2.5 ) Cat
 
-    $ bin/echo.py a b c | tr ' ' '\n' | bin/cat.py -
+    $ echo a b c | tr ' ' '\n' | bin/cat.py -  # pass stdin through to stdout
     a
     b
     c
+    $
+
+    $ (echo a; echo b; echo c) | cat -n | bin/cat.py -etv  # show \t as \t and \n as \n
+         1\ta\n
+         2\tb\n
+         3\tc\n
+    $
+
+    $ echo echo \$\''\x5A\xC2\xA0'\' | bash | bin/cat.py -tv  # do show even &nbsp; Non-Break Space as nonprinting
+    Z\xC2\xA0
     $
 
 
@@ -349,21 +388,21 @@ Give help for the keystrokes of the "bin/read.py" command line editor
     $
 
     $ bin/chmod.py -rw /dev/null
-    Namespace(mode='-rw', recursive=None, tops=['/dev/null'])
+    Namespace(mode='-rw', recursive=0, tops=['/dev/null'])
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py +rw /dev/null
-    Namespace(mode='+rw', recursive=None, tops=['/dev/null'])
+    Namespace(mode='+rw', recursive=0, tops=['/dev/null'])
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py =rw /dev/null
-    Namespace(mode='=rw', recursive=None, tops=['/dev/null'])
+    Namespace(mode='=rw', recursive=0, tops=['/dev/null'])
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
@@ -373,14 +412,15 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 ## 2.8 ) Cp
 
     $ bin/cp.py
-    usage: cp.py [-h] [-i] [-p] [-R] FILE
-    cp.py: error: the following arguments are required: FILE
+    Namespace(R=0, file=None, i=0, p=0)
+    usage: cp.py [-h] [-i] [-p] [-R] [FILE]
+    cp.py: error: not implemented
     + exit 2
     $
 
     $ bin/cp.py f.file
-    Namespace(R=None, file='f.file', i=None, p=None)
-    usage: cp.py [-h] [-i] [-p] [-R] FILE
+    Namespace(R=0, file='f.file', i=0, p=0)
+    usage: cp.py [-h] [-i] [-p] [-R] [FILE]
     cp.py: error: not implemented
     + exit 2
     $
@@ -520,48 +560,31 @@ Call a column numeric when two-thirds of its cells contain decimal digits
     $ bin/expand.py - </dev/null
     $
 
-    $ bash -c "bin/echo.py -n $'t\tr\rn\n'" | bin/expand.py | cat -etv
-    t       r$
-    n$
+    $ echo echo \$\''\xC0\x80'\' | bash | bin/expand.py | bin/hexdump.py  # x EF BF BD = uFFFD = Unicode Replacement chars
+    0000000 ef bf bd ef bf bd 0a
+    0000007
     $
 
-    $ bin/echo.py 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | bin/expand.py
-    åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢
+    $ echo echo -n \$\''t\tr\rn\n'\' | bash | bin/expand.py | bin/cat.py -etv
+    t       r\n
+    n\n
     $
 
-    $ bin/echo.py 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | bin/expand.py --repr | sed -E 's,(.u),$&,g' | tr '$' '\n'
-
-    \u00E5
-    \u00E9
-    \u00EE
-    \u00F8
-    \u00FC
-    \u2190
-    \u2191
-    \u2192
-    \u2193
-    \u21E7
-    \u2303
-    \u2318
-    \u2325
-    \u0001F494
-    \u0001F4A5
-    \u0001F60A
-    \u0001F620
-    \u0001F622
+    $ echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | bin/expand.py  # no change
+    åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢
     $
 
-    $ bash -c 'echo $'\''\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ '\' | bin/expand.py --plain
-      " " " ' " - -- ' '' '''
+    $ echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | bin/expand.py --repr  # such as "\u22EE" for "⋮" vertical ellipsis
+    \u00E5\u00E9\u00EE\u00F8\u00FC\u2190\u2191\u2192\u2193\u21E7\u22EE\u2303\u2318\u2325\u0001F494\u0001F4A5\u0001F60A\u0001F620\u0001F622
     $
 
-    $ bin/echo.py 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | bin/expand.py
-    import sys
-    if sys.stdout.isatty():
-        print("isatty")
+    $ echo echo -n \$\''\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ '\' | bash | bin/expand.py | bin/hexdump.py --chars  # common 'smart' chars
+    0000000   20 20 22 20 22 20 22 20 27 20 22 20 2D 20 2D 2D  |  " " " ' " - --|
+    0000010   20 27 20 27 27 20 27 27 27 0A                    | ' '' '''Ċ|
+    000001A
     $
 
-    $ bin/echo.py 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | bin/expand.py --wiki
+    $ echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | bin/expand.py --wiki
     <p>
     <code>import&nbsp;sys</code><br></br>
     <code>if&nbsp;sys.stdout.isatty():</code><br></br>
@@ -711,46 +734,66 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
 
 ## 2.22 ) HexDump
 
-    $ bin/hexdump.py /dev/null
-    0000000
+    $ bin/echo.py -n hexdump.py | bin/hexdump.py  # classic eight-bit groups
+    0000000 68 65 78 64 75 6d 70 2e 70 79
+    000000a
     $
 
-    $ bin/echo.py -n hexdump | bin/hexdump.py | bin/cat.py -etv
-    0000000 68 65 78 64 75 6d 70$
-    0000007$
+    $ bin/echo.py -n hexdump.py | hexdump -C
+    00000000  68 65 78 64 75 6d 70 2e  70 79                    |hexdump.py|
+    0000000a
     $
 
-    $ bin/echo.py -n hexdump | bin/hexdump.py -C
-    0000000   68 65 78 64 75 6D 70                              |hexdump|
-    0000007
+    $ bin/echo.py -n hexdump.py | bin/hexdump.py -C  # classic shorthand meaning --bytes 1
+    0000000   68 65 78 64 75 6d 70 2e  70 79                    |hexdump.py|
+    000000a
     $
 
-    % echo -n 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | hexdump.py -C
-    0000000   C3_A5 C3_A9 C3_AE C3_B8 C3_BC E2_86_90 E2_86_91   |å é î ø ü ←  ↑  |
-    0000010   E2_86_92 E2_86_93 E2_87_A7 E2_8B_AE E2_8C_83 E2_  |→  ↓  ⇧  ⋮  ⌃  ⌘|
-    0000020  _8C_98 E2_8C_A5 F0_9F_92_94 F0_9F_92_A5 F0_9F_98_  |  ⌥  💔   💥   😊  |
-    0000030  _8A F0_9F_98_A0 F0_9F_98_A2                        | 😠   😢   |
-    0000039
-    %
+    $ bin/echo.py -n hexdump.py | bin/hexdump.py --c  # new shorthand meaning --charset utf-8
+    0000000   68 65 78 64 75 6D 70 2E 70 79                    |hexdump.py|
+    000000A
+    $
 
-    $ bin/hexdump.py --dump-byteset | bin/hexdump.py --b
-    0000000   00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F   | Ā ā Ă ă Ą ą Ć ć Ĉ ĉ Ċ ċ Č č Ď ď |
-    0000010   10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F   | Đ đ Ē ē Ĕ ĕ Ė ė Ę ę Ě ě Ĝ ĝ Ğ ğ |
-    0000020   20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F   |   ! " # $ % & ' ( ) * + , - . / |
-    0000030   30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F   | 0 1 2 3 4 5 6 7 8 9 : ; < = > ? |
-    0000040   40 41 42 43 44 45 46 47 48 49 4A 4B 4C 4D 4E 4F   | @ A B C D E F G H I J K L M N O |
-    0000050   50 51 52 53 54 55 56 57 58 59 5A 5B 5C 5D 5E 5F   | P Q R S T U V W X Y Z [ \ ] ^ _ |
-    0000060   60 61 62 63 64 65 66 67 68 69 6A 6B 6C 6D 6E 6F   | ` a b c d e f g h i j k l m n o |
-    0000070   70 71 72 73 74 75 76 77 78 79 7A 7B 7C 7D 7E 7F   | p q r s t u v w x y z { | } ~ ſ |
-    0000080   80 81 82 83 84 85 86 87 88 89 8A 8B 8C 8D 8E 8F   | ƀ Ɓ Ƃ ƃ Ƅ ƅ Ɔ Ƈ ƈ Ɖ Ɗ Ƌ ƌ ƍ Ǝ Ə |
-    0000090   90 91 92 93 94 95 96 97 98 99 9A 9B 9C 9D 9E 9F   | Ɛ Ƒ ƒ Ɠ Ɣ ƕ Ɩ Ɨ Ƙ ƙ ƚ ƛ Ɯ Ɲ ƞ Ɵ |
-    00000A0   A0 A1 A2 A3 A4 A5 A6 A7 A8 A9 AA AB AC AD AE AF   | Ơ ¡ ¢ £ ¤ ¥ ¦ § ¨ © ª « ¬ ­ ® ¯ |
-    00000B0   B0 B1 B2 B3 B4 B5 B6 B7 B8 B9 BA BB BC BD BE BF   | ° ± ² ³ ´ µ ¶ · ¸ ¹ º » ¼ ½ ¾ ¿ |
-    00000C0   C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 CA CB CC CD CE CF   | À Á Â Ã Ä Å Æ Ç È É Ê Ë Ì Í Î Ï |
-    00000D0   D0 D1 D2 D3 D4 D5 D6 D7 D8 D9 DA DB DC DD DE DF   | Ð Ñ Ò Ó Ô Õ Ö × Ø Ù ǚ Û Ü Ý Þ ß |
-    00000E0   E0 E1 E2 E3 E4 E5 E6 E7 E8 E9 EA EB EC ED EE EF   | à á â ã ä å æ ç è é ê ë ì í î ï |
-    00000F0   F0 F1 F2 F3 F4 F5 F6 F7 F8 F9 FA FB FC FD FE FF   | ð ñ ò ó ô õ ö ÷ ø ù ú û ü ý þ ÿ |
+    $ bin/echo.py -n 0123456789abcdef | bin/hexdump.py --bytes 4 -C  # quads
+    0000000   30_31_32_33 34_35_36_37 38_39_61_62 63_64_65_66  | 0123 4567 89ab cdef |
+    0000010
+    $
+
+    $ echo echo -n \$\''ijk\xC0\x80nop'\' | bash | bin/hexdump.py --chars  # overlong encoding, aka non-shortest form utf-8
+    0000000   69 6A 6B C0 80 6E 6F 70                          |ijkÀƀnop|
+    0000008
+    $
+
+    $ bin/echo.py -n 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | bin/hexdump.py --chars  # common non-ascii
+    0000000   C3 A5 C3 A9 C3 AE C3 B8 C3 BC E2 86 90 E2 86 91  |å é î ø ü ←  ↑  |
+    0000010   E2 86 92 E2 86 93 E2 87 A7 E2 8C 83 E2 8C 98 E2  |→  ↓  ⇧  ⌃  ⌘  ⌥|
+    0000020   8C A5 F0 9F 92 94 F0 9F 92 A5 F0 9F 98 8A F0 9F  |  💔   💥   😊   😠 |
+    0000030   98 A0 F0 9F 98 A2                                |  😢   |
+    0000036
+    $
+
+    $ bin/hexdump.py --dump-byteset | bin/hexdump.py --chars
+    0000000   00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F  |ĀāĂăĄąĆćĈĉĊċČčĎď|
+    0000010   10 11 12 13 14 15 16 17 18 19 1A 1B 1C 1D 1E 1F  |ĐđĒēĔĕĖėĘęĚěĜĝĞğ|
+    0000020   20 21 22 23 24 25 26 27 28 29 2A 2B 2C 2D 2E 2F  | !"#$%&'()*+,-./|
+    0000030   30 31 32 33 34 35 36 37 38 39 3A 3B 3C 3D 3E 3F  |0123456789:;<=>?|
+    0000040   40 41 42 43 44 45 46 47 48 49 4A 4B 4C 4D 4E 4F  |@ABCDEFGHIJKLMNO|
+    0000050   50 51 52 53 54 55 56 57 58 59 5A 5B 5C 5D 5E 5F  |PQRSTUVWXYZ[\]^_|
+    0000060   60 61 62 63 64 65 66 67 68 69 6A 6B 6C 6D 6E 6F  |`abcdefghijklmno|
+    0000070   70 71 72 73 74 75 76 77 78 79 7A 7B 7C 7D 7E 7F  |pqrstuvwxyz{|}~ſ|
+    0000080   80 81 82 83 84 85 86 87 88 89 8A 8B 8C 8D 8E 8F  |ƀƁƂƃƄƅƆƇƈƉƊƋƌƍƎƏ|
+    0000090   90 91 92 93 94 95 96 97 98 99 9A 9B 9C 9D 9E 9F  |ƐƑƒƓƔƕƖƗƘƙƚƛƜƝƞƟ|
+    00000A0   A0 A1 A2 A3 A4 A5 A6 A7 A8 A9 AA AB AC AD AE AF  |Ơ¡¢£¤¥¦§¨©ª«¬ƭ®¯|
+    00000B0   B0 B1 B2 B3 B4 B5 B6 B7 B8 B9 BA BB BC BD BE BF  |°±²³´µ¶·¸¹º»¼½¾¿|
+    00000C0   C0 C1 C2 C3 C4 C5 C6 C7 C8 C9 CA CB CC CD CE CF  |ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏ|
+    00000D0   D0 D1 D2 D3 D4 D5 D6 D7 D8 D9 DA DB DC DD DE DF  |ÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞß|
+    00000E0   E0 E1 E2 E3 E4 E5 E6 E7 E8 E9 EA EB EC ED EE EF  |àáâãäåæçèéêëìíîï|
+    00000F0   F0 F1 F2 F3 F4 F5 F6 F7 F8 F9 FA FB FC FD FE FF  |ðñòóôõö÷øùúûüýþÿ|
     0000100
+    $
+
+    $ bin/hexdump.py /dev/null  # visibly empty
+    0000000
     $
 
 
@@ -772,7 +815,7 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
         2  echo def
         3  history
     (pybashish) $
-    (pybashish) $
+    (pybashish) $ ^D
     + exit 1
     $
 
@@ -961,14 +1004,15 @@ Clean up
 ## 2.29 ) Mv
 
     $ bin/mv.py
-    usage: mv.py [-h] [-i] FILE
-    mv.py: error: the following arguments are required: FILE
+    Namespace(file=None, i=0)
+    usage: mv.py [-h] [-i] [FILE]
+    mv.py: error: not implemented
     + exit 2
     $
 
     $ bin/mv.py f.file
-    Namespace(file='f.file', i=None)
-    usage: mv.py [-h] [-i] FILE
+    Namespace(file='f.file', i=0)
+    usage: mv.py [-h] [-i] [FILE]
     mv.py: error: not implemented
     + exit 2
     $
@@ -989,20 +1033,21 @@ Clean up
 
 ## 2.31 ) Read
 
-    $ bin/echo.py 'Hello, Line Editor' | bin/read.py
+    $ bin/echo.py 'Hello, Line Editor' | bin/read.py -e
     ? Hello, Line Editor
     'Hello, Line Editor\n'
     $
 
-    $ bin/echo.py 'Hello, ^ULine Editor' | sed 's,\^U,@,g' | tr '@' '\25' | bin/read.py
+    $ bin/echo.py 'Hello, ^ULine Editor' | sed 's,\^U,@,g' | tr '@' '\25' | bin/read.py -e
     ? Line Editor
     'Line Editor\n'
     $
 
-    $ bin/echo.py '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | tr -d '\n' | bin/read.py
+    $ bin/echo.py '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | tr -d '\n' | bin/read.py -e
     ? ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑
     '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑'
     $
+
 
 ## 2.32 ) Rm
 
@@ -1014,7 +1059,33 @@ Clean up
     $
 
 
-## 2.33 ) SubSh
+## 2.33 ) Sponge
+
+    $ rm -fr t.txt
+    $
+
+    $ echo one >t.txt && cat t.txt
+    one
+    $
+
+    $ echo two | bin/sponge.py t.txt && cat t.txt
+    two
+    $
+
+    $ cat t.txt | bin/sponge.py t.txt && cat t.txt
+    two
+    $
+
+    $ echo three | bin/sponge.py -a t.txt && cat t.txt
+    two
+    three
+    $
+
+    $ rm -fr t.txt
+    $
+
+
+## 2.34 ) SubSh
 
     $ bin/subsh.py echo 'Hello, Subsh World!'
     {'args': ['echo', 'Hello, Subsh World!'],
@@ -1031,17 +1102,17 @@ Clean up
     $
 
 
-## 2.34 ) Tail
+## 2.35 ) Tail
 
     $ bin/tail.py
-    Namespace(F=None, files=[], follow=None, lines=None, retry=None)
+    Namespace(F=0, files=[], follow=0, lines=None, retry=0)
     usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE [FILE ...]]
     tail.py: error: not implemented
     + exit 2
     $
 
 
-## 2.35 ) Tar
+## 2.36 ) Tar
 
     $ rm -fr tardir/ tardir.tgz
     $
@@ -1079,7 +1150,7 @@ Clean up
     $
 
 
-## 2.36 ) Touch
+## 2.37 ) Touch
 
     $ rm -fr x y z
     $
@@ -1098,7 +1169,7 @@ Clean up
     $
 
 
-## 2.37 ) Tr
+## 2.38 ) Tr
 
     $ bin/cat.py $(git ls-files | grep -v '^tests/') | bin/tr.py | awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
 
@@ -1110,7 +1181,7 @@ Clean up
     $
 
 
-## 2.38 ) Watch
+## 2.39 ) Watch
 
     $ bin/watch.py
     Namespace(interval=None, words=[])
@@ -1120,17 +1191,17 @@ Clean up
     $
 
 
-## 2.39 ) Wc
+## 2.40 ) Wc
 
     $ bin/wc.py
-    Namespace(bytes=None, chars=None, files=[], lines=None, max_line_length=None)
+    Namespace(bytes=0, chars=0, files=[], lines=0, max_line_length=0)
     usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE [FILE ...]]
     wc.py: error: not implemented
     + exit 2
     $
 
 
-## 2.40 ) XArgs
+## 2.41 ) XArgs
 
 Join words of lines into one line
 
@@ -1236,8 +1307,8 @@ else exit status 2 from being stubbed out
     $ bin/xargs.py </dev/null >/dev/null 2>&1
     $
 
-Test optional argument help of "show this help message and exit"
-spelled differently than:  -h, --help
+Test an optional argument spelled differently than:  -h, --help
+that still calls for automagic "show this help message and exit"
 
     $ rm -fr bin/p.py
     $
@@ -1245,17 +1316,20 @@ spelled differently than:  -h, --help
     $ bin/argdoc.py --rip doc bin/cal.py >/dev/null
     $
 
-    $ bin/argdoc.py --rip argdoc bin/cal.py >bin/p.py
+    $ bin/argdoc.py --rip argparse bin/cal.py >bin/p.py
     $ python3 bin/p.py
-    Namespace(h=None, help=None, ymd=None)
+    Namespace(h=0, help=0, ymd=None)
     usage: cal.py [--help] [-h] [YMD]
-    bin/cal.py: error: not implemented
+    cal.py: error: not implemented
     + exit 2
     $
 
-    $ bin/argdoc.py --rip argparse bin/cal.py >bin/p.py
+    $ bin/argdoc.py --rip argdoc bin/cal.py >bin/p.py
     $ python3 bin/p.py
-    Namespace(h=None, help=None, ymd=None)
+    Namespace(h=0, help=0, ymd=None)
+    usage: cal.py [--help] [-h] [YMD]
+    cal.py: error: not implemented
+    + exit 2
     $
 
     $ rm -fr bin/p.py
@@ -1266,9 +1340,6 @@ Clean up
     $ rm -fr ../pybashish/bin/argdoc.pyc
     $ rm -fr ../pybashish/bin/pybashish.pyc
     $
-
-
-// FIXME: remake this into a ".md" Markdown file
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

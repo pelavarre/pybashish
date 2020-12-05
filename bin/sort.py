@@ -1,22 +1,18 @@
 #!/usr/bin/env python3
 
 """
-usage: rm.py [-h] [FILE [FILE ...]]
+usage: sort.py [-h]
 
-move a file to the ../__jqd-trash/ dir
-
-positional arguments:
-  FILE        a file to trash (default: last modified of cwd)
+sort lines
 
 optional arguments:
   -h, --help  show this help message and exit
 
-quirks:
-  don't rush to reclaim disk space, like Bash "rm" does
-
 examples:
   Oh no! No examples disclosed!! 💥 💔 💥
 """
+# FIXME: -k-1,-1 for negative field indexing
+# FIXME: think into the mess at "sort" vs "LC_ALL=C sort"
 
 
 import sys
@@ -28,7 +24,7 @@ def main():
     args = argdoc.parse_args()
     sys.stderr.write("{}\n".format(args))
     sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
-    sys.stderr.write("rm.py: error: not implemented\n")
+    sys.stderr.write("sort.py: error: not implemented\n")
     sys.exit(2)  # exit 2 from rejecting usage
 
 

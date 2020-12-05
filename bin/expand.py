@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 
 r"""
-usage: expand.py [-h] [--csv] [--plain] [--repr] [--wiki] [FILE [FILE ...]]
+usage: expand.py [-h] [--csv] [--repr] [--keep-tabs] [--wiki] [FILE [FILE ...]]
 
 replace tabs with spaces, replace cr with lf, strip leading and trailing empty lines
 
 positional arguments:
-  FILE        a file to copy out
+  FILE         a file to copy out (default: stdin)
 
 optional arguments:
-  -h, --help  show this help message and exit
-  --csv       convert to a ".csv" table
-  --plain     replace smart quotes, smart dashes, and such with plain us-ascii " ' -
-  --repr      replace all but r"[\n\r\t]" and plain us-ascii with python \u escapes
-  --wiki      escape as html p of code nbsp br (fit for insertion into atlassian wiki)
+  -h, --help   show this help message and exit
+  --csv        convert to a ".csv" table
+  --repr       replace all but r"[\n\r\t]" and plain ascii with python \u escapes
+  --keep-tabs  don't replace tabs, smart quotes, smart dashes, and such with plain ascii " - etc
+  --wiki       escape as html p of code nbsp br (fit for insertion into atlassian wiki)
 
-bugs:
+quirks:
+  defaults to replace tabs, smart quotes, dashes, etc: not just tabs, but not also emoji
   doesn't accurately catenate binary files, unlike classic bash "expand"
   does strip leading and trailing empty lines, unlike bash "expand"
   does convert classic mac CR "\r" end-of-line to linux LF "\n", unlike bash "expand"
@@ -25,7 +26,7 @@ bugs:
   doesn't implement linux -i, --initial for keeping tabs in line after first nonwhite
   doesn't implement mac unexpand -a for compressing files maximally by replacing spaces with tabs
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "expand"
   accepts only the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
   does accept "-" as meaning "/dev/stdin", like linux "expand -", unlike mac "expand -"
@@ -37,14 +38,22 @@ see also:
 
 examples:
   expand.py -
-  echo -n $'\xC0\x80' | expand.py | hexdump -C  # Linux preserves binary, Mac says 'illegal byte'
-  echo -n $'t\tr\rn\n' | expand.py | cat -etv
-  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | expand.py
+  echo -n $'\xC0\x80' | expand | hexdump  # Linux happy, but Mac says 'illegal byte sequence'
+  echo -n $'\xC0\x80' | expand.py | hexdump.py  # x EF BF BD = uFFFD = Unicode Replacement chars
+  echo -n $'t\tr\rn\n' | expand.py | cat.py -etv
+  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | expand.py  # no change
   echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | expand.py --repr  # such as "\u22EE" for "⋮" vertical ellipsis
-  echo $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | expand.py --plain
+  echo -n $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | expand.py | hexdump.py --chars  # common 'smart' chars
   echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | expand.py --wiki
-
 """
+
+# note: the five chars "💔💥😊😠😢" are ": broken_heart : boom : blush : angry : cry :" in Slack 2020
+
+# FIXME: convert \u|\U to \u005C\u0075|55 to make --repr reversible, and option to reverse it
+
+# FIXME: option to sponge or not to sponge
+# FIXME: think into the redundancy between incremental and sponging solutions to "def striplines()"
+# FIXME: learn more of how much the sponging slows and stresses hosts
 
 
 import collections
@@ -64,9 +73,10 @@ def main(argv):
 
     args = argdoc.parse_args(argv[1:])
 
-    passme.print_lines = None
+    passme.sponging = False
+    passme.print_lines = list()
     if args.csv:
-        passme.print_lines = list()
+        passme.sponging = True
 
     # Expand each file
 
@@ -76,15 +86,13 @@ def main(argv):
         prompt_tty_stdin()
 
     for path in paths:
-        if path == "-":
-            expand_incoming(sys.stdin, args=args)
-        else:
-            try:
-                with open(path, "rt") as incoming:
-                    expand_incoming(incoming, args=args)
-            except FileNotFoundError as exc:
-                stderr_print("expand.py: error: {}: {}".format(type(exc).__name__, exc))
-                sys.exit(1)
+        readable = "/dev/stdin" if (path == "-") else path
+        try:
+            with open(readable, "rb") as incoming:
+                expand_incoming(incoming, args=args)
+        except FileNotFoundError as exc:
+            stderr_print("expand.py: error: {}: {}".format(type(exc).__name__, exc))
+            sys.exit(1)
 
 
 def expand_incoming(incoming, args):
@@ -97,7 +105,10 @@ def expand_incoming(incoming, args):
 
     while True:
 
-        line = incoming.readline()
+        line = incoming.readline().decode("utf-8", errors="replace")
+        # \uFFFD Replacement Character, in place of raising UnicodeDecodeError
+        # per https://unicode.org/charts/PDF/UFFF0.pdf
+
         lines = line.splitlines()
 
         if not line:
@@ -111,15 +122,19 @@ def expand_incoming(incoming, args):
             else:
 
                 if stripped:
-                    asif_print((stripped - 1) * "\n")
+                    as_print((stripped - 1) * "\n")
                     stripped = 0
 
-                asif_print(expanded)
+                as_print(expanded)
 
                 begun = True
 
     if passme.wiki_begun:
-        asif_print("</p>")
+        as_print("</p>")
+
+    printed = "\n".join(passme.print_lines) + "\n"
+    stripped = striplines(printed)
+    assert printed == stripped
 
     if args.csv:
         exit_csv(passme.print_lines)
@@ -128,10 +143,12 @@ def expand_incoming(incoming, args):
 def expand_line(line, args):
     """Transform one line"""
 
-    expanded = line.expandtabs()
+    expanded = line
 
-    if args.plain:
-        expanded = dash_quote_as_ascii(expanded)
+    if not args.keep_tabs:
+        expanded = line.expandtabs()
+        if not (args.repr or args.wiki):
+            expanded = dash_quote_as_ascii(expanded)
 
     if args.repr:
         expanded = code_points_as_unicode_escapes(expanded)
@@ -145,7 +162,7 @@ def expand_line(line, args):
         if args.wiki:
             if not passme.wiki_begun:
                 passme.wiki_begun = True
-                asif_print("<p>")
+                as_print("<p>")
 
     return expanded
 
@@ -168,29 +185,26 @@ def chars_as_wiki_html(chars):
     return reps
 
 
-def asif_print(*args):
+def as_print(*args):
     """Print, or just collect, lines of output"""
 
-    if passme.print_lines is None:
+    line = " ".join(str(_) for _ in args)
+    passme.print_lines.append(line)
 
-        print(*args)
-
-    else:
-
-        line = " ".join(str(_) for _ in args)
-        passme.print_lines.append(line)
+    if not passme.sponging:
+        print(line)
 
 
 def exit_csv(lines):
     """Convert to Csv from PSql today, and maybe to Csv from messier sources tomorrow"""
 
-    for (index, line,) in enumerate(lines):
+    for (index, line) in enumerate(lines):
 
-        bars = list(_ for (_, ch,) in enumerate(line) if ch == "|")
+        bars = list(_ for (_, ch) in enumerate(line) if ch == "|")
         if index == 0:
             bars0 = bars
         elif bars != bars0:
-            plusses = list(_ for (_, ch,) in enumerate(line) if ch == "+")
+            plusses = list(_ for (_, ch) in enumerate(line) if ch == "+")
             if index == 1:
                 assert plusses == bars0
             elif (not line) and (index == (len(lines) - 1)):
@@ -208,9 +222,17 @@ def exit_csv(lines):
     print(len(lines))  # FIXME: finish implementing "--csv"
 
 
+#
+# Git-track some Python idioms here
+#
+
+
+#
+# Copy-paste some "def"s from elsewhere
+#
 # deffed in many files  # missing from docs.python.org
 def code_points_as_unicode_escapes(chars):
-    r"""Replace all but r"[\n\r\t]" and plain us-ascii with \uXXXX and \uxxxxXXXX escapes"""
+    r"""Replace all but r"[\n\r\t]" and plain Ascii with \uXXXX and \uxxxxXXXX escapes"""
 
     reps = ""
     for ch in chars:
@@ -234,7 +256,7 @@ def code_points_as_unicode_escapes(chars):
 
 # deffed in many files  # missing from docs.python.org
 def dash_quote_as_ascii(chars):
-    """Replace such as “ ’ ” – — ′ ″ ‴ with printable us-ascii"""
+    """Replace such as “ ’ ” – — ′ ″ ‴ with printable Ascii"""
 
     reps_by_ch = collections.defaultdict(type(None))
 
@@ -271,8 +293,25 @@ def prompt_tty_stdin():
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def striplines(chars):
+    """Strip leading blank lines, trailing blank lines, and trailing blank spaces from every line"""
+
+    lines = chars.splitlines()
+    lines = list(_.rstrip() for _ in lines)
+    while lines and not lines[0]:
+        lines = lines[1:]
+    while lines and not lines[-1]:
+        lines = lines[:-1]
+
+    stripped = "\n".join(lines) + "\n"
+    return stripped
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
@@ -289,10 +328,10 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
+        (exc_type, exc, exc_traceback) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            null_fileno = os.open(os.devnull, flags=os.O_WRONLY)
             os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
 
             sys.exit(1)

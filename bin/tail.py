@@ -6,7 +6,7 @@ usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE [FILE ...]]
 show just the trailing lines of a file
 
 positional arguments:
-  FILE                  the file to drop leading lines from
+  FILE                  the file to drop leading lines from (default: stdin)
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -16,11 +16,11 @@ optional arguments:
   -n COUNT, --lines COUNT
                         how many trailing lines to show (default: 10)
 
-bugs:
+quirks:
   a count led by "+" to mark it as positive says how many leading lines to drop
   you can say just "-5" or "+9", you don't have to spell them out in full like linux "-n +9"
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "tail"
   accepts only the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
   does accept "-" as meaning "/dev/stdin", like linux "tail -", unlike mac "tail -"

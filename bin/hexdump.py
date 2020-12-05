@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 
 r"""
-usage: hexdump.py [-h] [-C] [--bytes BYTES] [--dump-byteset] [FILE [FILE ...]]
+usage: hexdump.py [-h] [-C] [--bytes BYTES] [--charset CHARSET] [--dump-byteset] [FILE [FILE ...]]
 
 show bytes as nybbles and more
 
 positional arguments:
-  FILE             a file to copy out
+  FILE                 a file to copy out (default: stdin)
 
 optional arguments:
-  -h, --help       show this help message and exit
-  -C               show bytes as characters, not just as visually overloaded nybbles
-  --bytes [BYTES]  show bytes as bytes:  distinct monospaced glyphs (default: 1 at a time)
-  --dump-byteset   first read a file of the bytes b"\x00" through b"\xff"
+  -h, --help           show this help message and exit
+  -C                   show bytes as eight-bit chars:  distinct monospaced glyphs
+  --bytes [BYTES]      group bytes as each single 1 byte, or pairs of 2, or quads of 4, etc
+  --charset [CHARSET]  show bytes as decoded by a charset (default: "utf-8")
+  --dump-byteset       write the bytes b"\x00" through b"\xff" to stdout
 
-bugs:
+quirks:
   too many emoji don't do monospace, and passing through arbitrary unicode has arbitrary effects
   shows terminal control (not data) characters of \u0000..\u00ff as \u0100..\u01ff
   shows utf-8 emoji as themselves, followed by as many spaces as they have bytes
@@ -23,20 +24,51 @@ bugs:
   shows empty files as a zeroed count of bytes (unlike bash showing nothing to mean zero)
   shows the --bytes in groups of n at a time (doesn't always make you count off all the bytes)
   ends each line when it ends, doesn't pad some with spaces
+  doesn't (yet?) compress duplicate lines of hex
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "hexdump"
   accepts only the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
   does accept "-" as meaning "/dev/stdin", unlike mac and linux
 
 examples:
-  echo hexdump | hexdump.py
-  echo hexdump | hexdump.py -C
-  hexdump.py /dev/null
-  echo -n 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | hexdump.py -C
-  hexdump.py --dump-byteset | hexdump.py -C
+  echo -n hexdump.py | hexdump  # classic eight-bit groups at Mac, but messy at Linux
+  echo -n hexdump.py | hexdump.py
+  echo -n hexdump.py | hexdump -C  # classic shorthand close to meaning --bytes 1
+  echo -n hexdump.py | hexdump.py -C
+  echo -n hexdump.py | hexdump.py --c  # our shorthand meaning --charset utf-8
+  echo -n 0123456789abcdef | hexdump.py --bytes 4 -C  # quads
+  /bin/echo -n $'ijk\xC0\x80nop' | hexdump.py --chars  # overlong encoding, aka non-shortest form
+  echo -n 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | hexdump.py --chars  # common non-ascii
+  echo -n $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | hexdump.py --chars  # common 'smart' chars
+  hexdump.py --dump-byteset | hexdump.py --chars
+  hexdump.py /dev/null  # visibly empty
 """
+
+# FIXME: default to:  hexdump.py --dump-byteset | hexdump.py --chars
+
+#
+# see also:
+#
+# Python3 UnicodeDecodeError "invalid start byte" for (all?) overlong encodings
+#
+# Unicode-org:  Control Chars of C0/C1, and Data Chars of Latin Basic/ Supplement/ Extended A/B
+# https://unicode.org/charts/PDF/U0000.pdf
+# https://unicode.org/charts/PDF/U0080.pdf
+# https://unicode.org/charts/PDF/U0100.pdf
+#
+# Google Search:  site:docs.python.org us-ascii
+# => "utf-8" and "latin-1" defined at:  https://docs.python.org/3/library/codecs.html
+#
+
+# FIXME: add -v to stop compressing duplicate lines of hex, and turn it on by default
+# FIXME: work out precisely how to make Linux "hexdump" match the style of the default Mac dump
+# FIXME: consider shipping "hd", "od", etc as additions or replacements of "hexdump.py"
+
+# FIXME: delete the CHARSET variations, or code something real such as "cp500, ebcdic-cp-be"
+
 # FIXME: implement usage: hexdump.py -s OFFSET -n LENGTH  # accept 0x hex for either
+# FIXME: add --no-offsets
 
 
 import contextlib
@@ -48,44 +80,91 @@ import argdoc
 
 def main(argv):
 
-    # Fetch and auto-correct the args
+    args = _parse_hexdump_argv(argv)
 
-    args = argdoc.parse_args(argv[1:])
-
-    if args.bytes is not False:
-        args.bytes = 1 if (args.bytes is None) else int(args.bytes)
-        args.C = True
-        assert args.bytes
-
-    # Discard Stdin and write the bytes b"\x00" through b"\xFF" to Stdout
+    # Write the bytes b"\x00" through b"\xFF" to Stdout, before doing more
 
     if args.dump_byteset:
-        assert not args.files
-
         for xx in range(0x100):
             xxs = bytearray(1)
             xxs[0] = xx
             os.write(sys.stdout.fileno(), xxs)
 
-        sys.exit()
-
     # Dump each file
 
     dumper = HexDumper(args)
 
-    paths = args.files if args.files else ["-"]
+    paths = args.files
+    if not (args.files or args.dump_byteset):
+        paths = ["-"]
 
     if "-" in paths:
         prompt_tty_stdin()
 
     for path in paths:
-        openable = "/dev/stdin" if (path == "-") else path
+        readable = "/dev/stdin" if (path == "-") else path
         try:
-            with open(openable, "rb") as incoming:
+            with open(readable, mode="rb") as incoming:
                 dumper.dump_incoming(incoming)
         except FileNotFoundError as exc:
             stderr_print("hexdump.py: error: {}: {}".format(type(exc).__name__, exc))
             sys.exit(1)
+
+
+def _parse_hexdump_argv(argv):
+    """Parse the command line"""
+
+    args = argdoc.parse_args(argv[1:])
+
+    args.classic = (args.bytes is False) and (args.charset is False)
+
+    #
+
+    args.stride = 1
+    if (args.bytes is not None) and (args.bytes is not False):
+        args.stride = int(args.bytes, 0)
+
+    #
+
+    args.encoding = args.C or (args.charset is not False)
+
+    args.decoding = None
+    far_codec_hint = "utf-8"
+    if args.charset is not False:
+        args.decoding = True
+        if args.charset:
+            far_codec_hint = args.charset
+
+        if args.bytes is not False:
+            stderr_print(argdoc.format_usage().rstrip())
+            stderr_print("hexdump.py: error: choose --charset or --bytes, not both")
+            sys.exit(2)  # exit 2 from rejecting usage
+
+    "".encode(far_codec_hint)  # may raise LookupError: unknown encoding
+
+    near_codec_hint = far_codec_hint.replace("-", "_").lower()
+
+    ascii_codec_hints = "ascii 646 us_ascii"
+    utf_8_codec_hints = "utf_8 u8 utf utf8 cp65001".split()
+    latin_1_codec_hints = (
+        "latin_1 iso_8859_1 iso8859_1 8859 cp819 latin latin1 l1".split()
+    )
+
+    args.codec = far_codec_hint
+    if near_codec_hint in ascii_codec_hints:
+        args.codec = "ascii"
+    elif near_codec_hint in latin_1_codec_hints:
+        args.codec = "latin-1"
+    elif near_codec_hint in utf_8_codec_hints:
+        args.codec = "utf-8"
+    else:
+        stderr_print(argdoc.format_usage().rstrip())
+        stderr_print("hexdump.py: error: choose --charset from: ascii, latin-1, utf-8")
+        sys.exit(2)  # exit 2 from rejecting usage
+
+    #
+
+    return args
 
 
 class HexDumper:
@@ -96,7 +175,6 @@ class HexDumper:
         self.incomings = b""
 
         self.encodeds = b""
-        self.nybbleds = ""
         self.decodeds = ""
 
         self.offset = 0
@@ -107,15 +185,15 @@ class HexDumper:
 
         while True:
 
-            more = incoming.read(1)  # FIXME: run faster
-            if not more:
-                self.dump_decodables(more)
+            got_more = incoming.read(1)  # FIXME: run faster
+            if not got_more:
+                self.dump_decodables(got_more)
                 break
 
-            self.incomings += more
-            self.dump_decodables(more)
+            self.incomings += got_more
+            self.dump_decodables(got_more)
 
-    def dump_decodables(self, more):
+    def dump_decodables(self, got_more):
         """Dump only what's decodable, till there are no more bytes"""
 
         args = self.args
@@ -130,9 +208,8 @@ class HexDumper:
 
                 # Quit if more bytes needed for decode, till there are no more
 
-                xx = incomings[0]
-                len_decode = 1 if args.bytes else self.len_utf8_decode(xx)
-                if more:
+                len_decode = self.len_decodable() if args.decoding else 1
+                if got_more:
                     if len(incomings) < len_decode:
                         break
 
@@ -143,11 +220,11 @@ class HexDumper:
                 # Decode all the bytes, else just the first byte
 
                 some = encodeds
-                rep = self.rep_byte_as_char(encodeds[:1])
-                if not args.bytes:
+                rep = self.rep_byte_as_char(encodeds[0])
+                if args.decoding:
                     try:  # decode if decodes, except keep \u00XX unprintables printable
-                        decoded = encodeds.decode()
-                        if len(some) > 1:
+                        decoded = encodeds.decode(args.codec)
+                        if len(some) > 1:  # FIXME: when not "utf-8"/ "latin-1"/ "ascii"
                             rep = decoded
                     except UnicodeDecodeError:
                         some = encodeds[:1]
@@ -159,34 +236,41 @@ class HexDumper:
 
             # Emit the byte or bytes, and the character
 
-            more_here = more or self.incomings
-            self.dump_one_char(some, rep=rep, more=more_here)
+            got_more_here = got_more or self.incomings
+            self.dump_one_char(some, rep=rep, got_more=got_more_here)
 
             # Quit after decoding all the fetched bytes
 
             if not self.incomings:
                 break
 
-    def rep_byte_as_char(self, encodeds):
+    def rep_byte_as_char(self, xx):
+        """Choose to print each undecoded byte as Latin or Extended Latin"""
 
-        assert len(encodeds) == 1
-
-        xx = ord(encodeds)
         assert 0 <= xx <= 0xFF
 
-        rep = chr(0x100 + ord(encodeds))  # not as decoded
+        rep = chr(0x100 + xx)  # not as decoded, extended latin instead
         if 0x20 <= xx <= 0x7E:
-            rep = chr(xx)
-        elif (0xA1 <= xx) and (xx != 0xDA):
-            rep = chr(xx)
+            rep = chr(xx)  # basic latin data, not control
+        elif (0xA1 <= xx) and (xx != 0xAD):
+            rep = chr(xx)  # latin 1 data, not control
 
         return rep
 
-    def len_utf8_decode(self, xx):
-        """Group one to eight bytes together, in the way of utf-8"""
+    def len_decodable(self):
+        """Group the bytes of the next char together"""
+
+        args = self.args
+
+        if args.codec in ("ascii", "latin-1"):
+            return 1
+
+        assert args.codec == "utf-8"
+
+        xx = self.incomings[0]
 
         masks = [0x00, 0x80, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC, 0xFE, 0xFF]
-        for (index, left, right,) in zip(range(len(masks)), masks, masks[1:]):
+        for (index, left, right) in zip(range(len(masks)), masks, masks[1:]):
             if (xx & right) == left:
                 if left <= 0x80:
                     return 1  # one leading 0b1000_0000 is already not decodable
@@ -195,93 +279,144 @@ class HexDumper:
 
         return len(masks)
 
-    def dump_one_char(self, some, rep, more):
+    def dump_one_char(self, some, rep, got_more):
         """Dump a line at a time, untill there is no more"""
 
         self.encodeds += some
-        self.nybbleds += "_".join("{:02X}".format(_) for _ in some) + " "
         self.decodeds += rep.ljust(len(some))
 
         width = 0x10
-        if (len(self.encodeds) >= width) or (not more):
+        if (len(self.encodeds) >= width) or (not got_more):
 
             self.dump_line_of_chars(
                 self.encodeds[:width],
-                nybbleds=self.nybbleds[: (len("XX_") * width)],
                 decodeds=self.decodeds[:width],
-                more=more,
+                got_more=got_more,
             )
 
             self.encodeds = self.encodeds[width:]
-            self.nybbleds = self.nybbleds[(len("XX_") * width) :]
             self.decodeds = self.decodeds[width:]
 
             assert len(self.encodeds) < width
 
         assert len(self.encodeds) == len(self.decodeds)
-        assert len(self.nybbleds) == (len("XX_") * len(self.encodeds))
 
-    def dump_line_of_chars(self, encodeds, nybbleds, decodeds, more):
+    def dump_line_of_chars(self, encodeds, decodeds, got_more):
         """Dump 0x30 columns of 2 .. 0x20 nybbles, with an option for 1 .. 0x10 characters too"""
 
-        str_open = ("_" if self.skids_open else " ") if self.args.C else ""
+        args = self.args
 
-        str_offset = "{:07X}".format(self.offset)
-        str_nybbles = self.str_nybbles(nybbleds)
-        str_bytes = self.str_chars(decodeds)
+        rep_open = ("_" if self.skids_open else " ") if args.decoding else ""
 
-        if not self.args.C:
-            sep = " "
-            line = (
-                str_offset.lower()
-                + sep
-                + str_open
-                + str_nybbles.lower().replace("_", " ")
-            )
-        else:
+        rep_offset = "{:07X}".format(self.offset)
+        if args.classic:
+            rep_offset = "{:07X}".format(self.offset).lower()
+
+        rep_nybbles = self.str_nybbles(encodeds)
+
+        rep_bytes = self.str_chars(decodeds)
+
+        if args.encoding:
+
             sep = "  "
+            left = "|"
+            right = "|"
             line = (
-                str_offset + sep + str_open + str_nybbles + sep + "|" + str_bytes + "|"
+                rep_offset
+                + sep
+                + rep_open
+                + rep_nybbles
+                + sep
+                + left
+                + rep_bytes
+                + right
             )
+
+        else:
+
+            sep = " "
+            line = rep_offset + sep + rep_open + rep_nybbles.lower().replace("_", " ")
+
         line = line.rstrip()
 
         if encodeds:
             print(line)
-            self.skids_open = str_nybbles.endswith("_")
+            self.skids_open = rep_nybbles.endswith("_")
 
         self.offset += len(encodeds)
 
-        if not more:  # print the last offset as the size of file, even when zero
-            if not self.args.C:
-                print("{:07x}".format(self.offset))
+        # Print the last offset as the size of file, even when file empty
+
+        str_offset = None
+        if not got_more:
+            if args.classic:
+                str_offset = "{:07X}".format(self.offset).lower()
             else:
-                print("{:07X}".format(self.offset))
+                str_offset = "{:07X}".format(self.offset)
 
-    def str_nybbles(self, nybbleds):
-        """Format 0x30 chars to rep between 2 and 0x20 nybbles"""
+        if str_offset:
+            print(str_offset)
 
-        reps = nybbleds.ljust(len("XX_") * 0x10)
+    def str_nybbles(self, encodeds):
+        """Format between 2 and 0x20 nybbles, spreading as wide as if 0x20 nybbles"""
+
+        args = self.args
+        width = 0x10
+
+        reps = ""
+
+        if args.C or (args.stride != 1):
+            reps += " "
+
+        for index in range(width):
+
+            if index:
+                if (args.stride != 1) and (index % args.stride):
+                    reps += "_"
+                else:
+                    reps += " "
+
+                if args.classic and args.encoding:
+                    if index == 8:
+                        reps += " "
+
+            if index >= len(encodeds):
+
+                reps += "  "
+
+            else:
+
+                xx = encodeds[index]
+                if args.classic:
+                    reps += "{:02X}".format(xx).lower()
+                else:
+                    reps += "{:02X}".format(xx)
 
         return reps
 
     def str_chars(self, decodeds):
         """Format between 1 and 0x10 chars, with " " spaces injected to group them, or not"""
 
-        stride = self.args.bytes
+        args = self.args
+        stride = args.stride
+        sep = " "
 
-        if stride is False:
+        if stride == 1:
             return decodeds
-
-        assert stride
 
         reps = ""
         for index in range(0, len(decodeds), stride):
-            reps += " "
+            reps += sep
             reps += decodeds[index:][:stride]
         if decodeds:
-            reps += " "
+            reps += sep
 
         return reps
+
+
+#
+# Git-track some Python idioms here
+#
 
 
 # deffed in many files  # missing from docs.python.org
@@ -291,8 +426,10 @@ def prompt_tty_stdin():
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
@@ -309,10 +446,10 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback,) = exc_info
+        (exc_type, exc, exc_traceback) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
-            null_fileno = os.open(os.devnull, os.O_WRONLY)
+            null_fileno = os.open(os.devnull, flags=os.O_WRONLY)
             os.dup2(null_fileno, sys.stdout.fileno())  # avoid the next one
 
             sys.exit(1)

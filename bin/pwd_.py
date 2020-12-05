@@ -11,7 +11,7 @@ optional arguments:
   --brief         show the briefest abspath/ homepath/ realpath
   --home          show the ~/... relpath in place of abspath or realpath
 
-bugs:
+quirks:
   defaults to "--home", in the spirit of Bash "dirs +0" and Zsh "dirs -p", unlike their "pwd"s
   offers "--brief" and "--home", unlike Bash anywhere
   offers "--physical" like Linux, not just "-P" like Mac
@@ -37,8 +37,8 @@ import argdoc
 
 def main(argv):
 
-    argv_tail = argv[1:] if argv[1:] else ["--home"]  # FIXME: more robust default
-    args = argdoc.parse_args(argv_tail)
+    pwd_argv_tail = argv[1:] if argv[1:] else ["--home"]  # FIXME: more robust default
+    args = argdoc.parse_args(pwd_argv_tail)
 
     pwd = os.environ["PWD"]
     abspath = os.path.abspath(pwd)
@@ -65,6 +65,11 @@ def main(argv):
         printable = briefpath
 
     print(printable)
+
+
+#
+# Git-track some Python idioms here
+#
 
 
 # deffed in many files  # missing from docs.python.org
@@ -102,10 +107,10 @@ def min_path_formatter_not_relpath(exemplar):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
+def stderr_print(*args, **kwargs):
     sys.stdout.flush()
-    print(*args, file=sys.stderr)
-    sys.stderr.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

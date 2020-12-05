@@ -9,12 +9,12 @@ optional arguments:
   -h, --help  show this help message and exit
   -t          print words, but separate columns by two spaces
 
-bugs:
+quirks:
   aligns cells to the right when two-thirds or more contain decimal digits
   doesn't offer to run without arguments a la mac and linux
   doesn't offer the "-csx" of mac, nor the "-censtx" of linux
 
-bugs:
+quirks:
   does prompt once for stdin, when stdin chosen as file "-" or by no file args, unlike bash "cat"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
@@ -91,7 +91,7 @@ def justify_cells_in_rows(rows):
     left = collections.defaultdict(int)
     right = collections.defaultdict(int)
     for row in strung_rows:
-        for (index, cell,) in enumerate(row):
+        for (index, cell) in enumerate(row):
             if re.search(
                 r"[0-9]", string=cell
             ):  # vote right once if one or more decimal digits
@@ -114,7 +114,7 @@ def justify_cells_in_rows(rows):
     for row in completed_rows:
 
         justified_row = list()
-        for (index, cell,) in enumerate(row):
+        for (index, cell) in enumerate(row):
 
             voters = left[index] + right[index]
             if right[index] >= ((2 * voters) / 3):  # require 2/3's vote to go right
@@ -146,6 +146,11 @@ def pick_some_digits():
     return digits  # '2773543517856402339162146190028809' in my Mar/2019 Python 3.7.3
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def prompt_tty_stdin():
     if sys.stdin.isatty():
@@ -153,8 +158,10 @@ def prompt_tty_stdin():
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

@@ -6,11 +6,11 @@ usage: pyish.py
 
 emulate Python 3 inside of Python 2, well enough for now
 
-bugs:
+quirks:
   cd pybashish/ && make  # foolishly insists this docstring should be an argdoc
 """
-# FIXME: help find and review diffs among scattered forks of such shared defs
-# FIXME: rename "guess_stdout_columns" to "sys_stdout_guess_columns"
+
+# FIXME: help find and review diffs among scattered forks of shared defs
 
 
 from __future__ import print_function
@@ -22,6 +22,11 @@ import io
 import shlex
 import subprocess
 import sys
+
+
+#
+# Git-track some Python idioms here
+#
 
 
 # deffed in many files  # since Oct/2019 Python 3.7  # much too meta to pass Flake8 review
@@ -74,24 +79,27 @@ def subprocess_run(*args, **kwargs):
     if ("input" in kwargs) and ("stdin" in kwargs):
         raise ValueError("stdin and input arguments may not both be used.")
 
-    if "input" in kwargs:
+    if "input" in kwargs:  # FIXME FIXME FIXME: this doesn't work??
         del kwargs_["input"]
         kwargs_["stdin"] = io.StringIO(kwargs["input"])
 
     sub = subprocess.Popen(*args, **kwargs_)
-    (stdout, stderr,) = sub.communicate()
+    (stdout, stderr) = sub.communicate()
     returncode = sub.poll()
 
     ran = argparse.Namespace(
-        args=args_, stdout=stdout, stderr=stderr, returncode=returncode,
+        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
     )
 
     return ran
 
 
-# deffed in many files  # but not in docs.python.org
+# deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
+    # print(*args, **kwargs, file=sys.stderr)  # SyntaxError in Python 2
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 # deffed in many files  # since Oct/2019 Python 3.7  # since Dec/2016 CPython 3.6

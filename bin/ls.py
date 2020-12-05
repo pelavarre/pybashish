@@ -31,11 +31,11 @@ optional arguments:
   --descending     sort descending:  newest to oldest, largest to smallest, etc
   -r               reverse the default sorts by size ascending, time ascending, name descending, etc
 
-temporary bugs:
+temporary quirks:
   doesn't sort the files before the dirs when given both files and dirs as tops
   shows only first failure to list a top and quit, should show all failures and successes
 
-bugs:
+quirks:
   doesn't show owner and group
   doesn't show size for dirs, nor for links
   lists --full-time as to the microsecond, not to the nanosecond, and without timezone
@@ -61,6 +61,8 @@ examples:
   ls.py -C | tee as-wide-as-tty.txt
   (mkdir foo && cd foo/ && echo hi>x && rm -fr ../foo/ && ls.py .)
 """
+
+# FIXME: add the --color that's missing at Mac
 # FIXME: tell us about sym links that don't resolve
 # FIXME FIXME:  -x               print by filling multiple rows
 # FIXME: add -R recursive walk
@@ -88,7 +90,7 @@ def main():
     """Interpret a command line"""
 
     stdout_isatty = sys.stdout.isatty()
-    stdout_columns = guess_stdout_columns()
+    stdout_columns = sys_stdout_guess_tty_columns()
     # stderr_print("stdout_columns={}".format(stdout_columns))
 
     args = argdoc.parse_args()
@@ -282,7 +284,7 @@ def _decide_sort_order_args(args):
 
 def print_one_top_walk(tops, index, args):
 
-    (top, names, args_directory,) = _plan_one_top_walk(tops, index=index, args=args)
+    (top, names, args_directory) = _plan_one_top_walk(tops, index=index, args=args)
 
     _run_one_top_walk(
         tops,
@@ -432,7 +434,7 @@ def mark_name(name, wherewhat, stats):
 
 
 def stats_items_sorted(stats_by_name, by, order):
-    """Return list of (key, value,) but sorted as requested"""
+    """Return list of (key, value) but sorted as requested"""
 
     items = list(stats_by_name.items())
 
@@ -453,7 +455,7 @@ def stats_items_sorted(stats_by_name, by, order):
         items.sort(key=lambda sw: sw[-1].st_mtime, reverse=py_sort_reverse)
     elif by == "version":
         items.sort(
-            key=lambda sw: looser_comparable_version(sw[0]), reverse=py_sort_reverse,
+            key=lambda sw: looser_comparable_version(sw[0]), reverse=py_sort_reverse
         )
     else:
         assert False
@@ -461,11 +463,16 @@ def stats_items_sorted(stats_by_name, by, order):
     return items
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def looser_comparable_version(vstring):
     """Workaround TypeError in LooseVersion comparisons between int and str"""
     words = distutils.version.LooseVersion(vstring).version
-    diffables = [([_], [],) if isinstance(_, int) else ([], [_],) for _ in words]
+    diffables = [([_], []) if isinstance(_, int) else ([], [_]) for _ in words]
     return diffables
 
 
@@ -522,10 +529,10 @@ def print_as_rows_of_detail(
             row = "chmods links owner group size stamp name".split()
             rows.append(row)
 
-    for (name, stats,) in items:
+    for (name, stats) in items:
 
         chmods = ""
-        for (char, mask,) in zip(chmod_chars, chmod_masks):
+        for (char, mask) in zip(chmod_chars, chmod_masks):
             chmods += char if (stats.st_mode & mask) else "-"
 
         links = str_none
@@ -593,7 +600,7 @@ def left_justify_cells_in_rows(rows):
     for row in completed_rows:
 
         justified_row = list()
-        for (index, cell,) in enumerate(row):
+        for (index, cell) in enumerate(row):
             if index == 4:  # FIXME: inconceivable hack
                 justified_cell = cell.rjust(max_column_widths[index])
             else:
@@ -650,7 +657,7 @@ def spill_cells(cells, columns, sep):  # FIXME FIXME FIXME  # noqa C901
 
         widths = collections.defaultdict(int)
         for floor in floors:
-            for (shaft_index, str_cell,) in enumerate(floor):
+            for (shaft_index, str_cell) in enumerate(floor):
                 widths[shaft_index] = max(widths[shaft_index], len(str_cell))
 
         # Take the first matrix that fits, else the last matrix tried
@@ -668,7 +675,7 @@ def spill_cells(cells, columns, sep):  # FIXME FIXME FIXME  # noqa C901
     rows = list()
     for floor in floors:
         row = list()
-        for (shaft_index, str_cell,) in enumerate(floor):
+        for (shaft_index, str_cell) in enumerate(floor):
             padded_str_cell = str_cell.ljust(widths[shaft_index])
             row.append(padded_str_cell)
         rows.append(row)
@@ -677,7 +684,7 @@ def spill_cells(cells, columns, sep):  # FIXME FIXME FIXME  # noqa C901
 
 
 # deffed in many files  # missing from docs.python.org
-def guess_stdout_columns(*hints):
+def sys_stdout_guess_tty_columns(*hints):
     """
     Run all the searches offered, accept the first result found if any, else return None
 
@@ -686,17 +693,17 @@ def guess_stdout_columns(*hints):
     To fail fast, call for all the guesses always, while still returning only the first that works
     """
 
-    chosen_hints = hints if hints else ("COLUMNS", sys.stdout, "/dev/tty", 80,)
+    chosen_hints = hints if hints else ("COLUMNS", sys.stdout, "/dev/tty", 80)
     # FIXME: port to "/dev/tty" outside of Mac and Linux
 
     terminal_widths = list()
     for hint in chosen_hints:
 
-        terminal_width = guess_stdout_columns_os(hint)
+        terminal_width = sys_stdout_guess_tty_columns_os(hint)
         if terminal_width is None:
-            terminal_width = guess_stdout_columns_os_environ_int(hint)
+            terminal_width = sys_stdout_guess_tty_columns_os_environ_int(hint)
         else:
-            _ = guess_stdout_columns_os_environ_int(hint)
+            _ = sys_stdout_guess_tty_columns_os_environ_int(hint)
 
         if terminal_width is not None:
             terminal_widths.append(terminal_width)
@@ -708,8 +715,8 @@ def guess_stdout_columns(*hints):
 
 
 # deffed in many files  # missing from docs.python.org
-def guess_stdout_columns_os(hint):
-    """Try "os.get_terminal_size", and slap back "shutil.get_terminal_size" pushing (80, 24,)"""
+def sys_stdout_guess_tty_columns_os(hint):
+    """Try "os.get_terminal_size", and slap back "shutil.get_terminal_size" pushing (80, 24)"""
 
     showing = None
     fd = None
@@ -737,7 +744,7 @@ def guess_stdout_columns_os(hint):
 
 
 # deffed in many files  # missing from docs.python.org
-def guess_stdout_columns_os_environ_int(hint):
+def sys_stdout_guess_tty_columns_os_environ_int(hint):
     """Pull digits from "os.environ" via the hint as key, else from the hint itself"""
 
     digits = hint
@@ -765,7 +772,7 @@ def os_path_isdir_deleted(top):  # FIXME: solve this without calling:  bash /dev
     ran = subprocess.run(
         "bash /dev/null".split(),
         cwd=top,
-        stdin=subprocess.PIPE,
+        stdin=subprocess.PIPE,  # FIXME FIXME: how often should .run.stdin be PIPE?
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -774,8 +781,10 @@ def os_path_isdir_deleted(top):  # FIXME: solve this without calling:  bash /dev
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

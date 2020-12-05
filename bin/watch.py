@@ -13,7 +13,7 @@ optional arguments:
   -n SECS, --interval SECS
                         seconds to wait between updates (default: 0.2s)
 
-bugs:
+quirks:
   doesn't default to the 2s intervals of the 1970s
 
 examples:
@@ -96,11 +96,16 @@ def shlex_join(argv):
     raise NotImplementedError()
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
+def stderr_print(*args, **kwargs):
     sys.stdout.flush()
-    print(*args, file=sys.stderr)
-    sys.stderr.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

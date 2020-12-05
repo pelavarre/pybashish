@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 
 """
-usage: rm.py [-h] [FILE [FILE ...]]
+usage: strings.py [-h] [FILE [FILE ...]]
 
-move a file to the ../__jqd-trash/ dir
+pick out bits from files
 
 positional arguments:
-  FILE        a file to trash (default: last modified of cwd)
+  FILE        a file to pick over (default: stdin)
 
 optional arguments:
   -h, --help  show this help message and exit
 
 quirks:
-  don't rush to reclaim disk space, like Bash "rm" does
+  don't just pick out printables from binaries, in the way of the classic "strings" app
 
 examples:
-  Oh no! No examples disclosed!! 💥 💔 💥
+  cat bin/strings.py | bin/strings.py
 """
 
 
@@ -28,7 +28,7 @@ def main():
     args = argdoc.parse_args()
     sys.stderr.write("{}\n".format(args))
     sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
-    sys.stderr.write("rm.py: error: not implemented\n")
+    sys.stderr.write("strings.py: error: not implemented\n")
     sys.exit(2)  # exit 2 from rejecting usage
 
 

@@ -10,4 +10,4 @@ Tell us if "bin/grep.py" is least like what you expected
 
 Stop settling for the points-of-view that Bash shoves on you, leftover from last century
 
-As of Thursday, 13th August, 2020
+As of Sunday, 30th August, 2020

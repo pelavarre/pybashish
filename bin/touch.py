@@ -6,16 +6,16 @@ usage: touch.py [-h] [FILE [FILE ...]]
 mark a file as modified, or create a new empty file
 
 positional arguments:
-  FILE        a file to mark as modified
+  FILE        a file to mark as modified (default: copies zero bytes from latest in cwd)
 
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   runs ahead and works with me, without mandating that I spell out the new name, unlike Bash "touch"
 
 examples:
-  touch  # creates "touch~1", then "touch~2", etc
+  touch  # creates "touch~1~", then "touch~2~", etc
 """
 
 import os
@@ -36,7 +36,7 @@ def main():
     for file_ in args.files:
 
         if not os.path.exists(file_):
-            with open(file_, "w"):
+            with open(file_, mode="w"):
                 pass
             continue
 
@@ -49,9 +49,16 @@ def main():
     sys.exit(exit_status)
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):
-    print(*args, file=sys.stderr)
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

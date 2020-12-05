@@ -2,19 +2,19 @@
 # -*- coding: utf-8 -*-
 
 """
-usage: tar2.py [-h] [-x] [-t] [-v] [-k] [-f FILE]
+usage: tar2.py [-h] [-t] [-x] [-v] [-k] [-f FILE]
 
 walk the files and dirs found inside a top dir compressed as Tgz
 
 optional arguments:
   -h, --help  show this help message and exit
-  -x          extract every file
-  -t          say it loud, you have not chosen -x
+  -t          list every file, without writing any files
+  -x          write out a copy of every file
   -v          trace each file or dir name found inside to Stderr
   -k          decline to replace pre-existing output files
   -f FILE     name the file to uncompress
 
-bugs:
+quirks:
   accepts only -tvf and -tvkf as options
   lets you type out just "tvf" or "tvkf" without their leading "-" dash
   prints only the name for -tvf, not all the "ls -al" columns
@@ -22,7 +22,7 @@ bugs:
   prints names found inside to stderr, not to classic stdout
   extracts always to stdout, never to the name found inside
 
-unsurprising bugs:
+unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", a la linux "tar ztvf -", unlike mac "tar tvf -"
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
@@ -134,15 +134,24 @@ def tar_file_tvf_xvkf(args_file, args_x):
                     os.write(sys.stdout.fileno(), file_bytes)
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def prompt_tty_stdin():
     if sys.stdin.isatty():
         stderr_print("Press ⌃D EOF to quit")
 
 
-# deffed in many files  # but not in docs.python.org
+# deffed in many files  # missing from docs.python.org
+# deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    sys.stdout.flush()
+    # print(*args, **kwargs, file=sys.stderr)  # SyntaxError in Python 2
     print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 
 if __name__ == "__main__":

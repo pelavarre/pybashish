@@ -11,7 +11,7 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 
-bugs:
+quirks:
   complains to stderr of codes outside -128..127
   returns codes 0..255 (in particular, substitutes 128..255 for -128..-1)
 

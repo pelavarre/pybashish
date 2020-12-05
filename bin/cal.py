@@ -12,7 +12,7 @@ optional arguments:
   --help  show this help message and exit
   -h      stop coloring one day (default: color when stdout isatty)
 
-bugs:
+quirks:
   starts each week on Monday, a la linux "ncal -MC", as in England
   doesn't pad every line with two blanks at the end
   doesn't fit well into a x25x80 terminal
@@ -124,7 +124,7 @@ def print_week_in_month(week, month, today):
         printing = week + dt.timedelta(days=days)
         if printing.month == month:
             pad = (len("  ") - len(str(printing.day))) * " "
-            if (printing.month, printing.day,) == (today.month, today.day,):
+            if (printing.month, printing.day) == (today.month, today.day):
                 stdout = "{}{}{}{}{}".format(sep, pad, wild, printing.day, calm)
             else:
                 stdout = "{}{:2d}".format(sep, printing.day)
@@ -144,6 +144,11 @@ def week_last_day(week):
     return end_of_week
 
 
+#
+# Git-track some Python idioms here
+#
+
+
 # deffed in many files  # missing from docs.python.org
 def misread_ymd_12n(ymd):
     """Guess what YYYY-MM-DD 12:00:00 is meant, from briefer input"""
@@ -159,7 +164,7 @@ def misread_ymd_12n(ymd):
 
     parsed = None
     for syntax in syntaxes:
-        (format_, keys,) = syntax
+        (format_, keys) = syntax
         try:
             parsed = dt.datetime.strptime(ymd, format_)
             break
@@ -171,9 +176,9 @@ def misread_ymd_12n(ymd):
 
     today = dt.datetime(now.year, now.month, now.day, 12, 00)  # duck 2am DST etc
     replaces = {k: getattr(parsed, k) for k in keys}
-    asif_today = today.replace(**replaces)
+    as_today = today.replace(**replaces)
 
-    return asif_today
+    return as_today
 
 
 # deffed in many files  # missing from docs.python.org
