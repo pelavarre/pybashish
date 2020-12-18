@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 
 """
-usage: hearme.py [-h] [-p] [-f] [-i] [-q] [-v] [HINT [HINT ...]]
+usage: hearme.py [-h] [-x] [-p] [-f] [-i] [-q] [-v] [HINT [HINT ...]]
 
 auto-complete the hints into a complete bash command line, trace it, and run it
 
 positional arguments:
-  HINT            code to run
+  HINT                  code to run
 
 optional arguments:
-  -h, --help      show this help message and exit
-  -p, --pipe      read stdin and write stdout, not the os copy-paste clipboard
-  -f, --force     ask less
-  -i, --interact  ask more
-  -q, --quiet     say less
-  -v, --verbose   say more
+  -h, --help            show this help message and exit
+  -x, --edit-clipboard  read and write the os copy-paste clipboard (default when tty)
+  -p, --edit-stdio      read stdin and write stdout (default when std/in/out not tty)
+  -f, --force           ask less
+  -i, --interact        ask more
+  -q, --quiet           say less
+  -v, --verbose         say more
 
 quirks:
 
@@ -25,29 +26,38 @@ examples:
 
   hearme.py -h  # show this help message and exit
 
-  hearme.py -p upper  # awk '{print toupper($0)}'
-  hearme.py upper  # pbpaste | awk '{print toupper($0)}' | pbcopy
+  hearme.py -p  # awk '//{print}'
+  hearme.py -p upper  # awk '//{print toupper($0)}'
+  hearme.py upper  # pbpaste | awk '//{print toupper($0)}'| pbcopy
+
   hearme.py -i upper  # ask permission before running it
   hearme.py -ii upper  # just show it, don't run it
   hearme.py -q upper  # just run it, don't show it
 
-  hearme.py -p lstrip  # awk '{sub("^  *", ""); print}'
-  hearme.py -p rstrip  # awk '{sub("  *$", ""); print}'
-  hearme.py -p strip  # awk '{sub("^  *", ""); sub("  *$", ""); print}'
+  hearme.py -pii lstrip  # awk '//{sub("^  *", ""); print}'
+  hearme.py -pii rstrip  # awk '//{sub("  *$", ""); print}'
+  hearme.py -pii strip  # awk '//{sub("^  *", ""); sub("  *$", ""); print}'
 
-  hearme.py -p .2  # awk '{print $3}'  # like py words[2]
-  hearme.py -p _.1  # awk '{print $NF}'  # like py words[-1]
-  hearme.py -p _.5  # awk '{print $(NF-4)}'  # like py words[-5]
+  hearme.py -pii dent  # awk '//{sub("^", "    "); print}'
+  hearme.py -pii dedent  # awk '//{sub("^    ", ""); print}'
 
-  hearme.py -p '.1 +/'  # awk '{v1 += $2} END{print v1}'  # sum
-  hearme.py -p '.3 +/ % #'  # awk '{v3 += $4} END{print v1 / NR}'  # average
+  hearme.py -pii .2  # awk '//{print $3}'  # like py words[2]
+  hearme.py -pii _.1  # awk '//{print $NF}'  # like py words[-1]
+  hearme.py -pii _.5  # awk '//{print $(NF-4)}'  # like py words[-5]
+
+  hearme.py -pii '.1 +/'  # awk '{v1 += $2} END{print v1}'  # sum
+  hearme.py -pii '.3 +/ % #'  # awk '{v3 += $4} END{print v1 / NR}'  # average
 
 """
 
 # FIXME: back up copies of the clipboard to "~/.hearme/pb/{pb,pb~,pb~2~,pb~3~,...}"
 
-# FIXME: Makefile: rewrite "hearme.py" for distribution without "argdoc.py"
+# FIXME: ArgDoc: compile concise options of multiple chars such as -ec|-eio vs -x|-p
+# FIXME: ArgDoc: compile exclusive options such as [-ec | -eio] vs [-ec] [-eio]
 # FIXME: ArgDoc: explain better when usage is mnemonic opt but must be concise opt
+# FIXME: Makefile: rewrite "hearme.py" for distribution without "argdoc.py"
+
+# FIXME: fall back to i'm-feeling-lucky search of confirmed history of command lines
 
 
 import argparse
@@ -63,7 +73,31 @@ def main(argv):  # FIXME FIXME  # noqa C901
 
     args = argdoc.parse_args()
 
-    #
+    # Choose to edit the os copy-paste clipboard, or not
+
+    if args.edit_clipboard and args.edit_stdio:
+        sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
+        sys.stderr.write(
+            "hearme.py: error: "
+            "choose '--edit-clipboard' or '--edit-stdio' or neither, never both\n"
+        )
+        sys.exit(2)  # exit 2 from rejecting usage
+
+    if args.edit_clipboard:
+        edit_clipboard = True
+    elif args.edit_stdio:
+        edit_clipboard = False
+    else:
+        edit_clipboard = True
+        if not sys.stdin.isatty():
+            edit_clipboard = False
+        if not sys.stdout.isatty():
+            edit_clipboard = False
+
+    if not edit_clipboard:
+        prompt_tty_stdin()
+
+    # Create an empty Awk program
 
     awk = argparse.Namespace()
 
@@ -71,7 +105,7 @@ def main(argv):  # FIXME FIXME  # noqa C901
     awk.prints = list()
     awk.end_prints = list()
 
-    #
+    # Parse each hint
 
     for hint in args.hints:
         try:
@@ -80,13 +114,13 @@ def main(argv):  # FIXME FIXME  # noqa C901
             sys.stderr.write("error: hearme.py: meaningless hint {!r}\n".format(hint))
             sys.exit(1)
 
-    #
+    # Option to source from the clipboard
 
     shline = ""
-    if not args.pipe:
+    if edit_clipboard:
         shline = "pbpaste | "
 
-    #
+    # Plan to print each of the "awk.prints", else infer a print of the Awk line
 
     awk_lines = awk.lines
     if awk.prints or not awk.lines:
@@ -95,34 +129,40 @@ def main(argv):  # FIXME FIXME  # noqa C901
     else:
         awk_lines.append("print")
 
+    # Form the Bash line
+
     shline += "awk '"
+
     shline += "//{"
     shline += "; ".join(awk_lines)
     shline += "}"
+
     if awk.end_prints:
         shline += " END{"
         shline += "print " + ", ".join(awk.end_prints)
         shline += "}"
+
     shline += "'"
 
-    #
+    # Option to sink back into the clipboard
+    # Note: We need "pbpaste" and/or "pbcopy" to sponge a whole copy
 
-    if not args.pipe:
+    if edit_clipboard:
         shline += "| pbcopy"
 
-    #
+    # Just show it, don't run it, if cut short by doubled "-ii"
 
     if args.interact > 1:
         if not args.quiet:
             sys.stderr.write("+ # {}\n".format(shline))
         sys.exit()
 
-    #
+    # Show it, unless silenced by "-q"
 
     if not args.quiet:
         sys.stderr.write("+ {}\n".format(shline))
 
-    #
+    # Ask to run it, before running it, if slowed by "-i"
 
     if args.interact:
         sys.stderr.write("Press Return to continue, else Control+C to quit\n")
@@ -132,7 +172,7 @@ def main(argv):  # FIXME FIXME  # noqa C901
             print("KeyboardInterrupt")
             sys.exit(1)
 
-    #
+    # Run it
 
     ran = subprocess.run(shline, shell=True)
     sys.exit(ran.returncode)
@@ -156,6 +196,12 @@ def add_awk_hint(awk, hint):  # FIXME FIXME  # noqa C901
     if shard0 == "lower":
         awk_value = "tolower($0)"
         awk.prints.append(awk_value)
+    elif shard0 == "dedent":
+        awk_line = """ sub("^    ", "") """.strip()
+        awk.lines.append(awk_line)
+    elif shard0 == "dent":
+        awk_line = """ sub("^", "    ") """.strip()
+        awk.lines.append(awk_line)
     elif shard0 == "lstrip":
         awk_line = """ sub("^  *", "") """.strip()
         awk.lines.append(awk_line)
@@ -199,6 +245,24 @@ def add_awk_hint(awk, hint):  # FIXME FIXME  # noqa C901
 
                 awk.lines.append(awk_line)
                 awk.end_prints.append(awk_end_print)
+
+
+#
+# Git-track some Python idioms here
+#
+
+
+# deffed in many files  # missing from docs.python.org
+def prompt_tty_stdin():
+    if sys.stdin.isatty():
+        stderr_print("Press ⌃D EOF to quit")
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

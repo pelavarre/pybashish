@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# FIXME: discard this abandoned dead code in favour of:  hearme.py
+
 """
 usage: jq.py [-h] [FILTER] [FILE [FILE ...]]
 

@@ -76,6 +76,11 @@ examples:
   ~ quit vim  # remind us how to quit Vim
   ~ vim quit  # same hit, just found by another order
 """
+
+#
+# FIXME: add a grep option to balance the () [] {} <<  >> found in hits, as context
+#
+
 #
 # FIXME: call it one hit when only one hit has more copies of some or of all the patterns, eg, ~ gs
 #
