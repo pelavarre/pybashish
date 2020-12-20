@@ -131,7 +131,7 @@ def tar_file_tvf_xvkf(args_file, args_x):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

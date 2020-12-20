@@ -97,7 +97,7 @@ def shlex_join(argv):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

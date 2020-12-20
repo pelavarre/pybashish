@@ -2346,7 +2346,7 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

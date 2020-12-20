@@ -147,7 +147,7 @@ def pick_some_digits():
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

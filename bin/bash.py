@@ -458,7 +458,7 @@ def calc_ps1():
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

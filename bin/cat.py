@@ -139,7 +139,7 @@ def cat_repr_byte(fd_byte, args):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

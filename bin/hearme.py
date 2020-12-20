@@ -51,6 +51,9 @@ examples:
 """
 
 # FIXME: back up copies of the clipboard to "~/.hearme/pb/{pb,pb~,pb~2~,pb~3~,...}"
+# FIXME: or rather "pb.txt" there
+# FIXME: and also code to "~/.hearme/code/a.awk" etc
+# FIXME: with renames to ~$mmdd$jqd$hhmm~ uniquified as needed
 
 # FIXME: ArgDoc: compile concise options of multiple chars such as -ec|-eio vs -x|-p
 # FIXME: ArgDoc: compile exclusive options such as [-ec | -eio] vs [-ec] [-eio]
@@ -248,7 +251,7 @@ def add_awk_hint(awk, hint):  # FIXME FIXME  # noqa C901
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 
