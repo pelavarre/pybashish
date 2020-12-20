@@ -145,7 +145,7 @@ def fmt_one_paragraph(dent, para, width):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

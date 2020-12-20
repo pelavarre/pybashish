@@ -497,7 +497,7 @@ def grep_lines(args, lines, chosen_lines):  # FIXME FIXME  # noqa C901
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

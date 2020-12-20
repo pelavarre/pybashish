@@ -78,7 +78,7 @@ def calc_socket_canonname_else_none(socket_hostname):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

@@ -148,7 +148,7 @@ def _run_bash_test_doc(incoming, path):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

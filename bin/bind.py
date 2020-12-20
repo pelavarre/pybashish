@@ -109,7 +109,7 @@ def bind_repr(stdin):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

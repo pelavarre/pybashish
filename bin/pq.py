@@ -194,7 +194,7 @@ def opt_in_argv_tail(argv_tail, concise, mnemonic):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 
