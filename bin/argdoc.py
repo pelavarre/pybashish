@@ -515,7 +515,8 @@ class ArgDocRipper(argparse.Namespace):
         coder = self.coder
 
         epilog = coder.epilog
-        epilog_key = epilog.strip().splitlines()[0]  # FIXME: what about empty epilogs
+        epilog_keys = epilog.strip().splitlines()
+        epilog_key = epilog_keys[0] if epilog_keys else ""
         repr_epilog_key = black_repr(epilog_key)
 
         d4 = r"    "
@@ -527,6 +528,7 @@ class ArgDocRipper(argparse.Namespace):
             if stripped.startswith(r'"""'):
                 if key == "head":
                     key = "example_docstring"
+                    # fall through, do not continue, here
                 else:
                     lines_by_key[key].append(line)
                     key = "middle"
@@ -535,8 +537,15 @@ class ArgDocRipper(argparse.Namespace):
                 merged_line = r"epilog_at = doc.index({})".format(repr_epilog_key)
                 lines_by_key[key].append((d4 + merged_line).rstrip())
                 continue
+            elif stripped.startswith(r"epilog = "):
+                if not epilog_key:
+                    merged_line = r"""epilog = None  # = doc.index("...")"""
+                    lines_by_key[key].append((d4 + merged_line).rstrip())
+                    continue
+                # fall through, do not continue, here
             elif stripped.startswith(r"parser = argparse.ArgumentParser("):
                 key = "example_parser"
+                # fall through, do not continue, here
             elif stripped == r")":
                 lines_by_key[key].append(line)
                 key = "tail"
