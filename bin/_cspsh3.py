@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 
 r"""
-usage: _cspsh3.py
+usage: _cspsh3.py [-h] [-c COMMAND]
 
-exploratory variation on cspsh.py
+chat over programs written as "communicating sequential processes"
+
+optional arguments:
+  -h, --help      show this help message and exit
+  -c COMMAND      take the command as the only input, else as the first input before -i
+
+examples:
+  _cspsh3.py
+  _cspsh3.py -c'VMCT = µ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))'
+  _cspsh3.py -c'coin → (choc → X | toffee → X)'
 """
 
 
@@ -13,17 +22,24 @@ import inspect
 import pdb
 import re
 
+import argdoc
+
+
+DEFAULT_CSP_CHARS = (
+    "VMCT = µ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))"
+)
+
 
 def b():
     pdb.set_trace()
 
 
-def parse_csp_chars(chars):  # noqa: C901
+def parse_csp_chars(csp_chars):  # noqa: C901
     # note: Flake8 miscounts a grammar of 15 "def", "while", "if" as "too complex"
 
     # accept mutations of a copy of the chars
 
-    mutable = argparse.Namespace(chars=chars)
+    mutable = argparse.Namespace(chars=csp_chars)
 
     # collect the matches
 
@@ -187,7 +203,7 @@ def parse_csp_chars(chars):  # noqa: C901
 
     print()
 
-    print(chars)
+    print(csp_chars)
     print()
 
     lstrip()
@@ -213,118 +229,9 @@ def parse_csp_chars(chars):  # noqa: C901
     print()
 
 
-csp = "VMCT = µ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))"
-parse_csp_chars(csp)
-
-
-"""
-
-
-"trinary normal form"?
-
-
-command := define_process_name | process
-definition := process_name "=" process_body
-process_body := process_with_such | process
-process_with_such := "µ" process_name [ ":" alphabet ] "•" process
-alphabet := "{" { event_name "," } event_name [ "," ] "}"
-process := choice | process_tail
-choice := guarded_process { "|" guarded_process }
-guarded_process := event_name "→" { event_name "→" } process_tail
-process_tail := anonymous_process | process_name
-anonymous_process := "(" process ")"
-process_name := ... upper name ...
-event_name := ... lower name ...
-
-
-
-failed test should fall back to call it more interactively to explain trouble
-
-
-
-
-
-
-
-def tick():
-    return "tick"
-
-def CLOCK():
-    yield "tick"
-    yield "tock"
-    for yielded in CLOCK():
-        yield yielded
-
-got = CLOCK()
-next(got)
-next(got)
-next(got)
-next(got)
-
-
-
-import random
-
-def event(event_name):
-    if random.randint(0, 1):
-        print(event_name)
-        return 1
-
-def DD():
-    while True:
-        if event("setorange"):
-            yield O()
-        elif event("setlemon"):
-            yield L()
-
-def O():
-    while True:
-        if event("orange"):
-            yield O()
-        elif event("setlemon"):
-            yield L()
-        elif event("setorange"):
-            yield O()
-
-def L():
-    while True:
-        if event("lemon"):
-            yield L()
-        elif event("setorange"):
-            yield O()
-        elif event("setlemon"):
-            yield L()
-
-x = DD()
-x = next(x)
-
-
-
-
-def walker(generator):
-    got = next(generator)
-    if isinstance(got, str):
-        print(got)
-    else:
-        for yielded in got:
-            if isinstance(got, str):
-                print(got)
-            else:
-                walker(got)
-
-
-
-
-DD: setorange,
-    O: orange, O,
-     | setlemon,
-        L: lemon, L,
-         | setorange, O,
-         | setlemon, L,
-     | setorange, O,
-
-
-"""
+args = argdoc.parse_args()
+csp_chars = args.command if args.command else DEFAULT_CSP_CHARS
+parse_csp_chars(csp_chars)
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git
