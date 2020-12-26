@@ -6,8 +6,8 @@ usage: _cspsh3.py [-h] [-c COMMAND]
 chat over programs written as "communicating sequential processes"
 
 optional arguments:
-  -h, --help      show this help message and exit
-  -c COMMAND      take the command as the only input, else as the first input before -i
+  -h, --help  show this help message and exit
+  -c COMMAND  take the command as the only input, else as the first input before -i
 
 examples:
   _cspsh3.py
