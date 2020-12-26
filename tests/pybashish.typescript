@@ -40,23 +40,22 @@ Contents
 ++ 2.22 ) HexDump
 ++ 2.23 ) History
 ++ 2.24 ) Hostname
-++ 2.25 ) Jq
-++ 2.26 ) Ls
-++ 2.27 ) Make
-++ 2.28 ) MkDir
-++ 2.29 ) Mv
-++ 2.30 ) Pwd
-++ 2.31 ) Read
-++ 2.32 ) Rm
-++ 2.33 ) Sponge
-++ 2.34 ) SubSh
-++ 2.35 ) Tail
-++ 2.36 ) Tar
-++ 2.37 ) Touch
-++ 2.38 ) Tr
-++ 2.39 ) Watch
-++ 2.40 ) Wc
-++ 2.41 ) XArgs
+++ 2.25 ) Ls
+++ 2.26 ) Make
+++ 2.27 ) MkDir
+++ 2.28 ) Mv
+++ 2.29 ) Pwd
+++ 2.30 ) Read
+++ 2.31 ) Rm
+++ 2.32 ) Sponge
+++ 2.33 ) SubSh
+++ 2.34 ) Tail
+++ 2.35 ) Tar
+++ 2.36 ) Touch
+++ 2.37 ) Tr
+++ 2.38 ) Watch
+++ 2.39 ) Wc
+++ 2.40 ) XArgs
 
 + 3 ) Additional tests
 
@@ -121,7 +120,7 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
         -  ..  argdoc  bash  bind  cal  cat  cd  chmod  column  cp  cspsh  date  dd
         doctestbash  echo  exit  expand  find  fmt  grep  head  hearme  help  hexdump
-        history  hostname  jq  ls  make  mkdir  mv  paste  pq  pwd  read  rm  sort  sponge
+        history  hostname  ls  make  mkdir  mv  paste  pwd  read  rm  shbutton  sort  sponge
         subsh  tail  tar  touch  tr  watch  wc  xargs
 
     Note: The "#" hash mark means ignore the following chars in the line
@@ -831,20 +830,7 @@ Search out lines to paste into Bash or Zsh, in place of keyboard input
     $
 
 
-## 2.25 ) Jq
-
-Require that "jq.py" not crash more often, without requiring correct output
-
-    $ bin/echo.py '["aa", "cc", "bb"]' | bin/jq.py .
-    ...
-    $
-
-    $ bash -c "bin/jq.py . <(echo '[12, 345, 6789]')"
-    ...
-    $
-
-
-## 2.26 ) Ls
+## 2.25 ) Ls
 
 List the files and dirs inside a dir
 
@@ -967,7 +953,7 @@ Clean up
     $
 
 
-## 2.27 ) Make
+## 2.26 ) Make
 
     $ bin/make.py </dev/null
     usage: make.py [-h]
@@ -976,7 +962,7 @@ Clean up
     $
 
 
-## 2.28 ) MkDir
+## 2.27 ) MkDir
 
     $ rm -fr x y z
     $
@@ -1001,7 +987,7 @@ Clean up
     $
 
 
-## 2.29 ) Mv
+## 2.28 ) Mv
 
     $ bin/mv.py
     Namespace(file=None, i=0)
@@ -1018,7 +1004,7 @@ Clean up
     $
 
 
-## 2.30 ) Pwd
+## 2.29 ) Pwd
 
     $ bin/pwd_.py
     ...
@@ -1031,7 +1017,7 @@ Clean up
     $
 
 
-## 2.31 ) Read
+## 2.30 ) Read
 
     $ bin/echo.py 'Hello, Line Editor' | bin/read.py -e
     ? Hello, Line Editor
@@ -1049,7 +1035,7 @@ Clean up
     $
 
 
-## 2.32 ) Rm
+## 2.31 ) Rm
 
     $ bin/rm.py
     Namespace(files=[])
@@ -1059,7 +1045,7 @@ Clean up
     $
 
 
-## 2.33 ) Sponge
+## 2.32 ) Sponge
 
     $ rm -fr t.txt
     $
@@ -1085,7 +1071,7 @@ Clean up
     $
 
 
-## 2.34 ) SubSh
+## 2.33 ) SubSh
 
     $ bin/subsh.py echo 'Hello, Subsh World!'
     {'args': ['echo', 'Hello, Subsh World!'],
@@ -1102,7 +1088,7 @@ Clean up
     $
 
 
-## 2.35 ) Tail
+## 2.34 ) Tail
 
     $ bin/tail.py
     Namespace(F=0, files=[], follow=0, lines=None, retry=0)
@@ -1112,7 +1098,7 @@ Clean up
     $
 
 
-## 2.36 ) Tar
+## 2.35 ) Tar
 
     $ rm -fr tardir/ tardir.tgz
     $
@@ -1150,7 +1136,7 @@ Clean up
     $
 
 
-## 2.37 ) Touch
+## 2.36 ) Touch
 
     $ rm -fr x y z
     $
@@ -1169,7 +1155,7 @@ Clean up
     $
 
 
-## 2.38 ) Tr
+## 2.37 ) Tr
 
     $ bin/cat.py $(git ls-files | grep -v '^tests/') | bin/tr.py | awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
 
@@ -1181,7 +1167,7 @@ Clean up
     $
 
 
-## 2.39 ) Watch
+## 2.38 ) Watch
 
     $ bin/watch.py
     Namespace(interval=None, words=[])
@@ -1191,7 +1177,7 @@ Clean up
     $
 
 
-## 2.40 ) Wc
+## 2.39 ) Wc
 
     $ bin/wc.py
     Namespace(bytes=0, chars=0, files=[], lines=0, max_line_length=0)
@@ -1201,7 +1187,7 @@ Clean up
     $
 
 
-## 2.41 ) XArgs
+## 2.40 ) XArgs
 
 Join words of lines into one line
 
@@ -1266,7 +1252,6 @@ else exit status 2 from being stubbed out
     $
 
     $ bin/hostname.py </dev/null >/dev/null 2>&1
-    $ bin/jq.py </dev/null >/dev/null 2>&1
     $ bin/ls.py </dev/null >/dev/null 2>&1
     $ bin/make.py </dev/null >/dev/null 2>&1
     + exit 2
