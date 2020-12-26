@@ -1,7 +1,10 @@
 ==== Some Fixme's are more equal than others
 
 
-Get farther with "bin/pq.py"
+Get farther with "bin/shbutton.py"
+
+
+Test pasting commands that edit the pasteboard (such as "pbcopy")
 
 
 Raise exceptions, first deployed imprecisely as asserts
