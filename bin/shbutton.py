@@ -15,7 +15,7 @@ quirks:
   works inside the os copy-paste clipboard, aka pasteboard, via "pbpaste" and "pbcopy"
 
 calculator buttons:
-  % * ** + , - /
+  % * ** + - /
 
 words:
   c d F k p r x y z
@@ -73,7 +73,7 @@ examples:
   , .-1,.0,.-2,.1  # call "awk"
   pbpaste
 
-  , 8:00 0:12:01.123456 17:00 '13 17:00' 1h12m 6m 23h F
+  , c 8:00 0:12:01.123456 17:00 '13 17:00' 1h12m 6m 23h F
 
   , 0 \~ p 0x5a \~ p 0xff \& p 0XA \| p 1 15 \<\< p 1 \>\> p
   , '0 ~ p 0x5a ~ p 0xff & p 0XA | p 1 15 << p 1 >> p' eval
@@ -86,21 +86,24 @@ examples:
   / 0.6 700
 """
 
+# TODO: stash a stack of paste - like collect paste now as input of next command
+# pbpaste >a; read SHLINE; <a pbcopy; source <(echo "$SHLINE")
 
-# TODO: add fmt.py --ruler
-# TODO: add read.py -h keyboard
+
+# TODO: add word "ruler" a la fmt.py --ruler
+# TODO: add word "keycaps" a la read.py -h
 # TODO: fill out the abs and rel date-time-stamps at left of a line
-# TODO: accept leading "_" skid in place of leading "-" dash
-# TODO: accept '%1.3f' %
-# TODO: accept '{:1.3f}' format
 
-# TODO: default decimal notations other than Python decimal engineering notation
-# TODO: default hex notations other than mixing upper r"[A-F]" in with lower "0x"
+# TODO: add words:  float format %
+# TODO: accept leading "_" skid in place of leading "-" dash
+# TODO: count (and blame) lines of input as shlines:1:...
+# TODO: configure str_decimal str_int
+
 # TODO: traces revs of the pasteboard into the "~/.pb_history/" dir, if that dir exists
 # TODO: announce first file dropped into "~/.pb_history/pb.bin~"
-# TODO: count (and blame) lines of input as shlines:1:...
 
 
+import collections
 import datetime as dt
 import decimal
 import math
@@ -315,14 +318,22 @@ class PbVirtualMachine:
         workers_by_name["tr.py.lower"] = self.tr_py_lower
         workers_by_name["tr.py.upper"] = self.tr_py_upper
 
+        workers_by_loose = collections.defaultdict(list)
         precise_worker_items = sorted(workers_by_name.items())
         for (precise, worker) in precise_worker_items:
             if "." in precise:
                 if precise != ".":
                     loose = precise.split(".")[-1]
-                    if loose not in workers_by_name.keys():
-                        workers_by_name[loose] = worker
-        # TODO: drop the collisions
+                    workers_by_loose[loose].append(worker)
+
+        for (loose, workers) in sorted(workers_by_loose.items()):
+            if len(workers) == 1:
+                worker = workers[-1]
+                if loose in workers_by_name.keys():
+                    del workers_by_name[loose]
+                    assert False  # untested in the early days
+                else:
+                    workers_by_name[loose] = worker
 
         return workers_by_name
 
