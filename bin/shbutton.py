@@ -56,7 +56,8 @@ contrast with:
   dc -e '2 k  0 12 + p 3 - p 4 / p 5 * p'  # minimal vocabulary arithmetic
   (echo 1 1; echo d p sx + lx r p; echo d p sx + lx r p; cat -) | dc  # Fibonacci
 
-stack examples:
+examples:
+
   , clearstack 1 1
   , swap over + p  # Forth Fibonacci in two slots
   , + lastx swap p  # Hp Fibonacci in two slots
@@ -64,16 +65,19 @@ stack examples:
   , 1.1 2.2 + p  # decimal fixed point, not binary floating point
   , 0.30 0.20 + p  # significant trailing zeroes
   , 70 k  1 7 / p  # as many digits as you need
-  , 123e1 eng p
+  , 123e1 p
 
-text examples:
   echo '      a b c d e      ' | pbcopy
   , dedent F  # call "sed"
   , upper F  # call "tr"
   , .-1,.0,.-2,.1  # call "awk"
   pbpaste
 
-math examples:
+  , 8:00 0:12:01.123456 17:00 '13 17:00' 1h12m 6m 23h F
+
+  , 0 \~ p 0x5a \~ p 0xff \& p 0XA \| p 1 15 \<\< p 1 \>\> p
+  , '0 ~ p 0x5a ~ p 0xff & p 0XA | p 1 15 << p 1 >> p' eval
+
   0
   + 12
   - 3
@@ -82,21 +86,24 @@ math examples:
   / 0.6 700
 """
 
-# TODO: learn date lists - print as abs and rel, sum rels
 
-# TODO: infer "-- " before negative numbers
+# TODO: add fmt.py --ruler
+# TODO: add read.py -h keyboard
+# TODO: fill out the abs and rel date-time-stamps at left of a line
 # TODO: accept leading "_" skid in place of leading "-" dash
-# TODO: accept hex int literals and << >> & | ^ bitwise ops
 # TODO: accept '%1.3f' %
 # TODO: accept '{:1.3f}' format
-# TODO: default notations other than Python decimal engineering notation
 
+# TODO: default decimal notations other than Python decimal engineering notation
+# TODO: default hex notations other than mixing upper r"[A-F]" in with lower "0x"
 # TODO: traces revs of the pasteboard into the "~/.pb_history/" dir, if that dir exists
 # TODO: announce first file dropped into "~/.pb_history/pb.bin~"
 # TODO: count (and blame) lines of input as shlines:1:...
 
 
+import datetime as dt
 import decimal
+import math
 import pdb
 import re
 import shlex
@@ -104,6 +111,64 @@ import subprocess
 import sys
 
 import argdoc
+
+
+ONE_DECIMAL = r"[-+]?[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?"
+
+ONE_HEXADECIMAL = r"[-+]?0[Xx][0-9A-Fa-f]+"
+
+ONE_INDEX = r"[.][-+]?[0-9]+"
+
+SOME_INDICES = r"{}([,]{})+".format(ONE_INDEX, ONE_INDEX)
+
+ONE_INTERVAL = (
+    r"([0-9]+)" + r"([YZEPTGMKkmµunpfazy])?" + r"([hms])"  # \u00B5 micro-sign
+)
+
+SOME_INTERVALS = r"({})+".format(ONE_INTERVAL)
+
+ONE_MOMENT_FORMATS = (
+    r"%Y-%m-%d %H:%M:%S",
+    r"%Y-%m-%d %H:%M",
+    r"%Y-%m-%d %H",
+    r"%y-%m-%d %H:%M:%S",
+    r"%y-%m-%d %H:%M",
+    r"%y-%m-%d %H",
+    r"%m-%d %H:%M:%S",
+    r"%m-%d %H:%M",
+    r"%m-%d %H",
+    r"%d %H:%M:%S",
+    r"%d %H:%M",
+    r"%d %H",
+    r"%H:%M",
+    r"%H:%M:%S",
+)
+
+ONE_MOMENT = (
+    r"|".join(ONE_MOMENT_FORMATS)
+    .replace(r" ", r"[ T]")  # ISO 8601 accepts only "T" not also " " space
+    .replace(r"%H", r"([0-9][0-9]?)")
+    .replace(r"%M", r"([0-9][0-9]?)")
+    .replace(r"%S", r"([0-9][0-9]?([.][0-9]+)?)")
+    .replace(r"%Y", r"([0-9][0-9][0-9][0-9])")
+    .replace(r"%d", r"([0-9][0-9]?)")
+    .replace(r"%m", r"([0-9][0-9]?)")
+    .replace(r"%y", r"([0-9][0-9])")
+)
+
+ONE_HINT_REGEX = (
+    r"^("
+    + r"(?P<decimal>{})".format(ONE_DECIMAL)
+    + r"|"
+    + r"(?P<hexadecimal>{})".format(ONE_HEXADECIMAL)
+    + r"|"
+    + r"(?P<indices>{})".format(SOME_INDICES)
+    + r"|"
+    + r"(?P<interval>{})".format(SOME_INTERVALS)
+    + r"|"
+    + r"(?P<moment>{})".format(ONE_MOMENT)
+    + r")$"
+)
 
 
 HINTS_BY_HINT = dict()
@@ -122,7 +187,25 @@ def b():
 def main(argv):
     """Run one split command line"""
 
-    args = argdoc.parse_args()
+    argv_tail = list()
+    for (index, arg) in enumerate(argv):
+        if index:
+
+            if arg == "--":  # accept negated numbers as not dash options
+                argv_tail.extend(argv[index:])
+                break
+
+            if re.match(r"^[-]?[0-9]", string=arg):
+                argv_tail.append("--")
+                argv_tail.extend(argv[index:])
+                break
+
+            argv_tail.append(arg)
+
+    # if argv_tail != argv[1:]:
+    #     stderr_print("+ , {}".format(shlex.join(argv_tail)))
+
+    args = argdoc.parse_args(argv_tail)
 
     hints = args.hints
     if hints:
@@ -149,12 +232,32 @@ class PbVirtualMachine:
     "Work on one pasteboard"
 
     def __init__(self, pb_lines):
-        self.hp_last_line = pb_lines[-1] if pb_lines else None
+        self.era = dt.datetime.now()
+        self.hp_last_line = None
+        self.multipliers_by_code = self.init_multipliers_by_code()
         self.pb_lines = pb_lines
         self.workers_by_name = self.init_workers_by_name()
+        self.workers_by_syntax = self.init_workers_by_syntax()
+
+    def init_multipliers_by_code(self):
+
+        multipliers_by_code = dict()
+
+        for (index, code) in enumerate(".kMGTPEZY"):
+            if code != ".":
+                multipliers_by_code[code] = 10 ** (3 * index)
+
+        for (index, code) in enumerate(".munpfazy"):
+            if code != ".":
+                multipliers_by_code[code] = 10 ** (-3 * index)
+
+        multipliers_by_code["K"] = 10 ** 3
+        multipliers_by_code["µ"] = 10 ** -6  # \u00B5 micro-sign
+
+        return multipliers_by_code
 
     def init_workers_by_name(self):
-        """Name the workers"""
+        """Name the workers who work the "pb_lines" stack"""
 
         workers_by_name = dict()
 
@@ -165,6 +268,16 @@ class PbVirtualMachine:
         workers_by_name[","] = self.on_comma
         workers_by_name["-"] = self.on_hyphen_minus
         workers_by_name["/"] = self.on_solidus
+
+        workers_by_name["&"] = self.on_ampersand
+        workers_by_name["<<"] = self.py_left_shift
+        workers_by_name[">>"] = self.py_right_shift
+        workers_by_name["^"] = self.on_circumflex_accent
+        workers_by_name["|"] = self.on_vertical_line
+        workers_by_name["^"] = self.on_circumflex_accent
+        workers_by_name["~"] = self.on_tilde
+
+        workers_by_name["bash.eval"] = self.bash_eval
 
         workers_by_name["dc.c"] = self.dc_clearstack  # ... --
         workers_by_name["dc.d"] = self.dc_dup  # x -- x x
@@ -187,9 +300,10 @@ class PbVirtualMachine:
         workers_by_name["hp.y"] = self.hp_y  # y x -- y x y
         workers_by_name["hp.z"] = self.hp_z  # z y x -- z y x z  # aka rot-without-pop-z
 
-        #       workers_by_name["py.math.e"] = self.py_math_e e  # TODO: add these
-        #       workers_by_name["py.math.pi"] = self.py_math_pi π
-        workers_by_name["py.eng"] = self.py_eng
+        workers_by_name["py.math.e"] = self.py_math_e
+        workers_by_name["py.math.pi"] = self.py_math_pi
+        workers_by_name["py.math.π"] = self.py_math_pi
+        workers_by_name["py.hex"] = self.py_hex
         workers_by_name["py.int"] = self.py_int
 
         workers_by_name["sed.py.dedent"] = self.sed_py_dedent
@@ -212,46 +326,64 @@ class PbVirtualMachine:
 
         return workers_by_name
 
+    def init_workers_by_syntax(self):
+        """Name the workers who parse hints"""
+
+        workers_by_syntax = dict()
+
+        workers_by_syntax["decimal"] = self.work_decimal_hint
+        workers_by_syntax["hexadecimal"] = self.work_hexadecimal_hint
+        workers_by_syntax["interval"] = self.work_interval_hint
+        workers_by_syntax["indices"] = self.work_indices_hint
+        workers_by_syntax["moment"] = self.work_moment_hint
+        workers_by_syntax["str"] = self.work_str_hint
+
+        return workers_by_syntax
+
+    def bash_eval(self):
+        """Eval the last line as if it were the arguments of a command line"""
+
+        line = self.pb_lines.pop()
+        argv = shlex.split(line)
+        self.walk_hints(hints=argv)  # argv[:], not argv[1:]
+
     def walk_hints(self, hints):
         """Interpret each hint in turn"""
 
-        workers_by_name = self.workers_by_name
-
         for hint in hints:
-
+            worker = self.find_worker(hint)
             try:
-                if hint in workers_by_name:
-                    worker = workers_by_name[hint]
-                    worker()
-                elif re.match(r"^([.][-+]?[0-9]+)([,][.][-+]?[0-9]+)*", string=hint):
-                    self.awk_column_picker(hint)
-                else:
-                    w = decimal.Decimal(hint)
-                    self.push_one_decimal(w)
+                worker()
             except Exception:
+                # TODO: trace last few of self.pb_lines
                 stderr_print("shbutton: error: at {!r}".format(hint))
                 raise
 
-    def awk_column_picker(self, hint):
-        """Call Awk to reorder or dupe columns, while dropping the rest"""
+    def find_worker(self, hint):
+        """Interpret one hint"""
 
-        fetches = list()
-        for str_index in hint.split(","):
-            check(got=str_index.startswith("."), str_index=str_index)
+        self.hint = hint
 
-            index = int(str_index[len(".") :])
-            if index < 0:
-                if index == -1:
-                    fetch = "$NF"
-                else:
-                    fetch = "$(NF-{})".format(-1 - index)
-            else:
-                fetch = "${}".format(1 + index)
+        workers_by_syntax = self.workers_by_syntax
+        workers_by_name = self.workers_by_name
 
-            fetches.append(fetch)
+        key = None
+        match = re.match(ONE_HINT_REGEX, string=hint)
+        if match:
+            keys = list(k for (k, v) in match.groupdict().items() if v)
+            if keys:
+                check(want=1, got=len(keys), keys=keys)
+                key = keys[-1]
 
-        awk = ", ".join(fetches)
-        self.pipe_through("awk '//{print " + awk + "}'")
+        worker = None
+        if key:
+            worker = workers_by_syntax[key]
+        elif hint in workers_by_name.keys():
+            worker = workers_by_name[hint]
+        else:
+            worker = workers_by_syntax["str"]
+
+        return worker
 
     def dc_cat(self):
         """Print a copy of all lines in order (not reversed like Dc "f")"""
@@ -293,6 +425,141 @@ class PbVirtualMachine:
         x = self.pb_lines[-1]
         self.pb_lines[-2] = x
         self.pb_lines[-1] = y
+
+    def eval_decimal(self, chars):
+        """Convert to decimal.Decimal from str, else from str of int, else exit"""
+
+        try:
+            arg = decimal.Decimal(chars)
+        except Exception:
+            try:
+                base_0 = 0
+                arg = decimal.Decimal(int(chars, base_0))
+            except Exception:
+                shards = chars.split()
+                starter = "{} ...".format(" ".join(shards[:2]))
+                handwave = chars if (len(shards) < 3) else starter
+                stderr_print(
+                    "shbutton.py: error: want decimal, got {!r}".format(handwave)
+                )
+                sys.exit(1)
+
+        return arg
+
+    def eval_int(self, chars):
+        """Convert to int from str, else exit"""
+
+        try:
+            base_0 = 0
+            arg = int(chars, base_0)
+        except Exception:
+            stderr_print("shbutton.py: error: want int, got {!r}".format(chars))
+            sys.exit(1)
+
+        return arg
+
+    def eval_interval_hint(self, hint):
+        """Convert to dt.timedelta from str, else raise exception"""
+
+        multipliers_by_code = self.multipliers_by_code
+        codes = sorted(multipliers_by_code.keys())
+
+        regex = (
+            r"(?P<digits>[0-9]+)"
+            + r"(?P<multiplier>[{}])?".format("".join(codes))
+            + r"(?P<unit>[hms])"
+        )
+
+        matches = list(re.finditer(regex, string=hint))
+        check(got=matches)
+
+        interval = dt.timedelta()
+        for match in matches:
+            parts = match.groupdict()
+
+            digits = parts["digits"]
+            multiplicand = int(digits)
+
+            multiplier_code = parts["multiplier"]
+            multiplier = 1
+            if multiplier_code in codes:
+                multiplier = multipliers_by_code[multiplier_code]
+
+            multiplied = multiplier * multiplicand
+
+            unit = parts["unit"]
+            if unit == "h":
+                interval += dt.timedelta(hours=multiplied)
+            elif unit == "m":
+                interval += dt.timedelta(minutes=multiplied)
+            else:
+                check(want="s", got=unit)
+                interval += dt.timedelta(seconds=multiplied)
+
+        return interval
+
+    def eval_moment_hint(self, era, hint):
+        """Expand an abbreviated moment into the year-month-day hour of now"""
+
+        (moment_, format_) = self._find_moment_format(hint)
+        moment = self._pin_moment(era, moment_=moment_, format_=format_, hint=hint)
+
+        return moment
+
+    def _find_moment_format(self, hint):
+        """Convert the hint to a partial moment of a particular format"""
+
+        chars = hint
+        if "." in hint:
+            check(want=1, got=hint.count("."))
+            chars = hint.split(".")[0]
+
+        formats = list()
+        moments = list()
+        for format_ in ONE_MOMENT_FORMATS:
+            try:
+                moment_ = dt.datetime.strptime(chars, format_)
+            except Exception:
+                continue
+            formats.append(format_)
+            moments.append(moment_)
+
+        check(want=1, got=len(moments), moments=moments)
+        format_ = formats[-1]
+        moment_ = moments[-1]
+
+        return (moment_, format_)
+
+    def _pin_moment(self, era, moment_, format_, hint):
+        """Fit the partial moment to the year-month-day hour of now"""
+
+        moment = era.replace(microsecond=0)
+        parts = format_.replace("-", " ").replace(":", "  ").split()
+        for part in parts:
+            if part == "%Y":
+                moment = moment.replace(year=moment_.year)
+            elif part == "%y":
+                moment = moment.replace(year=moment_.year)
+            elif part == "%m":
+                moment = moment.replace(month=moment_.month)
+            elif part == "%d":
+                moment = moment.replace(day=moment_.day)
+            elif part == "%H":
+                moment = moment.replace(hour=moment_.hour, minute=0, second=0)
+            elif part == "%M":
+                moment = moment.replace(minute=moment_.minute, second=0)
+            elif part == "%S":
+                moment = moment.replace(second=moment_.second)
+
+        if "." in hint:
+            check(got=("%S" in parts))
+            digits = hint.split(".")[-1]
+            check(got=(len(digits) <= 6), digits=digits)
+            digits_plus = digits + "000" + "000"
+            microsecond = int(digits_plus[:6])
+            moment = moment.replace(microsecond=microsecond)
+
+        return moment
 
     def forth_drop(self):
         """Lose the last line"""
@@ -357,18 +624,46 @@ class PbVirtualMachine:
 
         self.pb_lines.append(self.pb_lines[-3])
 
+    def on_ampersand(self):
+        """Replace the last two lines, seen as hex ints, by and'ing their bits"""
+
+        (y, x) = self.pop_some_ints(2)
+        w = y & x
+        self.push_one_hexadecimal(w)
+
     def on_asterisk(self):
-        """Multiply the last two lines"""
+        """Multiply the last two lines, seen as decimals"""
 
         (y, x) = self.pop_some_decimals(2)
         w = y * x
         self.push_one_decimal(w)
 
+    def on_circumflex_accent(self):
+        """Replace the last two lines, seen as hex ints, by xor'ing their bits"""
+
+        (y, x) = self.pop_some_ints(2)
+        w = y ^ x
+        self.push_one_hexadecimal(w)
+
+    def on_tilde(self):
+        """Replace the last line, seen as a hex int, by flip its bits"""
+
+        (x,) = self.pop_some_ints(1)
+        w = ~x
+        self.push_one_hexadecimal(w)
+
+    def on_vertical_line(self):
+        """Replace the last two lines, seen as hex ints, by or'ing their bits"""
+
+        (y, x) = self.pop_some_ints(2)
+        w = y | x
+        self.push_one_hexadecimal(w)
+
     def on_comma(self):
         """Gracefully do nothing"""
 
     def on_hyphen_minus(self):
-        """Subtract the last two lines"""
+        """Subtract the last two lines, seen as decimals"""
 
         (y, x) = self.pop_some_decimals(2)
         w = y - x
@@ -382,7 +677,7 @@ class PbVirtualMachine:
         self.push_one_decimal(w)
 
     def on_plus_sign(self):
-        """Add the last two lines"""
+        """Add the last two lines, seen as decimals"""
 
         (y, x) = self.pop_some_decimals(2)
         w = y + x
@@ -419,19 +714,6 @@ class PbVirtualMachine:
 
         self.pb_lines = pb_lines
 
-    def decimal_or_exit(self, chars):
-        try:
-            arg = decimal.Decimal(chars)
-        except Exception:
-            shards = chars.split()
-            starter = "{} ...".format(" ".join(shards[:2]))
-            handwave = chars if (len(shards) < 3) else starter
-            stderr_print(
-                "shbutton.py: error: want decimal digits, got {!r}".format(handwave)
-            )
-            sys.exit(1)
-        return arg
-
     def pop_some_decimals(self, depth=1):
         """Take one or more of the trailing lines as decimals"""
 
@@ -440,31 +722,75 @@ class PbVirtualMachine:
         decimals = list()
         for _ in range(depth):
             line = self.pb_lines.pop() if self.pb_lines else "0"
-            w = self.decimal_or_exit(line)
+            w = self.eval_decimal(line)
             decimals.insert(0, w)
 
         check(want=depth, got=len(decimals))
-        self.hp_last_line = str(decimals[-1])
+        self.hp_last_line = self.str_decimal(decimals[-1])
 
         return decimals
+
+    def pop_some_ints(self, depth=1):
+        """Take one or more of the trailing lines as ints"""
+
+        check(got=(depth > 0), depth=depth)
+
+        ints = list()
+        for _ in range(depth):
+            line = self.pb_lines.pop() if self.pb_lines else "0"
+            w = self.eval_int(line)
+            ints.insert(0, w)
+
+        check(want=depth, got=len(ints))
+        self.hp_last_line = self.str_int(ints[-1])
+
+        return ints
 
     def push_one_decimal(self, w):
         """Add one decimal as the trailing line"""
 
-        self.pb_lines.append(str(w))
+        self.pb_lines.append(self.str_decimal(w))
 
-    def py_eng(self):
-        """Replace the last line with its decimal value in engineering notation"""
+    def push_one_hexadecimal(self, w):
+        """Add one hexadecimal as the trailing line"""
 
-        (x,) = self.pop_some_decimals(1)
-        w = x.to_eng_string()
-        self.push_one_decimal(w)
+        self.pb_lines.append(self.str_int(w))
+
+    def py_hex(self):
+        """Replace the last line with the hex of its int floor"""
+
+        self.py_int()
+        self.pb_lines[-1] = hex(int(self.pb_lines[-1]))
 
     def py_int(self):
         """Replace the last line with its int floor"""
 
+        try:
+            (x,) = self.pop_some_ints(1)
+        except Exception:
+            (x,) = self.pop_some_decimals(1)
+
         (x,) = self.pop_some_decimals(1)
         w = int(x)
+        self.push_one_decimal(w)
+
+    def py_left_shift(self):
+        """Replace the last two lines, seen as hex ints, by shifting y left by x"""
+
+        (y, x) = self.pop_some_ints(2)
+        w = y << x
+        self.push_one_hexadecimal(w)
+
+    def py_math_e(self):
+        """Add an approximate copy of Euler's number"""
+
+        w = math.e
+        self.push_one_decimal(w)
+
+    def py_math_pi(self):
+        """Add an approximate copy of Pi"""
+
+        w = math.pi
         self.push_one_decimal(w)
 
     def py_pow(self):
@@ -473,6 +799,13 @@ class PbVirtualMachine:
         (y, x) = self.pop_some_decimals(2)
         w = y ** x
         self.push_one_decimal(w)
+
+    def py_right_shift(self):
+        """Replace the last two lines, seen as hex ints, by shifting y right by x"""
+
+        (y, x) = self.pop_some_ints(2)
+        w = y >> x
+        self.push_one_hexadecimal(w)
 
     def sed_py_dedent(self):
         """Strip four spaces or none from the left of each line"""
@@ -506,6 +839,18 @@ class PbVirtualMachine:
         # self.pipe_through("""awk '//{sub("^  *", "");sub("^  *", ""); print}'""")
         self.pipe_through("sed -E 's,^ *| *$,,g'")
 
+    def str_decimal(self, w):
+        """Format a decimal to stack it"""
+
+        chars = w.to_eng_string()
+        return chars
+
+    def str_int(self, w):
+        """Format an int to stack it"""
+
+        chars = hex(w).upper().replace("X", "x")
+        return chars
+
     def tr_py_lower(self):
         """Lowercase every character of every line"""
 
@@ -515,6 +860,63 @@ class PbVirtualMachine:
         """Uppercase every character of every line"""
 
         self.pipe_through("tr '[:lower:]' '[:upper:]'")
+
+    def work_decimal_hint(self):
+        """Push one decimal.Decimal arg"""
+
+        hint = self.hint
+        w = self.eval_decimal(chars=hint)
+        self.push_one_decimal(w)
+
+    def work_hexadecimal_hint(self):
+        """Push one hexadecimal int arg"""
+
+        hint = self.hint
+        w = self.eval_int(chars=hint)
+        self.pb_lines.append(self.str_int(w))
+
+    def work_interval_hint(self):
+        """Push one dt.timedelta arg"""
+
+        hint = self.hint
+        interval = self.eval_interval_hint(hint)
+        self.pb_lines.append(str(interval))
+
+    def work_indices_hint(self):
+        """Call Awk to reorder or dupe columns, while dropping the rest"""
+
+        hint = self.hint
+
+        fetches = list()
+        for str_index in hint.split(","):
+            check(got=str_index.startswith("."), str_index=str_index)
+
+            index = int(str_index[len(".") :])
+            if index < 0:
+                if index == -1:
+                    fetch = "$NF"
+                else:
+                    fetch = "$(NF-{})".format(-1 - index)
+            else:
+                fetch = "${}".format(1 + index)
+
+            fetches.append(fetch)
+
+        awk = ", ".join(fetches)
+        self.pipe_through("awk '//{print " + awk + "}'")
+
+    def work_moment_hint(self):
+
+        era = self.era
+        hint = self.hint
+        moment = self.eval_moment_hint(era, hint)
+        self.pb_lines.append(str(moment))
+
+    def work_str_hint(self):
+        """Push one str arg"""
+
+        str_hint = self.hint
+        self.pb_lines.append(str_hint)
 
 
 #
@@ -556,11 +958,11 @@ def suspend_to_pb(pb_lines):
 
 #
 # Define some Python idioms
+# TODO: push changes back out to other copies
 #
 
 
 # deffed in many files  # missing from docs.python.org
-# TODO: push changes back out to other copies of KwargsException at CheckException
 class KwargsException(Exception):
     """Raise the values of some vars"""
 
