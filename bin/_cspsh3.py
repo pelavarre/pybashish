@@ -11,7 +11,7 @@ optional arguments:
 
 examples:
   _cspsh3.py
-  _cspsh3.py -c'VMCT = µ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))'
+  _cspsh3.py -c'VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))'
   _cspsh3.py -c'coin → (choc → X | toffee → X)'
 """
 
@@ -26,7 +26,7 @@ import argdoc
 
 
 DEFAULT_CSP_CHARS = (
-    "VMCT = µ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))"
+    "VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))"
 )
 
 
@@ -61,7 +61,7 @@ def parse_csp_chars(csp_chars):  # noqa: C901
         return collect(ok)
 
     def process_with_such():
-        ok = mark("µ") and process_name()
+        ok = mark("μ") and process_name()
         _ = ok and mark(":") and alphabet()
         ok = ok and mark("•") and process()
         return collect(ok)
