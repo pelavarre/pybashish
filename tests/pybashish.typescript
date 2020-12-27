@@ -1163,9 +1163,12 @@ Clean up
     0123456789:;<=>?@
     ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`
     abcdefghijklmnopqrstuvwxyz{|}~
-    «µ»åéîøüαπ–—’“”•′″‴←↑→↓⇧∀∧≠≡⋮⌃⌘⌥⟨⟩💔💥😊😠😢
+    «µ»åéîøüαμπ–—’“”•′″‴←↑→↓⇧∀∧≠≡⋮⌃⌘⌥⟨⟩💔💥😊😠😢
     $
 
+    "µ" is "\u00B5" micro-sign
+    "μ" is "\u03BC" greek small-letter-mu
+    etc
 
 ## 2.38 ) Watch
 

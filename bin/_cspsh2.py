@@ -352,7 +352,7 @@ class CspProcessBody(CspTree):
     def take_tree_from(taker):
 
         cut = taker.peek_one_cut()
-        if cut and (cut.chars == "µ"):
+        if cut and (cut.chars == "μ"):
             process_with_such = CspProcessWithSuch().take_tree_from(taker)
             tree = process_with_such
         else:
@@ -365,13 +365,13 @@ class CspProcessBody(CspTree):
 
 class CspProcessWithSuch(CspTree):
     """
-    process_with_such := "µ" process_name [ ":" alphabet ] "•" process
+    process_with_such := "μ" process_name [ ":" alphabet ] "•" process
     """
 
     @staticmethod
     def take_tree_from(taker):
 
-        process_mark = CspMark.take_tree_from_chars(taker, chars="µ", formatted="µ ")
+        process_mark = CspMark.take_tree_from_chars(taker, chars="μ", formatted="μ ")
         process_name = CspProcessName().take_tree_from(taker)
 
         cut = taker.peek_one_cut()
@@ -686,7 +686,7 @@ class CspMark(CspLeaf):
 
 LINESEP = r"(?P<linesep>#.*)"  # Csp doesn't define '#' comments, but we do
 NAME = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
-MARK = r"(?P<mark>[(),:={|}µ•→⟨⟩])"
+MARK = r"(?P<mark>[(),:={|}μ•→⟨⟩])"
 GAP = r"(?P<gap>[ ])"  # TODO: expand tabs, strip chars, strip lines, at input
 GOOF = r"(?P<goof>.)"  # doesn't match r"[\r\n]"
 
@@ -1124,7 +1124,7 @@ BASIC_TEST_CHARS = """
     HER.WALTZ
     HIS.WALTZ
 
-    CLOCK = µ X : {tick, tock} • (tick → tock → X)
+    CLOCK = μ X : {tick, tock} • (tick → tock → X)
     CLOCK
 
 """
@@ -1156,7 +1156,7 @@ CHAPTER_1_TEST_CHARS = """
     CLOCK = (tick → tick → tick → CLOCK)
     CLOCK
 
-    CLOCK = µ X : {tick} • (tick → X)  # 1.1.2 X1
+    CLOCK = μ X : {tick} • (tick → X)  # 1.1.2 X1
     CLOCK
 
     VMS = (coin → (choc → VMS))  # 1.1.2 X2
@@ -1181,7 +1181,7 @@ CHAPTER_1_TEST_CHARS = """
 
     (x → P | y → Q)
 
-    VMCT = µ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
+    VMCT = μ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
     VMCT
 
     VMC = (  # 1.1.3 X4
@@ -1193,13 +1193,13 @@ CHAPTER_1_TEST_CHARS = """
     )))
     VMC
 
-    VMCRED = µ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
+    VMCRED = μ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
     VMCRED
 
     VMS2 = (coin → VMCRED)  # 1.1.3 X6
     VMS2
 
-    COPYBIT = µ X • (in.0 → out.0 → X  # 1.1.3 X7
+    COPYBIT = μ X • (in.0 → out.0 → X  # 1.1.3 X7
                      | in.1 → out.1 → X)
     COPYBIT
 
@@ -1258,11 +1258,11 @@ CHAPTER_1_TEST_CHARS = """
 
     # (coin → choc → coin → choc → STOP) ≠ (coin → STOP)  # 1.3 X1
 
-    # µ X • (coin → (choc → X | toffee → X ))  =  # 1.3 X2
-    #   µ X • (coin → (toffee → X | choc → X ))
+    # μ X • (coin → (choc → X | toffee → X ))  =  # 1.3 X2
+    #   μ X • (coin → (toffee → X | choc → X ))
 
-    # L2    (Y = F(Y))  ≡  (Y = µ X • F(X))  # <= TODO: what is this??
-    # L2A   µ X • F(X) = F(µ X • F(X))  # <= TODO: a la L2
+    # L2    (Y = F(Y))  ≡  (Y = μ X • F(X))  # <= TODO: what is this??
+    # L2A   μ X • F(X) = F(μ X • F(X))  # <= TODO: a la L2
 
     VM1 = (coin → VM2)
     VM2 = (choc → VM1)

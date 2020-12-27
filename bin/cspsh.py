@@ -54,7 +54,7 @@ CspWord = collections.namedtuple("CspWord", "kind, chars".split(", "))
 
 
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
-MARK_REGEX = r"(?P<mark>[(),:={|}µ•→⟨⟩])"
+MARK_REGEX = r"(?P<mark>[(),:={|}μ•→⟨⟩])"
 BLANKS_REGEX = r"(?P<blanks>[ ]+)"
 
 SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
@@ -188,7 +188,7 @@ def csp_pick_open_marks(string):
 
     Count the ) ] } marks as closing the ( [ { marks
 
-    Count the other marks (such as = µ • →) as closed by the next name
+    Count the other marks (such as = μ • →) as closed by the next name
     """
 
     # To list which marks are left open, if any:  open marks, and close the last mark
@@ -609,7 +609,7 @@ class ProcessCaller(CspWorker):
         if process:
             if not isinstance(process, ProcessCaller):
                 CspCommandLine.cspvm.goto_named_process(name, process=process)
-            else:  # trace → X as the P at µ X in P = µ X : ... • ... → X
+            else:  # trace → X as the P at μ X in P = μ X : ... • ... → X
                 process_caller = process
                 CspCommandLine.cspvm.goto_named_process(
                     process_caller.name, process=process_caller.process
@@ -665,7 +665,7 @@ class DefineProcess(CspWorker):
         is_mark = CspMark.take_one(taker, "=")
 
         word = taker.peek_one_shard()
-        if word.chars != "µ":
+        if word.chars != "μ":
             process = Process.take_one(taker)
             definition = process
             process_caller_process = process
@@ -676,7 +676,7 @@ class DefineProcess(CspWorker):
 
             assert process_with_such.process_caller.name
             process_with_such.process_caller.name = name
-            # trace µ X as P in P = µ X : ... • ... → X
+            # trace μ X as P in P = μ X : ... • ... → X
 
         assert CspCommandLine.process_callers_by_name[name] == process_caller
         assert process_caller.process is None
@@ -709,7 +709,7 @@ class ProcessWithSuch(CspWorker):
     @classmethod
     def take_one(cls, taker):
 
-        the_process_mark = CspMark.take_one(taker, "µ")
+        the_process_mark = CspMark.take_one(taker, "μ")
 
         process_caller = ProcessCaller.take_one(taker)
         name = process_caller.name
@@ -1061,7 +1061,7 @@ BASIC_TEST_LINES = """
     # more examples from us
     #
 
-    CLOCK = µ X : {tick, tock} • (tick → tock → X)
+    CLOCK = μ X : {tick, tock} • (tick → tock → X)
     CLOCK
 
     HER.WALTZ = (
@@ -1104,7 +1104,7 @@ CHAPTER_1_TEST_LINES = """
     CLOCK = (tick → tick → tick → CLOCK)
     CLOCK
 
-    CLOCK = µ X : {tick} • (tick → X)  # 1.1.2 X1
+    CLOCK = μ X : {tick} • (tick → X)  # 1.1.2 X1
     CLOCK
 
     VMS = (coin → (choc → VMS))  # 1.1.2 X2
@@ -1128,7 +1128,7 @@ CHAPTER_1_TEST_LINES = """
 
     (x → P | y → Q)
 
-    VMCT = µ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
+    VMCT = μ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
     VMCT
 
     VMC = (in2p → (large → VMC |  # 1.1.3 X4
@@ -1138,13 +1138,13 @@ CHAPTER_1_TEST_LINES = """
                            in1p → STOP)))
     VMC
 
-    VMCRED = µ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
+    VMCRED = μ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
     VMCRED
 
     VMS2 = (coin → VMCRED)  # 1.1.3 X6
     VMS2
 
-    COPYBIT = µ X • (in.0 → out.0 → X |  # 1.1.3 X7
+    COPYBIT = μ X • (in.0 → out.0 → X |  # 1.1.3 X7
                      in.1 → out.1 → X)
     COPYBIT
 
@@ -1203,11 +1203,11 @@ CHAPTER_1_TEST_LINES = """
 
     # (coin → choc → coin → choc → STOP) ≠ (coin → STOP)  # 1.3 X1
 
-    # µ X • (coin → (choc → X | toffee → X ))  =  # 1.3 X2
-    #   µ X • (coin → (toffee → X | choc → X ))
+    # μ X • (coin → (choc → X | toffee → X ))  =  # 1.3 X2
+    #   μ X • (coin → (toffee → X | choc → X ))
 
-    # L2    (Y = F(Y))  ≡  (Y = µ X • F(X))  # <= FIXME: what is this??
-    # L2A   µ X • F(X) = F(µ X • F(X))  # <= FIXME: a la L2
+    # L2    (Y = F(Y))  ≡  (Y = μ X • F(X))  # <= FIXME: what is this??
+    # L2A   μ X • F(X) = F(μ X • F(X))  # <= FIXME: a la L2
 
     VM1 = (coin → VM2)
     VM2 = (choc → VM1)
