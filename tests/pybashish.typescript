@@ -120,8 +120,8 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
         -  ..  argdoc  bash  bind  cal  cat  cd  chmod  column  cp  cspsh  date  dd
         doctestbash  echo  exit  expand  find  fmt  grep  head  hearme  help  hexdump
-        history  hostname  ls  make  mkdir  mv  paste  pwd  read  rm  shbutton  sort  sponge
-        subsh  tail  tar  touch  tr  watch  wc  xargs
+        hostname  ls  make  mkdir  mv  paste  pwd  read  rm  shbutton  sort  sponge
+        ssh  subsh  tail  tar  touch  tr  watch  wc  xargs
 
     Note: The "#" hash mark means ignore the following chars in the line
     Note: The ":" colon as the first word means mostly ignore the following words in the line
@@ -134,6 +134,8 @@ It's a bug if it surprises you, because a bug is a thing that bother somebody wh
 you matter
 
 Please tell us about it
+
+FIXME:  test passes falsely when i delete the first words of the "Next try one of" lines
 
 
 # 2 ) Man PyBashIsh All
@@ -373,35 +375,35 @@ Give help for the keystrokes of the "bin/read.py" command line editor
     $
 
     $ bin/chmod.py -R ugo+rw /dev/null
-    Namespace(mode='ugo+rw', recursive=1, tops=['/dev/null'])
+    Namespace(mode='ugo+rw', tops=['/dev/null'], recursive=1)
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py ugo+rw /dev/null -R
-    Namespace(mode='ugo+rw', recursive=1, tops=['/dev/null'])
+    Namespace(mode='ugo+rw', tops=['/dev/null'], recursive=1)
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py -rw /dev/null
-    Namespace(mode='-rw', recursive=0, tops=['/dev/null'])
+    Namespace(mode='-rw', tops=['/dev/null'], recursive=0)
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py +rw /dev/null
-    Namespace(mode='+rw', recursive=0, tops=['/dev/null'])
+    Namespace(mode='+rw', tops=['/dev/null'], recursive=0)
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py =rw /dev/null
-    Namespace(mode='=rw', recursive=0, tops=['/dev/null'])
+    Namespace(mode='=rw', tops=['/dev/null'], recursive=0)
     usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
     chmod.py: error: not implemented
     + exit 2
@@ -411,14 +413,14 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 ## 2.8 ) Cp
 
     $ bin/cp.py
-    Namespace(R=0, file=None, i=0, p=0)
+    Namespace(file=None, i=0, p=0, R=0)
     usage: cp.py [-h] [-i] [-p] [-R] [FILE]
     cp.py: error: not implemented
     + exit 2
     $
 
     $ bin/cp.py f.file
-    Namespace(R=0, file='f.file', i=0, p=0)
+    Namespace(file='f.file', i=0, p=0, R=0)
     usage: cp.py [-h] [-i] [-p] [-R] [FILE]
     cp.py: error: not implemented
     + exit 2
@@ -1091,7 +1093,7 @@ Clean up
 ## 2.34 ) Tail
 
     $ bin/tail.py
-    Namespace(F=0, files=[], follow=0, lines=None, retry=0)
+    Namespace(files=[], F=0, follow=0, retry=0, lines=None)
     usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE [FILE ...]]
     tail.py: error: not implemented
     + exit 2
@@ -1173,7 +1175,7 @@ Clean up
 ## 2.38 ) Watch
 
     $ bin/watch.py
-    Namespace(interval=None, words=[])
+    Namespace(words=[], interval=None)
     usage: watch.py [-h] [-n SECS] [WORD [WORD ...]]
     watch.py: error: not implemented
     + exit 2
@@ -1183,7 +1185,7 @@ Clean up
 ## 2.39 ) Wc
 
     $ bin/wc.py
-    Namespace(bytes=0, chars=0, files=[], lines=0, max_line_length=0)
+    Namespace(files=[], max_line_length=0, lines=0, chars=0, bytes=0)
     usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE [FILE ...]]
     wc.py: error: not implemented
     + exit 2
@@ -1306,7 +1308,7 @@ that still calls for automagic "show this help message and exit"
 
     $ bin/argdoc.py --rip argparse bin/cal.py >bin/p.py
     $ python3 bin/p.py
-    Namespace(h=0, help=0, ymd=None)
+    Namespace(ymd=None, help=0, h=0)
     usage: cal.py [--help] [-h] [YMD]
     cal.py: error: not implemented
     + exit 2
@@ -1314,7 +1316,7 @@ that still calls for automagic "show this help message and exit"
 
     $ bin/argdoc.py --rip argdoc bin/cal.py >bin/p.py
     $ python3 bin/p.py
-    Namespace(h=0, help=0, ymd=None)
+    Namespace(ymd=None, help=0, h=0)
     usage: cal.py [--help] [-h] [YMD]
     cal.py: error: not implemented
     + exit 2
