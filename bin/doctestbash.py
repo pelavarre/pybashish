@@ -35,6 +35,7 @@ see also:  python "import doctest"
 # FIXME: think harder when no files chosen
 
 
+import argparse
 import doctest
 import os
 import subprocess
@@ -72,7 +73,7 @@ def main(argv):
     # Declare success
 
     if not args.rip_bash_paste:
-        stderr_print("doctestbash.py: {} tests passed".format(passes))
+        stderr_print("doctestbash.py: {} tests passed at:  {}".format(passes, path))
 
     # Call one Python Doc Test, just to help people reviewing the code find that precedent
 
@@ -250,64 +251,97 @@ def run_one_shline(shline):
 def require_test_passed(path, passes, gots, dent, wants):
     """Raise exception, unless actual output roughly equals expected output"""
 
+    # Print each line we want, while we get it
+    # Round up what we got with as many trailing blank lines as we want
+
     max_len = max(len(wants), len(gots))
     min_len = min(len(wants), len(gots))
     empties = (max_len - min_len) * [""]
 
+    eq = True
+    tail_wants = list(wants)
+    tail_gots = list(gots)
+
     for (want, got) in zip(wants + empties, gots + empties):
+
         if got != want:
-
-            eq = equal_but_for_ellipses(got, want=want)
-            if not eq:
-
-                tail_wants = list(wants)
-                tail_gots = list(gots)
-                for (want, got) in zip(wants + empties, gots + empties):
-                    if got != want:
-                        if not equal_but_for_ellipses(got, want=want):
-                            break
-
-                    vv_print(dent + got)
-
-                    tail_wants = tail_wants[1:]
-                    tail_gots = tail_gots[1:]
-
-                vv_print()
-                vv_print()
-
-                vv_print("wants ......: {}".format(repr(tail_wants)))
-                vv_print()
-                vv_print("but gots ...: {}".format(repr(tail_gots)))
-                vv_print()
-                vv_print()
-
-                vv_print("want ......: {}".format(want))
-                vv_print("but got ...: {}".format(got))
-                vv_print()
-                vv_print()
-
-                ellipsis = "..."
-                if ellipsis in want:
-
-                    vv_print("want splits ......: {}".format(want.split(ellipsis)))
-                    vv_print("but got ..........: {}".format(repr(got)))
-                    vv_print()
-                    vv_print()
-
-                reasons = list()
-                reasons.append("unexpected output after {} tests:".format(passes))
-                if main.args.vq < len("vv"):
-                    reasons.append("try again with -vv")
-                reasons.append(
-                    "fix the code, and/or fix the test at:  vim {}".format(path)
-                )
-
-                for reason in reasons:
-                    stderr_print("doctestbash.py: error: {}".format(reason))
-
-                sys.exit(1)
+            if not equal_as_unordered_str_namespace(want, got=got):
+                if not equal_but_for_ellipses(got, want=want):
+                    eq = False
+                    break
 
         vv_print(dent + got)
+
+        tail_wants = tail_wants[1:]
+        tail_gots = tail_gots[1:]
+
+    if eq:
+        return
+
+    vv_print()
+    vv_print()
+
+    vv_print("wants ......: {}".format(repr(tail_wants)))
+    vv_print()
+    vv_print("but gots ...: {}".format(repr(tail_gots)))
+    vv_print()
+    vv_print()
+
+    vv_print("want ......: {}".format(want))
+    vv_print("but got ...: {}".format(got))
+    vv_print()
+    vv_print()
+
+    ellipsis = "..."
+    if ellipsis in want:
+
+        vv_print("want splits ......: {}".format(want.split(ellipsis)))
+        vv_print("but got ..........: {}".format(repr(got)))
+        vv_print()
+        vv_print()
+
+    reasons = list()
+    reasons.append("unexpected output after {} tests:".format(passes))
+    if main.args.vq < len("vv"):
+        reasons.append("try again with -vv")
+    reasons.append("fix the code, and/or fix the test at:  vim {}".format(path))
+
+    for reason in reasons:
+        stderr_print("doctestbash.py: error: {}".format(reason))
+
+    sys.exit(1)
+
+
+def equal_as_unordered_str_namespace(want, got):
+    """
+    Reformat a printed Namespace to match the wanted key order
+
+    As a workaround for the change in CPython behavior at:
+        argparse should preserve argument ordering in Namespace
+        https://bugs.python.org/issue39058
+    """
+
+    # Give up if not a match for prints of "argparse.Namespace" instances
+
+    if not want.startswith("Namespace("):
+        return
+    if not got.startswith("Namespace("):
+        return
+
+    # Give up if this Python doesn't sort an "a" key before a "z" key
+
+    space = argparse.Namespace(z=26)
+    space.a = 1
+    if str(space) != "Namespace(z=26, a=1)":
+        return
+
+    # Eval both, and substitute the "want" for the "got" only when they're equal
+
+    eval_want = eval("argparse." + want)
+    eval_got = eval("argparse." + got)
+
+    if eval_want == eval_got:
+        return True
 
 
 def equal_but_for_ellipses(got, want):
