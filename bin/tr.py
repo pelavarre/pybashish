@@ -19,7 +19,7 @@ quirks:
   runs as "--unique-everseen --sort" when called with no args, unlike Mac and Linux "tr" choking
 
 examples:
-  cat $(git ls-files) | tr.py --unique-everseen -d '[^ -~]\t\r\n' && echo
+  cat $(git ls-files) | tr.py --unique-everseen -d '[ -~]\t\r\n' && echo
   cat $(git ls-files) | tr.py --unique-everseen --sort -d 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' && echo
   cat $(git ls-files) | tr.py; echo
 """
@@ -43,7 +43,7 @@ def main(argv):
     args_charset = args.charset if args.charset else ""
 
     charset = None
-    if args_charset == r"[^ -~]\t\r\n":
+    if args_charset == r"[ -~]\t\r\n":
         codes = list(range(ord(" "), (ord("~") + 1)))
         codes.extend([ord("\t"), ord("\r"), ord("\n")])
         charset = "".join(chr(_) for _ in codes)
