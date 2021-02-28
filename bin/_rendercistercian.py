@@ -20,7 +20,7 @@ PIXELS = """
 .....
 """.strip().splitlines()
 
-GLYPHS = """
+GLYPHS = r"""
 ...  ._.  ...  ...  ...  ._.  ...  ._.  ...  ._.
 |..  |..  |_.  |\.  |/.  |./  |.|  |.|  |_|  |_|
 """.strip().splitlines()
