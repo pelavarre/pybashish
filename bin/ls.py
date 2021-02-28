@@ -464,7 +464,7 @@ def stats_items_sorted(stats_by_name, by, order):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

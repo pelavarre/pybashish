@@ -67,7 +67,7 @@ def print_os_walk_minpaths(top):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

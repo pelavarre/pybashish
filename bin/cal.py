@@ -145,7 +145,7 @@ def week_last_day(week):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

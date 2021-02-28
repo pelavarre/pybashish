@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
+# FIXME: discard this abandoned dead code in favour of:  hearme.py
+
 """
 usage: pq.py [-h] [-b] [-c] [-i] [-l] [-p] [-t] [-w] [DOT [DOT ...]]
 
 produce output from input by way of read, reread, reshape, zip, for, if, and/or pipe
 
 positional arguments:
-  DOT  a name or mark speaking output in terms of input
+  DOT             a name or mark speaking output in terms of input
 
 optional arguments:
   -h, --help      show this help message and exit
@@ -192,7 +194,7 @@ def opt_in_argv_tail(argv_tail, concise, mnemonic):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

@@ -515,7 +515,8 @@ class ArgDocRipper(argparse.Namespace):
         coder = self.coder
 
         epilog = coder.epilog
-        epilog_key = epilog.strip().splitlines()[0]  # FIXME: what about empty epilogs
+        epilog_keys = epilog.strip().splitlines()
+        epilog_key = epilog_keys[0] if epilog_keys else ""
         repr_epilog_key = black_repr(epilog_key)
 
         d4 = r"    "
@@ -527,6 +528,7 @@ class ArgDocRipper(argparse.Namespace):
             if stripped.startswith(r'"""'):
                 if key == "head":
                     key = "example_docstring"
+                    # fall through, do not continue, here
                 else:
                     lines_by_key[key].append(line)
                     key = "middle"
@@ -535,8 +537,15 @@ class ArgDocRipper(argparse.Namespace):
                 merged_line = r"epilog_at = doc.index({})".format(repr_epilog_key)
                 lines_by_key[key].append((d4 + merged_line).rstrip())
                 continue
+            elif stripped.startswith(r"epilog = "):
+                if not epilog_key:
+                    merged_line = r"""epilog = None  # = doc.index("...")"""
+                    lines_by_key[key].append((d4 + merged_line).rstrip())
+                    continue
+                # fall through, do not continue, here
             elif stripped.startswith(r"parser = argparse.ArgumentParser("):
                 key = "example_parser"
+                # fall through, do not continue, here
             elif stripped == r")":
                 lines_by_key[key].append(line)
                 key = "tail"
@@ -1785,8 +1794,25 @@ class _UsagePhrasesTaker(argparse.Namespace):
 
     def __init__(self, usage_chars):
 
+        self.usage_chars = usage_chars
         self.uses = None  # the fragments of source matched by this parser
         self.taker = ShardsTaker(shards=usage_chars)
+
+    def _arg_doc_error(self, reason):
+        """Construct an ArgDocError that says it came from the usage line"""
+
+        reason_here = (
+            textwrap.dedent(
+                """
+            {} in
+              {}
+        """
+            )
+            .format(reason, self.usage_chars)
+            .strip()
+        )
+
+        return ArgDocError(reason_here)
 
     def take_usage_chars_into(self, uses):
         """Parse an Arg Doc Usage Line into its Uses"""
@@ -1836,7 +1862,7 @@ class _UsagePhrasesTaker(argparse.Namespace):
                 word, hopes
             )
 
-            raise ArgDocError(reason)
+            raise self._arg_doc_error(reason)
 
         taker.take_some_shards(len(hopes))
         taker.accept_blank_shards()
@@ -1856,7 +1882,7 @@ class _UsagePhrasesTaker(argparse.Namespace):
         if not prog_phrase:
             reason = "second word of Arg Doc must exist, to name the app"
 
-            raise ArgDocError(reason)
+            raise self._arg_doc_error(reason)
 
         taker.take_some_shards(len(prog_phrase))
         taker.accept_blank_shards()
@@ -1918,8 +1944,8 @@ class _UsagePhrasesTaker(argparse.Namespace):
                 break
 
             if not taker.peek_more():
-                reason = "{} of [ not balanced by {} of ]".format(openings, closings)
-                raise ArgDocError(reason)
+                reason = "{} of [ not balanced by {}".format(openings, closings)
+                raise self._arg_doc_error(reason)
 
         return argument_phrase
 
@@ -2346,7 +2372,7 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

@@ -25,7 +25,7 @@ import sys
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 

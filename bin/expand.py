@@ -223,7 +223,7 @@ def exit_csv(lines):
 
 
 #
-# Git-track some Python idioms here
+# Define some Python idioms
 #
 
 
