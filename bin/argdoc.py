@@ -1794,8 +1794,25 @@ class _UsagePhrasesTaker(argparse.Namespace):
 
     def __init__(self, usage_chars):
 
+        self.usage_chars = usage_chars
         self.uses = None  # the fragments of source matched by this parser
         self.taker = ShardsTaker(shards=usage_chars)
+
+    def _arg_doc_error(self, reason):
+        """Construct an ArgDocError that says it came from the usage line"""
+
+        reason_here = (
+            textwrap.dedent(
+                """
+            {} in
+              {}
+        """
+            )
+            .format(reason, self.usage_chars)
+            .strip()
+        )
+
+        return ArgDocError(reason_here)
 
     def take_usage_chars_into(self, uses):
         """Parse an Arg Doc Usage Line into its Uses"""
@@ -1845,7 +1862,7 @@ class _UsagePhrasesTaker(argparse.Namespace):
                 word, hopes
             )
 
-            raise ArgDocError(reason)
+            raise self._arg_doc_error(reason)
 
         taker.take_some_shards(len(hopes))
         taker.accept_blank_shards()
@@ -1865,7 +1882,7 @@ class _UsagePhrasesTaker(argparse.Namespace):
         if not prog_phrase:
             reason = "second word of Arg Doc must exist, to name the app"
 
-            raise ArgDocError(reason)
+            raise self._arg_doc_error(reason)
 
         taker.take_some_shards(len(prog_phrase))
         taker.accept_blank_shards()
@@ -1927,8 +1944,8 @@ class _UsagePhrasesTaker(argparse.Namespace):
                 break
 
             if not taker.peek_more():
-                reason = "{} of [ not balanced by {} of ]".format(openings, closings)
-                raise ArgDocError(reason)
+                reason = "{} of [ not balanced by {}".format(openings, closings)
+                raise self._arg_doc_error(reason)
 
         return argument_phrase
 
