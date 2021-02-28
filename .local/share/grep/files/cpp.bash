@@ -12,6 +12,7 @@ int main() {
 }
 EOF
 ) && g++ -Wall -Wpedantic c.cpp && ./a.out
+# TODO: evaluate g++ -Weverything -Werror -w c.c
 #
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

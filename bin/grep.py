@@ -77,9 +77,9 @@ examples:
   ~ vim quit  # same hit, just found by another order
 """
 
-#
+# FIXME: move off of "~" quasi-reserved at left of line by "ssh"
+
 # FIXME: add a grep option to balance the () [] {} <<  >> found in hits, as context
-#
 
 #
 # FIXME: call it one hit when only one hit has more copies of some or of all the patterns, eg, ~ gs
@@ -767,6 +767,7 @@ FILES_CHARS = r"""
     }
     EOF
     ) && g++ -Wall -Wpedantic c.cpp && ./a.out
+    # TODO: evaluate g++ -Weverything -Werror -w c.c
     #
 
 
