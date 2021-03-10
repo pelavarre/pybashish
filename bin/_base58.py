@@ -5,8 +5,14 @@ usage: _base58.py
 
 demo SNakamoto/ MSporny https://tools.ietf.org/html/draft-msporny-base58-02
 
+wrong answers from revisions of "def b58encode":
+  b'oGU3JqabjWkQ'
+  b'mRp4L4W7xW8gjqimnjEXTX9oF9XKv14bur4GQ1VcyaC2'
+  b'11ZbCh'
+
 examples:
   black bin/_base58.py && python3 -i bin/_base58.py
+
 """
 
 import string
