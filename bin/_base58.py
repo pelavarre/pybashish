@@ -23,6 +23,10 @@ assert B58 == b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 assert len(B58) == 58 == 10 + 26 + 26 - 4
 
 
+def b58decode(coded_bytes):
+    return b"NotImplementedError"
+
+
 def b58encode(plain_bytes):
 
     b58_bytearray = bytearray()
@@ -54,21 +58,24 @@ def b58encode(plain_bytes):
     return b58_encoding
 
 
-def b58decode(encodeds):
-    raise NotImplementedError()
+def b58test(plain_bytes, coded_bytes):
+    print(plain_bytes)
+    print(b58decode(coded_bytes))
+    print(coded_bytes)
+    print(b58encode(plain_bytes))
+    print()
 
 
-print(b"2NEpo7TZRRrLZSi2U")
-print(b58encode(b"Hello World!"))
-print()
+if __name__ == "__main__":
 
-print(b"USm3fpXnKG5EUBx2ndxBDMPVciP5hGey2Jh4NDv6gmeo1LkMeiKrLJUUBk6Z")
-print(b58encode(b"The quick brown fox jumps over the lazy dog."))
-print()
+    b58test(b"Hello World!", coded_bytes=b"2NEpo7TZRRrLZSi2U")
 
-print(b"111233QC4")
-print(b58encode(b"\x00\x00\x28\x7F\xB4\xCD"))
-print()
+    b58test(
+        b"The quick brown fox jumps over the lazy dog.",
+        coded_bytes=b"USm3fpXnKG5EUBx2ndxBDMPVciP5hGey2Jh4NDv6gmeo1LkMeiKrLJUUBk6Z",
+    )
+
+    b58test(b"\x00\x00\x28\x7F\xB4\xCD", coded_bytes=b"111233QC4")
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git
