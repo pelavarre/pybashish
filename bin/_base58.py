@@ -5,12 +5,25 @@ usage: _base58.py
 
 demo SNakamoto/ MSporny https://tools.ietf.org/html/draft-msporny-base58-02
 
+wrong-headed because Ietf draft doesn't make clear:
+
+  it's about converting a wide natural numbers between Base 2^N and Base 58
+
+  like correctly encoding the b"\xFF\xFF" of Base 100 into Base 58 gives us b"LUv"
+
+    65535 % 58 = 53  # b"v"
+    65535 // 58 = 1129
+    1129 % 58 = 27  # b"U"
+    1129 // 58 = 19  # b"L"
+
 wrong answers from revisions of "def b58encode":
+
   b'oGU3JqabjWkQ'
   b'mRp4L4W7xW8gjqimnjEXTX9oF9XKv14bur4GQ1VcyaC2'
   b'11ZbCh'
 
 examples:
+
   black bin/_base58.py && python3 -i bin/_base58.py
 
 """
@@ -24,6 +37,16 @@ assert len(B58) == 58 == 10 + 26 + 26 - 4
 
 
 def b58decode(coded_bytes):
+
+    carry = 0
+
+    for coded in coded_bytes:
+
+        carry = B58.index(coded)  # may raise ValueError: subsection not found
+
+        remainder = carry % len(B58)
+        carry = carry // len(B58)
+
     return b"NotImplementedError"
 
 
