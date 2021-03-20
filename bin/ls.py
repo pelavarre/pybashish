@@ -62,6 +62,9 @@ examples:
   (mkdir foo && cd foo/ && echo hi>x && rm -fr ../foo/ && ls.py .)
 """
 
+# FIXME: -ll print header line "Mode Links Owner Group Bytes m d H:M Name\n"
+# FIXME: -lll print blank line, header line, blank line, data lines, blank trailer line
+
 # FIXME: add the --color that's missing at Mac
 # FIXME: tell us about sym links that don't resolve
 # FIXME FIXME:  -x               print by filling multiple rows
