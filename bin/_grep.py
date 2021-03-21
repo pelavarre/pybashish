@@ -135,9 +135,9 @@ def emit_header(ext, p_py):
                 with ZCatLines(filename) as reading:
 
                     for (index, ended_line) in enumerate(reading):
+                        line_number = 1 + index
                         line = ended_line.splitlines()[0]
 
-                        line_number = 1 + index
                         lines[index] = line
 
                         text = line.expandtabs(tabsize=8).strip()
@@ -263,7 +263,7 @@ def emit_body(patterns):
         pattern_py = (
             textwrap.dedent(
                 r"""
-                    if not re.search(r"{regex}", string=line, flags=re.IGNORECASE):
+                    if not re.search(r"{regex}", string=text, flags=re.IGNORECASE):
                         continue
                 """
             )
