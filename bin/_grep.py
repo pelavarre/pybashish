@@ -14,6 +14,7 @@ optional arguments:
   --rip [SHRED]  rip code to stdout (or to a filename with a '.' dot in it)
 
 quirks in the syntax:
+  writes code that works like "|zgrep -in ... |zgrep -in ..."
   welcomes only more patterns, leaves you to do the work of searching multiple files
 
 examples:
@@ -280,6 +281,7 @@ def emit_body(patterns):
         textwrap.dedent(
             r"""
                 print("{}:{}".format(line_number, line), file=sys.stderr)
+                sys.stdout.flush()
             """
         ).strip()
         + "\n"
