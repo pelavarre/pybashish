@@ -29,7 +29,7 @@ emacs -nw ~/.emacs
 # emacs  ⌃X( ⌃X) ⌃Xe  => record replay
 # emacs  fixme => vertical delete copy paste insert
 # emacs  fixme => dent/dedent
-# emacs  ⌥H⌃U1⌥|  => pipe
+# emacs  ⌥H⌃U1⌥|  => pipe bash
 #
 # emacs  ⌃V ⌥V ⌃L  => scroll rows
 # emacs  ⌃X1 ⌃Xk ⌃Xo  => close others, close this, warp to next

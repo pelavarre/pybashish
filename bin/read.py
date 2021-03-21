@@ -34,6 +34,8 @@ examples:
   FOO=123; vared -e FOO  # in Zsh
 """
 
+# FIXME: compare vs "script" runs of Bash show a ^D at EOF in their "typescript" file
+
 # FIXME: read.py --file  # invite lots of paste, capture it to file
 
 # FIXME: somehow bookmark permutations '⌘ ⇧⌘ ⇧ ⌥⇧ ⌥⇧⌘ ⌥⌘ ⌥ ⌃⌥ ⌃⌥⌘ ⌃⌥⇧⌘ ⌃⌥⇧ ⌃⇧ ⌃⇧⌘ ⌃⌘ ⌃'

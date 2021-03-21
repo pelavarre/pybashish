@@ -123,6 +123,8 @@ def main(argv):
     else:
         assert shred == "patch"  # per other if-elif-shred
 
+        raise NotImplementedError("you got --rip patch, did you mean --rip args")
+
         next_ripper = ripper.take_next_words(taker.args.words)
 
         diffed_files = ripper.rip_diff_argparse_py_files(next_ripper)
@@ -1659,7 +1661,7 @@ class _ArgDocTaker(argparse.Namespace):
     def _fabricate_arg_line(self, arg_phrase):
         """Fabricate an arg doc line that matches a usage phrase declaring an arg"""
 
-        assert bool(arg_phrase.concise) ^ bool(arg_phrase.mnemonic)
+        # assert bool(arg_phrase.concise) ^ bool(arg_phrase.mnemonic)
 
         broken_argument_line = ""
         if arg_phrase.concise:
@@ -1671,6 +1673,8 @@ class _ArgDocTaker(argparse.Namespace):
             broken_argument_line += arg_phrase.metavar
             # arg phrase alone can't imply:  --mnemonic [OPTIONAL_METAVAR]
             # FIXME FIXME: challenge this, I jittered over how lifted up the [] are
+
+        assert broken_argument_line  # FIXME FIXME: is this the assert we want?
 
         arg_line = ArgumentLineSyntaxTaker(broken_argument_line)
 

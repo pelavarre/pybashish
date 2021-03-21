@@ -30,7 +30,7 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 # vim  qqq @q  => record, replay
 # vim  ⌃V I X Y P  => vertical: insert, delete, copy, paste
 # vim  <x >x  => dedent/indent
-# vim  !x  => pipe
+# vim  !x  => pipe bash
 #
 # vim  zb zt zz ⌃B ⌃D ⌃E ⌃F ⌃U ⌃Y  => scroll rows
 # vim  ⌃Wo ⌃WW ⌃Ww ⌃]  => close others, previous, next, goto link

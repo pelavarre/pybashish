@@ -56,6 +56,7 @@ def main():
         if not name.startswith("_"):
             verb = name.strip("_")
 
+            assert verb not in whats_by_verb
             whats_by_verb[verb] = what
 
     #

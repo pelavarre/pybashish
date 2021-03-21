@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""
+r"""
 usage: _base58.py
 
 demo SNakamoto/ MSporny https://tools.ietf.org/html/draft-msporny-base58-02
@@ -44,7 +44,7 @@ def b58decode(coded_bytes):
 
         carry = B58.index(coded)  # may raise ValueError: subsection not found
 
-        remainder = carry % len(B58)
+        # remainder = carry % len(B58)
         carry = carry // len(B58)
 
     return b"NotImplementedError"
