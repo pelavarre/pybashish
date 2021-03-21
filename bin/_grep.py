@@ -131,7 +131,7 @@ def emit_header(ext, p_py):
                 lines = {}
 
                 filename = "/dev/stdin"
-                # with open(filename) as ...
+                # with open(filename) as reading:
                 with ZCatLines(filename) as reading:
 
                     for (index, ended_line) in enumerate(reading):
