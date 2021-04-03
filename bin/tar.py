@@ -42,7 +42,7 @@ examples:
 
 import os
 import sys
-import tarfile
+import tarfile  # depends on import gzip
 
 import argdoc
 
@@ -76,7 +76,11 @@ def main(argv):
         args_file = "/dev/stdin"
         prompt_tty_stdin()
 
-    tar_file_tvf_xvkf(args_file, args_x=args.x)
+    try:
+        tar_file_tvf_xvkf(args_file, args_x=args.x)
+    except Exception:
+        sys.stderr.write("tar.py: error: args={}\n".format(args))
+        raise
 
 
 def stderr_print_usage_error(args):

@@ -55,6 +55,8 @@ examples:
 # FIXME: think into the redundancy between incremental and sponging solutions to "def striplines()"
 # FIXME: learn more of how much the sponging slows and stresses hosts
 
+# FIXME: add option for loosening search expressions, e.g., "/bin/bash" -> r".bin.bash"
+
 
 import collections
 import contextlib

@@ -2746,6 +2746,9 @@ if __name__ == "__main__":
 # FIXME: so likewise, it should have an ' action="raise" ' to raise NotImplementedError
 # FIXME: even when called to do so by ' parser.set_defaults '
 
+# FIXME: reject dropped args such as the "-- hello" of
+# FIXME:    bin/argdoc.py --rip argparse bin/tar.py -- hello >/dev/null
+
 # add class ArgParseAuthor to wrap around _ArgDocCoder
 #
 # develop some good way to patch up the Python, such as

@@ -28,6 +28,7 @@ examples:
 # FIXME: add --c, -C, --complement
 # FIXME: add -t, --truncate-set1
 # FIXME: add the interpretation of charset's, or mix it with Python regex
+# FIXME: count open and close "{[( )]}"
 
 
 import sys

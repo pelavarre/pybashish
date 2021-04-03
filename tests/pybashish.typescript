@@ -120,8 +120,9 @@ PyBashIsh does a few things much much better, some things just as well, and many
 
         -  ..  argdoc  bash  bind  cal  cat  cd  chmod  column  cp  cspsh  date  dd
         doctestbash  echo  exit  expand  find  fmt  grep  head  hearme  help  hexdump
-        hostname  ls  make  mkdir  mv  paste  pwd  read  rm  shbutton  sort  sponge
-        ssh  subsh  tail  tar  touch  tr  watch  wc  xargs
+        history  hostname  ls  make  mkdir  mv  paste  pwd  pyish  read  rm  shbutton  sleep
+        sort  sponge  ssh  strings  subsh  subsh2  tail  tar  tar2  touch  tr  watch  wc
+        which  xargs
 
     Note: The "#" hash mark means ignore the following chars in the line
     Note: The ":" colon as the first word means mostly ignore the following words in the line
@@ -1114,6 +1115,7 @@ Clean up
     $ rm -fr tardir/
     $
 
+    $ bin/tar.py tvf tardir.tgz >/dev/null 2>&1
     $ bin/tar.py tvf /dev/null/child -tvf tardir.tgz 2>&1 | sort
     tardir/
     tardir/a/
