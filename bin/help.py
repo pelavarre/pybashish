@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: help_.py [-h] [VERB]
+usage: help.py [-h] [VERB]
 
 print some help
 
@@ -12,8 +12,8 @@ optional arguments:
   -h, --help  show this help message and exit
 
 examples:
-  help_.py
-  help_.py fmt  # calls out to:  fmt.py --help
+  help.py
+  help.py fmt  # calls out to:  fmt.py --help
   man bash
   man zshall
 """
