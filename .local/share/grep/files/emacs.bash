@@ -15,7 +15,7 @@ emacs -nw ~/.emacs
 # emacs  ⌃A ⌃B ⌃E ⌃F ⌥M  => move column
 # emacs  ⌥B ⌥F ⌥A ⌥E  => move small word, sentence
 # emacs  ⌃P ⌃N ⌥G⌥G  => move row, goto line
-# emacs  fixme => move match balance pair
+# emacs  fixme  => move match balance pair
 #
 # emacs  ⌃D ⌥D ⌥Z  => delete char, word, to char
 # emacs  ⌃@⌃@ ⌃@ ⌃X⌃X ⌃U⌃@  => mark: begin, place, bounce, goto
@@ -24,11 +24,11 @@ emacs -nw ~/.emacs
 #
 # emacs  ⌃U1234567890 ⌃- ⌃_ ⌃Xu  => repeat, undo, undo
 # emacs  ⌥L ⌥U ⌥C ⌃U1⌃Xrni⌃Xr+i⌃Xrii  => lower, upper, title, increment
-# emacs  ⌃S ⌃R ⌥% => find, replace
+# emacs  ⌃S ⌃R ⌥%  => find, replace
 #
 # emacs  ⌃X( ⌃X) ⌃Xe  => record replay
-# emacs  fixme => vertical delete copy paste insert
-# emacs  fixme => dent/dedent
+# emacs  fixme  => vertical delete copy paste insert
+# emacs  fixme  => dent/dedent
 # emacs  ⌥H⌃U1⌥|  => pipe bash
 #
 # emacs  ⌃V ⌥V ⌃L  => scroll rows
@@ -41,7 +41,7 @@ emacs -nw ~/.emacs
 # emacs  ⌃Z  => as per terminal or no-op
 #
 # emacs  ⌃] ⌃\  => obscure
-# emacs  ⌃Ca-z => custom
+# emacs  ⌃Ca-z  => custom
 #
 
 #
