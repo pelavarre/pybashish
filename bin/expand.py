@@ -262,20 +262,20 @@ def dash_quote_as_ascii(chars):
 
     reps_by_ch = collections.defaultdict(type(None))
 
-    reps_by_ch["\u00A0"] = " "  # 00A0 no-break space  # &nbsp;
-    reps_by_ch["«"] = '"'  # 00AB left-pointing double angle quotation mark
-    reps_by_ch["»"] = '"'  # 00BB right-pointing double angle quotation mark
+    reps_by_ch["\u00A0"] = " "  # u00A0 no-break space  # &nbsp;
+    reps_by_ch["«"] = '"'  # u00AB left-pointing double angle quotation mark
+    reps_by_ch["»"] = '"'  # u00BB right-pointing double angle quotation mark
 
-    reps_by_ch["\u200B"] = " "  # 200B zero width space
-    reps_by_ch["–"] = "-"  # 2013 en dash
-    reps_by_ch["—"] = "--"  # 2014 em dash
-    reps_by_ch["\u2018"] = "'"  # 2018 left single quotation mark
-    reps_by_ch["’"] = "'"  # 2019 right single quotation mark
-    reps_by_ch["“"] = '"'  # 201C left double quotation mark
-    reps_by_ch["”"] = '"'  # 201D right double quotation mark
-    reps_by_ch["′"] = "'"  # 2032 prime
-    reps_by_ch["″"] = "''"  # 2033 double prime
-    reps_by_ch["‴"] = "'''"  # 2034 triple prime
+    reps_by_ch["\u200B"] = " "  # u200B zero width space
+    reps_by_ch["–"] = "-"  # u2013 en dash
+    reps_by_ch["—"] = "--"  # u2014 em dash
+    reps_by_ch["\u2018"] = "'"  # u2018 left single quotation mark
+    reps_by_ch["’"] = "'"  # u2019 right single quotation mark
+    reps_by_ch["“"] = '"'  # u201C left double quotation mark
+    reps_by_ch["”"] = '"'  # u201D right double quotation mark
+    reps_by_ch["′"] = "'"  # u2032 prime
+    reps_by_ch["″"] = "''"  # u2033 double prime
+    reps_by_ch["‴"] = "'''"  # u2034 triple prime
 
     reps = ""
     for ch in chars:

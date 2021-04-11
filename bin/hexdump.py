@@ -86,7 +86,7 @@ def main(argv):
 
     if args.dump_byteset:
         for xx in range(0x100):
-            xxs = bytearray(1)
+            xxs = bytearray(1)  # FIXME: consider bytes([xx])
             xxs[0] = xx
             os.write(sys.stdout.fileno(), xxs)
 

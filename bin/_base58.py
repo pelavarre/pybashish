@@ -52,7 +52,7 @@ def b58decode(coded_bytes):
 
 def b58encode(plain_bytes):
 
-    b58_bytearray = bytearray()
+    b58_bytearray = bytearray()  # FIXME: consider bytes() in place of bytearray()
     encoding_flag = False
     zero_counter = 0
     carry = 0
