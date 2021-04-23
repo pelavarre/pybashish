@@ -21,6 +21,7 @@ dreams:
   accept keystrokes to accelerate
   teach make to more ignore notes of this kind, like because all comments and blanks
   like allow docstring but reject code without a proper stub
+  turn on the "-vvv" of "ssh -vvv" only AFTER the session is up, a la ~v
 
 examples:
   Oh no! No examples disclosed!! 💥 💔 💥

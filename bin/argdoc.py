@@ -50,6 +50,7 @@ examples:
 
 from __future__ import print_function
 
+import __main__
 import argparse
 import collections
 import os
@@ -381,9 +382,8 @@ class ArgDocRipper(argparse.Namespace):
     def fetch_file_doc(self, doc, path):
         """Fetch the Arg Doc from Arg else from Path else from Main Module"""
 
-        main_module = sys.modules["__main__"]
-        main_module_doc = main_module.__doc__
-        main_module_file = main_module.__file__
+        main_doc = __main__.__doc__
+        main_file = __main__.__file__
 
         file_doc = doc
         file_path = path
@@ -393,8 +393,8 @@ class ArgDocRipper(argparse.Namespace):
                 file_path = os.devnull
         else:
             if path is None:
-                file_doc = main_module_doc if main_module_doc else ""
-                file_path = main_module_file
+                file_doc = main_doc if main_doc else ""
+                file_path = main_file
             else:
                 file_doc = self.read_eval_docstring_from(path)
                 file_path = path
@@ -769,6 +769,7 @@ ARGPARSE_EXAMPLE = textwrap.dedent(
     """  # : boom : broken_heart : boom :
 
 
+    import __main__
     import argparse
     import sys
 
@@ -776,8 +777,7 @@ ARGPARSE_EXAMPLE = textwrap.dedent(
     def main(argv):
         """Run a command line"""
 
-        main_module = sys.modules["__main__"]
-        doc = main_module.__doc__
+        doc = __main__.__doc__
 
         prog = doc.strip().splitlines()[0].split()[1]
         description = list(_ for _ in doc.strip().splitlines() if _)[1]

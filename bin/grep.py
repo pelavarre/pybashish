@@ -638,6 +638,7 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
 
 # FIXME: sort the files here by name
 # FIXME: then cross-ref bash to mac, emacs to emacs, vim to vim, etc
+# FIXME: declare these as docstrings of defs, for "diff -burp" to cite them
 FILES_CHARS = r"""
 
     #
@@ -675,15 +676,6 @@ FILES_CHARS = r"""
     ls *.csv | sed 's,[.]csv$,,' | xargs -I{} mv -i {}.csv {}.txt  # demo replace ext
     ls --full-time ...  # to the second, at Linux
     ls | LC_ALL=C sort | cat -n
-
-    pylint --rcfile=/dev/null --reports=n --disable=locally-disabled ...
-    pylint --list-msgs
-    pylint --help-msg E0012  # bad-option-value  # not adopted above
-
-    python2 p.py
-    python2 -m pdb p.py
-    python3 p.py
-    python3 -m pdb p.py
 
     rename 's,[.]csv$,-csv.txt,' *.csv  # replace ext, at Perl Linux
 
@@ -883,6 +875,25 @@ FILES_CHARS = r"""
 
 
     #
+    # files/python.bash:  Python
+    #
+
+    pylint --rcfile=/dev/null --reports=n --disable=locally-disabled ...
+    pylint --list-msgs
+    pylint --help-msg E0012  # bad-option-value  # not adopted above
+
+    python2 p.py
+    python2 -m pdb p.py
+    python3 p.py
+    python3 -m pdb p.py
+
+    python3 -i -c ''
+    : # >>> o = [[0, 1, 2], [], [3], [4, 5]]
+    : # >>> p = list(_ for listed in o for _ in listed)  # flatten/unravel list of lists
+    : # >>> p  # [0, 1, 2, 3, 4, 5]
+    : # >>> sum(o, list())  # [0, 1, 2, 3, 4, 5]  # flatten/unravel list of lists
+
+    #
     # files/screen.bash:  Screen
     #
 
@@ -958,12 +969,16 @@ FILES_CHARS = r"""
     vim  # glass-terminal scratchpad
     vim '+$' ~/.vimrc  # + option to say what line to start on
 
-    # vim  :help ⌃V...  "" help with key chord sequence
+    # vim  :help ⌃V⌃C  "" help with key chord sequence
     # vim  :q  "" close help panel
 
     #
-    # vim  Esc  => cancel
+    # vim  Esc ⌃O  => stop inserting: indefinitely or temporarily
     # vim  ⌃V  => literal input, such as ⌃I Tab
+    # vim  Q :+1,+5 :vi  => line-editor/ screen-editor mode
+    #
+    # vim  :set hlsearch / :set nohlsearch
+    # vim  :set number / :set nonumber
     #
 
     #
@@ -976,11 +991,11 @@ FILES_CHARS = r"""
     # vim  a cx i o s Esc A C O S  => enter/ exit insert mode
     # vim  R Esc  => enter/ exit overlay mode
     #
-    # vim  . 1234567890 u ⌃R U UU ⌃O  => repeat, do again, undo, redo, revisit
-    # vim  ~ ⌃G ⌃L ⌃A  => toggle case, say where, redraw, increment
-    # vim  n N / ? .  => find and repeat
+    # vim  . 1234567890 u ⌃R ⌃O ⌃I  => do again, repeat, undo, redo, revisit
+    # vim  ~ ⌃G ⌃L ⌃A ⌃X  => toggle case, say where, redraw, increment
+    # vim  * / ? n N / .  => this, ahead, behind, next, previous, do again
     #
-    # vim  :g/regex/  => preview find and replace
+    # vim  :g/regex/  => preview what will be found
     # vim  :s/regex/repl/gc  => find and replace, .../g for no confirmations
     #
     # vim  mm 'm '' `` `m  => mark, goto, bounce, bounce, bounce and mark
@@ -998,9 +1013,9 @@ FILES_CHARS = r"""
     #
     # vim  ⌃C ⌃Q ⌃S ⌃Z ⌃[  => vary by terminal, ⌃Z may need $ fg,  ⌃Q can mean ⌃V
     #
-    # vim  # & * = [ ] "  => obscure
-    # vim  ⌃H ⌃I ⌃T ⌃X ⌃\ ⌃_  => obscure
-    # vim  ⌃@ ⌃A g v V \ ⌃?  => not classic
+    # vim  U UU # & * = [ ] "  => obscure
+    # vim  ⌃H ⌃K ⌃T ⌃\ ⌃_  => obscure
+    # vim  ⌃@ ⌃A ⌃I ⌃O ⌃X g v V \ ⌃?  => not classic
     #
 
     #

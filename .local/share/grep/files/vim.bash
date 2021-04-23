@@ -6,12 +6,16 @@ vim --version
 vim  # glass-terminal scratchpad
 vim '+$' ~/.vimrc  # + option to say what line to start on
 
-# vim  :help ⌃V...  "" help with key chord sequence
+# vim  :help ⌃V⌃C  "" help with key chord sequence
 # vim  :q  "" close help panel
 
 #
-# vim  Esc  => cancel
+# vim  Esc ⌃O  => stop inserting: indefinitely or temporarily
 # vim  ⌃V  => literal input, such as ⌃I Tab
+# vim  Q :+1,+5 :vi  => line-editor/ screen-editor mode
+#
+# vim  :set hlsearch / :set nohlsearch
+# vim  :set number / :set nonumber
 #
 
 #
@@ -24,11 +28,11 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 # vim  a cx i o s Esc A C O S  => enter/ exit insert mode
 # vim  R Esc  => enter/ exit overlay mode
 #
-# vim  . 1234567890 u ⌃R U UU ⌃O  => repeat, do again, undo, redo, revisit
-# vim  ~ ⌃G ⌃L ⌃A  => toggle case, say where, redraw, increment
-# vim  n N / ? .  => find and repeat
+# vim  . 1234567890 u ⌃R ⌃O ⌃I  => do again, repeat, undo, redo, revisit
+# vim  ~ ⌃G ⌃L ⌃A ⌃X  => toggle case, say where, redraw, increment
+# vim  * / ? n N / .  => this, ahead, behind, next, previous, do again
 #
-# vim  :g/regex/  => preview find and replace
+# vim  :g/regex/  => preview what will be found
 # vim  :s/regex/repl/gc  => find and replace, .../g for no confirmations
 #
 # vim  mm 'm '' `` `m  => mark, goto, bounce, bounce, bounce and mark
@@ -46,9 +50,9 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 #
 # vim  ⌃C ⌃Q ⌃S ⌃Z ⌃[  => vary by terminal, ⌃Z may need $ fg,  ⌃Q can mean ⌃V
 #
-# vim  # & * = [ ] "  => obscure
-# vim  ⌃H ⌃I ⌃T ⌃X ⌃\ ⌃_  => obscure
-# vim  ⌃@ ⌃A g v V \ ⌃?  => not classic
+# vim  U UU # & * = [ ] "  => obscure
+# vim  ⌃H ⌃K ⌃T ⌃\ ⌃_  => obscure
+# vim  ⌃@ ⌃A ⌃I ⌃O ⌃X g v V \ ⌃?  => not classic
 #
 
 #

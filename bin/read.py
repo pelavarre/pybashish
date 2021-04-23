@@ -41,7 +41,7 @@ examples:
 # FIXME: somehow bookmark permutations '⌘ ⇧⌘ ⇧ ⌥⇧ ⌥⇧⌘ ⌥⌘ ⌥ ⌃⌥ ⌃⌥⌘ ⌃⌥⇧⌘ ⌃⌥⇧ ⌃⇧ ⌃⇧⌘ ⌃⌘ ⌃'
 # FIXME FIXME: bind an undo key such as ⌃_
 # FIXME FIXME:  stop discarding history edits at ⌃N "_next_history"
-# FIXME: add -t TIMEOUT in seconds
+# FIXME: add -t TIMEOUT in seconds, especially for the case of no line-editor
 
 
 from __future__ import print_function
@@ -221,9 +221,7 @@ class GlassTeletype(contextlib.ContextDecorator):
 
             self.fdin = sys.stdin.fileno()
             self.with_termios = termios.tcgetattr(self.fdin)
-
-            when = termios.TCSADRAIN  # not termios.TCSAFLUSH
-            tty.setraw(self.fdin, when)
+            tty.setraw(self.fdin, when=termios.TCSADRAIN)  # not TCSAFLUSH
 
         return self
 
@@ -242,9 +240,9 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         if self.with_termios:
 
-            when = termios.TCSADRAIN
-            attributes = self.with_termios
-            termios.tcsetattr(self.fdin, when, attributes)
+            termios.tcsetattr(
+                self.fdin, when=termios.TCSADRAIN, attributes=self.with_termios
+            )
 
         self.fdin = None
         self.with_termios = None

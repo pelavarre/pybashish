@@ -11,7 +11,8 @@ optional arguments:
 quirks:
   does forward interactive input lines immediately, unlike bash
   crashes "pybashish" shell if called from there, at ⌃C SIGINT
-  implements mac SIGINFO as linux SIGUSR1
+  pressing ⌃T at mac works, pressing ⌃T at linux doesn't
+  kill with SIGUSR1 works at linux (TODO: write example of this & also test Mac)
 
 unsurprising quirks:
   does prompt once for stdin, like bash "grep -R", unlike bash "dd"
@@ -54,7 +55,7 @@ def main():
     def siginfo(signum, frame):
         stderr_print("dd.py: ⌃T SIGINFO")
 
-    with SigInfoHandler(siginfo):
+    with SigInfoHandler(handler=siginfo):
 
         # Serve till EOF or SIGINT
 
@@ -89,18 +90,24 @@ def main():
             print(line.rstrip())  # FIXME: call for larger buffer inside "dd"
 
 
-class SigInfoHandler(contextlib.ContextDecorator):
-    """Back up and redefined global SIGINFO at entry, restore at exit"""
+#
+# Define some Python idioms
+#
 
-    def __init__(self, handle_signum_frame):
-        self.handle_signum_frame = handle_signum_frame
+
+# deffed in many files  # missing from docs.python.org
+class SigInfoHandler(contextlib.ContextDecorator):
+    """Assign to global "signal.signal(signal.SIGINFO)" at entry, restore at exit"""
+
+    def __init__(self, handler):
+        self.handler = handler
 
     def __enter__(self):
-        handle_signum_frame = self.handle_signum_frame
+        handler = self.handler
         if hasattr(signal, "SIGINFO"):  # Mac
-            with_siginfo = signal.signal(signal.SIGINFO, handle_signum_frame)
+            with_siginfo = signal.signal(signal.SIGINFO, handler)
         else:  # Linux
-            with_siginfo = signal.signal(signal.SIGUSR1, handle_signum_frame)
+            with_siginfo = signal.signal(signal.SIGUSR1, handler)
         self.with_siginfo = with_siginfo
         return self
 
@@ -110,11 +117,6 @@ class SigInfoHandler(contextlib.ContextDecorator):
             signal.signal(signal.SIGINFO, with_siginfo)
         else:  # Linux
             signal.signal(signal.SIGUSR1, with_siginfo)
-
-
-#
-# Define some Python idioms
-#
 
 
 # deffed in many files  # missing from docs.python.org

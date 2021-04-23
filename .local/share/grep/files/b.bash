@@ -34,15 +34,6 @@ ls *.csv | sed 's,[.]csv$,,' | xargs -I{} mv -i {}.csv {}.txt  # demo replace ex
 ls --full-time ...  # to the second, at Linux
 ls | LC_ALL=C sort | cat -n
 
-pylint --rcfile=/dev/null --reports=n --disable=locally-disabled ...
-pylint --list-msgs
-pylint --help-msg E0012  # bad-option-value  # not adopted above
-
-python2 p.py
-python2 -m pdb p.py
-python3 p.py
-python3 -m pdb p.py
-
 rename 's,[.]csv$,-csv.txt,' *.csv  # replace ext, at Perl Linux
 
 sed -e $'3i\\\n...' | tee >(head -3) >(tail -2) >/dev/null  # first two, ellipsis, last two

@@ -75,6 +75,7 @@ more examples
 
 # FIXME: work with files and dirs too
 
+import __main__
 import os
 import re
 import shlex
@@ -202,8 +203,7 @@ def opt_in_argv_tail(argv_tail, concise, mnemonic):
 def print_help():
     """Print the lines of the argdoc at top of file, much like ArgumentParser would"""
 
-    module = sys.modules[__name__]
-    doc = module.__doc__.strip()
+    doc = __main__.__doc__.strip()
     print(doc)
 
 

@@ -15,8 +15,10 @@ optional arguments:
   -v, --verbose         say more
 
 quirks:
-  always test only the files at "tests/"
-  only find "tests/pybashish.typescript" when searching "tests/"
+  always tests only the files at "tests/"
+  only finds "tests/pybashish.typescript" when searching "tests/"
+  prints the actual output, even when matching it to "..." (unlike classic doctest)
+  allows blank lines in output to mean blank lines (unlike classic doctest)
 
 examples:
   mkdir -p tests/
