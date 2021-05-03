@@ -1,0 +1,18 @@
+# ~/.ssh/config
+
+# first match wins
+
+
+# CanonicalizeHostname
+# CanonicalDomains
+
+# Host
+# Hostname
+# IdentityFile
+# LogLevel
+# StrictHostKeyChecking
+# User
+# UserKnownHostsFile /dev/null
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

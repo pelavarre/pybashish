@@ -1056,4 +1056,8 @@ if __name__ == "__main__":
     main(sys.argv)
 
 
+# FIXME: alias "+" to grow a "~/.python.py" history to rerun at each reentry
+# feeling lucky enough to kill wrong history when it becomes wrong
+
+
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

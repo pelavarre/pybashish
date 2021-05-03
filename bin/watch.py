@@ -26,6 +26,8 @@ examples:
 see also:  man script, man watch
 """
 
+# FIXME: demo watching:  pbpaste.py |cat.py -v
+
 
 from __future__ import print_function
 

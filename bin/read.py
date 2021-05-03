@@ -240,9 +240,9 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         if self.with_termios:
 
-            termios.tcsetattr(
-                self.fdin, when=termios.TCSADRAIN, attributes=self.with_termios
-            )
+            when = termios.TCSADRAIN
+            attributes = self.with_termios
+            termios.tcsetattr(self.fdin, when, attributes)
 
         self.fdin = None
         self.with_termios = None

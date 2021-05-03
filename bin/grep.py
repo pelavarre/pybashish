@@ -95,6 +95,8 @@ examples:
 # FIXME: add --color=unstable for flipping the defaults to where I like them
 #
 
+# FIXME: capture:  F=p.py && mv -i $F $F~$(date +'%m%dJQDH%M%S')~
+
 
 import contextlib
 import os
@@ -701,7 +703,7 @@ FILES_CHARS = r"""
 
     cat - | grep . | tr -c '[ -~\n]' '@'  # substitute '@', when Mac 'cat -etv' doesn't
 
-    curl -O ...  # Mac a la Linux wget
+    curl -O -Ss ...  # Mac a la Linux wget
     gunzip -c ...  # Mac a la Linux zcat
     openssl dgst -md5 ...  # Mac a la Linux md5sum
     openssl dgst -sha1 ...  # Mac a la Linux sha1sum
