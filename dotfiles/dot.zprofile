@@ -60,6 +60,18 @@ function ps1 () {
 
 setopt PRINT_EXIT_VALUE  &&: # stop silencing nonzero exit status
 
+autoload -U edit-command-line  &&: # from ".oh-my-zsh/", else "No such shell function"
+zle -N edit-command-line  &&: # create new keymap
+bindkey '\C-x\C-e' edit-command-line  &&: # define ⌃X⌃E
+
+setopt AUTO_CD  &&: # lacks Tab-completion, emulates Bash shopt -s autocd 2>/dev/null
+: &&: # don't setopt interactive_comments, while you want default Zsh experience
+
+
+#
+# Capture every input line (no drops a la Bash HISTCONTROL=ignorespace)
+#
+
 if [ ! "${HISTFILE+True}" ]; then  # emulate macOS Catalina, if HISTFILE unset
     HISTFILE=~/.zsh_history
     HISTSIZE=2000
@@ -71,20 +83,8 @@ unsetopt INC_APPEND_HISTORY  &&: # make room for INC_APPEND_HISTORY_TIME  # unne
 setopt INC_APPEND_HISTORY_TIME  &&: # feed well into  history -t '%Y-%m-%d %H:%M:%S'
 setopt SHARE_HISTORY  &&: # reload fresh history after each INC_APPEND
 
-autoload -U edit-command-line  &&: # from ".oh-my-zsh/", else "No such shell function"
-zle -N edit-command-line  &&: # create new keymap
-bindkey '\C-x\C-e' edit-command-line  &&: # define ⌃X⌃E
-
-setopt AUTO_CD  &&: # lacks Tab-completion, emulates Bash shopt -s autocd 2>/dev/null
-: &&: # don't setopt interactive_comments, while you want default Zsh experience
-
 alias -- --history="history -t '%b %d %H:%M:%S' 0"  &&:
 # a la Bash HISTTIMEFORMAT='%b %d %H:%M:%S  ' history
-
-
-#
-# Capture every input line (no drops a la Bash HISTCONTROL=ignorespace)
-#
 
 _HISTORY_1_="history -t '%b %d %H:%M:%S' -1"
 _LOGME_='echo "$$ $(whoami)@$(hostname):$(pwd)$('$_HISTORY_1_')" >>~/.zsh_command.log'
@@ -144,23 +144,23 @@ function --dotfiles-restore () {
 # Work with command line input history
 #
 
-function --source-search-hits () {
-    : : trace and source a confident hit as input, else trace the hits found
+function --source-one-search-hit () {
+    : : trace and source a single hit as input, else trace the hits found
 
     local sourceable=$(mktemp)
     "$@" >"$sourceable"
 
     local xs=$?
     if [ $xs != 0 ]; then
-        cat "$sourceable" 1>&2
+        cat "$sourceable" >&2
     else
         local usage=''
         cat "$sourceable" |head -1 |grep '^usage: ' |read usage
         if [ "$usage" ]; then
-            cat "$sourceable" 1>&2
+            cat "$sourceable" >&2
         else
 
-            cat "$sourceable" |sed 's,^,+ ,' 1>&2
+            cat "$sourceable" |sed 's,^,+ ,' >&2
             source "$sourceable"
             xs=$?
 
@@ -171,8 +171,8 @@ function --source-search-hits () {
     return $xs
 }
 
-function --grep-local () {
-    : : search the curated input history saved at '~/.local/share/grep/files'
+function --search-histories () {
+    : : search the curated input histories saved at '~/.histories*'
 
     : : find just the one line 'cd -' when given no args
 
@@ -184,21 +184,21 @@ function --grep-local () {
     : : exit nonzero when multiple hits found, and when zero hits found
 
     local hits=$(mktemp)
-    cat /dev/null $(find ~/.local/share/grep/files -not -type d) |grep "$@" >"$hits"
-    local wcl=$(cat "$hits" |wc -l)
+    cat /dev/null ~/.histories* |grep "$@" >"$hits"
+    local wcl=$(($(cat "$hits" |wc -l)))
     if [ "$wcl" != "1" ]; then
-        echo "$wcl hits found by:  grep $@ ~/.local/share/grep/files" >&2
+        echo "$wcl hits found by:  grep $@ ~/.histories*" >&2
         cat "$hits" >&2
         return 1
     fi
 
     : : print to stdout and exit zero when one hit found
 
-    cat "$hits" >&2
+    cat "$hits"
 }
 
-alias -- '-'='--source-search-hits --grep-local'
-alias -- '--'='--grep-local'
+alias -- '-'='--source-one-search-hit --search-histories'
+alias -- '--'='--search-histories'
 
 
 #
@@ -283,11 +283,13 @@ alias -- -gb="--exec-xe git branch"
 alias -- -gc="pwd && --exec-xe-maybe 'git clean -ffxdq'"
 alias -- -gf='--exec-xe git fetch'
 alias -- -gd='--exec-xe git diff'
+alias -- -gg='--exec-xe git grep'
 alias -- -gl='--exec-xe git log --decorate --oneline -9'
 alias -- -gr='--exec-xe git rebase'
 alias -- -gs='--exec-xe git show'
 
 alias -- -gbq="--exec-xe \"git branch |grep '[*]'\""
+alias -- -gca='--exec-xe git commit --amend'
 alias -- -gcd='--exec-xe '\''cd $(git rev-parse --show-toplevel) && dirs -p |head -1'\'
 alias -- -gco='--exec-xe git checkout'  # especially:  gco -
 alias -- -gd1='--exec-xe git diff HEAD~1'

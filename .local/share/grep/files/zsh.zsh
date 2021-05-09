@@ -4,6 +4,7 @@
 
 zsh --version
 
+alias -- --history="history -t '%b %d %H:%M:%S' 0"
 fc -Dil -50
 vared _
 
