@@ -139,26 +139,23 @@ def _decide_print_as_args(args):
     vote_headings = "--headings" if args.headings else ""
 
     vote_args = (
-        vote_cee,
-        vote_el,
-        vote_one,
-        vote_full_time,
-        vote_headings,
+        vote_cee,  # -C => "columns_of_names"
+        vote_el,  # -l => "rows_of_detail"
+        vote_one,  # -1 => "lines_of_names"
+        vote_full_time,  # implies -l "rows_of_detail"
+        vote_headings,  # implies -l "rows_of_detail"
     )
 
-    votes = (
-        vote_cee,
-        vote_el,
-        vote_one or vote_full_time or vote_headings,
-    )
+    votes = (vote_cee, vote_el or vote_full_time or vote_headings, vote_one)
     votes = tuple(_ for _ in votes if _)
 
     if len(votes) > 1:
         ballot = (
-            "-1 -l -C --headings".split()
+            "-C -l -1 --full-time --headings".split()
         )  # -1 simple, -l messy, -C classic, else --headings
         stderr_print(
-            "ls.py: error: choose just one of {!r}, not the style contradiction {!r}".format(
+            "ls.py: error: "
+            "choose just one of {!r}, not the style contradiction {!r}".format(
                 " ".join(ballot), " ".join(vote_args)
             )
         )
@@ -311,11 +308,18 @@ def _plan_one_top_walk(tops, index, args):
         top = None
         listed = list(tops)
 
+        names = listed
+        if not args.all:
+            names = list(_ for _ in names if not os.path.split(_)[-1].startswith("."))
+            # hidden file names start with "." at Mac and Linux, per:  os.name == "posix"
+
     elif not os.path.isdir(tops[index]):
 
         args_directory = True
         top = None
         listed = [tops[index]]
+
+        names = listed
 
     else:
 
@@ -337,10 +341,10 @@ def _plan_one_top_walk(tops, index, args):
             )
             sys.exit(2)  # classic exit status 2 for a deleted dir
 
-    names = listed
-    if not args.all:
-        names = list(_ for _ in names if not os.path.split(_)[-1].startswith("."))
-        # hidden file names start with "." at Mac and Linux, per:  os.name == "posix"
+        names = listed
+        if not args.all:
+            names = list(_ for _ in names if not os.path.split(_)[-1].startswith("."))
+            # hidden file names start with "." at Mac and Linux, per:  os.name == "posix"
 
     return (
         top,
