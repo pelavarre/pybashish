@@ -10,7 +10,7 @@ date
 # Grow my keyboard
 #
 
-alias -- '::'="(set -xeuo pipefail; echo '⋮' |tee >(pbcopy))"
+alias -- ':::'="(echo '⋮' |tee >(pbcopy))"
 
 
 #
@@ -141,8 +141,11 @@ function --dotfiles-restore () {
 
 
 #
-# Work with command line input history
+# Work with input and output history
 #
+
+function --pbpipe () { pbpaste |"$@" |tee >(pbcopy); }
+alias ::='--pbpipe '  &&: # trailing space so its first arg can be an alias in Bash
 
 function --source-one-search-hit () {
     : : trace and source a single hit as input, else trace the hits found
@@ -302,6 +305,7 @@ alias -- -grl='--exec-xe git reflog'
 alias -- -grv='--exec-xe git remote -vvv'
 
 alias -- -gcaa='--exec-xe git commit --all --amend'
+alias -- -gdno='--exec-xe git diff --name-only'
 alias -- -grhu="pwd && --exec-xe-maybe 'git reset --hard @{upstream}'"
 alias -- -gsno="--exec-xe git show --name-only --pretty=''"
 alias -- -gssn='--exec-xe git shortlog --summary --numbered'
