@@ -29,6 +29,8 @@ examples:
 
 # FIXME: argdoc: accept, do not require, [--] separating optionals from positionals
 
+# FIXME: see unmarked args as and-also when presented as patterns then >= 0 files
+
 import os
 import sys
 import textwrap

@@ -10,12 +10,14 @@ date
 # Grow my keyboard
 #
 
+
 alias -- ':::'="(echo '⋮' |tee >(pbcopy))"
 
 
 #
 # Repair macOS Bluetooth after the next reboot
 #
+
 
 function -rehab-bluetooth () {
     : : help the next macOS boot find your Bluetooth widgets
@@ -30,13 +32,14 @@ function -rehab-bluetooth () {
 # Calm my prompts
 #
 
+
 stty -ixon  &&: # define Control+S to undo Control+R, not XOFF
 
-if [ "$(dircolors 2>/dev/null)" ]; then
+if dircolors >/dev/null 2>&1; then
     eval "$(dircolors <(dircolors -p | sed 's,1;,0;,g'))"  &&: # no bold for light mode
 fi
 
-function unix-filename-rubout() {
+function unix-filename-rubout () {
     : : approximately undo Tab-Completion
     local WORDCHARS="*?_[]~=&;\!#$%^(){}<>.-"
     zle backward-kill-word
@@ -58,6 +61,7 @@ function ps1 () {
 # Configure Zsh
 #
 
+
 setopt PRINT_EXIT_VALUE  &&: # stop silencing nonzero exit status
 
 autoload -U edit-command-line  &&: # from ".oh-my-zsh/", else "No such shell function"
@@ -71,6 +75,7 @@ setopt AUTO_CD  &&: # lacks Tab-completion, emulates Bash shopt -s autocd 2>/dev
 #
 # Capture every input line (no drops a la Bash HISTCONTROL=ignorespace)
 #
+
 
 if [ ! "${HISTFILE+True}" ]; then  # emulate macOS Catalina, if HISTFILE unset
     HISTFILE=~/.zsh_history
@@ -101,6 +106,7 @@ fi
 #
 # Push out and merge back in configuration secrets of Zsh, Bash, etc
 #
+
 
 function --dotfiles-dir () {
     : : say where to push out the dotfiles
@@ -143,6 +149,7 @@ function --dotfiles-restore () {
 #
 # Work with input and output history
 #
+
 
 function --pbpipe () { pbpaste |"$@" |tee >(pbcopy); }
 alias ::='--pbpipe '  &&: # trailing space so its first arg can be an alias in Bash
@@ -208,6 +215,7 @@ alias -- '--'='--search-histories'
 # Supply MM DD JQL HH MM SS date/time stamps
 #
 
+
 # alias -- '-'='cd -'
 alias -- '..'='cd .. && (dirs -p |head -1)'
 
@@ -216,21 +224,21 @@ function --jqd () {
     echo 'jqd'  # J Q Doe
 }  # redefined by ~/.zprofile-zsecrets
 
-function --like-cp() {
+function --like-cp () {
     : : back up to date-author-time stamp
     local F="$1"
     local JQD=$(--jqd)
     (set -xe; cp -ipR "$F" "$F~$(date +%m%d$JQD%H%M%S)~")
 }
 
-function --like-do() {
+function --like-do () {
     : : add date-author-time stamp as the last arg
     local F="$1"
     local JQD=$(--jqd)
     (set -xe; "$@" "$F~$(date +%m%d$JQD%H%M%S)~")
 }
 
-function --like-mv() {
+function --like-mv () {
     : : back up to date-author-time stamp and remove
     local F="$1"
     local JQD=$(--jqd)
@@ -250,6 +258,7 @@ alias -- -mv=--like-mv
 #
 # Often trace and sometimes confirm expansions of shorthand
 #
+
 
 alias -- '?'="echo -n '? '>/dev/tty && cat -"  # press ⌃D for Yes, ⌃C for No
 
@@ -274,7 +283,16 @@ function --exec-xe-maybe () {
 # Work with Git
 #
 
-function --like-git-status() {
+
+function -gcd () {
+    if [ "$#" = 0 ]; then
+        --exec-xe "cd $(git rev-parse --show-toplevel) && dirs -p |head -1"
+    else
+        --exec-xe "cd $(git rev-parse --show-toplevel) && cd $@ && dirs -p |head -1"
+    fi
+}
+
+function --like-git-status () {
     : : Git Status for hulking large slow Git repos
     (set -xe; git status -u no "$@" && git status && git status --short --ignored "$@")
 }
@@ -282,8 +300,8 @@ function --like-git-status() {
 alias -- -g=--like-git-status
 
 alias -- -ga='--exec-xe git add'
-alias -- -gb="--exec-xe git branch"
-alias -- -gc="pwd && --exec-xe-maybe 'git clean -ffxdq'"
+alias -- -gb='--exec-xe git branch'
+alias -- -gc='pwd && --exec-xe-maybe git clean -ffxdq'
 alias -- -gf='--exec-xe git fetch'
 alias -- -gd='--exec-xe git diff'
 alias -- -gg='--exec-xe git grep'
@@ -293,29 +311,32 @@ alias -- -gs='--exec-xe git show'
 
 alias -- -gbq="--exec-xe \"git branch |grep '[*]'\""
 alias -- -gca='--exec-xe git commit --amend'
-alias -- -gcd='--exec-xe '\''cd $(git rev-parse --show-toplevel) && dirs -p |head -1'\'
 alias -- -gco='--exec-xe git checkout'  # especially:  gco -
 alias -- -gd1='--exec-xe git diff HEAD~1'
 alias -- -gfr="--exec-xe '(set -xe; git fetch && git rebase)'"
 alias -- -gl1='--exec-xe git log --decorate -1'
 alias -- -glf='--exec-xe git ls-files'
 alias -- -glq='--exec-xe git log --no-decorate --oneline -9'
+alias -- -grh='pwd && --exec-xe-maybe git reset --hard'
 alias -- -gri='--exec-xe git rebase -i --autosquash HEAD~9'
 alias -- -grl='--exec-xe git reflog'
 alias -- -grv='--exec-xe git remote -vvv'
 
 alias -- -gcaa='--exec-xe git commit --all --amend'
+alias -- -gcaf='git commit --all --fixup'
 alias -- -gdno='--exec-xe git diff --name-only'
-alias -- -grhu="pwd && --exec-xe-maybe 'git reset --hard @{upstream}'"
+alias -- -grhu='pwd && --exec-xe-maybe git reset --hard @{upstream}'
 alias -- -gsno="--exec-xe git show --name-only --pretty=''"
 alias -- -gssn='--exec-xe git shortlog --summary --numbered'
 
+alias -- -gcafh='git commit --all --fixup HEAD'
 alias -- -gdno1='--exec-xe git diff --name-only HEAD~1'
 
 
 #
 # Work with Python
 #
+
 
 alias -- -p='( set -xe; python3 -i ~/.python.py )'
 alias -- -p3="( set -xe; python3 -i ~/.python.py 'print(sys.version.split()[0])' )"
@@ -325,6 +346,7 @@ alias -- -p2="( set -xe; python2 -i ~/.python.py 'print(sys.version.split()[0])'
 #
 # Define first call of each Pip tool to activate its own virtual env and exit nonzero
 #
+
 
 function --activate-bin-source () {
     local F=$1
@@ -365,6 +387,7 @@ done
 # Alias first words for pasting back printed lines as input
 #
 
+
 alias -- 'A'=vim  # such as git status:  A  dotfiles/dot.zprofile
 alias -- 'M'=vim  # such as git status:  M dotfiles/dot.zprofile
 
@@ -386,6 +409,7 @@ function --feed-back-git-diff-plus () {
 #   pushd my favorite dirs
 #
 
+
 export PATH="${PATH:+$PATH:}$HOME/bin"
 source ~/.zprofile-zsecrets
 echo "$(dirs -p |head -1)/"
@@ -394,6 +418,7 @@ echo "$(dirs -p |head -1)/"
 #
 # Fall through to patches added onto this source file later, and then to ~/.zshrc
 #
+
 
 # source ~/.zshrc  # sometimes needed in Bash as:  source ~/.bashrc
 
