@@ -41,9 +41,9 @@ examples of files of lines of words of chars of bytes, sketched as bash:
   pq.py enumerate  # cat -n=0
   pq.py reversed  # linux tac, mac tail -r
   pq.py sorted  # sort
-  pq.py set sorted  # sort | uniq
+  pq.py set sorted  # sort |uniq
   pq.py sorted.reverse  # sort -r
-  pq.py set uniq.c reversed  # sort | uniq -c | sort -nr
+  pq.py set uniq.c reversed  # sort |uniq -c |sort -nr
   pq.py :10  # head
   pq.py :5, '"..."', -5:,  # bash -c 'tee >(head -5) >(echo ...) >(tail -5) >/dev/null'
   pq.py _ join  # x$args

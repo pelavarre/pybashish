@@ -3,7 +3,7 @@
 """
 usage: watch.py [-h] [-n SECS] [WORD [WORD ...]]
 
-repeat a Bash command every so often till Control+C, while deleting only duplicate outputs
+repeat a Bash command every so often till Control+C, and delete duplicate outputs
 
 positional arguments:
   WORD                  word of command
@@ -62,7 +62,7 @@ def main(argv):
         if result != last_result:
             last_result = result
 
-            sys.stdout.write("\x1B[H\x1B[2J")  # Ansi Clear from $(clear | cat -tv)
+            sys.stdout.write("\x1B[H\x1B[2J")  # Ansi Clear from $(clear |cat -tv)
             sys.stdout.write("\n")  # end the line to keep the 'screen' text 'grep'pable
 
             (exit_status, out_bytes) = result

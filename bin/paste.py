@@ -15,8 +15,9 @@ quirks:
   no implementation
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", unlike bash "fmt"
-  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+  prompts for stdin, like mac bash "grep -R .", unlike bash "paste -"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
+  takes no args as meaning file stdin, like linux "paste", unlike mac "paste"
 
 examples:
   Oh no! No examples disclosed!! 💥 💔 💥

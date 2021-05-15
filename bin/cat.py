@@ -26,18 +26,18 @@ quirks:
   does print hard b"\x09" tab after each line number, via "{:6}\t", same as bash "cat"
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", unlike bash "cat" and "cat -"
-  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+  prompts for stdin, like mac bash "grep -R .", unlike bash "cat -" and "cat"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
 
 examples:
   cat -  # copy out each line of input
   cat - >/dev/null  # echo and discard each line of input
-  cat - | grep . | cat.py -etv  # collect and echo some input, then echo it escaped
-  echo a b c | tr ' ' '\n' | bin/cat.py -  # pass stdin through to stdout
-  (echo a; echo b; echo c) | cat -n | cat.py -etv  # show \t as \t and \n as \n
-  pbpaste | cat.py -etv  # show nonprinting in paste buffer
-  echo $'\x5A\xC2\xA0' | cat -tv  # Linux ok, but Mac shows &nbsp; Non-Break Space as space :-(
-  echo $'\x5A\xC2\xA0' | cat.py -tv  # do show even &nbsp; Non-Break Space as nonprinting
+  cat - |grep . |cat.py -etv  # collect and echo some input, then echo it escaped
+  echo a b c |tr ' ' '\n' |bin/cat.py -  # pass stdin through to stdout
+  (echo a; echo b; echo c) |cat -n |cat.py -etv  # show \t as \t and \n as \n
+  pbpaste |cat.py -etv  # show nonprinting in paste buffer
+  echo $'\x5A\xC2\xA0' |cat -tv  # Linux ok, but Mac shows &nbsp; Non-Break Space as space :-(
+  echo $'\x5A\xC2\xA0' |cat.py -tv  # do show even &nbsp; Non-Break Space as nonprinting
 """
 # FIXME: let cat -n=0 mean count up from zero
 # FIXME: rewrite as Python 2 without contextlib.ContextDecorator
@@ -160,7 +160,7 @@ def stderr_print(*args, **kwargs):
 class BrokenPipeErrorSink(contextlib.ContextDecorator):
     """Cut unhandled BrokenPipeError down to sys.exit(1)
 
-    Test with large Stdout cut sharply, such as:  find.py ~ | head
+    Test with large Stdout cut sharply, such as:  find.py ~ |head
 
     More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
     As per https://docs.python.org/3/library/signal.html#note-on-sigpipe

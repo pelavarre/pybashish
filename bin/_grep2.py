@@ -27,6 +27,8 @@ examples:
   bin/_grep.py -- -key3 # search stdin for "key3" but spell it starting with a dash
 """
 
+# FIXME: convert between regexes, such as from "grep -E" to "grep"
+
 # FIXME: argdoc: accept, do not require, [--] separating optionals from positionals
 
 # FIXME: see unmarked args as and-also when presented as patterns then >= 0 files

@@ -11,9 +11,9 @@ optional arguments:
                         words per line
 
 examples:
-  echo 'a  b  c$  d  e$$f  g$' | tr '$' '\n' | xargs.py  # join words of lines into one line
-  echo a b c d e f g | xargs.py -n 1  # split words of lines into one word per line
-  expand.py | xargs.py -n 1  # convert &nbsp; to spaces, etc, before trying to split it
+  echo 'a  b  c$  d  e$$f  g$' |tr '$' '\n' |xargs.py  # join words of lines into one line
+  echo a b c d e f g |xargs.py -n 1  # split words of lines into one word per line
+  expand.py |xargs.py -n 1  # convert &nbsp; to spaces, etc, before trying to split it
 """
 
 

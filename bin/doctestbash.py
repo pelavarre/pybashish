@@ -238,7 +238,11 @@ def run_one_shline(shline):
     """Shell out"""
 
     ran = subprocess.run(
-        shline, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        shline,
+        shell=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     )
     assert not ran.stderr  # because stderr=subprocess.STDOUT
     assert ran.returncode is not None

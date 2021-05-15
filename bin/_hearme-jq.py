@@ -18,8 +18,8 @@ quirks:
   does nothing except test python json.loads and json.dumps
 
 unsurprising quirks:
-  does prompt once for stdin, when stdin chosen as file "-" or by no file args, unlike bash "cat"
-  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+  prompts for stdin, like mac bash "grep -R .", unlike bash "jq ."
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
 
 see also:
   https://stedolan.github.io/jq/tutorial/
@@ -31,18 +31,18 @@ early guesses:
   jq '. []'  # Take a value from each index of list
   jq '.[] .key'  # Take one column by name
   jq '.[] [.key1, .key2]'  # Take values, drop keys - like to List of Lists from List of Dicts
-  jq ".[] | keys"  # Take keys, drop values, without making you type out all the values
-  jq '.[] | {newkey1:.key1, newkey2:.key2}'  # Rename columns
-  jq '.[] | [.key1, .key2] | @csv'  # Format List of Lists as Csv
-  jq '.[] | keys'  # Take keys and sort them, drop values
-  jq '.[] | .key1 + " " + .key2'  # Join the values in each Dict
-  jq '.[] | .slot_digits | tonumber'  # Strip the quotes from a numeric column
-  jq '.[] | [.key1, .key2] | @sh'  # Add another layer of quotes
-  jq --raw-input . | jq .  # Add the first layer of quotes
-  jq --raw-output '.[] | [.key1, .key2]'  # Drop a layer of keys and quotes
+  jq ".[] |keys"  # Take keys, drop values, without making you type out all the values
+  jq '.[] |{newkey1:.key1, newkey2:.key2}'  # Rename columns
+  jq '.[] |[.key1, .key2] |@csv'  # Format List of Lists as Csv
+  jq '.[] |keys'  # Take keys and sort them, drop values
+  jq '.[] |.key1 + " " + .key2'  # Join the values in each Dict
+  jq '.[] |.slot_digits |tonumber'  # Strip the quotes from a numeric column
+  jq '.[] |[.key1, .key2] |@sh'  # Add another layer of quotes
+  jq --raw-input . |jq .  # Add the first layer of quotes
+  jq --raw-output '.[] |[.key1, .key2]'  # Drop a layer of keys and quotes
 
 examples:
-  echo '["aa", "cc", "bb"]' | jq .
+  echo '["aa", "cc", "bb"]' |jq .
   jq . <(echo '[12, 345, 6789]')
 """
 

@@ -15,7 +15,7 @@ quirks:
   don't just pick out printables from binaries, in the way of the classic "strings" app
 
 examples:
-  cat bin/strings.py | bin/strings.py
+  cat bin/strings.py |bin/strings.py
 """
 
 

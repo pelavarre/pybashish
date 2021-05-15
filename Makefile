@@ -2,7 +2,7 @@
 
 default: black test-once
 	:
-	git status | grep -v '^$$'
+	git status |grep -v '^$$'
 	:
 	: consider
 	:
@@ -34,10 +34,10 @@ black:
 test-once:
 	:
 	rm -fr ../pybashish/.local/share/grep/files/
-	bin/grep.py >/dev/null
+	bin/_grep1.py >/dev/null
 	:
 	: catch up with
-	@echo 'bin/cspsh.py -f 2>&1 | sed '\''s,  *$$,,'\''  >tests/cspsh-f.txt'
+	@echo 'bin/cspsh.py -f 2>&1 |sed '\''s,  *$$,,'\''  >tests/cspsh-f.txt'
 	:
 	bin/cspsh.py -fv >/dev/null 2>&1
 	bash -c 'diff -burp tests/cspsh-f.txt <(bin/cspsh.py -f 2>&1)'
@@ -54,7 +54,7 @@ test-once:
 	: test_subsh: tests passed
 	:
 	rm -fr a b
-	git ls-files | grep -vE '(.gitignore|__init__.py|README.md|tests/cspsh-f.txt)' >a
+	git ls-files |grep -vE '(.gitignore|__init__.py|README.md|tests/cspsh-f.txt)' >a
 	git grep -l copied.from $$(git ls-files) >b
 	diff -burp a b || :
 	rm -fr a b
@@ -66,7 +66,7 @@ test-once:
 	:
 
 grep-fixme:
-	echo && echo && echo && git grep 'F'IXME | awk -F: '{ n=$$1; if (n != o) {o=n; print ""; print $$1":"}; $$1=""; print substr($$0, 2)}' | less -FRX
+	echo && echo && echo && git grep 'F'IXME |awk -F: '{ n=$$1; if (n != o) {o=n; print ""; print $$1":"}; $$1=""; print substr($$0, 2)}' |less -FRX
 
 me:
 	python3 ../pybashish/

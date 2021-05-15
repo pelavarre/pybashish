@@ -3,7 +3,7 @@
 """
 usage: zsh.py [-h]
 
-stub out the next bash verb you'll define
+tweak up your experience of Zsh
 
 optional arguments:
   -h, --help            show this help message and exit

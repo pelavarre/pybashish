@@ -54,11 +54,11 @@ examples:
   ls -1
   ls -l
   ls -C
-  ls -alFt | tac  # reverse sort without ls -r at Linux
-  ls -alFt | tail -r  # reverse sort without ls -r at Mac
+  ls -alFt |tac  # reverse sort without ls -r at Linux
+  ls -alFt |tail -r  # reverse sort without ls -r at Mac
   ls.py --headings
-  COLUMNS=101 ls.py -C | tee as-wide-as-you-say.txt
-  ls.py -C | tee as-wide-as-tty.txt
+  COLUMNS=101 ls.py -C |tee as-wide-as-you-say.txt
+  ls.py -C |tee as-wide-as-tty.txt
   (mkdir foo && cd foo/ && echo hi>x && rm -fr ../foo/ && ls.py .)
 """
 

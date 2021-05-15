@@ -23,7 +23,7 @@ examples:
   cspsh.py -h
   cspsh.py
   cspsh.py -c $'CLOCK = (tick → tock → CLOCK)\nCLOCK'
-  (echo 'CLOCK = (tick → tock → CLOCK)'; echo CLOCK) | cspsh.py
+  (echo 'CLOCK = (tick → tock → CLOCK)'; echo CLOCK) |cspsh.py
   open http://www.usingcsp.com/cspbook.pdf  # 1985 CARHoare
 """
 

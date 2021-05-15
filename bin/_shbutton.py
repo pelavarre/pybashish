@@ -54,7 +54,7 @@ install into mac bash:
 contrast with:
   bash -c 'echo $(( (0 + 12 - 3) / 4 * 5 ))'  # small integer arithmetic
   dc -e '2 k  0 12 + p 3 - p 4 / p 5 * p'  # minimal vocabulary arithmetic
-  (echo 1 1; echo d p sx + lx r p; echo d p sx + lx r p; cat -) | dc  # Fibonacci
+  (echo 1 1; echo d p sx + lx r p; echo d p sx + lx r p; cat -) |dc  # Fibonacci
 
 examples:
 
@@ -67,7 +67,7 @@ examples:
   , 70 k  1 7 / p  # as many digits as you need
   , 123e1 p
 
-  echo '      a b c d e      ' | pbcopy
+  echo '      a b c d e      ' |pbcopy
   , dedent F  # call "sed"
   , upper F  # call "tr"
   , .-1,.0,.-2,.1  # call "awk"
@@ -411,7 +411,7 @@ class PbVirtualMachine:
     def dc_dup_print(self):
         """Print a copy of the last line"""
 
-        line = self.pb_lines[-1]  # a la Bash:  pbpaste | tail -1
+        line = self.pb_lines[-1]  # a la Bash:  pbpaste |tail -1
         print(line)
 
     def dc_clearstack(self):  # ... --

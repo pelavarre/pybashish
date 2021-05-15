@@ -23,6 +23,9 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 :highlight RedLight ctermbg=red
 :call matchadd('RedLight', '\s\+$')
 
+:nnoremap <Bslash>m :set mouse=a<return> " mouse moves cursor
+:nnoremap <Bslash>M :set mouse=<return>  " mouse selects chars to copy-paste
+
 :nnoremap <Bslash>w :call RStripEachLine()<return>
 " n-no-remap = remap in the normal (not-insert) mode except don't recurse thru other remaps
 function! RStripEachLine()

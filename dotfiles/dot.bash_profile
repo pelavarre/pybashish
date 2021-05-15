@@ -33,7 +33,7 @@ function -rehab-bluetooth () {
 stty -ixon  &&: # define Control+S to undo Control+R, not XOFF
 
 if dircolors >/dev/null 2>&1; then
-    eval "$(dircolors <(dircolors -p | sed 's,1;,0;,g'))"  &&: # no bold for light mode
+    eval "$(dircolors <(dircolors -p |sed 's,1;,0;,g'))"  &&: # no bold for light mode
 fi
 
 function ps1 () {
@@ -51,7 +51,7 @@ function ps1 () {
 #
 
 
-if shopt -p | grep autocd  >/dev/null; then shopt -s autocd; fi
+if shopt -p |grep autocd  >/dev/null; then shopt -s autocd; fi
 
 
 #
@@ -93,7 +93,7 @@ function --dotfiles-backup () {
     : : back up the dot files - take mine, lose theirs
     dotfiles=$(--dotfiles-dir)
     for F in $(--dotfiles-find); do
-        --exec-xe "cp -p ~/$F $dotfiles/dot$F"
+        --exec-echo-xe "cp -p ~/$F $dotfiles/dot$F"
     done
     echo ": not backing up ~/.bash_profile_secrets" >&2
 }
@@ -102,7 +102,7 @@ function --dotfiles-restore () {
     : : restore the dot files  - take theirs, lose mine
     dotfiles=$(--dotfiles-dir)
     for F in $(--dotfiles-find); do
-        --exec-xe "echo cp -p $dotfiles/dot$F ~/$F"
+        --exec-echo-xe "echo cp -p $dotfiles/dot$F ~/$F"
     done
     touch ~/.zprofile-zsecrets
 }
@@ -174,12 +174,14 @@ alias -- '--'='--search-histories'
 
 
 #
-# Supply MM DD JQL HH MM SS date/time stamps
+# Work with dirs of files, and supply MM DD JQL HH MM SS date/time stamps
 #
 
 
 # alias -- '-'='cd -'
 alias -- '..'='cd .. && (dirs -p |head -1)'
+
+alias -- '?'="echo -n '? '>/dev/tty && cat -"  # press ⌃D for Yes, ⌃C for No
 
 function --jqd () {
     : : guess the initials of the person at the keyboard
@@ -216,28 +218,32 @@ alias -- -do=--like-do
 alias -- -ls='(set -xe; ls -alF -rt)'
 alias -- -mv=--like-mv
 
+# TODO: abbreviate $(ls -rt |tail -1)
+# TODO: abbreviate $(ls -rtc |tail -1)
+
 
 #
-# Often trace and sometimes confirm expansions of shorthand
+# Expand shorthand, but trace most of it and confirm some of it in advance
 #
 
 
-alias -- '?'="echo -n '? '>/dev/tty && cat -"  # press ⌃D for Yes, ⌃C for No
 
-function --exec-xe () {
-    : : execute the args, but trace them first
-    echo "+ $@" >&2  &&: # less decoration than "$PS4"
+function --exec-echo-xe () {
+    : : unquote and execute the args, but unquote and trace them first
+    echo "+ $@" >&2
     source <(echo "$@")
 }
 
-function --exec-xe-maybe () {
-    : : execute the args, but trace them first and press ⌃D to proceed
-    echo "did you mean:  $@" >&2
+function --authorize () {
+    echo "$@" >&2
     echo 'press ⌃D to execute, or ⌃C to quit' >&2
     cat - >/dev/null
     echo '⌃D'
-    echo "+ $@" >&2  &&: # echo like "$PS4", but more calmly
-    source <(echo "$@")
+}
+
+function --exec-echo-xe-maybe () {
+    --authorize "did you mean:  $@"
+    --exec-echo-xe "$@"
 }
 
 
@@ -246,53 +252,58 @@ function --exec-xe-maybe () {
 #
 
 
-function -gcd () {
-    if [ "$#" = 0 ]; then
-        --exec-xe "cd $(git rev-parse --show-toplevel) && dirs -p |head -1"
-    else
-        --exec-xe "cd $(git rev-parse --show-toplevel) && cd $@ && dirs -p |head -1"
-    fi
+function --exec-gcd-xe () {
+    --exec-echo-xe 'cd $(git rev-parse --show-toplevel) && cd ./'$@' && dirs -p |head -1'
 }
 
 function --like-git-status () {
-    : : Git Status for hulking large slow Git repos
+    : : Git Status for huge Git Repos - as in hulking, large, and slow
     (set -xe; git status -u no "$@" && git status && git status --short --ignored "$@")
 }
 
 alias -- -g=--like-git-status
 
-alias -- -ga='--exec-xe git add'
-alias -- -gb='--exec-xe git branch'
-alias -- -gc='pwd && --exec-xe-maybe git clean -ffxdq'
-alias -- -gf='--exec-xe git fetch'
-alias -- -gd='--exec-xe git diff'
-alias -- -gg='--exec-xe git grep'
-alias -- -gl='--exec-xe git log --decorate --oneline -9'
-alias -- -gr='--exec-xe git rebase'
-alias -- -gs='--exec-xe git show'
+alias -- -ga='--exec-echo-xe git add'
+alias -- -gb='--exec-echo-xe git branch'
+alias -- -gc='pwd && --exec-echo-xe-maybe git clean -ffxdq'
+alias -- -gf='--exec-echo-xe git fetch'
+alias -- -gd='--exec-echo-xe git diff'
+alias -- -gg='--exec-echo-xe git grep'
+alias -- -gl='--exec-echo-xe git log'
+alias -- -gr='--exec-echo-xe git rebase'
+alias -- -gs='--exec-echo-xe git show'
 
-alias -- -gbq="--exec-xe \"git branch |grep '[*]'\""
-alias -- -gca='--exec-xe git commit --amend'
-alias -- -gco='--exec-xe git checkout'  # especially:  gco -
-alias -- -gd1='--exec-xe git diff HEAD~1'
-alias -- -gfr="--exec-xe '(set -xe; git fetch && git rebase)'"
-alias -- -gl1='--exec-xe git log --decorate -1'
-alias -- -glf='--exec-xe git ls-files'
-alias -- -glq='--exec-xe git log --no-decorate --oneline -9'
-alias -- -grh='pwd && --exec-xe-maybe git reset --hard'
-alias -- -gri='--exec-xe git rebase -i --autosquash HEAD~9'
-alias -- -grl='--exec-xe git reflog'
-alias -- -grv='--exec-xe git remote -vvv'
+alias -- -gbq='--exec-echo-xe "git branch |grep '\''[*]'\''"'
+alias -- -gca='--exec-echo-xe git commit --amend'
+alias -- -gcd=--exec-gcd-xe
+alias -- -gco='--exec-echo-xe git checkout'  # especially:  gco -
+alias -- -gdh='--exec-echo-xe git diff HEAD~1'
+alias -- -gfr='--exec-echo-xe "(set -xe; git fetch && git rebase)"'
+alias -- -ggl='--exec-echo-xe git grep -l'  # --files-with-matches
+alias -- -gl1='--exec-echo-xe git log --decorate -1'
+alias -- -glf='--exec-echo-xe git ls-files'
+alias -- -glg='--exec-echo-xe git log --no-decorate --oneline --grep'
+alias -- -glq='--exec-echo-xe git log --no-decorate --oneline -9'
+alias -- -grh='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard'
+alias -- -gri='--exec-echo-xe git rebase -i --autosquash HEAD~9'
+alias -- -grl='--exec-echo-xe git reflog'
+alias -- -grv='--exec-echo-xe git remote -vvv'
 
-alias -- -gcaa='--exec-xe git commit --all --amend'
-alias -- -gcaf='git commit --all --fixup'
-alias -- -gdno='--exec-xe git diff --name-only'
-alias -- -grhu='pwd && --exec-xe-maybe git reset --hard @{upstream}'
-alias -- -gsno="--exec-xe git show --name-only --pretty=''"
-alias -- -gssn='--exec-xe git shortlog --summary --numbered'
+alias -- -gcaa='--exec-echo-xe git commit --all --amend'
+alias -- -gcaf='--exec-echo-xegit commit --all --fixup'
+alias -- -gdno='--exec-echo-xe git diff --name-only'
+alias -- -glq0='--exec-echo-xe git log --decorate --oneline'
+alias -- -glqv='--exec-echo-xe git log --decorate --oneline -9'
+alias -- -grhu='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard @{upstream}'
+alias -- -gsno="--exec-echo-xe git show --name-only --pretty=''"
+alias -- -gssn='--exec-echo-xe git shortlog --summary --numbered'
 
-alias -- -gcafh='git commit --all --fixup HEAD'
-alias -- -gdno1='--exec-xe git diff --name-only HEAD~1'
+alias -- -gcafh='--exec-echo-xe git commit --all --fixup HEAD'
+alias -- -gdno1='--exec-echo-xe git diff --name-only HEAD~1'
+alias -- -glqv0='--exec-echo-xe git log --no-decorate --oneline'
+
+# TODO: git log -G regex file.ext # grep the changes
+# TODO: git log -S regex file.ext # grep the changes for an odd number (PickAxe)
 
 
 #
@@ -385,7 +396,7 @@ echo "$(dirs -p |head -1)/"
 source ~/.bashrc
 
 if dircolors >/dev/null 2>&1; then
-    eval "$(dircolors <(dircolors -p | sed 's,1;,0;,g'))"  &&: # no bold for light mode
+    eval "$(dircolors <(dircolors -p |sed 's,1;,0;,g'))"  &&: # no bold for light mode
 fi
 
 

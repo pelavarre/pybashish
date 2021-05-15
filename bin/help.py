@@ -80,7 +80,7 @@ def main():
             For instance:
 
                 echo --h
-                grep -h | head
+                grep -h |head
             """
         ).strip()
     )

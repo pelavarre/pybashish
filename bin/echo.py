@@ -18,7 +18,7 @@ quirks:
 
 examples:
   echo 'Hello, Echo World!'
-  echo -n '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑ ' | hexdump -C
+  echo -n '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑ ' |hexdump -C
   echo.py --v 'Hello, Echo World!'
 """
 

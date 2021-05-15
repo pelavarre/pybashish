@@ -16,20 +16,19 @@ optional arguments:
   --wiki       escape as html p of code nbsp br (fit for insertion into atlassian wiki)
 
 quirks:
-  defaults to replace tabs, smart quotes, dashes, etc: not just tabs, but not also emoji
-  doesn't accurately catenate binary files, unlike classic bash "expand"
-  does strip leading and trailing empty lines, unlike bash "expand"
-  does convert classic mac CR "\r" end-of-line to linux LF "\n", unlike bash "expand"
-  does always end the last line with linux LF "\n" end-of-line, unlike bash "expand"
-  does print eight-nybble \U code points as four lowercase nybbles then four uppercase
-  doesn't implement classic -t 9,17 tab list, nor -t 4 tab width, nor linux --tabs alias thereof
-  doesn't implement linux -i, --initial for keeping tabs in line after first nonwhite
-  doesn't implement mac unexpand -a for compressing files maximally by replacing spaces with tabs
+  defaults to replace tabs, smart quotes, dashes, etc, but no emoji, and not just tabs
+  converts classic mac cr "\r" end-of-line to linux lf "\n", unlike bash "expand"
+  ends the last line with linux lf "\n" end-of-line always, unlike bash "expand"
+  strips leading and trailing empty lines, unlike bash "expand"
+  prints the eight-nybble \U code points as four lowercase nybbles then four uppercase
+  doesn't take classic -t 9,17 tab list, nor -t 4 tab width, nor linux "expand --tabs"
+  doesn't take linux -i, --initial for tabs in line after first nonwhite
+  doesn't offer "unexpand" of initial tabs, nor "unexpand -a" of all tabs in line
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", unlike bash "expand"
-  accepts only the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
-  does accept "-" as meaning "/dev/stdin", like linux "expand -", unlike mac "expand -"
+  prompts for stdin, like mac bash "grep -R .", unlike bash "cat -"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
+  takes "-" as meaning "/dev/stdin", like linux "expand -", unlike mac "expand -"
 
 see also:
   https://unicode.org/charts/PDF/U0000.pdf
@@ -37,14 +36,14 @@ see also:
   https://unicode.org/charts/PDF/U2000.pdf
 
 examples:
-  expand.py -
-  echo -n $'\xC0\x80' | expand | hexdump  # Linux happy, but Mac says 'illegal byte sequence'
-  echo -n $'\xC0\x80' | expand.py | hexdump.py  # x EF BF BD = uFFFD = Unicode Replacement chars
-  echo -n $'t\tr\rn\n' | expand.py | cat.py -etv
-  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | expand.py  # no change
-  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' | expand.py --repr  # such as "\u22EE" for "⋮" vertical ellipsis
-  echo -n $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | expand.py | hexdump.py --chars  # common 'smart' chars
-  echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' | tr '$' '\n' | expand.py --wiki
+  expand.py -  # try it out line by line
+  echo -n $'\xC0\x80' |expand |hexdump  # Linux happy, Mac 'illegal byte sequence'
+  echo -n $'\xC0\x80' |expand.py |hexdump.py  # uFFFD = Unicode Replacement Char
+  echo -n $'t\tr\rn\n' |expand.py |cat.py -etv  # same as classic
+  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' |expand.py  # no change
+  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' |expand.py --repr  # "\u22EE" for "⋮" etc
+  echo -n $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' |expand.py |cat.py -tv  # 'smart' chars
+  echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' |tr '$' '\n' |expand.py --wiki
 """
 
 # note: the five chars "💔💥😊😠😢" are ": broken_heart : boom : blush : angry : cry :" in Slack 2020
@@ -320,7 +319,7 @@ def stderr_print(*args, **kwargs):
 class BrokenPipeErrorSink(contextlib.ContextDecorator):
     """Cut unhandled BrokenPipeError down to sys.exit(1)
 
-    Test with large Stdout cut sharply, such as:  find.py ~ | head
+    Test with large Stdout cut sharply, such as:  find.py ~ |head
 
     More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
     As per https://docs.python.org/3/library/signal.html#note-on-sigpipe

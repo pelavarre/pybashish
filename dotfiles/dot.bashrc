@@ -2,11 +2,12 @@
 
 source ~/.bashrc-theirs
 
-
-# if [ ! "${_DOT_BASH_PROFILE_:-}" ]; then
-#     source ~/.bash_profile
-# fi
-# TODO: settle all my hosts on "~/.bashrc" calls "~/.bash_profile" or not, like macOS
+if [ "$(uname)" = Darwin ]; then
+    if [ ! "${_DOT_BASH_PROFILE_:-}" ]; then
+        source ~/.bash_profile
+    fi
+fi
+# TODO: work up better answer for ~/.bash_profile skipped by macOS Zsh
 
 export OLDPS1="$PS1"  &&: # back up the default prompt here, as if it's screaming loud
 export PS1="$(echo $PS1 |sed 's,\\\[\\033\[[^\\]*\\\],,g') "  # no color for no glare

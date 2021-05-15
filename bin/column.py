@@ -19,9 +19,9 @@ quirks:
   accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
 
 examples:
-  echo 'su per ca $ li fra gil $ is tic ex $ pi a li $ doc ious' | tr '$' '\n' | column -t
-  echo '27 735 43 $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' | tr '$' '\n' | column -t
-  echo 'su per ca $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' | tr '$' '\n' | column -t
+  echo 'su per ca $ li fra gil $ is tic ex $ pi a li $ doc ious' |tr '$' '\n' |column -t
+  echo '27 735 43 $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' |tr '$' '\n' |column -t
+  echo 'su per ca $ 51 785 640 $ 23 391 62 $ 14 6 19 $ 002 8809' |tr '$' '\n' |column -t
 """
 
 

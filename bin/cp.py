@@ -15,7 +15,7 @@ optional arguments:
   -R          copy the dirs and files inside a dir too, don't just give up on it
 
 quirks:
-  runs ahead and works, without making you name the duplicate, unlike bash "cp"
+  chooses a new name for you, when none provided, unlike bash "cp"
   increments the name, such as:  touch it~41~ && touch it && cp.py  # it~41~ it it~42~
 
 examples:
@@ -24,9 +24,12 @@ examples:
   cp.py /dev/null  # creates empty file named "null~1~", etc
   cp.py itself  # creates backup named "itself~1~", etc
 """
+
 # FIXME: except cp.py from outside this dir should mean cp -ip to this dir
 # FIXME: also copy from (FILE | HOSTNAME:FILE) to here, like Bash "scp" would
 # FIXME: think about "cp SOURCE TARGET" vs "cp TARGET SOURCE" vs line-editor's
+
+# FIXME: somehow define a way to default to "cp -ipR"
 
 
 import sys

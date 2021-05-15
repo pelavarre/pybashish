@@ -9,19 +9,19 @@ optional arguments:
   -h, --help  show this help message and exit
 
 quirks:
-  does forward interactive input lines immediately, unlike bash
-  crashes "pybashish" shell if called from there, at ⌃C SIGINT
+  does forward interactive input lines immediately, unlike bash "dd"
   pressing ⌃T at mac works, pressing ⌃T at linux doesn't
-  kill with SIGUSR1 works at linux (TODO: write example of this & also test Mac)
+  kill with SIGUSR1 works at linux (todo: more detail)
+  mystically crashes "pybashish" shell if called from there, at ⌃C SIGINT
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", unlike bash "dd"
-  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+  prompts for stdin, like mac bash "grep -R .", unlike bash "dd"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
 
 examples:
-  dd  # run demo of ⌃T SIGINFO and ⌃C SIGINT, till ⌃D EOF or ⌃\ SIGQUIT
+  dd  # run demo of ⌃C SIGINT and mac ⌃T SIGINFO, till ⌃D EOF or ⌃\ SIGQUIT
 """
-# FIXME: fix "dd" quirks
+# TODO: on adding FILE args, do take "-" as meaning "/dev/stdin"
 
 
 from __future__ import print_function

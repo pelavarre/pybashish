@@ -20,8 +20,9 @@ quirks:
   acts like "wc -L -l" if called without args, unlike Bash "wc"
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", unlike bash "fmt"
-  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+  prompts for stdin, like mac bash "grep -R .", unlike bash "wc"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
+  takes "-" as meaning "/dev/stdin", like linux "wc -", unlike mac "wc -"
 
 examples:
   Oh no! No examples disclosed!! 💥 💔 💥

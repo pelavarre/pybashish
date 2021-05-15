@@ -14,13 +14,13 @@ optional arguments:
                         how many leading lines to show (default: 10)
 
 quirks:
-  a count led by "+" to mark it as positive says how many trailing lines to drop (unlike bash)
-  you can say just "-5" or "+9", you don't have to spell them out in full as "-n 5" or "-n +9"
+  takes a count led by "+" as how many trailing lines to drop
+  takes "-5" or "+9" and such, like mac "tail", unlike bash "head"
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", unlike bash "head"
-  accepts only the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
-  does accept "-" as meaning "/dev/stdin", like linux "head -", unlike mac "head -"
+  prompts for stdin, like mac bash "grep -R .", unlike bash "head"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
+  takes file "-" as meaning "/dev/stdin", like linux "head -", unlike mac "head -"
 
 examples:
   head.py /dev/null

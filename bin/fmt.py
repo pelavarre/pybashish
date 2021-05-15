@@ -18,19 +18,19 @@ quirks:
   prints '_' skids onto the ruler to mark the tabsize=8 tab stops:  1, 9, 17, ...
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", unlike bash "fmt"
-  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
-  does accept "-" as meaning "/dev/stdin", like linux "fmt -", unlike mac "fmt -"
+  prompts for stdin, like mac bash "grep -R .", unlike bash "fmt"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
+  takes file "-" as meaning "/dev/stdin", like linux "fmt -", unlike mac "fmt -"
 
 examples:
-  echo 'a b  c  d e f g  h i j   k  l m' | fmt.py -9  # keep blanks except at joins and splits
-  echo '  a b c$  d e f$  g$$h' | tr '$' '\n' | fmt.py -9  # group by common indents
-  echo '   a b c' | fmt.py -1  # forward indentation wider than wanted, if present
+  echo 'a b  c  d e f g  h i j   k  l m' |fmt.py -9  # keep blanks except at joins and splits
+  echo '  a b c$  d e f$  g$$h' |tr '$' '\n' |fmt.py -9  # group by common indents
+  echo '   a b c' |fmt.py -1  # forward indentation wider than wanted, if present
   :
-  echo $(seq 0 99) | fmt.py  # split to fit inside Terminal
-  echo $(seq 0 39) | fmt.py -42  # split to fit inside width
-  echo $(seq 0 39) | tr -d ' ' | fmt.py -42  # no split at width
-  echo su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious | fmt.py -42  # no split at "-" dashes
+  echo $(seq 0 99) |fmt.py  # split to fit inside Terminal
+  echo $(seq 0 39) |fmt.py -42  # split to fit inside width
+  echo $(seq 0 39) |tr -d ' ' |fmt.py -42  # no split at width
+  echo su-per-ca-li-fra-gil-is-tic-ex-pi-a-li-doc-ious |fmt.py -42  # no split at "-" dashes
   :
   fmt.py --ruler -w72  # ends in column 72
   : # 5678_0123456_8901234_6789012_4567890 2345678_0123456_8901234_6789012  # the 72-column ruler

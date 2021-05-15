@@ -25,9 +25,9 @@ quirks:
   prints the received line as a Python Repr
 
 examples:
-  echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' | read.py  # Control Option Shift Command Arrows at Mac
-  echo 'å é î ø ü' | read.py  # the accented vowels prominent in Mac ⌥ Option
-  echo '⋮' | read.py  # more favorite characters of mine
+  echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' |read.py  # Control Option Shift Command Arrows at Mac
+  echo 'å é î ø ü' |read.py  # the accented vowels prominent in Mac ⌥ Option
+  echo '⋮' |read.py  # more favorite characters of mine
   read.py
   read.py --lines
   read -e  # in Bash
@@ -42,6 +42,8 @@ examples:
 # FIXME FIXME: bind an undo key such as ⌃_
 # FIXME FIXME:  stop discarding history edits at ⌃N "_next_history"
 # FIXME: add -t TIMEOUT in seconds, especially for the case of no line-editor
+
+# FIXME: read.py --splat but do momentarily echo the last char of input
 
 
 from __future__ import print_function

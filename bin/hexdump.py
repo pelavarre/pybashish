@@ -27,25 +27,26 @@ quirks:
   doesn't (yet?) compress duplicate lines of hex
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", unlike bash "hexdump"
-  accepts only the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
-  does accept "-" as meaning "/dev/stdin", unlike mac and linux
+  prompts for stdin, like mac bash "grep -R .", unlike bash "hexdump"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
+  takes file "-" as meaning "/dev/stdin", like bash "hexdump -"
 
 examples:
-  echo -n hexdump.py | hexdump  # classic eight-bit groups at Mac, but messy at Linux
-  echo -n hexdump.py | hexdump.py
-  echo -n hexdump.py | hexdump -C  # classic shorthand close to meaning --bytes 1
-  echo -n hexdump.py | hexdump.py -C
-  echo -n hexdump.py | hexdump.py --c  # our shorthand meaning --charset utf-8
-  echo -n 0123456789abcdef | hexdump.py --bytes 4 -C  # quads
-  /bin/echo -n $'ijk\xC0\x80nop' | hexdump.py --chars  # overlong encoding, aka non-shortest form
-  echo -n 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' | hexdump.py --chars  # common non-ascii
-  echo -n $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' | hexdump.py --chars  # common 'smart' chars
-  hexdump.py --dump-byteset | hexdump.py --chars
+  echo -n hexdump.py |hexdump  # classic eight-bit groups at Mac, but messy at Linux
+  echo -n hexdump.py |hexdump.py
+  echo -n hexdump.py |hexdump -C  # classic shorthand close to meaning --bytes 1
+  echo -n hexdump.py |hexdump.py -C
+  echo -n hexdump.py |hexdump.py --c  # our shorthand meaning --charset utf-8
+  echo -n 0123456789abcdef |hexdump.py --bytes 4 -C  # quads
+  /bin/echo -n $'ijk\xC0\x80nop' |hexdump.py --chars  # overlong encoding, aka non-shortest form
+  echo -n 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' |hexdump.py --chars  # common non-ascii
+  echo -n $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' |hexdump.py --chars  # common 'smart' chars
+  hexdump.py --dump-byteset |hexdump.py --chars
   hexdump.py /dev/null  # visibly empty
 """
 
-# FIXME: default to:  hexdump.py --dump-byteset | hexdump.py --chars
+# FIXME: default to:  hexdump.py --dump-byteset |hexdump.py --chars
+# FIXME: less uncounted spaces @ echo -n '💔💥😊😠😢' |hexdump.py --chars
 
 #
 # see also:
@@ -436,7 +437,7 @@ def stderr_print(*args, **kwargs):
 class BrokenPipeErrorSink(contextlib.ContextDecorator):
     """Cut unhandled BrokenPipeError down to sys.exit(1)
 
-    Test with large Stdout cut sharply, such as:  find.py ~ | head
+    Test with large Stdout cut sharply, such as:  find.py ~ |head
 
     More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
     As per https://docs.python.org/3/library/signal.html#note-on-sigpipe

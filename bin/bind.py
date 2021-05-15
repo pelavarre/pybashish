@@ -19,9 +19,9 @@ quirks:
   prints just the bindings only for ansi ↑ ↓ arrows, till "read.py" grows to bind the → ← arrows
 
 examples:
-  bind -p | grep '".e[[][DCAB]"' | sort  # ansi ↑ ↓ → ← arrows in bash
-  bindkey | grep '".[[][[][ABCD]"'  # ansi ↑ ↓ → ← arrows in zsh
-  bind.py | grep '".e[[][DCAB]"' | sort  # ansi ↑ ↓ → ← arrows in pybashish
+  bind -p |grep '".e[[][DCAB]"' |sort  # ansi ↑ ↓ → ← arrows in bash
+  bindkey |grep '".[[][[][ABCD]"'  # ansi ↑ ↓ → ← arrows in zsh
+  bind.py |grep '".e[[][DCAB]"' |sort  # ansi ↑ ↓ → ← arrows in pybashish
 """
 # FIXME --mac       print what each means, but in Apple style
 # FIXME --zsh       print what each means, but in Zsh "bindkey" style

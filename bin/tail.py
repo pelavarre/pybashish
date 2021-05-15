@@ -17,20 +17,20 @@ optional arguments:
                         how many trailing lines to show (default: 10)
 
 quirks:
-  a count led by "+" to mark it as positive says how many leading lines to drop
-  you can say just "-5" or "+9", you don't have to spell them out in full like linux "-n +9"
+  takes a count led by "+" as how many leading lines to drop
+  takes "-5" or "+9" and such, like mac "tail", unlike linux "tail -n"
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", unlike bash "tail"
-  accepts only the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
-  does accept "-" as meaning "/dev/stdin", like linux "tail -", unlike mac "tail -"
+  prompts for stdin, like mac bash "grep -R .", unlike bash "tail"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
+  takes "-" as meaning "/dev/stdin", like linux "tail -", unlike mac "tail -"
 
 examples:
   tail.py /dev/null
   tail.py tail.py
   tail.py -5 tail.py
   tail.py -n 5 tail.py
-  python3 -c 'import this' | tail.py -n 3 | cat.py -n
+  python3 -c 'import this' |tail.py -n 3 |cat.py -n
 """
 
 

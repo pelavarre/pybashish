@@ -13,9 +13,9 @@ optional arguments:
   -i          ask before replacing some other file
 
 quirks:
-  runs ahead and works, without making you spell out the new name, unlike Bash "mv"
+  chooses a new name for you, when none provided, unlike bash "mv"
   increments the name, such as:  touch it~41~ && touch it && mv.py  # it~41~ it~42~
-  requires two args to rename files that aren't files or dirs below the root dir
+  requires two args to rename files that aren't files or dirs inside the current dir
 
 examples:
   mv.py  # renames the last modified file of cwd (makes it not found)

@@ -12,7 +12,7 @@ optional arguments:
   -h, --help  show this help message and exit
 
 quirks:
-  runs ahead and works with me, without mandating that I spell out the new name, unlike Bash "touch"
+  chooses a new file name for you, when none provided, unlike bash "touch"
 
 examples:
   touch  # creates "touch~1~", then "touch~2~", etc

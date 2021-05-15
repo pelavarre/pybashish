@@ -19,7 +19,7 @@ Try it out, inside Linux or Mac OS, any time since Jun/2018 Python 3.7
 To run the self-test's of this code
 
     source ~/bin/black.source
-    pip freeze | grep black
+    pip freeze |grep black
     time make
 
 As of Sunday, 26th July 2020

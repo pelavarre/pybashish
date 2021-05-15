@@ -13,8 +13,7 @@ optional arguments:
   -p, --parents  create the dir, its parent dir, and ancestors, if need be
 
 quirks:
-  says "dir exists" when
-  runs ahead and works with me, without mandating that I spell out the new name, unlike Bash "mkdir"
+  chooses a new dir name for you, when none provided, unlike bash "mkdir"
   says "dir exists", not traditional "file exists", if dir exists already
 
 examples:

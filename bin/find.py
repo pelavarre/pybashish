@@ -142,7 +142,7 @@ def stderr_print(*args, **kwargs):
 class BrokenPipeErrorSink(contextlib.ContextDecorator):
     """Cut unhandled BrokenPipeError down to sys.exit(1)
 
-    Test with large Stdout cut sharply, such as:  find.py ~ | head
+    Test with large Stdout cut sharply, such as:  find.py ~ |head
 
     More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
     As per https://docs.python.org/3/library/signal.html#note-on-sigpipe

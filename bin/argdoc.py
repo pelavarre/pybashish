@@ -24,8 +24,9 @@ quirks:
   you can't mix more python into your argparse by inserting it into your arg doc
 
 unsurprising quirks:
-  does prompt once for stdin when called as "argdoc -", like bash "grep -R", unlike bash "cat -"
-  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+  prompts for stdin, like mac bash "grep -R .", unlike bash "cat -"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
+  takes file "-" as meaning "/dev/stdin"
 
 examples:
 

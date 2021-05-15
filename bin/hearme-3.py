@@ -28,7 +28,7 @@ examples:
 
   hearme.py -p  # awk '//{print}'
   hearme.py -p upper  # awk '//{print toupper($0)}'
-  hearme.py upper  # pbpaste | awk '//{print toupper($0)}'| pbcopy
+  hearme.py upper  # pbpaste |awk '//{print toupper($0)}'| pbcopy
 
   hearme.py -i upper  # ask permission before running it
   hearme.py -ii upper  # just show it, don't run it
@@ -121,7 +121,7 @@ def main(argv):  # FIXME FIXME  # noqa C901
 
     shline = ""
     if edit_clipboard:
-        shline = "pbpaste | "
+        shline = "pbpaste |"
 
     # Plan to print each of the "awk.prints", else infer a print of the Awk line
 

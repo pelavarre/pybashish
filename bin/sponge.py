@@ -21,15 +21,17 @@ quirks:
   fails if more input than free memory
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", unlike bash "cat" and "cat -"
-  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+  prompts for stdin, like mac bash "grep -R .", unlike bash "cat -" and "cat"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
 
 examples:
   echo one >t.txt && cat t.txt
-  echo two | sponge.py t.txt && cat t.txt
-  cat t.txt | sponge.py t.txt && cat t.txt
-  echo three | sponge.py -a t.txt && cat t.txt
+  echo two |sponge.py t.txt && cat t.txt
+  cat t.txt |sponge.py t.txt && cat t.txt
+  echo three |sponge.py -a t.txt && cat t.txt
 """
+
+# TODO: explore "sponge" with no args and "sponge -" with one arg
 
 
 import contextlib
@@ -85,7 +87,7 @@ def stderr_print(*args, **kwargs):
 class BrokenPipeErrorSink(contextlib.ContextDecorator):
     """Cut unhandled BrokenPipeError down to sys.exit(1)
 
-    Test with large Stdout cut sharply, such as:  find.py ~ | head
+    Test with large Stdout cut sharply, such as:  find.py ~ |head
 
     More narrowly than:  signal.signal(signal.SIGPIPE, handler=signal.SIG_DFL)
     As per https://docs.python.org/3/library/signal.html#note-on-sigpipe

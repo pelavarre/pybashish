@@ -22,8 +22,8 @@ quirks:
   extracts always to stdout, never to the name found inside
 
 unsurprising quirks:
-  does prompt once for stdin, like bash "grep -R", a la linux "tar ztvf -", unlike mac "tar tvf -"
-  accepts only the "stty -a" line-editing c0-control's, not the "bind -p" c0-control's
+  prompts for stdin, like linux "tar tvf -", unlike mac "tar tvf -"
+  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
 
 bash script to compress a top dir as Tgz for test:
   rm -fr dir/ dir.tgz
@@ -35,7 +35,7 @@ bash script to compress a top dir as Tgz for test:
 
 examples:
   tar.py tvf dir.tgz
-  tar.py xvkf dir.tgz | wc  # 2 lines, 2 words, 14 bytes
+  tar.py xvkf dir.tgz |wc  # 2 lines, 2 words, 14 bytes
   tar.py -tvf /dev/null/child -tvf dir.tgz  # first args discarded, last args obeyed
 """
 

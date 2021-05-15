@@ -25,7 +25,7 @@ function demo-c () { local x="cd pybashish/"; echo "+ $x" >&2; $x; }
 function demo-d () { (set -xe; cat README.md); }
 function demo-e () { (set -xe; git branch -a); }
 function demo-f () { (set -xe; git checkout pelavarre-patch-1); }
-function demo-g () { (set -xe; git ls-files | column); }
+function demo-g () { (set -xe; git ls-files |column); }
 function demo-h () { (set -xe; less bin/hostname.py); }
 function demo-i () { (set -xe; bin/argdoc.py --rip argdoc bin/hostname.py); }
 function demo-j () { (set -xe; bin/argdoc.py --rip argparse bin/hostname.py); }
@@ -41,7 +41,7 @@ function demo-s () { (set -xe; rm -fr ~/Desktop/pybashish/); }
 function demo-t () { local x="exit"; echo "+ logout" >&2; $x; }
 
 pushd ~/Desktop >/dev/null
-dirs +0  # aka:  dirs | awk '{print $1}'
+dirs +0  # aka:  dirs |awk '{print $1}'
 
 export PS1='(public) \$ '
 
