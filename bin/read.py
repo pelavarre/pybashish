@@ -25,7 +25,7 @@ quirks:
   prints the received line as a Python Repr
 
 examples:
-  echo '⌃ ⌥ ⇧ ⌘ ← → ↓ ↑' |read.py  # Control Option Shift Command Arrows at Mac
+  echo '⌃ ⌥ ⇧ ⌘ ⇥ ← → ↓ ↑' |read.py  # Control Option Shift Command Arrows at Mac
   echo 'å é î ø ü' |read.py  # the accented vowels prominent in Mac ⌥ Option
   echo '⋮' |read.py  # more favorite characters of mine
   read.py

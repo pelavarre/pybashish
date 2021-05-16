@@ -4,6 +4,7 @@
 ;; Configure Emacs
 
 (setq-default indent-tabs-mode nil)  ; indent with Spaces not Tabs
+(setq-default tab-width 4)  ; count out columns of C-x TAB S-LEFT/S-RIGHT
 
 (when (fboundp 'global-superword-mode) (global-superword-mode 't))  ; accelerate M-f M-b
 
@@ -29,7 +30,7 @@
     (interactive)
     (unless (mark) (mark-paragraph))
     (setq string (read-from-minibuffer
-	"Shell command on region: " nil nil nil (quote shell-command-history)))
+        "Shell command on region: " nil nil nil (quote shell-command-history)))
     (shell-command-on-region (region-beginning) (region-end) string nil 'replace)
     )
 

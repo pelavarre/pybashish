@@ -4,6 +4,7 @@ source ~/.bashrc-theirs
 
 if [ "$(uname)" = Darwin ]; then
     if [ ! "${_DOT_BASH_PROFILE_:-}" ]; then
+        echo + source ~/.bash_profile
         source ~/.bash_profile
     fi
 fi

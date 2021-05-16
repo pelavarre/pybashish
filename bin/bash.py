@@ -20,6 +20,8 @@ examples:
   bash.py  # chat till "exit", or ⌃D EOF pressed to quit, or ssh drops, etc
 """
 
+# FIXME: alias | and ||, unlike Bash unlike Zsh
+
 # FIXME: add brace expansion:  echo a{B,C{d1,d2}E,F}g{H,I}j
 
 # FIXME: add --color=never|always|auto

@@ -775,11 +775,11 @@ FILES_CHARS = r"""
 
     #
     # emacs  ⌃G  => cancel
-    # emacs  ⌃Q  => literal input
+    # emacs  ⌃Q ⌃J  => literal input, literal newline
     #
     # emacs  ⌃A ⌃B ⌃E ⌃F ⌥M  => move column
     # emacs  ⌥B ⌥F ⌥A ⌥E  => move small word, sentence
-    # emacs  ⌃P ⌃N ⌥G⌥G  => move row, goto line
+    # emacs  ⌃P ⌃N ⌥< ⌥> ⌥G  => move row, goto line
     # emacs  fixme  => move match balance pair
     #
     # emacs  ⌃D ⌥D ⌥Z  => delete char, word, to char
@@ -788,18 +788,18 @@ FILES_CHARS = r"""
     # emacs  ⌥H ⌥Q  => paragraph: mark, reflow
     #
     # emacs  ⌃U1234567890 ⌃- ⌃_ ⌃Xu  => repeat, undo, undo
-    # emacs  ⌥L ⌥U ⌥C ⌃U1⌃Xrni⌃Xr+i⌃Xrii  => lower, upper, title, increment
+    # emacs  ⌥L ⌥U ⌥C ⌃U1⌃XRNI⌃XR+I⌃XRII  => lower, upper, title, increment
     # emacs  ⌃S ⌃R ⌥%  => find, replace
     #
-    # emacs  ⌃X( ⌃X) ⌃Xe  => record replay
+    # emacs  ⌃X( ⌃X) ⌃XE  => record replay
     # emacs  fixme  => vertical delete copy paste insert
-    # emacs  fixme  => dent/dedent
-    # emacs  ⌥H⌃U1⌥|  => pipe bash
+    # emacs  ⌃X⇥ ⌃XRD  => dent/dedent
+    # emacs  ⌃U1⌥|  => pipe bash, such as ⌥H⌃U1⌥| or ⌥<⌃@⌥>⌃U1⌥|
     #
     # emacs  ⌃V ⌥V ⌃L  => scroll rows
-    # emacs  ⌃X1 ⌃Xk ⌃Xo  => close others, close this, warp to next
+    # emacs  ⌃X1 ⌃XK ⌃XO  => close others, close this, warp to next
     #
-    # emacs  ⌃Xc ⌥~  => quit emacs, without saving
+    # emacs  ⌃X⌃C ⌥~⌃X⌃C  => quit emacs, without saving
     #
     # emacs  ⌃Hk... ⌃Hkb ⌃Ha...   => help for key chord sequence, for all keys, for word
     # emacs  ⌥X ⌥:  => execute-extended-command, eval-expression  => dry run ~/.emacs
@@ -818,12 +818,17 @@ FILES_CHARS = r"""
 
     ; ~/.emacs
 
-    ;; Choose preferences
+    ;
+    ;; Configure Emacs
 
-    (setq-default fill-column 99)
+    (setq-default indent-tabs-mode nil)  ; indent with Spaces not Tabs
+    (setq-default tab-width 4)  ; count out columns of C-x TAB S-LEFT/S-RIGHT
+
     (when (fboundp 'global-superword-mode) (global-superword-mode 't))  ; accelerate M-f M-b
 
+    ;
     ;; Define new keys
+    ;; (as dry run by M-x execute-extended-command, M-: eval-expression)
 
     (global-set-key (kbd "C-c %") 'query-replace-regexp)  ; for when C-M-% unavailable
     (global-set-key (kbd "C-c -") 'undo)  ; for when C-- alias of C-_ unavailable
@@ -835,7 +840,8 @@ FILES_CHARS = r"""
     (global-set-key (kbd "C-c s") 'superword-mode)  ; toggle accelerate of M-f M-b
     (global-set-key (kbd "C-c w") 'whitespace-cleanup)
 
-    ;; Abbreviate M-h C-u 1 M-| = Mark-Paragraph Universal-Argument Shell-Command-On-Region
+    ;
+    ;; Def C-c | = M-h C-u 1 M-| = Mark-Paragraph Universal-Argument Shell-Command-On-Region
 
     (global-set-key (kbd "C-c |") 'like-shell-command-on-region)
     (defun like-shell-command-on-region ()
@@ -845,6 +851,15 @@ FILES_CHARS = r"""
             "Shell command on region: " nil nil nil (quote shell-command-history)))
         (shell-command-on-region (region-beginning) (region-end) string nil 'replace)
         )
+
+    ;
+    ;; Turn off enough of macOS to run Emacs
+
+    ; macOS Terminal > Preferences > Profile > Use Option as Meta Key
+    ; ; or press Esc in place of Meta
+
+    ; macOS System Preferences > Keyboard > Input Sources > Shortcuts > Previous Source
+    ; ; or press ⌃⇧2 to reach C-@ to mean C-SPC 'set-mark-command
 
 
     #
@@ -983,7 +998,7 @@ FILES_CHARS = r"""
     #
     # vim  0 ^ $ fx h l tx Fx Tx | ; ,  => move column
     # vim  b e w B E W ( ) { }  => move small word, large word, sentence, paragraph
-    # vim  j k G 1G !G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => move row
+    # vim  j k G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => move row, goto line
     # vim  %  => move match balance pair
     #
     # vim  dx dd x D X p yx yy P Y J  => cut, copy, paste, join
@@ -1001,7 +1016,7 @@ FILES_CHARS = r"""
     # vim  qqq @q  => record, replay
     # vim  ⌃V I X Y P  => vertical: insert, delete, copy, paste
     # vim  >x <x  => dent/dedent
-    # vim  !x  => pipe bash
+    # vim  !x  => pipe bash, such as {}!G or 1G!G
     #
     # vim  zb zt zz ⌃B ⌃D ⌃E ⌃F ⌃U ⌃Y  => scroll rows
     # vim  ⌃Wo ⌃WW ⌃Ww ⌃]  => close others, previous, next, goto link
@@ -1039,9 +1054,15 @@ FILES_CHARS = r"""
 
     " ~/.vimrc
 
+    "
+    " Lay out Spaces and Tabs
+
     :set softtabstop=4 shiftwidth=4 expandtab
     autocmd FileType c,cpp   set softtabstop=8 shiftwidth=8 expandtab
     autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
+
+    "
+    " Configure Vim
 
     :syntax on
 
@@ -1050,26 +1071,33 @@ FILES_CHARS = r"""
     " :set number
 
     :set hlsearch
-    " :set hlsearch  " highlight all hits of search
-    " /$$  " turn the highlights off by failing a search
-    " :noh  " turn the highlights off by command
-    " :nnoremap <esc><esc> :noh<return>  " nope, fails tests of multiple Esc
 
     :highlight RedLight ctermbg=red
     :call matchadd('RedLight', '\s\+$')
 
-    :nnoremap <Bslash>m :set mouse=a<return> " mouse moves cursor
-    :nnoremap <Bslash>M :set mouse=<return>  " mouse selects chars to copy-paste
+    :set ruler  " not inferred from :set ttyfast at Mac
+    :set showcmd  " not inferred from :set ttyfast at Linux or Mac
 
+    "
+    " Add keys (without redefining keys)
+    " n-nore-map = map Normal (non insert) Mode and don't recurse through other remaps
+
+    " \ Esc => cancel the :set hlsearch highlighting of all search hits on screen
+    :nnoremap <Bslash><esc> :noh<return>
+
+    " \ m => mouse moves cursor
+    " \ M => mouse selects zigzags of chars to copy-paste
+    :nnoremap <Bslash>m :set mouse=a<return>
+    :nnoremap <Bslash>M :set mouse=<return>
+
+    " \ w => delete the trailing whitespace from each line (not yet from file)
     :nnoremap <Bslash>w :call RStripEachLine()<return>
-    " n-no-remap = remap in the normal (not-insert) mode except don't recurse thru other remaps
     function! RStripEachLine()
         let with_line = line(".")
         let with_col = col(".")
         %s/\s\+$//e
         call cursor(with_line, with_col)
     endfun
-    " RStripEachLine = delete the trailing whitespace from each line (not from file)
 
 
     #

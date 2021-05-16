@@ -20,7 +20,7 @@ alias -- ':::'="(echo '⋮' |tee >(pbcopy))"
 
 
 function -rehab-bluetooth () {
-    : : help the next macOS boot find your Bluetooth widgets
+    : :: help the next macOS boot find your Bluetooth widgets
     find ~/Library/Preferences -iname '*bluetooth*'
     ls -l $(find ~/Library/Preferences -iname '*bluetooth*')
     rm -i $(find ~/Library/Preferences -iname '*bluetooth*')
@@ -40,7 +40,7 @@ if dircolors >/dev/null 2>&1; then
 fi
 
 function unix-filename-rubout () {
-    : : approximately undo Tab-Completion
+    : :: approximately undo Tab-Completion
     local WORDCHARS="*?_[]~=&;\!#$%^(){}<>.-"
     zle backward-kill-word
 }
@@ -48,7 +48,7 @@ zle -N unix-filename-rubout unix-filename-rubout  &&: # create new keymap
 bindkey "^W" unix-filename-rubout  # define Control+W to nearly undo Tab-Completion
 
 function ps1 () {
-    : : toggle the prompt off and on
+    : :: toggle the prompt off and on
     if [ "$PS1" != '%# ' ]; then
         export PS1='%# '  # no hostname, no pwd, etc etc
     else
@@ -89,7 +89,7 @@ unsetopt INC_APPEND_HISTORY  &&: # make room for INC_APPEND_HISTORY_TIME  # unne
 setopt INC_APPEND_HISTORY_TIME  &&: # feed well into  history -t '%Y-%m-%d %H:%M:%S'
 setopt SHARE_HISTORY  &&: # reload fresh history after each INC_APPEND
 
-alias -- --history="history -t '%b %d %H:%M:%S' 0"  &&:
+alias -- -h="history -t '%b %d %H:%M:%S' 0"  &&:
 # a la Bash HISTTIMEFORMAT='%b %d %H:%M:%S  ' history
 
 _HISTORY_1_="history -t '%b %d %H:%M:%S' -1"
@@ -110,28 +110,29 @@ fi
 
 
 function --dotfiles-dir () {
-    : : say where to push out the dotfiles
+    : :: say where to push out the dotfiles
     dotfiles=$(dirname $(dirname $(which zsh.py)))/dotfiles
     dotfiles=$(cd $dotfiles && dirs -p|head -1)
     echo $dotfiles
 }
 
 function --dotfiles-find () {
-    : : name the files to push out, and do not name the files to hide
+    : :: name the files to push out, and do not name the files to hide
 
     echo .bash_profile
     echo .bashrc
     echo .emacs
-    echo .vimrc
+    echo .pipe.hits
     echo .python.py
+    echo .vimrc
     echo .zprofile
     echo .zshrc
 
-    : : # echo .zprofile-zsecrets
+    : :: # echo .zprofile-zsecrets
 }
 
 function --dotfiles-backup () {
-    : : back up the dot files - take mine, lose theirs
+    : :: back up the dot files - take mine, lose theirs
     dotfiles=$(--dotfiles-dir)
     for F in $(--dotfiles-find); do
         --exec-echo-xe "cp -p ~/$F $dotfiles/dot$F"
@@ -140,7 +141,7 @@ function --dotfiles-backup () {
 }
 
 function --dotfiles-restore () {
-    : : restore the dot files  - take theirs, lose mine
+    : :: restore the dot files  - take theirs, lose mine
     dotfiles=$(--dotfiles-dir)
     for F in $(--dotfiles-find); do
         --exec-echo-xe "echo cp -p $dotfiles/dot$F ~/$F"
@@ -154,28 +155,58 @@ function --dotfiles-restore () {
 #
 
 
-function --pbpipe () { pbpaste |"$@" |tee >(pbcopy); }
-alias ::='--pbpipe '  &&: # trailing space so its first arg can be an alias in Bash
+alias -- '-'="--source-lucky-search-hit --search-hits 'cd -'"
+alias -- '--'="--search-hits 'cd -'"
 
-function --source-one-search-hit () {
-    : : trace and source a single hit as input, else trace the hits found
+function , () {
+    : :: capture os copy-paste buffer, and pipe it out
+    echo '+ pbpaste |tee ~/.pbpaste.history' >&2
+    pbpaste |tee ~/.pbpaste.history | \
+        --source-lucky-search-hit --search-hits 'cat -' "$@"
+}
+
+function ,, () {
+    : :: apply filter inside the os copy-paste buffer, and capture result
+
+    echo '+ pbpaste |tee ~/.pbpaste.history' >&2
+    pbpaste |tee ~/.pbpaste.history | \
+        --source-lucky-search-hit --search-hits 'cat -' "$@" >~/.pbcopy.history
+    local xs=$?
+    if [ $xs = 0 ]; then
+        echo '+ tee ~/.pbcopy.history |pbcopy' >&2
+        cat ~/.pbcopy.history |pbcopy
+        xs=$?
+    fi
+    return $xs
+}
+
+function --source-lucky-search-hit () {
+    : :: trace and source a strong hit as input, else trace the weak hits
+
+    : search
 
     local sourceable=$(mktemp)
     "$@" >"$sourceable"
-
     local xs=$?
+
+    : quit now if search failed
+
     if [ $xs != 0 ]; then
         cat "$sourceable" >&2
     else
+
+        : forward usage with zeroed exit status, if usage
+
         local usage=''
         cat "$sourceable" |head -1 |grep '^usage: ' |read usage
         if [ "$usage" ]; then
             cat "$sourceable" >&2
         else
 
+            : forward strong hit as input
+
             cat "$sourceable" |sed 's,^,+ ,' >&2
             source "$sourceable"
-            xs=$?
 
         fi
     fi
@@ -184,34 +215,33 @@ function --source-one-search-hit () {
     return $xs
 }
 
-function --search-histories () {
-    : : search the curated input histories saved at '~/.histories*'
+function --search-hits () {
+    : :: search the curated input hits saved at '~/.*.hits'
 
-    : : find just the one line 'cd -' when given no args
+    : find first arg when given no search key
 
-    if [ $# = 0 ]; then
-        echo 'cd -'
+    if [ $# = 1 ]; then
+        echo "$1"
         return
     fi
 
-    : : exit nonzero when multiple hits found, and when zero hits found
+    shift
+
+    : exit nonzero when multiple hits found, or zero hits found
 
     local hits=$(mktemp)
-    cat /dev/null ~/.histories* |grep "$@" >"$hits"
+    cat /dev/null ~/.*.hits |grep "$@" >"$hits"
     local wcl=$(($(cat "$hits" |wc -l)))
     if [ "$wcl" != "1" ]; then
-        echo "$wcl hits found by:  grep $@ ~/.histories*" >&2
+        echo "$wcl hits found by:  grep $@ ~/.*.hits" >&2
         cat "$hits" >&2
         return 1
     fi
 
-    : : print to stdout and exit zero when one hit found
+    : forward to stdout and exit zero when exactly one hit found
 
     cat "$hits"
 }
-
-alias -- '-'='--source-one-search-hit --search-histories'
-alias -- '--'='--search-histories'
 
 
 #
@@ -225,26 +255,26 @@ alias -- '..'='cd .. && (dirs -p |head -1)'
 alias -- '?'="echo -n '? '>/dev/tty && cat -"  # press ⌃D for Yes, ⌃C for No
 
 function --jqd () {
-    : : guess the initials of the person at the keyboard
+    : :: guess the initials of the person at the keyboard
     echo 'jqd'  # J Q Doe
 }  # redefined by ~/.zprofile-zsecrets
 
 function --like-cp () {
-    : : back up to date-author-time stamp
+    : :: back up to date-author-time stamp
     local F="$1"
     local JQD=$(--jqd)
     (set -xe; cp -ipR "$F" "$F~$(date +%m%d$JQD%H%M%S)~")
 }
 
 function --like-do () {
-    : : add date-author-time stamp as the last arg
+    : :: add date-author-time stamp as the last arg
     local F="$1"
     local JQD=$(--jqd)
     (set -xe; "$@" "$F~$(date +%m%d$JQD%H%M%S)~")
 }
 
 function --like-mv () {
-    : : back up to date-author-time stamp and remove
+    : :: back up to date-author-time stamp and remove
     local F="$1"
     local JQD=$(--jqd)
     (set -xe; mv -i "$F" "$F~$(date +%m%d$JQD%H%M%S)~")
@@ -270,7 +300,7 @@ alias -- -mv=--like-mv
 
 
 function --exec-echo-xe () {
-    : : unquote and execute the args, but unquote and trace them first
+    : :: unquote and execute the args, but unquote and trace them first
     echo "+ $@" >&2
     source <(echo "$@")
 }
@@ -298,7 +328,7 @@ function --exec-gcd-xe () {
 }
 
 function --like-git-status () {
-    : : Git Status for huge Git Repos - as in hulking, large, and slow
+    : :: Git Status for huge Git Repos - as in hulking, large, and slow
     (set -xe; git status -u no "$@" && git status && git status --short --ignored "$@")
 }
 
@@ -349,7 +379,7 @@ alias -- -glqv0='--exec-echo-xe git log --no-decorate --oneline'
 
 
 #
-# Work with Python
+# Work with Emacs, Python, Vim, and such
 #
 
 
@@ -411,7 +441,7 @@ alias -- 'M'=vim  # such as git status:  M dotfiles/dot.zprofile
 
 alias -- '+++'=--feed-back-git-diff-plus
 function --feed-back-git-diff-plus () {
-    : : edit a file mentioned as changed in the style of Git Diff
+    : :: edit a file mentioned as changed in the style of Git Diff
     local filename="$(echo $1 |cut -d/ -f2-)"
     shift
     (set -xe; vim $filename $@)

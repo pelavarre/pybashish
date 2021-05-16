@@ -21,7 +21,7 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 #
 # vim  0 ^ $ fx h l tx Fx Tx | ; ,  => move column
 # vim  b e w B E W ( ) { }  => move small word, large word, sentence, paragraph
-# vim  j k G 1G !G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => move row
+# vim  j k G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => move row, goto line
 # vim  %  => move match balance pair
 #
 # vim  dx dd x D X p yx yy P Y J  => cut, copy, paste, join
@@ -39,7 +39,7 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 # vim  qqq @q  => record, replay
 # vim  ⌃V I X Y P  => vertical: insert, delete, copy, paste
 # vim  >x <x  => dent/dedent
-# vim  !x  => pipe bash
+# vim  !x  => pipe bash, such as {}!G or 1G!G
 #
 # vim  zb zt zz ⌃B ⌃D ⌃E ⌃F ⌃U ⌃Y  => scroll rows
 # vim  ⌃Wo ⌃WW ⌃Ww ⌃]  => close others, previous, next, goto link
