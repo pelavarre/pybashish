@@ -5,6 +5,8 @@ Come here to patch the unlicensed Python source code inside Bash
 Take these source files and fork them, to meet your own need today, as you decline to
 settle for the points-of-view that Bash shoves on you, leftover from last century
 
+Four steps
+
 1 )
 
 Try this out:

@@ -770,9 +770,7 @@ FILES_CHARS = r"""
     #
 
     emacs --version
-
     emacs -nw --no-splash  # free-text glass-terminal
-
     emacs -nw ~/.emacs
 
     #
@@ -803,16 +801,14 @@ FILES_CHARS = r"""
     #
     # emacs  ⌃Xc ⌥~  => quit emacs, without saving
     #
-    # emacs  ⌃Hk... ⌃Ha...  => help with key chord sequence, help with word
+    # emacs  ⌃Hk... ⌃Hkb ⌃Ha...   => help for key chord sequence, for all keys, for word
+    # emacs  ⌥X ⌥:  => execute-extended-command, eval-expression  => dry run ~/.emacs
     #
     # emacs  ⌃Z  => as per terminal or no-op
     #
     # emacs  ⌃] ⌃\  => obscure
     # emacs  ⌃Ca-z  => custom
-    #
-
-    #
-    # emacs ⌥X describe-bindings Return  => help with lots of key chord sequences
+    # emacs  ⌃C⌃C...  => custom
     #
 
 

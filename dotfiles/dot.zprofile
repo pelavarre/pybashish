@@ -121,6 +121,8 @@ function --dotfiles-find () {
 
     echo .bash_profile
     echo .bashrc
+    echo .emacs
+    echo .vimrc
     echo .python.py
     echo .zprofile
     echo .zshrc
@@ -329,7 +331,8 @@ alias -- -grl='--exec-echo-xe git reflog'
 alias -- -grv='--exec-echo-xe git remote -vvv'
 
 alias -- -gcaa='--exec-echo-xe git commit --all --amend'
-alias -- -gcaf='--exec-echo-xegit commit --all --fixup'
+alias -- -gcaf='--exec-echo-xe git commit --all --fixup'
+alias -- -gcam='--exec-echo-xe git commit --all -m WIP-$(basename $(pwd))'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
 alias -- -glq0='--exec-echo-xe git log --decorate --oneline'
 alias -- -glqv='--exec-echo-xe git log --decorate --oneline -9'
@@ -349,6 +352,9 @@ alias -- -glqv0='--exec-echo-xe git log --no-decorate --oneline'
 # Work with Python
 #
 
+
+alias -- -e='emacs -nw --no-splash'
+alias -- -v='vim'
 
 alias -- -p='( set -xe; python3 -i ~/.python.py )'
 alias -- -p3="( set -xe; python3 -i ~/.python.py 'print(sys.version.split()[0])' )"
