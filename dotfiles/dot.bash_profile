@@ -284,20 +284,12 @@ function --exec-echo-xe-maybe () {
 #
 
 
-function --exec-gcd-xe () {
-    --exec-echo-xe 'cd $(git rev-parse --show-toplevel) && cd ./'$@' && dirs -p |head -1'
-}
-
-function --like-git-status () {
-    : :: Git Status for huge Git Repos - as in hulking, large, and slow
-    (set -xe; git status -u no "$@" && git status && git status --short --ignored "$@")
-}
-
-alias -- -g=--like-git-status
+alias -- -g=--git
 
 alias -- -ga='--exec-echo-xe git add'
 alias -- -gb='--exec-echo-xe git branch'
 alias -- -gc='pwd && --exec-echo-xe-maybe git clean -ffxdq'
+alias -- -gcs='pwd && --exec-echo-xe-maybe sudo git clean -ffxdq'
 alias -- -gf='--exec-echo-xe git fetch'
 alias -- -gd='--exec-echo-xe git diff'
 alias -- -gg='--exec-echo-xe git grep'
@@ -307,8 +299,9 @@ alias -- -gs='--exec-echo-xe git show'
 
 alias -- -gbq='--exec-echo-xe "git branch |grep '\''[*]'\''"'
 alias -- -gca='--exec-echo-xe git commit --amend'
-alias -- -gcd=--exec-gcd-xe
+alias -- -gcd=--git-chdir
 alias -- -gco='--exec-echo-xe git checkout'  # especially:  gco -
+alias -- -gcp='--exec-echo-xe git cherry-pick'
 alias -- -gdh='--exec-echo-xe git diff HEAD~1'
 alias -- -gfr='--exec-echo-xe "(set -xe; git fetch && git rebase)"'
 alias -- -ggl='--exec-echo-xe git grep -l'  # --files-with-matches
@@ -317,7 +310,7 @@ alias -- -glf='--exec-echo-xe git ls-files'
 alias -- -glg='--exec-echo-xe git log --no-decorate --oneline --grep'
 alias -- -glq='--exec-echo-xe git log --no-decorate --oneline -9'
 alias -- -grh='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard'
-alias -- -gri='--exec-echo-xe git rebase -i --autosquash HEAD~9'
+alias -- -gri=--git-rebase-interactive
 alias -- -grl='--exec-echo-xe git reflog'
 alias -- -grv='--exec-echo-xe git remote -vvv'
 
@@ -325,11 +318,13 @@ alias -- -gcaa='--exec-echo-xe git commit --all --amend'
 alias -- -gcaf='--exec-echo-xe git commit --all --fixup'
 alias -- -gcam='--exec-echo-xe git commit --all -m WIP-$(basename $(pwd))'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
-alias -- -glq0='--exec-echo-xe git log --decorate --oneline'
+alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
 alias -- -glqv='--exec-echo-xe git log --decorate --oneline -9'
 alias -- -grhu='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard @{upstream}'
 alias -- -gsno="--exec-echo-xe git show --name-only --pretty=''"
+alias -- -gssi='--exec-echo-xe git status --short --ignored'
 alias -- -gssn='--exec-echo-xe git shortlog --summary --numbered'
+alias -- -gsun='--exec-echo-xe git status --untracked-files=no'
 
 alias -- -gcafh='--exec-echo-xe git commit --all --fixup HEAD'
 alias -- -gdno1='--exec-echo-xe git diff --name-only HEAD~1'
@@ -337,6 +332,36 @@ alias -- -glqv0='--exec-echo-xe git log --no-decorate --oneline'
 
 # TODO: git log -G regex file.ext # grep the changes
 # TODO: git log -S regex file.ext # grep the changes for an odd number (PickAxe)
+# TODO: --pretty=format:'%h %aE %s'  |cat - <(echo) |sed "s,@$DOMAIN,,"
+
+
+function --git-chdir () {
+    --exec-echo-xe 'cd $(git rev-parse --show-toplevel) && cd ./'$@' && dirs -p |head -1'
+}
+
+function --git-clean-sudo () {
+    --exec-echo-xe-maybe sudo git clean -ffxdq "$@"
+}
+
+function --git-rebase-interactive () {
+    if [ $# = 0 ]; then
+        --git-rebase-interactive 9
+    else
+        --exec-echo-xe git rebase -i --autosquash "HEAD~$@"
+    fi
+}
+
+function --git () {
+    : :: Git Status for huge Git Repos - as in hulking, large, and slow
+    echo + >&2
+    if --exec-echo-xe git status --untracked-files=no "$@"; then
+        echo + >&2
+        if --exec-echo-xe git status "$@"; then
+            echo + >&2
+            --exec-echo-xe git status --short --ignored "$@"
+        fi
+    fi
+}
 
 
 #
@@ -344,8 +369,8 @@ alias -- -glqv0='--exec-echo-xe git log --no-decorate --oneline'
 #
 
 
-alias -- -e='emacs -nw --no-splash'
-alias -- -v='vim'
+alias -- -e='--exec-echo-xe emacs -nw --no-splash'
+alias -- -v='--exec-echo-xe vim'
 
 alias -- -p='( set -xe; python3 -i ~/.python.py )'
 alias -- -p3="( set -xe; python3 -i ~/.python.py 'print(sys.version.split()[0])' )"
