@@ -9,7 +9,7 @@
 (when (fboundp 'global-superword-mode) (global-superword-mode 't))  ; accelerate M-f M-b
 
 
-;; Define new keys
+;; Add keys (without redefining keys)
 ;; (as dry run by M-x execute-extended-command, M-: eval-expression)
 
 (global-set-key (kbd "C-c %") 'query-replace-regexp)  ; for when C-M-% unavailable

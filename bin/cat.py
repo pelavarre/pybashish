@@ -90,12 +90,22 @@ def cat_incoming(fd, args):
 
     while True:
 
+        # Rep each byte
+
         length = 1
-        if fd_byte:
-            fd_byte = os.read(fd, length)
+        fd_byte = os.read(fd, length)
 
         rep = cat_repr_byte(fd_byte, args)
         line_bytes += rep
+
+        # Close the last line, if showing ends and last line open
+
+        if args.show_ends:
+            if line_bytes:
+                if not fd_byte:
+                    line_bytes += b"\n"
+
+        # Write the line and open new line, if line
 
         if line_bytes:
 
@@ -108,6 +118,8 @@ def cat_incoming(fd, args):
 
                 line_index += 1
                 line_bytes = b""
+
+        # Quit after the last byte
 
         if not fd_byte:
 
