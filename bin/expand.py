@@ -56,6 +56,8 @@ examples:
 
 # FIXME: add option for loosening search expressions, e.g., "/bin/bash" -> r".bin.bash"
 
+# FIXME: add --frame=vi to indent 4 columns, insert 3 rows above, 2 rows below
+
 
 import collections
 import contextlib

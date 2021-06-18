@@ -1,4 +1,4 @@
-# ~/.pipe.histories
+# ~/.pipe.luck
 
 
 awk '{print $NF}'  # hexdump

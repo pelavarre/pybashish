@@ -18,6 +18,8 @@ examples:
   touch  # creates "touch~1~", then "touch~2~", etc
 """
 
+# TODO: layer over:  os.utime
+
 import os
 import sys
 

@@ -29,6 +29,7 @@ examples:
 
 from __future__ import print_function
 
+import getpass
 import os
 import platform
 import shlex
@@ -426,11 +427,8 @@ def calc_ps1():
 
     # But first calculate a long prompt
 
-    ran = subprocess.run(shlex.split("id -un"), stdout=subprocess.PIPE)
-    user = ran.stdout.decode().rstrip()
+    user = getpass.getuser()  # a la Bash:  id -un
     calc_ps1.user = user
-
-    user = calc_ps1.user
 
     hostname = platform.node()
     #

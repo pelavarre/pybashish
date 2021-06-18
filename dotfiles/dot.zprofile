@@ -4,6 +4,7 @@ _DOT_ZPROFILE_=~/.zprofile  # don't export, to say if this file has been sourced
 
 date
 
+# TODO: contrast with Ubuntu ~/.bash_aliases
 
 
 #
@@ -11,7 +12,7 @@ date
 #
 
 
-alias -- '::'="(echo '⋮' |tee >(pbcopy))"
+alias -- '::'="(echo '⌃ ⌥ ⇧ ⌘ ⎋ ⇥ ⋮' |tee >(pbcopy))"
 
 
 #
@@ -33,10 +34,10 @@ function --rehab-bluetooth () {
 #
 
 
-stty -ixon  &&: # define Control+S to undo Control+R, not XOFF
+stty -ixon  && : 'define Control+S to undo Control+R, not XOFF'
 
 if dircolors >/dev/null 2>&1; then
-    eval $(dircolors <(dircolors -p |sed 's,1;,0;,g'))  &&: # no bold for light mode
+    eval $(dircolors <(dircolors -p |sed 's,1;,0;,g'))  && : 'no bold for light mode'
 fi
 
 function unix-filename-rubout () {
@@ -44,7 +45,7 @@ function unix-filename-rubout () {
     local WORDCHARS="*?_[]~=&;\!#$%^(){}<>.-"
     zle backward-kill-word
 }
-zle -N unix-filename-rubout unix-filename-rubout  &&: # create new keymap
+zle -N unix-filename-rubout unix-filename-rubout  && : 'create new keymap'
 bindkey "^W" unix-filename-rubout  # define Control+W to nearly undo Tab-Completion
 
 function ps1 () {
@@ -62,13 +63,13 @@ function ps1 () {
 #
 
 
-setopt PRINT_EXIT_VALUE  &&: # stop silencing nonzero exit status
+setopt PRINT_EXIT_VALUE  && : 'stop silencing nonzero exit status'
 
-autoload -U edit-command-line  &&: # from ".oh-my-zsh/", else "No such shell function"
-zle -N edit-command-line  &&: # create new keymap
-bindkey '\C-x\C-e' edit-command-line  &&: # define ⌃X⌃E
+autoload -U edit-command-line  && : 'from ".oh-my-zsh/", else "No such shell function"'
+zle -N edit-command-line  && : 'create new keymap'
+bindkey '\C-x\C-e' edit-command-line  && : 'define ⌃X⌃E'
 
-setopt AUTO_CD  &&: # lacks Tab-completion, emulates Bash shopt -s autocd 2>/dev/null
+setopt AUTO_CD  && : 'lacks Tab-completion, emulates Bash shopt -s autocd 2>/dev/null'
 
 # setopt INTERACTIVE_COMMENTS  # Zsh forwards #... as arg when not interactive
 
@@ -84,12 +85,12 @@ if [ ! "${HISTFILE+True}" ]; then  # emulate macOS Catalina, if HISTFILE unset
     SAVEHIST=1000
 fi
 
-setopt EXTENDED_HISTORY  &&: # keep history over lotsa shells
-unsetopt INC_APPEND_HISTORY  &&: # make room for INC_APPEND_HISTORY_TIME  # unneeded?
-setopt INC_APPEND_HISTORY_TIME  &&: # feed well into  history -t '%Y-%m-%d %H:%M:%S'
-setopt SHARE_HISTORY  &&: # reload fresh history after each INC_APPEND
+setopt EXTENDED_HISTORY  && : 'keep history over lotsa shells'
+unsetopt INC_APPEND_HISTORY  && : 'make room for INC_APPEND_HISTORY_TIME  # unneeded?'
+setopt INC_APPEND_HISTORY_TIME  && : "feed well into  history -t '%Y-%m-%d %H:%M:%S'"
+setopt SHARE_HISTORY  && : 'reload fresh history after each INC_APPEND'
 
-alias -- -h="history -t '%b %d %H:%M:%S' 0"  &&: # look back at Zsh or Bash
+alias -- -h="history -t '%b %d %H:%M:%S' 0"  && : 'look back at Zsh or Bash'
 alias -- --history="history -t '%b %d %H:%M:%S' 0"
 # a la Bash HISTTIMEFORMAT='%b %d %H:%M:%S  ' history
 
@@ -152,16 +153,37 @@ function --dotfiles-restore () {
 
 
 #
-# Work with input and output history
+# Abbreviate pipes
 #
 
+function a () {
+    local shline=$(--awk $@)
+    echo "+ $shline" >&2
+    eval $shline
+}
 
-alias -- ','="--take-pbpipe-from --search-dotluck 'expand.py'"
-alias -- ',,'="--pbpaste-dotluck 'cat.py -entv'"
-alias -- '-'="--take-input-from --search-dotluck 'cd -'"
-alias -- '--'="--search-dotluck 'cd -'"
-alias -- '@'="--pbpipe 'expand.py'"
-alias -- '@@'="--pbpaste 'cat.py -entv'"
+function --awk () {
+    if [ $# = 0 ]; then
+        echo "awk '{print \$NF}'"
+    elif [[ "$1" =~ ^[A-Za-z0-9_]+$ ]]; then
+        echo "awk '{print \$$1}'"
+    elif [ $# = 1 ]; then
+        echo "awk -F'$1' '{print \$NF}'"
+    elif [[ "$2" =~ ^[A-Za-z0-9_]+$ ]]; then
+        echo "awk -F'$1' '{print \$$2}'"
+    else
+        local sep="$1"
+        shift
+        echo "awk -F'$sep' '{print $@}'"
+    fi
+}
+
+function --cd () {
+    if [ $# != 0 ]; then
+        cd "$@"
+    fi
+    echo "+ cd $(dirs -p |head -1)/"
+}
 
 function g () {
     --grep "$@"
@@ -198,6 +220,23 @@ function --grepq () {
         eval "$pipe"
     fi
 }
+
+function --pwd () {
+    echo "+ cd $(dirs -p |head -1)/"
+}
+
+
+#
+# Work with input and output history
+#
+
+
+alias -- ','="--take-pbpipe-from --search-dotluck 'expand.py'"
+alias -- ',,'="--pbpaste-dotluck 'cat.py -entv'"
+alias -- '-'="--take-input-from --search-dotluck 'cd -'"
+alias -- '--'="--search-dotluck 'cd -'"
+alias -- '@'="--pbpipe 'expand.py'"
+alias -- '@@'="--pbpaste 'cat.py -entv'"
 
 function --pbpaste () {
     : :: 'capture and pipe out through tail args, else pipe out through head arg'
@@ -415,7 +454,7 @@ function --like-mv () {
     (set -xe; mv -i "$F" "$F~$(date +%m%d$JQD%H%M%S)~")
 }
 
-alias l='ls -CF'  &&: # define "l", "la", and "ll" by Linux conventions
+alias l='ls -CF'  && : 'define "l", "la", and "ll" by Linux conventions'
 alias la='ls -A'
 alias ll='ls -alF'
 
@@ -431,7 +470,6 @@ alias -- -mv=--like-mv
 #
 # Expand shorthand, but trace most of it and confirm some of it in advance
 #
-
 
 
 function --exec-echo-xe () {
@@ -483,10 +521,14 @@ alias -- -gl1='--exec-echo-xe git log --decorate -1'
 alias -- -glf=--git-ls-files
 alias -- -glg='--exec-echo-xe git log --no-decorate --oneline --grep'
 alias -- -glq='--exec-echo-xe git log --no-decorate --oneline -9'
+alias -- -gls='--exec-echo-xe git log --stat'
 alias -- -grh='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard'
 alias -- -gri=--git-rebase-interactive
 alias -- -grl='--exec-echo-xe git reflog'
 alias -- -grv='--exec-echo-xe git remote -vvv'
+alias -- -gs1='--git-show-conflict :1'
+alias -- -gs2='--git-show-conflict :2'
+alias -- -gs3='--git-show-conflict :3'
 
 alias -- -gcaa='--exec-echo-xe git commit --all --amend'
 alias -- -gcaf=--git-commit-all-fixup
@@ -501,18 +543,48 @@ alias -- -gssn='--exec-echo-xe git shortlog --summary --numbered'
 alias -- -gsun='--exec-echo-xe git status --untracked-files=no'
 
 alias -- -gdno1='--exec-echo-xe git diff --name-only HEAD~1'
-alias -- -glqv0='--exec-echo-xe git log --no-decorate --oneline'
+alias -- -glqv0='--exec-echo-xe git log --decorate --oneline'
+alias -- -gpfwl='dirs -p |head -1 && --exec-echo-xe-maybe git push --force-with-lease'
 
+
+# TODO: solve -gg -ggl etc with quoted args
+# TODO: give us -gg as -i and -ggi as not -i
 # TODO: git log -G regex file.ext # grep the changes
 # TODO: git log -S regex file.ext # grep the changes for an odd number (PickAxe)
 # TODO: --pretty=format:'%h %aE %s'  |cat - <(echo) |sed "s,@$DOMAIN,,"
+# TODO: git blame/log --abbrev
 
+
+function --git () {
+    : :: 'Git Status for huge Git Repos - as in hulking, large, and slow'
+
+    echo + >&2
+    if --exec-echo-xe git status --untracked-files=no "$@"; then
+
+        echo + >&2
+        if --exec-echo-xe git status "$@"; then
+
+            if [ $# = 0 ]; then
+                echo + >&2
+                echo '+ git status --short --ignored |...' >&2
+                git status --short --ignored |awk '{print $1}' |sort |uniq -c| expand
+            else
+                echo + >&2
+                --exec-echo-xe git status --short --ignored "$@"
+                : # available as:  --git --
+            fi
+
+        fi
+    fi
+}
 
 function --git-chdir () {
+    : :: 'ChDir to root of Git Clone'
     --exec-echo-xe 'cd $(git rev-parse --show-toplevel) && cd ./'$@' && dirs -p |head -1'
 }
 
 function --git-commit-all-fixup () {
+    : :: 'Commit fixup to Head, else to some Commit'
     if [ $# = 0 ]; then
         --exec-echo-xe git commit --all --fixup HEAD
     else
@@ -521,6 +593,7 @@ function --git-commit-all-fixup () {
 }
 
 function --git-diff-head () {
+    : :: 'Commit Diff since before Head, else since some Commit'
     if [ $# = 0 ]; then
         --exec-echo-xe git diff HEAD~1
     else
@@ -529,6 +602,7 @@ function --git-diff-head () {
 }
 
 function --git-ls-files () {
+    : :: 'Find tracked files at and beneath root of Git Clone, else below some Dir'
     if [ $# = 0 ]; then
         local abs=$(git rev-parse --show-toplevel)
         local rel=$(python3 -c "import os; print(os.path.relpath('$abs'))")
@@ -539,22 +613,23 @@ function --git-ls-files () {
 }
 
 function --git-rebase-interactive () {
+    : :: 'Rebase Interactive with Auto Squash of the last 9, else of the last N'
     if [ $# = 0 ]; then
-        --git-rebase-interactive 9
+        --exec-echo-xe git rebase -i --autosquash HEAD~$9
     else
         --exec-echo-xe git rebase -i --autosquash "HEAD~$@"
     fi
 }
 
-function --git () {
-    : :: 'Git Status for huge Git Repos - as in hulking, large, and slow'
-    echo + >&2
-    if --exec-echo-xe git status --untracked-files=no "$@"; then
-        echo + >&2
-        if --exec-echo-xe git status "$@"; then
-            echo + >&2
-            --exec-echo-xe git status --short --ignored "$@"
-        fi
+function --git-show-conflict () {
+    : :: 'Exit loud & nonzero, else Show Conflict Base, else Show choice of Conflict'
+    if [ $# = 1 ]; then
+        --exec-echo-xe git show ":1:$1"
+    elif [ $# = 2 ]; then
+        --exec-echo-xe git show ":$1:$2"
+    else
+        echo 'usage: -gs 1|2|3 FILENAME |less  # base | theirs | ours'
+        return 2
     fi
 }
 
@@ -620,13 +695,20 @@ done
 alias -- 'A'=vim  # such as git status:  A  dotfiles/dot.zprofile
 alias -- 'M'=vim  # such as git status:  M dotfiles/dot.zprofile
 
-alias -- '+++'=--feed-back-git-diff-plus
-function --feed-back-git-diff-plus () {
-    : :: 'edit a file mentioned as changed in the style of Git Diff'
+alias -- both=--edit-shifted
+function --edit-shifted () {
+    : :: 'edit a file mentioned as Conflicted in the style of Git Status'
+    shift
+    (set -xe; vim $@)
+}  # such as:  both modified:   dotfiles/dot.zprofile
+
+alias -- '+++'=--edit-shifted-slash
+function --edit-shifted-slash () {
+    : :: 'edit a file mentioned as Changed in the style of Git Diff'
     local filename=$(echo $1 |cut -d/ -f2-)
     shift
     (set -xe; vim $filename $@)
-}  # such as:  +++ b/dotfiles/dot.zprofile +185
+}  # such as:  +++ b/dotfiles/dot.zprofile +711
 
 
 #

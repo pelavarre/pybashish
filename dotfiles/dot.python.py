@@ -10,7 +10,10 @@ alias -- -p2="( set -xe; python2 -i ~/.python.py 'print(sys.version.split()[0])'
 
 import argparse
 import datetime as dt
+import math
 import os
+import random
+import subprocess
 import sys
 
 try:
