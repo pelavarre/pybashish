@@ -29,6 +29,8 @@ examples:
 # FIXME: except mv.py from outside this dir should mean mv -i to this dir
 # FIXME: coordinate well across chmod.py cp.py mv.py rm.py touch.py ...
 
+# FIXME: spec & test the two arg case of 'overwrite ...? (y/n [n]) ' moving same file
+
 
 import sys
 

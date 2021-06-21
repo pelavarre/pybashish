@@ -31,6 +31,8 @@ examples:
 
 # FIXME: somehow define a way to default to "cp -ipR"
 
+# FIXME: spec & test the two arg case of cp: '...' and '...' are the same file
+
 
 import sys
 

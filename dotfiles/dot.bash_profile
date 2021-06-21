@@ -52,6 +52,30 @@ function ps1 () {
 
 
 #
+# Expand shorthand, but trace most of it and confirm some of it in advance
+#
+
+
+function --exec-echo-xe () {
+    : :: 'unquote and execute the args, but unquote and trace them first'
+    echo "+ $@" >&2
+    source <(echo "$@")
+}
+
+function --authorize () {
+    echo "$@" >&2
+    echo 'press ⌃D to execute, or ⌃C to quit' >&2
+    cat - >/dev/null
+    echo '⌃D'
+}
+
+function --exec-echo-xe-maybe () {
+    --authorize "did you mean:  $@"
+    --exec-echo-xe "$@"
+}
+
+
+#
 # Configure Bash (with "shopt" and so on)
 #
 
@@ -63,14 +87,17 @@ if shopt -p |grep autocd  >/dev/null; then shopt -s autocd; fi
 # Capture every input line (no drops a la Bash HISTCONTROL=ignorespace)
 #
 
-HISTTIMEFORMAT='%b %d %H:%M:%S  '
-
 _LOGME_='echo "$$ $(whoami)@$(hostname):$(pwd)$(history 1)" >>~/.bash_command.log'
 PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND ; }$_LOGME_"
 unset _LOGME_
 
-alias -- -h="history"  && : 'look back at Bash or Zsh'
-alias -- --history="history"
+alias -- -h=--history
+HISTTIMEFORMAT='%b %d %H:%M:%S  '
+function --history () {
+    --exec-echo-xe "history"  # a la Zsh:  history -t '%b %d %H:%M:%S' 0"
+}
+alias -- --more-history="--exec-echo-xe 'cat ~/.*command*log* |grep'"
+alias -- --null="--exec-echo-xe 'cat - >/dev/null'"
 
 
 #
@@ -435,30 +462,6 @@ alias -- -mv=--like-mv
 
 
 #
-# Expand shorthand, but trace most of it and confirm some of it in advance
-#
-
-
-function --exec-echo-xe () {
-    : :: 'unquote and execute the args, but unquote and trace them first'
-    echo "+ $@" >&2
-    source <(echo "$@")
-}
-
-function --authorize () {
-    echo "$@" >&2
-    echo 'press ⌃D to execute, or ⌃C to quit' >&2
-    cat - >/dev/null
-    echo '⌃D'
-}
-
-function --exec-echo-xe-maybe () {
-    --authorize "did you mean:  $@"
-    --exec-echo-xe "$@"
-}
-
-
-#
 # Work with Git
 #
 
@@ -467,8 +470,7 @@ alias -- -g=--git
 
 alias -- -ga='--exec-echo-xe git add'
 alias -- -gb='--exec-echo-xe git branch'
-alias -- -gc='pwd && --exec-echo-xe-maybe git clean -ffxdq'
-alias -- -gcs='pwd && --exec-echo-xe-maybe sudo git clean -ffxdq'
+alias -- -gc='--exec-echo-xe git commit'
 alias -- -gf='--exec-echo-xe git fetch'
 alias -- -gd='--exec-echo-xe git diff'
 alias -- -gg='--exec-echo-xe git grep'
@@ -479,6 +481,8 @@ alias -- -gs='--exec-echo-xe git show'
 alias -- -gbq='--exec-echo-xe "git branch |grep '\''[*]'\''"'
 alias -- -gca='--exec-echo-xe git commit --amend'
 alias -- -gcd=--git-chdir
+alias -- -gcf=--git-commit-fixup
+alias -- -gcl='pwd && --exec-echo-xe-maybe git clean -ffxdq'
 alias -- -gco='--exec-echo-xe git checkout'  # especially:  gco -
 alias -- -gcp='--exec-echo-xe git cherry-pick'
 alias -- -gdh=--git-diff-head
@@ -500,6 +504,7 @@ alias -- -gs3='--git-show-conflict :3'
 alias -- -gcaa='--exec-echo-xe git commit --all --amend'
 alias -- -gcaf=--git-commit-all-fixup
 alias -- -gcam='--exec-echo-xe git commit --all -m WIP-$(basename $(pwd))'
+alias -- -gcls='pwd && --exec-echo-xe-maybe sudo git clean -ffxdq'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
 alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
 alias -- -glqv='--exec-echo-xe git log --decorate --oneline -9'
@@ -514,8 +519,12 @@ alias -- -glqv0='--exec-echo-xe git log --decorate --oneline'
 alias -- -gpfwl='dirs -p |head -1 && --exec-echo-xe-maybe git push --force-with-lease'
 
 
+# TODO: solve dry run of -gco -  => git log --oneline --decorate -1 @{-1}
+# TODO: version test results by:  git describe --always --dirty
+
 # TODO: solve -gg -ggl etc with quoted args
 # TODO: give us -gg as -i and -ggi as not -i
+
 # TODO: git log -G regex file.ext # grep the changes
 # TODO: git log -S regex file.ext # grep the changes for an odd number (PickAxe)
 # TODO: --pretty=format:'%h %aE %s'  |cat - <(echo) |sed "s,@$DOMAIN,,"
@@ -551,11 +560,20 @@ function --git-chdir () {
 }
 
 function --git-commit-all-fixup () {
-    : :: 'Commit fixup to Head, else to some Commit'
+    : :: 'Add all tracked and commit fixup to Head, else to some Commit'
     if [ $# = 0 ]; then
         --exec-echo-xe git commit --all --fixup HEAD
     else
         --exec-echo-xe git commit --all --fixup "$@"
+    fi
+}
+
+function --git-commit-fixup () {
+    : :: 'Commit fixup to Head, else to some Commit'
+    if [ $# = 0 ]; then
+        --exec-echo-xe git commit --fixup HEAD
+    else
+        --exec-echo-xe git commit --fixup "$@"
     fi
 }
 
@@ -582,7 +600,7 @@ function --git-ls-files () {
 function --git-rebase-interactive () {
     : :: 'Rebase Interactive with Auto Squash of the last 9, else of the last N'
     if [ $# = 0 ]; then
-        --exec-echo-xe git rebase -i --autosquash HEAD~$9
+        --exec-echo-xe git rebase -i --autosquash HEAD~9
     else
         --exec-echo-xe git rebase -i --autosquash "HEAD~$@"
     fi
