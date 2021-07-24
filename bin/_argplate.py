@@ -25,19 +25,19 @@ import sys
 def main(argv):
     """Run from the command line"""
 
-    parser = compile_argdoc(epilog="examples:")
+    parser = compile_argdoc(epi="examples:")
     args = parser.parse_args(argv[1:])
     print(args)
 
 
 # deffed in many files  # missing from docs.python.org
-def compile_argdoc(epilog):
+def compile_argdoc(epi):
     """Declare how to parse the command line"""
 
     doc = __main__.__doc__
     prog = doc.strip().splitlines()[0].split()[1]
     description = list(_ for _ in doc.strip().splitlines() if _)[1]
-    epilog_at = doc.index(epilog)
+    epilog_at = doc.index(epi)
     epilog = doc[epilog_at:]
 
     parser = argparse.ArgumentParser(
