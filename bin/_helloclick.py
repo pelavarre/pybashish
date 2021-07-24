@@ -3,9 +3,10 @@
 r"""
 Usage: helloclick.py [OPTIONS]
 
+  Show a small Python Click CLI with an ArgParse Epilog of Examples
+
 Options:
-  -h      Show this message and exit.
-  --help  Show this message and exit.
+  --h, --he, --hel, --help, -h  Show this message and exit.
 
 Workflow::
   : git clone https://github.com/pelavarre/pybashish.git
@@ -19,30 +20,45 @@ Workflow::
   : --ignore=W503  # 2017 Pep 8 and Black over Flake8 W503 line break before binary op
 
 Examples:
-  _helloclick.py -h  # Show Click interpreting a short option flag
+  _helloclick.py --h  # Show Click accepting an abbreviated long option
 """
 
 
 import __main__
 import argparse
-import sys
 import textwrap
 
 import click
 
 
-@click.command()
-@click.pass_context
-@click.option("-h", is_flag=True, help="Show this message and exit.")
-def main(ctx, h):
+# deffed in many files  # missing from docs.python.org
+def parse_main_doc(epi=None):
+    """Pick the Epilog of help lines out of the Main Doc String"""
 
-    if h:
-        click.echo(main.get_help(ctx))
-        sys.exit()
+    doc = __main__.__doc__
 
+    desc = list(_ for _ in doc.strip().splitlines() if _)[1]
+
+    epilog = None
+    if epi is not None:
+        epilog_at = doc.index(epi)
+        epilog = textwrap.dedent(doc[epilog_at:]).strip()
+
+    space = argparse.Namespace(desc=desc, epilog=epilog)
+
+    return space
+
+
+@click.command(
+    context_settings=dict(
+        help_option_names="--h --he --hel --help -h".split(),
+    ),
+    help=parse_main_doc().desc,
+)
+def main():
     main.click_main = click_main
 
-    args = argparse.Namespace(h=h)
+    args = argparse.Namespace()
     print(args)
 
 
@@ -50,23 +66,12 @@ def main(ctx, h):
 def click_main(func):
     try:
         main()
-    except SystemExit:
-        if not hasattr(main, "click_main"):
-            print()
-            print(main_doc_epilog(epi="Workflow"))
+    except SystemExit as exc:
+        if exc.code == 0:
+            if not hasattr(main, "click_main"):
+                print()
+                print(parse_main_doc(epi="Workflow").epilog)
         raise
-
-
-# deffed in many files  # missing from docs.python.org
-def main_doc_epilog(epi):
-    """Pick the Epilog of help lines out of the Main Doc String"""
-
-    doc = __main__.__doc__
-
-    epilog_at = doc.index(epi)
-    epilog = textwrap.dedent(doc[epilog_at:]).strip()
-
-    return epilog
 
 
 if __name__ == "__main__":
