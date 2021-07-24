@@ -124,7 +124,7 @@ function --dotfiles-find () {
     echo .zprofile
     echo .zshrc
 
-    : 'do Not echo .bash_profile_secrets'
+    : 'do Not echo ".bash_profile_secrets" because local per host'
 }
 
 function --dotfiles-backup () {
@@ -478,6 +478,7 @@ alias -- -gl='--exec-echo-xe git log'
 alias -- -gr='--exec-echo-xe git rebase'
 alias -- -gs='--exec-echo-xe git show'
 
+alias -- -gba='--exec-echo-xe git branch --all'
 alias -- -gbq='--exec-echo-xe "git branch |grep '\''[*]'\''"'
 alias -- -gca='--exec-echo-xe git commit --amend'
 alias -- -gcd=--git-chdir
@@ -491,7 +492,7 @@ alias -- -ggl='--exec-echo-xe git grep -l'  # --files-with-matches
 alias -- -gl1='--exec-echo-xe git log --decorate -1'
 alias -- -glf=--git-ls-files
 alias -- -glg='--exec-echo-xe git log --no-decorate --oneline --grep'
-alias -- -glq='--exec-echo-xe git log --no-decorate --oneline -9'
+alias -- -glq='--exec-echo-xe git log --no-decorate --oneline -19'
 alias -- -gls='--exec-echo-xe git log --stat'
 alias -- -grh='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard'
 alias -- -gri=--git-rebase-interactive
@@ -507,7 +508,7 @@ alias -- -gcam='--exec-echo-xe git commit --all -m WIP-$(basename $(pwd))'
 alias -- -gcls='pwd && --exec-echo-xe-maybe sudo git clean -ffxdq'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
 alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
-alias -- -glqv='--exec-echo-xe git log --decorate --oneline -9'
+alias -- -glqv='--exec-echo-xe git log --decorate --oneline -19'
 alias -- -grhu='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard @{upstream}'
 alias -- -gsno="--exec-echo-xe git show --name-only --pretty=''"
 alias -- -gssi='--exec-echo-xe git status --short --ignored'
