@@ -21,6 +21,14 @@ import sys
 
 _ = pdb
 
+
+_ = math
+_ = random
+_ = re
+_ = string
+_ = subprocess
+
+
 try:
     import pathlib
 except ImportError:

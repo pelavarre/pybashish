@@ -999,7 +999,7 @@ class ShardsTaker(argparse.Namespace):
         return more
 
     def peek_more_shards(self):
-        """List remaining shards """
+        """List remaining shards"""
 
         more_shards = list(self.shards)
         return more_shards

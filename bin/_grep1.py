@@ -305,7 +305,7 @@ def _export_one_file(wherewhat, chars):
 
 
 def _ext_files_readlines(ext, files):
-    """Collect the lines of some files, but if not .ext then preface with # {filename}: """
+    """Collect the lines of some files, but if not .ext then preface with # {filename}:"""
 
     verbose_print(
         "grep.py: collecting, from the {}/ dir, the relpaths:  {}".format(

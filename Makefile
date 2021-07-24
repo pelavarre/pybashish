@@ -1,6 +1,7 @@
 # pybashish/Makefile:  Run the self-test's
 
-default: black test-once
+
+default: black flake8 test-once
 	:
 	git status |grep -v '^$$'
 	:
@@ -12,6 +13,7 @@ default: black test-once
 	:
 	: make: passed
 	:
+
 
 help:
 	: # usage: make {default|blacken-here|help|test-here}
@@ -28,8 +30,19 @@ help:
 	: #     prompts with "? ", unlike the "" of Bash "read" with no -p PROMPT
 	: #
 
+
 black:
-	. ~/bin/black.source && black $$PWD/../pybashish/
+	. ~/bin/pips.source && black $$PWD/../pybashish/
+
+
+FLAKE_OPTS=--max-line-length=999 --ignore=E203,W503
+# --max-line-length=999  # Black max line lengths over Flake8 max line lengths
+# --ignore=E203  # Black '[ : ]' rules over Flake8 E203 whitespace before ':'
+# --ignore=W503  # 2017 Pep 8 and Black over Flake8 W503 line break before binary op
+
+flake8:
+	. ~/bin/pips.source && flake8 ${FLAKE_OPTS} $$PWD/../pybashish/
+
 
 test-once:
 	:
@@ -65,10 +78,13 @@ test-once:
 	git status --short --ignored
 	:
 
+
 grep-fixme:
 	echo && echo && echo && git grep 'F'IXME |awk -F: '{ n=$$1; if (n != o) {o=n; print ""; print $$1":"}; $$1=""; print substr($$0, 2)}' |less -FRX
 
+
 me:
 	python3 ../pybashish/
+
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git
