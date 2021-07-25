@@ -35,13 +35,13 @@ black:
 	. ~/bin/pips.source && black $$PWD/../pybashish/
 
 
-FLAKE_OPTS=--max-line-length=999 --ignore=E203,W503
+FLAKE8_OPTS=--max-line-length=999 --ignore=E203,W503
 # --max-line-length=999  # Black max line lengths over Flake8 max line lengths
 # --ignore=E203  # Black '[ : ]' rules over Flake8 E203 whitespace before ':'
 # --ignore=W503  # 2017 Pep 8 and Black over Flake8 W503 line break before binary op
 
 flake8:
-	. ~/bin/pips.source && flake8 ${FLAKE_OPTS} $$PWD/../pybashish/
+	. ~/bin/pips.source && flake8 ${FLAKE8_OPTS} $$PWD/../pybashish/
 
 
 test-once:

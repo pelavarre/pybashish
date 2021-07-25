@@ -749,6 +749,14 @@ function --edit-shifted-slash () {
 
 
 export PATH="${PATH:+$PATH:}$HOME/bin"
+
+alias -- --black='~/.venvs/pips/bin/black'
+
+alias -- --flake8='~/.venvs/pips/bin/flake8 --max-line-length=999 --ignore=E203,W503'
+: --max-line-length=999  # Black max line lengths over Flake8 max line lengths
+: --ignore=E203  # Black '[ : ]' rules over Flake8 E203 whitespace before ':'
+: --ignore=W503  # 2017 Pep 8 and Black over Flake8 W503 line break before binary op
+
 source ~/.zprofile-zsecrets
 echo $(dirs -p |head -1)/
 
@@ -760,5 +768,9 @@ echo $(dirs -p |head -1)/
 
 # source ~/.zshrc  # sometimes needed in Bash as:  source ~/.bashrc
 
+# Setting PATH for Python 3.9
+# The original version is saved in .zprofile.pysave
+# PATH="/Library/Frameworks/Python.framework/Versions/3.9/bin:${PATH}"
+# export PATH
 
 # above copied from:  git clone https://github.com/pelavarre/pybashish.git
