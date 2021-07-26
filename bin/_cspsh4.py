@@ -8,6 +8,9 @@ chat over programs written as "communicating sequential processes"
 optional arguments:
   -h, --help  show this help message and exit
 
+workflow:
+  cd ~/Public/pybashish/bin && --black _cspsh4.py && --flake8 _cspsh4.py && python3 -i _cspsh4.py
+
 examples:
   _cspsh4.py
 """
@@ -35,11 +38,11 @@ DENT = 4 * " "
 
 
 class AfterProc(collections.namedtuple("AfterProc", "before after".split())):
-    def to_py(self, depth):
+    def _to_deep_py_(self, depth):
         pys = list()
         pys.append("AfterProc(")
-        pys.append(DENT + "before=" + self.before.to_py(depth + 1) + ",")
-        pys.append(DENT + "after=" + self.after.to_py(depth + 1) + ",")
+        pys.append(DENT + "before=" + self.before._to_deep_py_(depth + 1) + ",")
+        pys.append(DENT + "after=" + self.after._to_deep_py_(depth + 1) + ",")
         pys.append(")")
 
         dent = depth * DENT
@@ -48,12 +51,12 @@ class AfterProc(collections.namedtuple("AfterProc", "before after".split())):
 
 
 class EventsProc(collections.namedtuple("EventsProc", "name events body".split())):
-    def to_py(self, depth):
+    def _to_deep_py_(self, depth):
         pys = list()
         pys.append("EventsProc(")
         pys.append(DENT + 'name="{}",'.format(self.name))
-        pys.append(DENT + "events=" + self.events.to_py(depth + 1) + ",")
-        pys.append(DENT + "body=" + self.body.to_py(depth + 1) + ",")
+        pys.append(DENT + "events=" + self.events._to_deep_py_(depth + 1) + ",")
+        pys.append(DENT + "body=" + self.body._to_deep_py_(depth + 1) + ",")
         pys.append(")")
 
         dent = depth * DENT
@@ -65,11 +68,11 @@ class ChoiceTuple(tuple):
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
-    def to_py(self, depth):
+    def _to_deep_py_(self, depth):
         pys = list()
         pys.append("ChoiceTuple(")
         for event in self:
-            pys.append(DENT + event.to_py(depth + 1) + ",")
+            pys.append(DENT + event._to_deep_py_(depth + 1) + ",")
         pys.append(")")
 
         dent = depth * DENT
@@ -78,7 +81,7 @@ class ChoiceTuple(tuple):
 
 
 class Event(collections.namedtuple("Event", "name".split())):
-    def to_py(self, depth):
+    def _to_deep_py_(self, depth):
         py = 'Event("{}")'.format(self.name)  # wrong over quotes or line breaks
         return py
 
@@ -91,11 +94,11 @@ class EventTuple(tuple):
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
-    def to_py(self, depth):
+    def _to_deep_py_(self, depth):
         pys = list()
         pys.append("EventTuple(")
         for event in self:
-            pys.append(DENT + event.to_py(depth + 1) + ",")
+            pys.append(DENT + event._to_deep_py_(depth + 1) + ",")
         pys.append(")")
 
         dent = depth * DENT
@@ -103,12 +106,12 @@ class EventTuple(tuple):
         return py
 
 
-class Proc(collections.namedtuple("Proc", "name body".split())):
-    def to_py(self, depth):
+class ProcDef(collections.namedtuple("ProcDef", "name body".split())):
+    def _to_deep_py_(self, depth):
         pys = list()
-        pys.append("Proc(")
+        pys.append("ProcDef(")
         pys.append(DENT + 'name="{}",'.format(self.name))
-        pys.append(DENT + "body=" + self.body.to_py(depth + 1) + ",")
+        pys.append(DENT + "body=" + self.body._to_deep_py_(depth + 1) + ",")
         pys.append(")")
 
         dent = depth * DENT
@@ -116,14 +119,14 @@ class Proc(collections.namedtuple("Proc", "name body".split())):
         return py
 
 
-class StoredProc(collections.namedtuple("StoredProc", "name".split())):
-    def to_py(self, depth):
-        py = 'StoredProc("{}")'.format(self.name)  # wrong over quotes or line breaks
+class DeffedProc(collections.namedtuple("DeffedProc", "name".split())):
+    def _to_deep_py_(self, depth):
+        py = 'DeffedProc("{}")'.format(self.name)  # wrong over quotes or line breaks
         return py
 
 
-def to_py(csp):  # TODO: declare type(csp) as layer over collections.namedtuple
-    py = csp.to_py(0)
+def to_deep_py(csp_tree):  # TODO: derive "type(csp_tree)" from "collections.namedtuple"
+    py = csp_tree._to_deep_py_(0)
     return py
 
 
@@ -135,12 +138,12 @@ def to_py(csp):  # TODO: declare type(csp) as layer over collections.namedtuple
 def main(argv):
     """Run from the command line"""
 
-    parser = compile_argdoc(epi="examples:")
+    parser = compile_argdoc(epi="workflow:")
     _ = parser.parse_args(argv[1:])
 
-    try_csp_py()
+    try_to_deep_py()
 
-    print("+ exit 0")
+    stderr_print("+ exit 0")
 
 
 #
@@ -196,11 +199,18 @@ def exit_unless_main_doc_eq(parser):
     if diff_lines:
 
         lines = list((_.rstrip() if _.endswith("\n") else _) for _ in diff_lines)
-        print("\n".join(lines))
+        stderr_print("\n".join(lines))
 
-        print("error: update main argdoc to match help, or vice versa")
+        stderr_print("error: update main argdoc to match help, or vice versa")
 
         sys.exit(1)
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print(*args, **kwargs):
+    sys.stdout.flush()
+    print(*args, **kwargs, file=sys.stderr)
+    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
 #
@@ -208,79 +218,54 @@ def exit_unless_main_doc_eq(parser):
 #
 
 
-def try_csp_py():
-    """VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))"""
+def try_to_deep_py():
+    """Translate to source lines of nests of Python calls, from Csp Tree"""
 
-    vmct = Proc(
-        name="VMCT",
-        body=EventsProc(
-            name="X",
-            events=EventTuple(
-                Event("coin"),
-                Event("choc"),
-                Event("toffee"),
-            ),
-            body=AfterProc(
-                before=Event("coin"),
-                after=ChoiceTuple(
-                    AfterProc(
-                        before=Event("choc"),
-                        after=StoredProc("X"),
-                    ),
-                    AfterProc(
-                        before=Event("toffee"),
-                        after=StoredProc("X"),
-                    ),
-                ),
-            ),
-        ),
-    )
+    # coin  # an event exists
 
-    _ = vmct
+    want0 = textwrap.dedent(
+        """
+        Event("coin")
+        """
+    ).strip()
 
-    csp1 = Event("coin")
-    py = to_py(csp1)
-    assert py == 'Event("coin")', repr(py)
+    # {coin, choc, toffee}  # an alphabet collects one event after another
 
-    csp2 = EventTuple(
-        Event("coin"),
-        Event("choc"),
-        Event("toffee"),
-    )
-    py = to_py(csp2)
-    want = 'EventTuple(\n Event("coin"),\n Event("choc"),\n Event("toffee"),\n)'
-    assert py == want.replace(" ", DENT), repr(py)
+    want1 = textwrap.dedent(
+        """
+        EventTuple(
+            Event("coin"),
+            Event("choc"),
+            Event("toffee"),
+        )
+        """
+    ).strip()
 
-    csp3 = AfterProc(
-        before=Event("coin"),
-        after=ChoiceTuple(
-            AfterProc(before=Event("choc"), after=StoredProc("X")),
-            AfterProc(before=Event("toffee"), after=StoredProc("X")),
-        ),
-    )
-    py = to_py(csp3)
-    want = textwrap.dedent(  # FIXME: read this from this source file
+    # coin → (choc → X | toffee → X)  # events guard processes
+
+    want2 = textwrap.dedent(
         """
         AfterProc(
             before=Event("coin"),
             after=ChoiceTuple(
                 AfterProc(
                     before=Event("choc"),
-                    after=StoredProc("X"),
+                    after=DeffedProc("X"),
                 ),
                 AfterProc(
                     before=Event("toffee"),
-                    after=StoredProc("X"),
+                    after=DeffedProc("X"),
                 ),
             ),
         )
         """
     ).strip()
-    assert py == want, (repr(want), repr(py))
 
-    want = textwrap.dedent(  # FIXME: read this from this source file
+    # VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
+
+    want3 = textwrap.dedent(
         """
-        Proc(
+        ProcDef(
             name="VMCT",
             body=EventsProc(
                 name="X",
@@ -294,11 +279,11 @@ def try_csp_py():
                     after=ChoiceTuple(
                         AfterProc(
                             before=Event("choc"),
-                            after=StoredProc("X"),
+                            after=DeffedProc("X"),
                         ),
                         AfterProc(
                             before=Event("toffee"),
-                            after=StoredProc("X"),
+                            after=DeffedProc("X"),
                         ),
                     ),
                 ),
@@ -307,19 +292,38 @@ def try_csp_py():
         """
     ).strip()
 
-    got = to_py(vmct)
+    wants = (want0, want1, want2, want3)
+    for want in wants:
+        csp_tree = eval(want)
+        py = to_deep_py(csp_tree)
+
+        if False:
+            stderr_print()
+            stderr_print(py)
+
+        assert not stderr_print_diff(input=want, output=py)
+
+
+def stderr_print_diff(**kwargs):
+    """Retun the Diff of the Lines given, but print it first when not empty"""
+
+    (fromfile, tofile) = kwargs.keys()
+    a = kwargs[fromfile].splitlines()
+    b = kwargs[tofile].splitlines()
 
     diff_lines = list(
         difflib.unified_diff(
-            a=want.splitlines(),
-            b=got.splitlines(),
-            fromfile="input",
-            tofile="output",
+            a=a,
+            b=b,
+            fromfile=fromfile,
+            tofile=tofile,
         )
     )
 
-    assert not diff_lines, print("\n".join(diff_lines)) or len(diff_lines)
-    # FIXME: stderr_print
+    if diff_lines:
+        stderr_print(diff_lines)
+
+    return diff_lines
 
 
 if __name__ == "__main__":
