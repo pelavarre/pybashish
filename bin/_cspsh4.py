@@ -14,21 +14,9 @@ examples:
 
 # FIXME:
 #
-# 1
-# git commit code that doesn't crash
-#
-# 2
-# derive Classes from Named Tuple
-# write def to_py(self), one test at a time
-# test from innermost expression, then more and more
-# collapse to line that fits
-# pass down the indent level to discover fits or not
-#
-# 3
-# write def to_csp(self)
-#
-# 4
-# write def from_csp(str) factories
+# 2 # write def to_csp(self)
+# 3 # write def from_csp(str) factories
+# 4 # collapse to line that fits
 #
 
 # code reviewed by people, and by Black and Flake8 bots
@@ -40,14 +28,103 @@ import collections
 import difflib
 import os
 import sys
+import textwrap
 
 
-Proc = collections.namedtuple("Proc", "name body".split())
-AlphabetProc = collections.namedtuple("AlphabetProc", "name alphabet body".split())
-Event = collections.namedtuple("Event", "name".split())
-AfterProc = collections.namedtuple("AfterProc", "before after".split())
-ChoiceProc = collections.namedtuple("ChoiceProc", "first last".split())
-StoredProc = collections.namedtuple("StoredProc", "name".split())
+DENT = 4 * " "
+
+
+class AfterProc(collections.namedtuple("AfterProc", "before after".split())):
+    def to_py(self, depth):
+        pys = list()
+        pys.append("AfterProc(")
+        pys.append(DENT + "before=" + self.before.to_py(depth + 1) + ",")
+        pys.append(DENT + "after=" + self.after.to_py(depth + 1) + ",")
+        pys.append(")")
+
+        dent = depth * DENT
+        py = ("\n" + dent).join(pys)
+        return py
+
+
+class EventsProc(collections.namedtuple("EventsProc", "name events body".split())):
+    def to_py(self, depth):
+        pys = list()
+        pys.append("EventsProc(")
+        pys.append(DENT + 'name="{}",'.format(self.name))
+        pys.append(DENT + "events=" + self.events.to_py(depth + 1) + ",")
+        pys.append(DENT + "body=" + self.body.to_py(depth + 1) + ",")
+        pys.append(")")
+
+        dent = depth * DENT
+        py = ("\n" + dent).join(pys)
+        return py
+
+
+class ChoiceTuple(tuple):
+    def __new__(cls, *args):
+        return super().__new__(cls, args)
+
+    def to_py(self, depth):
+        pys = list()
+        pys.append("ChoiceTuple(")
+        for event in self:
+            pys.append(DENT + event.to_py(depth + 1) + ",")
+        pys.append(")")
+
+        dent = depth * DENT
+        py = ("\n" + dent).join(pys)
+        return py
+
+
+class Event(collections.namedtuple("Event", "name".split())):
+    def to_py(self, depth):
+        py = 'Event("{}")'.format(self.name)  # wrong over quotes or line breaks
+        return py
+
+
+class EventPair(collections.namedtuple("EventPair", "head tail".split())):
+    pass
+
+
+class EventTuple(tuple):
+    def __new__(cls, *args):
+        return super().__new__(cls, args)
+
+    def to_py(self, depth):
+        pys = list()
+        pys.append("EventTuple(")
+        for event in self:
+            pys.append(DENT + event.to_py(depth + 1) + ",")
+        pys.append(")")
+
+        dent = depth * DENT
+        py = ("\n" + dent).join(pys)
+        return py
+
+
+class Proc(collections.namedtuple("Proc", "name body".split())):
+    def to_py(self, depth):
+        pys = list()
+        pys.append("Proc(")
+        pys.append(DENT + 'name="{}",'.format(self.name))
+        pys.append(DENT + "body=" + self.body.to_py(depth + 1) + ",")
+        pys.append(")")
+
+        dent = depth * DENT
+        py = ("\n" + dent).join(pys)
+        return py
+
+
+class StoredProc(collections.namedtuple("StoredProc", "name".split())):
+    def to_py(self, depth):
+        py = 'StoredProc("{}")'.format(self.name)  # wrong over quotes or line breaks
+        return py
+
+
+def to_py(csp):  # TODO: declare type(csp) as layer over collections.namedtuple
+    py = csp.to_py(0)
+    return py
 
 
 #
@@ -64,31 +141,6 @@ def main(argv):
     try_csp_py()
 
     print("+ exit 0")
-
-
-def try_csp_py():
-    """VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))"""
-
-    vmct = Proc(
-        name="VMCT",
-        body=AlphabetProc(
-            name="X",
-            alphabet={
-                Event("coin"),
-                Event("choc"),
-                Event("toffee"),
-            },
-            body=AfterProc(
-                before=Event("coin"),
-                after=ChoiceProc(
-                    AfterProc(before=Event("choc"), after=StoredProc("X")),
-                    AfterProc(before=Event("toffee"), after=StoredProc("X")),
-                ),
-            ),
-        ),
-    )
-
-    _ = vmct
 
 
 #
@@ -149,6 +201,125 @@ def exit_unless_main_doc_eq(parser):
         print("error: update main argdoc to match help, or vice versa")
 
         sys.exit(1)
+
+
+#
+# Self test
+#
+
+
+def try_csp_py():
+    """VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))"""
+
+    vmct = Proc(
+        name="VMCT",
+        body=EventsProc(
+            name="X",
+            events=EventTuple(
+                Event("coin"),
+                Event("choc"),
+                Event("toffee"),
+            ),
+            body=AfterProc(
+                before=Event("coin"),
+                after=ChoiceTuple(
+                    AfterProc(
+                        before=Event("choc"),
+                        after=StoredProc("X"),
+                    ),
+                    AfterProc(
+                        before=Event("toffee"),
+                        after=StoredProc("X"),
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    _ = vmct
+
+    csp1 = Event("coin")
+    py = to_py(csp1)
+    assert py == 'Event("coin")', repr(py)
+
+    csp2 = EventTuple(
+        Event("coin"),
+        Event("choc"),
+        Event("toffee"),
+    )
+    py = to_py(csp2)
+    want = 'EventTuple(\n Event("coin"),\n Event("choc"),\n Event("toffee"),\n)'
+    assert py == want.replace(" ", DENT), repr(py)
+
+    csp3 = AfterProc(
+        before=Event("coin"),
+        after=ChoiceTuple(
+            AfterProc(before=Event("choc"), after=StoredProc("X")),
+            AfterProc(before=Event("toffee"), after=StoredProc("X")),
+        ),
+    )
+    py = to_py(csp3)
+    want = textwrap.dedent(  # FIXME: read this from this source file
+        """
+        AfterProc(
+            before=Event("coin"),
+            after=ChoiceTuple(
+                AfterProc(
+                    before=Event("choc"),
+                    after=StoredProc("X"),
+                ),
+                AfterProc(
+                    before=Event("toffee"),
+                    after=StoredProc("X"),
+                ),
+            ),
+        )
+        """
+    ).strip()
+    assert py == want, (repr(want), repr(py))
+
+    want = textwrap.dedent(  # FIXME: read this from this source file
+        """
+        Proc(
+            name="VMCT",
+            body=EventsProc(
+                name="X",
+                events=EventTuple(
+                    Event("coin"),
+                    Event("choc"),
+                    Event("toffee"),
+                ),
+                body=AfterProc(
+                    before=Event("coin"),
+                    after=ChoiceTuple(
+                        AfterProc(
+                            before=Event("choc"),
+                            after=StoredProc("X"),
+                        ),
+                        AfterProc(
+                            before=Event("toffee"),
+                            after=StoredProc("X"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        """
+    ).strip()
+
+    got = to_py(vmct)
+
+    diff_lines = list(
+        difflib.unified_diff(
+            a=want.splitlines(),
+            b=got.splitlines(),
+            fromfile="input",
+            tofile="output",
+        )
+    )
+
+    assert not diff_lines, print("\n".join(diff_lines)) or len(diff_lines)
+    # FIXME: stderr_print
 
 
 if __name__ == "__main__":
