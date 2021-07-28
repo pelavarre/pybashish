@@ -17,8 +17,7 @@ examples:
 
 # FIXME:
 #
-# 2 # write def to_csp(self)
-# 3 # write def from_csp(str) factories
+# 3 # write def eval_csp(str) factories
 # 4 # collapse to line that fits
 #
 
@@ -29,9 +28,14 @@ import __main__
 import argparse
 import collections
 import difflib
+import itertools
 import os
+import pdb
+import re
 import sys
 import textwrap
+
+_ = pdb
 
 
 #
@@ -43,6 +47,24 @@ DENT = 4 * " "
 
 
 class CspTree:
+    def _to_deep_csp_(self, depth):
+
+        csps = list()
+
+        mark_field_pairs = itertools.zip_longest(self._marks_, self._fields)
+        for (mark, field) in mark_field_pairs:
+            tree = getattr(self, field)
+            if not hasattr(tree, "_to_deep_py_"):
+                csp_item = str(tree)
+            else:
+                csp_item = tree._to_deep_csp_(depth + 1)
+
+            csps.append(DENT + mark + csp_item)
+
+        dent = depth * DENT
+        csp = ("\n" + dent).join(csps)
+        return csp
+
     def _to_deep_py_(self, depth):
 
         pys = list()
@@ -62,10 +84,21 @@ class CspTree:
 
         return py
 
-        # .format(... tree ...) goes wrong over quotes, line breaks, etc
+        # goes wrong when field value type is not in (CspTree, str)
+        # goes wrong over quotes, line breaks, etc in field values
 
 
 class CspLeaf(CspTree):
+    def _to_deep_csp_(self, depth):
+
+        assert len(self._fields) == 1, self._fields
+
+        field = self._fields[-1]
+        tree = getattr(self, field)
+        csp = tree
+
+        return csp
+
     def _to_deep_py_(self, depth):
 
         assert len(self._fields) == 1, self._fields
@@ -76,10 +109,30 @@ class CspLeaf(CspTree):
 
         return py
 
-        # .format(... tree ...) goes wrong over quotes, line breaks, etc
+        # goes wrong over quotes, line breaks, etc in field value
 
 
-class CspList(CspTree):
+class CspTuple(CspTree):
+    def _to_deep_csp_(self, depth):
+
+        csps = list()
+        csps.append(self._open_mark_)
+
+        for (index, item) in enumerate(self):
+            csp_item = item._to_deep_csp_(depth + 1)
+            csp_item = _csp_unwrap_(csp_item)
+
+            if not index:
+                csps.append(DENT + csp_item + self._comma_mark_)
+            else:
+                csps.append(DENT + self._op_mark_ + csp_item + self._comma_mark_)
+
+        csps.append(self._close_mark_)
+
+        dent = depth * DENT
+        csp = ("\n" + dent).join(csps)
+        return csp
+
     def _to_deep_py_(self, depth):
 
         pys = list()
@@ -94,9 +147,44 @@ class CspList(CspTree):
         return py
 
 
+class CspPair(CspTree):
+    def _to_deep_csp_(self, depth):
+
+        assert len(self._fields) == 2, self._fields
+
+        csps = list()
+        csps.append(self._open_mark_)
+
+        for (index, field) in enumerate(self._fields):
+            tree = getattr(self, field)
+            if not index:
+                csps.append(DENT + tree._to_deep_csp_(depth + 1))
+            else:
+                csps.append(DENT + self._op_mark_ + " " + tree._to_deep_csp_(depth + 1))
+
+        csps.append(self._close_mark_)
+
+        dent = depth * DENT
+        csp = ("\n" + dent).join(csps)
+
+        return csp
+
+
+def to_deep_csp(csp_tree):
+    csp = csp_tree._to_deep_csp_(0)
+    return csp
+
+
 def to_deep_py(csp_tree):
     py = csp_tree._to_deep_py_(0)
     return py
+
+
+def _csp_unwrap_(csp_got):
+    if csp_got.startswith("(") and csp_got.endswith(")"):
+        csp_got = csp_got[len("(") :][: -len(")")]
+    csp_got = csp_got.strip()
+    return csp_got
 
 
 #
@@ -104,17 +192,25 @@ def to_deep_py(csp_tree):
 #
 
 
-class AfterProc(collections.namedtuple("AfterProc", "before after".split()), CspTree):
-    pass
+class AfterProc(collections.namedtuple("AfterProc", "before after".split()), CspPair):
+    _open_mark_ = "("
+    _op_mark_ = "→"
+    _close_mark_ = ")"
 
 
 class EventsProc(
     collections.namedtuple("EventsProc", "name events body".split()), CspTree
 ):
-    pass
+    _marks_ = ("μ ", " : ", " • ")
 
 
-class ChoiceTuple(tuple, CspList):
+class ChoiceTuple(tuple, CspTuple):
+
+    _open_mark_ = "("
+    _op_mark_ = "| "
+    _comma_mark_ = ""
+    _close_mark_ = ")"
+
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
@@ -123,17 +219,19 @@ class Event(CspLeaf, collections.namedtuple("Event", "name".split())):
     pass
 
 
-class EventPair(collections.namedtuple("EventPair", "head tail".split())):
-    pass
+class EventTuple(tuple, CspTuple):
 
+    _open_mark_ = "{"
+    _op_mark_ = ""
+    _comma_mark_ = ","
+    _close_mark_ = "}"
 
-class EventTuple(tuple, CspList):
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
 
 class ProcDef(collections.namedtuple("ProcDef", "name body".split()), CspTree):
-    pass
+    _marks_ = ("", " = ")
 
 
 class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), CspLeaf):
@@ -218,9 +316,34 @@ def exit_unless_main_doc_eq(parser):
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args, **kwargs):
+    """Format and log like "print", except flush Stdout & write and flush Stderr"""
+
     sys.stdout.flush()
     print(*args, **kwargs, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+
+
+# deffed in many files  # missing from docs.python.org
+def stderr_print_diff(**kwargs):
+    """Return the Diff of the Lines given, but print it first when not empty"""
+
+    (fromfile, tofile) = kwargs.keys()
+    a = kwargs[fromfile].splitlines()
+    b = kwargs[tofile].splitlines()
+
+    diff_lines = list(
+        difflib.unified_diff(
+            a=a,
+            b=b,
+            fromfile=fromfile,
+            tofile=tofile,
+        )
+    )
+
+    if diff_lines:
+        stderr_print("\n".join(diff_lines))
+
+    return diff_lines
 
 
 #
@@ -258,6 +381,23 @@ def try_to_deep_py():
         AfterProc(
             before=Event("choc"),
             after=DeffedProc("X"),
+        )
+        """
+    ).strip()
+
+    # choc → X | toffee → X  # events guard processes
+
+    want20 = textwrap.dedent(
+        """
+        ChoiceTuple(
+            AfterProc(
+                before=Event("choc"),
+                after=DeffedProc("X"),
+            ),
+            AfterProc(
+                before=Event("toffee"),
+                after=DeffedProc("X"),
+            ),
         )
         """
     ).strip()
@@ -313,38 +453,64 @@ def try_to_deep_py():
         """
     ).strip()
 
-    wants = (want0, want1, want11, want2, want3)
-    for want in wants:
-        csp_tree = eval(want)
-        py = to_deep_py(csp_tree)
+    # choose
 
-        if False:
-            stderr_print()
-            stderr_print(py)
+    py_wants = (want0, want1, want11, want20, want2, want3)
 
-        assert not stderr_print_diff(input=want, output=py)
-
-
-def stderr_print_diff(**kwargs):
-    """Retun the Diff of the Lines given, but print it first when not empty"""
-
-    (fromfile, tofile) = kwargs.keys()
-    a = kwargs[fromfile].splitlines()
-    b = kwargs[tofile].splitlines()
-
-    diff_lines = list(
-        difflib.unified_diff(
-            a=a,
-            b=b,
-            fromfile=fromfile,
-            tofile=tofile,
+    csp_wants = (
+        textwrap.dedent(
+            """
+            coin
+            {coin, choc, toffee}
+            choc → X
+            choc → X | toffee → X
+            coin → (choc → X | toffee → X)
+            VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
+            """
         )
+        .strip()
+        .splitlines()
     )
 
-    if diff_lines:
-        stderr_print("\n".join(diff_lines))
+    # test
 
-    return diff_lines
+    tupled_wants = itertools.zip_longest(py_wants, csp_wants)
+    for (index, tupled_want) in enumerate(tupled_wants):
+        (py_want, csp_want) = tupled_want
+
+        csp_tree = eval(py_want)
+
+        # test print as Py
+
+        py_got = to_deep_py(csp_tree)
+
+        assert not stderr_print_diff(input=py_want, output=py_got)
+
+        # test print as Csp
+
+        csp_got = to_deep_csp(csp_tree)
+
+        if False:  # compile time option to review line broken format
+            print()
+            print(csp_got)  # intelligible, but not yet great
+
+        if True:
+            csp_got = re.sub(r" +", repl=" ", string=csp_got)
+            csp_got = csp_got.replace("\n", "")
+            csp_got = csp_got.replace("( ", "(")
+            csp_got = csp_got.replace("{ ", "{")
+            csp_got = csp_got.replace(",}", "}")
+            csp_got = csp_got.replace(", }", "}")
+            csp_got = csp_got.replace(" )", ")")
+            csp_got = csp_got.strip()
+            csp_got = _csp_unwrap_(csp_got)
+
+        assert csp_got == csp_want, dict(csp_got=csp_got, csp_want=csp_want)
+
+
+#
+# Launch from command line
+#
 
 
 if __name__ == "__main__":
