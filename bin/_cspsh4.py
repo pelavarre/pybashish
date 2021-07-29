@@ -55,7 +55,7 @@ class CspTree:
         mark_field_pairs = itertools.zip_longest(self._marks_, self._fields)
         for (mark, field) in mark_field_pairs:
             tree = getattr(self, field)
-            if not hasattr(tree, "_to_deep_py_"):
+            if not hasattr(tree, "_1st_to_deep_py_"):
                 csp_item = str(tree)
             else:
                 csp_item = tree._to_deep_csp_(depth + 1)
@@ -66,17 +66,49 @@ class CspTree:
         csp = ("\n" + dent).join(csps)
         return csp
 
-    def _to_deep_py_(self, depth):
+    def _to_deep_py_(self):
+
+        styles = self._py_style_.splitlines(keepends=True)
+        assert len(styles) >= 3, repr(styles)
+
+        self_name = type(self).__name__
+
+        #
+
+        chars = ""
+
+        if "{}" not in styles[0]:
+            chars += to_deep_py(styles[0])
+        else:
+            chars += styles[0].format(to_deep_py(self_name))
+
+        for (index, item) in enumerate(self):
+            if not index:
+                styled = styles[1].format(to_deep_py(item))
+            else:
+                styled = styles[-2].format(to_deep_py(item))
+            dented = "\n\t".join(styled.splitlines()) + "\n"
+            chars += dented
+
+        chars += styles[-1].format()
+
+        #
+
+        spaced_chars = chars.replace("\t", DENT)
+
+        return spaced_chars
+
+    def _1st_to_deep_py_(self, depth):
 
         pys = list()
         pys.append(type(self).__name__ + "(")
 
         for field in self._fields:
             tree = getattr(self, field)
-            if not hasattr(tree, "_to_deep_py_"):
+            if not hasattr(tree, "_1st_to_deep_py_"):
                 pys.append(DENT + field + '="{}",'.format(tree))
             else:
-                pys.append(DENT + field + "=" + tree._to_deep_py_(depth + 1) + ",")
+                pys.append(DENT + field + "=" + tree._1st_to_deep_py_(depth + 1) + ",")
 
         pys.append(")")
 
@@ -100,7 +132,7 @@ class CspLeaf(CspTree):
 
         return csp
 
-    def _to_deep_py_(self, depth):
+    def _1st_to_deep_py_(self, depth):
 
         assert len(self._fields) == 1, self._fields
 
@@ -134,41 +166,19 @@ class CspTuple(CspTree):
         csp = ("\n" + dent).join(csps)
         return csp
 
-    def _to_deep_py_(self, depth):
+    def _1st_to_deep_py_(self, depth):
 
         if hasattr(self, "_py_style_"):
+            outdented = self._to_deep_py_()
+            chars = ("\n" + depth * DENT).join(outdented.splitlines())
 
-            styles = self._py_style_.splitlines(keepends=True)
-            assert len(styles) >= 3, repr(styles)
-
-            self_name = type(self).__name__
-
-            chars = ""
-
-            if "{}" not in styles[0]:
-                chars += to_deep_py(styles[0])
-            else:
-                chars += styles[0].format(to_deep_py(self_name, depth=(depth + 1)))
-
-            for (index, item) in enumerate(self):
-                if not index:
-                    chars += styles[1].format(to_deep_py(item, depth=(depth + 1)))
-                else:
-                    chars += styles[-2].format(to_deep_py(item, depth=(depth + 1)))
-
-            chars += styles[-1].format()
-
-            dent = depth * "\t"
-            dented_chars = ("\n" + dent).join(chars.splitlines())
-            spaced_chars = dented_chars.replace("\t", DENT)
-
-            return spaced_chars
+            return chars
 
         pys = list()
         pys.append(type(self).__name__ + "(")
 
         for item in self:
-            pys.append(DENT + item._to_deep_py_(depth + 1) + ",")
+            pys.append(DENT + item._1st_to_deep_py_(depth + 1) + ",")
         pys.append(")")
 
         dent = depth * DENT
@@ -205,8 +215,8 @@ def to_deep_csp(csp_tree):
 
 
 def to_deep_py(obj, depth=0):
-    if hasattr(obj, "_to_deep_py_"):
-        chars = obj._to_deep_py_(depth)
+    if hasattr(obj, "_1st_to_deep_py_"):
+        chars = obj._1st_to_deep_py_(depth)
     else:
         chars = str(obj)
     return chars
@@ -237,6 +247,8 @@ class EventsProc(
 
 
 class ChoiceTuple(tuple, CspTuple):
+
+    _py_style_ = "{}(\n" "\t{},\n" ")\n"
 
     _open_mark_ = "("
     _op_mark_ = "| "
@@ -376,7 +388,8 @@ def stderr_print_diff(**kwargs):
     )
 
     if diff_lines:
-        stderr_print("\n".join(diff_lines))
+        lines = list((_.rstrip() if _.endswith("\n") else _) for _ in diff_lines)
+        stderr_print("\n".join(lines))
 
     return diff_lines
 
