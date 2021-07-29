@@ -15,7 +15,6 @@ date
 alias -- '::'="(echo '⌃ ⌥ ⇧ ⌘ ⎋ ⇥ ⋮' |tee >(pbcopy))"
 
 
-
 #
 # Repair macOS Bluetooth after the next reboot
 #
@@ -96,7 +95,7 @@ HISTTIMEFORMAT='%b %d %H:%M:%S  '
 function --history () {
     --exec-echo-xe "history"  # a la Zsh:  history -t '%b %d %H:%M:%S' 0"
 }
-alias -- --more-history="--exec-echo-xe 'cat ~/.*command*log* |grep'"
+alias -- --more-history="--exec-echo-xe 'cat ~/.*command*log*'"
 alias -- --null="--exec-echo-xe 'cat - >/dev/null'"
 
 
@@ -120,6 +119,7 @@ function --dotfiles-find () {
     echo .emacs
     echo .pipe.luck
     echo .python.py
+    echo .python.lazy.py
     echo .vimrc
     echo .zprofile
     echo .zshrc
@@ -147,14 +147,29 @@ function --dotfiles-restore () {
 
 
 #
-# Abbreviate pipes
+# Abbreviate command lines down to:  ?
 #
+
 
 function a () {
     local shline=$(--awk $@)
     echo "+ $shline" >&2
     eval $shline
 }
+
+function g () {
+    --grep "$@"
+}
+
+function p () {
+    popd
+}
+
+
+#
+# Abbreviate command lines down to:  --*
+#
+
 
 function --awk () {
     if [ $# = 0 ]; then
@@ -177,10 +192,6 @@ function --cd () {
         cd "$@"
     fi
     echo "+ cd $(dirs -p |head -1)/"
-}
-
-function g () {
-    --grep "$@"
 }
 
 function --grep () {
@@ -427,21 +438,14 @@ function --jqd () {
     echo 'jqd'  # J Q Doe
 }  # redefined by ~/.bash_profile_secrets
 
-function --like-cp () {
+function --cp () {
     : :: 'back up to date-author-time stamp'
     local F="$1"
     local JQD=$(--jqd)
     (set -xe; cp -ipR "$F" "$F~$(date +%m%d$JQD%H%M%S)~")
 }
 
-function --like-do () {
-    : :: 'add date-author-time stamp as the last arg'
-    local F="$1"
-    local JQD=$(--jqd)
-    (set -xe; "$@" "$F~$(date +%m%d$JQD%H%M%S)~")
-}
-
-function --like-mv () {
+function --mv () {
     : :: 'back up to date-author-time stamp and remove'
     local F="$1"
     local JQD=$(--jqd)
@@ -452,10 +456,7 @@ alias l='ls -CF'  && : 'define "l", "la", and "ll" by Linux conventions'
 alias la='ls -A'
 alias ll='ls -alF'
 
-alias -- -cp=--like-cp
-alias -- -do=--like-do
-alias -- -ls='(set -xe; ls -alF -rt)'
-alias -- -mv=--like-mv
+alias -- --ls='(set -xe; ls -alF -rt)'
 
 # TODO: abbreviate $(ls -rt |tail -1)
 # TODO: abbreviate $(ls -rtc |tail -1)
@@ -530,6 +531,13 @@ alias -- -gpfwl='dirs -p |head -1 && --exec-echo-xe-maybe git push --force-with-
 # TODO: git log -S regex file.ext # grep the changes for an odd number (PickAxe)
 # TODO: --pretty=format:'%h %aE %s'  |cat - <(echo) |sed "s,@$DOMAIN,,"
 # TODO: git blame/log --abbrev
+
+# TODO: help with
+# git push origin HEAD:people/jqdoe/project/1234
+# git checkout -b people/jqdoe/project/1234 origin/people/jqdoe/project/1234
+# git push -d origin people/jqdoe/project/12345
+# git branch -D people/jqdoe/project/12345
+#
 
 
 function --git () {
@@ -628,9 +636,35 @@ function --git-show-conflict () {
 alias -- -e='--exec-echo-xe emacs -nw --no-splash'
 alias -- -v='--exec-echo-xe vim'
 
-alias -- -p='( set -xe; python3 -i ~/.python.py )'
-alias -- -p3="( set -xe; python3 -i ~/.python.py 'print(sys.version.split()[0])' )"
-alias -- -p2="( set -xe; python2 -i ~/.python.py 'print(sys.version.split()[0])' )"
+function -pp () {
+    ( set -xe; python3 -i "$@" ~/.python.py; )
+}
+function -pp3 () {
+    ( set -xe; python3 -i "$@" ~/.python.py 'print(sys.version.split()[0])'; )
+}
+function -pp2 () {
+    ( set -xe; python2 -i "$@" ~/.python.py 'print(sys.version.split()[0])'; )
+}
+
+function -p () {
+    (
+        echo '+ source ~/bin/pips.source' >&2
+        source ~/bin/pips.source
+        set -xe
+        python3 -i "$@" ~/.python.lazy.py
+    )
+}
+function -p3 () {
+    (
+        echo '+ source ~/bin/pips.source' >&2
+        source ~/bin/pips.source
+        set -xe
+        python3 -i "$@" ~/.python.lazy.py 'print(sys.version.split()[0])'
+    )
+}
+function -p2 () {
+    -pp2 "$@"
+}
 
 
 #
