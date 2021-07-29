@@ -9,7 +9,8 @@ optional arguments:
   -h, --help  show this help message and exit
 
 workflow:
-  cd ~/Public/pybashish/bin && --black _cspsh4.py && --flake8 _cspsh4.py && python3 -i _cspsh4.py
+  cd ~/Public/pybashish/bin && \
+    --black _cspsh4.py && --flake8 _cspsh4.py && python3 -i _cspsh4.py
 
 examples:
   _cspsh4.py
@@ -135,6 +136,34 @@ class CspTuple(CspTree):
 
     def _to_deep_py_(self, depth):
 
+        if hasattr(self, "_py_style_"):
+
+            styles = self._py_style_.splitlines(keepends=True)
+            assert len(styles) >= 3, repr(styles)
+
+            self_name = type(self).__name__
+
+            chars = ""
+
+            if "{}" not in styles[0]:
+                chars += to_deep_py(styles[0])
+            else:
+                chars += styles[0].format(to_deep_py(self_name, depth=(depth + 1)))
+
+            for (index, item) in enumerate(self):
+                if not index:
+                    chars += styles[1].format(to_deep_py(item, depth=(depth + 1)))
+                else:
+                    chars += styles[-2].format(to_deep_py(item, depth=(depth + 1)))
+
+            chars += styles[-1].format()
+
+            dent = depth * "\t"
+            dented_chars = ("\n" + dent).join(chars.splitlines())
+            spaced_chars = dented_chars.replace("\t", DENT)
+
+            return spaced_chars
+
         pys = list()
         pys.append(type(self).__name__ + "(")
 
@@ -175,9 +204,12 @@ def to_deep_csp(csp_tree):
     return csp
 
 
-def to_deep_py(csp_tree):
-    py = csp_tree._to_deep_py_(0)
-    return py
+def to_deep_py(obj, depth=0):
+    if hasattr(obj, "_to_deep_py_"):
+        chars = obj._to_deep_py_(depth)
+    else:
+        chars = str(obj)
+    return chars
 
 
 def _csp_unwrap_(csp_got):
@@ -220,6 +252,9 @@ class Event(CspLeaf, collections.namedtuple("Event", "name".split())):
 
 
 class EventTuple(tuple, CspTuple):
+
+    # TODO: _csp_style_ = "{{\n" "\t{},\n" "}}\n"
+    _py_style_ = "{}(\n" "\t{},\n" ")\n"
 
     _open_mark_ = "{"
     _op_mark_ = ""
