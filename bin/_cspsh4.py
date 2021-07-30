@@ -16,7 +16,7 @@ examples:
   _cspsh4.py
 """
 
-# FIXME:
+# TODO
 #
 # 3 # write def eval_csp(str) factories
 # 4 # collapse to line that fits
@@ -32,7 +32,6 @@ import difflib
 import itertools
 import os
 import pdb
-import re
 import sys
 import textwrap
 
@@ -47,185 +46,150 @@ _ = pdb
 DENT = 4 * " "
 
 
-class CspTree:
-    def _to_deep_csp_(self, depth):
+class Call:
+    """Collect the Args or KwArgs of a Call"""
 
-        csps = list()
-
-        mark_field_pairs = itertools.zip_longest(self._marks_, self._fields)
-        for (mark, field) in mark_field_pairs:
-            tree = getattr(self, field)
-            if not hasattr(tree, "_1st_to_deep_py_"):
-                csp_item = str(tree)
-            else:
-                csp_item = tree._to_deep_csp_(depth + 1)
-
-            csps.append(DENT + mark + csp_item)
-
-        dent = depth * DENT
-        csp = ("\n" + dent).join(csps)
-        return csp
+    def _to_deep_csp_(self):
+        """Format the entire Call Tree as CSP"""
+        chars = self._to_deep_style_(styles=self._csp_styles_, func=to_deep_csp)
+        return chars
 
     def _to_deep_py_(self):
+        """Format the entire Call Tree as Python"""
+        chars = self._to_deep_style_(styles=self._py_styles_, func=to_deep_py)
+        return chars
 
-        styles = self._py_style_.splitlines(keepends=True)
+    def _to_deep_style_(self, styles, func):
+        """Format the entire Call Tree as CSP or as Python"""
+
         assert len(styles) >= 3, repr(styles)
 
         self_name = type(self).__name__
 
-        #
+        if False:
+            if self_name == "ChoiceTuple":
+                if styles != self._py_styles_:
+                    pdb.set_trace()
+
+        # Open up, visit each Item or Value, and close out
 
         chars = ""
 
-        if "{}" not in styles[0]:
-            chars += to_deep_py(styles[0])
+        if "{}" not in styles[0]:  # 1st
+            chars += styles[0].format()
         else:
-            chars += styles[0].format(to_deep_py(self_name))
+            chars += styles[0].format(self_name)
 
-        for (index, item) in enumerate(self):
-            if not index:
-                styled = styles[1].format(to_deep_py(item))
+        zippeds = list(self._zip_())
+        zipped_styles = styles[1:][:-1]
+
+        for zipped in zippeds:
+            (index, key, value) = zipped
+
+            # Choose a style for the zipped Item or Value
+
+            zipped_style_index = -1  # end with the last zipped style
+            if len(zipped_styles) > 1:
+                if index < (len(zippeds) - 1):
+                    zipped_style_index = index  # step through the styles
+                    if index >= (len(zipped_styles) - 1):
+                        zipped_style_index = -2  # but don't step past the 2nd to last
+
+            style = zipped_styles[zipped_style_index]
+
+            # Apply the chosen style
+
+            count = style.count("{}")
+            assert count in (1, 2), (count, self_name)
+
+            func_value = func(value)
+            if self_name == "ChoiceTuple":  # TODO: inelegant
+                func_value = csp_unwrap(func_value)
+
+            if (count == 1) or (key is None):
+                styled = style.format(func_value)
             else:
-                styled = styles[-2].format(to_deep_py(item))
-            dented = "\n\t".join(styled.splitlines()) + "\n"
+                styled = style.format(key, func_value)
+
+            # Indent each Item or Value
+
+            dented = styled
+            if "\n" in styled:
+                dented = "\n\t".join(styled.splitlines()) + "\n"
+
             chars += dented
 
-        chars += styles[-1].format()
+        chars += styles[-1].format()  # Last
 
-        #
+        # Convert Tabs to Spaces
 
         spaced_chars = chars.replace("\t", DENT)
 
         return spaced_chars
 
-    def _1st_to_deep_py_(self, depth):
 
-        pys = list()
-        pys.append(type(self).__name__ + "(")
+class SomeKwArgs(Call):
+    """Collect the KwArgs of a Call like a Collections Named Tuple"""
 
-        for field in self._fields:
-            tree = getattr(self, field)
-            if not hasattr(tree, "_1st_to_deep_py_"):
-                pys.append(DENT + field + '="{}",'.format(tree))
-            else:
-                pys.append(DENT + field + "=" + tree._1st_to_deep_py_(depth + 1) + ",")
+    _py_styles_ = ("{}(\n", "\t{}={},\n", ")")
 
-        pys.append(")")
+    def _zip_(self):
+        """Yield each (index, key, value) of the Named Tuple in order"""
 
-        dent = depth * DENT
-        py = ("\n" + dent).join(pys)
-
-        return py
-
-        # goes wrong when field value type is not in (CspTree, str)
-        # goes wrong over quotes, line breaks, etc in field values
+        for (index, key) in enumerate(self._fields):  # from collections.namedtuple
+            value = getattr(self, key)
+            yield (index, key, value)
 
 
-class CspLeaf(CspTree):
-    def _to_deep_csp_(self, depth):
+class OneKwArg(SomeKwArgs):
+    """Like SomeKwArgs, but styled differently"""
 
-        assert len(self._fields) == 1, self._fields
-
-        field = self._fields[-1]
-        tree = getattr(self, field)
-        csp = tree
-
-        return csp
-
-    def _1st_to_deep_py_(self, depth):
-
-        assert len(self._fields) == 1, self._fields
-
-        field = self._fields[-1]
-        tree = getattr(self, field)
-        py = '{}("{}")'.format(type(self).__name__, tree)
-
-        return py
-
-        # goes wrong over quotes, line breaks, etc in field value
+    _py_styles_ = ("{}(", "{}", ")")
 
 
-class CspTuple(CspTree):
-    def _to_deep_csp_(self, depth):
+class SomeArgs(Call):
+    """Collect the indexed Args of a Call like a Tuple"""
 
-        csps = list()
-        csps.append(self._open_mark_)
+    _py_styles_ = ("{}(\n", "\t{},\n", ")")
 
-        for (index, item) in enumerate(self):
-            csp_item = item._to_deep_csp_(depth + 1)
-            csp_item = _csp_unwrap_(csp_item)
+    def _zip_(self):
+        """Yield each (index, key, value) of the Tuple, always with None as the key"""
 
-            if not index:
-                csps.append(DENT + csp_item + self._comma_mark_)
-            else:
-                csps.append(DENT + self._op_mark_ + csp_item + self._comma_mark_)
-
-        csps.append(self._close_mark_)
-
-        dent = depth * DENT
-        csp = ("\n" + dent).join(csps)
-        return csp
-
-    def _1st_to_deep_py_(self, depth):
-
-        if hasattr(self, "_py_style_"):
-            outdented = self._to_deep_py_()
-            chars = ("\n" + depth * DENT).join(outdented.splitlines())
-
-            return chars
-
-        pys = list()
-        pys.append(type(self).__name__ + "(")
-
-        for item in self:
-            pys.append(DENT + item._1st_to_deep_py_(depth + 1) + ",")
-        pys.append(")")
-
-        dent = depth * DENT
-        py = ("\n" + dent).join(pys)
-        return py
+        key = None
+        for (index, value) in enumerate(self):
+            yield (index, key, value)
 
 
-class CspPair(CspTree):
-    def _to_deep_csp_(self, depth):
+def to_deep_csp(obj):
+    """Format the entire Call Tree as CSP"""
 
-        assert len(self._fields) == 2, self._fields
-
-        csps = list()
-        csps.append(self._open_mark_)
-
-        for (index, field) in enumerate(self._fields):
-            tree = getattr(self, field)
-            if not index:
-                csps.append(DENT + tree._to_deep_csp_(depth + 1))
-            else:
-                csps.append(DENT + self._op_mark_ + " " + tree._to_deep_csp_(depth + 1))
-
-        csps.append(self._close_mark_)
-
-        dent = depth * DENT
-        csp = ("\n" + dent).join(csps)
-
-        return csp
-
-
-def to_deep_csp(csp_tree):
-    csp = csp_tree._to_deep_csp_(0)
-    return csp
-
-
-def to_deep_py(obj, depth=0):
-    if hasattr(obj, "_1st_to_deep_py_"):
-        chars = obj._1st_to_deep_py_(depth)
+    if hasattr(obj, "_to_deep_csp_"):
+        chars = obj._to_deep_csp_()
     else:
-        chars = str(obj)
+        assert isinstance(obj, str), type(obj)
+        chars = "{}".format(obj)  # TODO: too easily goes wrong
+
     return chars
 
 
-def _csp_unwrap_(csp_got):
+def to_deep_py(obj, depth=0):
+    """Format the entire Call Tree as Python"""
+
+    if hasattr(obj, "_to_deep_py_"):
+        chars = obj._to_deep_py_()
+    else:
+        assert isinstance(obj, str), type(obj)
+        chars = '"{}"'.format(obj)  # TODO: too easily goes wrong
+
+    return chars
+
+
+def csp_unwrap(csp_got):
+    """Drop the () enclosing parentheses"""
+
     if csp_got.startswith("(") and csp_got.endswith(")"):
         csp_got = csp_got[len("(") :][: -len(")")]
-    csp_got = csp_got.strip()
+
     return csp_got
 
 
@@ -234,55 +198,49 @@ def _csp_unwrap_(csp_got):
 #
 
 
-class AfterProc(collections.namedtuple("AfterProc", "before after".split()), CspPair):
-    _open_mark_ = "("
-    _op_mark_ = "→"
-    _close_mark_ = ")"
+class AfterProc(
+    collections.namedtuple("AfterProc", "before after".split()), SomeKwArgs
+):
+
+    _csp_styles_ = ("(", "{}", " → {}", ")")
 
 
 class EventsProc(
-    collections.namedtuple("EventsProc", "name events body".split()), CspTree
+    collections.namedtuple("EventsProc", "name events body".split()), SomeKwArgs
 ):
-    _marks_ = ("μ ", " : ", " • ")
+
+    _csp_styles_ = ("", "μ {}", " : {}", " • {}", "")
 
 
-class ChoiceTuple(tuple, CspTuple):
+class ChoiceTuple(tuple, SomeArgs):
 
-    _py_style_ = "{}(\n" "\t{},\n" ")\n"
-
-    _open_mark_ = "("
-    _op_mark_ = "| "
-    _comma_mark_ = ""
-    _close_mark_ = ")"
+    _csp_styles_ = ("(", "{}", " | {}", ")")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
 
-class Event(CspLeaf, collections.namedtuple("Event", "name".split())):
-    pass
+class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
+
+    _csp_styles_ = ("", "{}", "")
 
 
-class EventTuple(tuple, CspTuple):
+class EventTuple(tuple, SomeArgs):
 
-    # TODO: _csp_style_ = "{{\n" "\t{},\n" "}}\n"
-    _py_style_ = "{}(\n" "\t{},\n" ")\n"
-
-    _open_mark_ = "{"
-    _op_mark_ = ""
-    _comma_mark_ = ","
-    _close_mark_ = "}"
+    _csp_styles_ = ("{{", "{}, ", "{}", "}}")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
 
-class ProcDef(collections.namedtuple("ProcDef", "name body".split()), CspTree):
-    _marks_ = ("", " = ")
+class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs):
+
+    _csp_styles_ = ("", "{}", " = {}", "")
 
 
-class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), CspLeaf):
-    pass
+class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg):
+
+    _csp_styles_ = ("", "{}", "")
 
 
 #
@@ -296,7 +254,7 @@ def main(argv):
     parser = compile_argdoc(epi="workflow:")
     _ = parser.parse_args(argv[1:])
 
-    try_to_deep_py()
+    try_to_deep_style()
 
     stderr_print("+ exit 0")
 
@@ -399,7 +357,7 @@ def stderr_print_diff(**kwargs):
 #
 
 
-def try_to_deep_py():
+def try_to_deep_style():
     """Translate to source lines of nests of Python calls, from Csp Tree"""
 
     # coin  # an event exists
@@ -537,21 +495,7 @@ def try_to_deep_py():
         # test print as Csp
 
         csp_got = to_deep_csp(csp_tree)
-
-        if False:  # compile time option to review line broken format
-            print()
-            print(csp_got)  # intelligible, but not yet great
-
-        if True:
-            csp_got = re.sub(r" +", repl=" ", string=csp_got)
-            csp_got = csp_got.replace("\n", "")
-            csp_got = csp_got.replace("( ", "(")
-            csp_got = csp_got.replace("{ ", "{")
-            csp_got = csp_got.replace(",}", "}")
-            csp_got = csp_got.replace(", }", "}")
-            csp_got = csp_got.replace(" )", ")")
-            csp_got = csp_got.strip()
-            csp_got = _csp_unwrap_(csp_got)
+        csp_got = csp_unwrap(csp_got)
 
         assert csp_got == csp_want, dict(csp_got=csp_got, csp_want=csp_want)
 
