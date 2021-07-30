@@ -18,8 +18,8 @@ examples:
 
 # TODO
 #
-# 3 # write def eval_csp(str) factories
-# 4 # collapse to line that fits
+# -2  # write def eval_csp(str) factories
+# -1  # collapse to line that fits
 #
 
 # code reviewed by people, and by Black and Flake8 bots
@@ -205,19 +205,17 @@ class AfterProc(
     _csp_styles_ = ("(", "{}", " → {}", ")")
 
 
-class EventsProc(
-    collections.namedtuple("EventsProc", "name events body".split()), SomeKwArgs
-):
-
-    _csp_styles_ = ("", "μ {}", " : {}", " • {}", "")
-
-
 class ChoiceTuple(tuple, SomeArgs):
 
     _csp_styles_ = ("(", "{}", " | {}", ")")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
+
+
+class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg):
+
+    _csp_styles_ = ("", "{}", "")
 
 
 class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
@@ -233,14 +231,16 @@ class EventTuple(tuple, SomeArgs):
         return super().__new__(cls, args)
 
 
+class EventsProc(
+    collections.namedtuple("EventsProc", "name events body".split()), SomeKwArgs
+):
+
+    _csp_styles_ = ("", "μ {}", " : {}", " • {}", "")
+
+
 class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs):
 
     _csp_styles_ = ("", "{}", " = {}", "")
-
-
-class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg):
-
-    _csp_styles_ = ("", "{}", "")
 
 
 #
