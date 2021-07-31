@@ -48,13 +48,13 @@ test-once:
 	:
 	rm -fr ../pybashish/.local/share/grep/files/
 	bin/_grep1.py >/dev/null
-	:
-	: catch up with
-	@echo 'bin/cspsh.py -f 2>&1 |sed '\''s,  *$$,,'\''  >tests/cspsh-f.txt'
-	:
-	bin/cspsh.py -fv >/dev/null 2>&1
-	bash -c 'diff -burp tests/cspsh-f.txt <(bin/cspsh.py -f 2>&1)'
-	:
+	# :
+	# : catch up with
+	# @echo 'bin/cspsh.py -f 2>&1 |sed '\''s,  *$$,,'\''  >tests/cspsh-f.txt'
+	# :
+	# bin/cspsh.py -fv >/dev/null 2>&1
+	# bash -c 'diff -burp tests/cspsh-f.txt <(bin/cspsh.py -f 2>&1)'
+	# :
 	bin/doctestbash.py tests/ || (bin/doctestbash.py -vv tests/; exit 1)
 	:
 	for F in $(find bin/*.py -perm -0111); do bin/argdoc.py $$F >/dev/null && continue; echo "make: error:  python3 -m pdb bin/argdoc.py $$F" >&2; exit 1; done

@@ -5,6 +5,11 @@ Welcome to testing PyBashIsh
 // FIXME: pull the examples from help lines, run them, see changed output as regression
 // FIXME: add tests of the untested new verbs
 
+// TODO: maybe git track all of these separately
+// redundantly with this huge combined file
+// so this file is your glance over it all
+// but Git understands better how to track the separate pieces
+
 
 Contents
 ========
@@ -464,7 +469,9 @@ Call a column numeric when two-thirds of its cells contain decimal digits
 
 ## 2.10 ) CspSh
 
-    $ bin/echo.py 'tick → STOP$tick → tick → STOP$CLOCK = (tick → CLOCK)$CLOCK' |tr '$' '\n' |bin/cspsh.py -qi
+    // is a shell prompt we don't interpret lately
+
+    // bin/echo.py 'tick → STOP$tick → tick → STOP$CLOCK = (tick → CLOCK)$CLOCK' |tr '$' '\n' |bin/cspsh.py -qi
 
     ??  tick → STOP
     ⟨tick, STOP⟩
@@ -479,7 +486,7 @@ Call a column numeric when two-thirds of its cells contain decimal digits
 
     ??
 
-    $
+    //
 
 
 ## 2.11 ) Date
