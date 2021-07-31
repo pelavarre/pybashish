@@ -9,18 +9,17 @@ optional arguments:
   -h, --help  show this help message and exit
 
 workflow:
-  cd ~/Public/pybashish/bin && \
-    --black _cspsh4.py && --flake8 _cspsh4.py && python3 -i _cspsh4.py
+  while :; do
+    date
+    cd ~/Public/pybashish/bin && \
+      --black _cspsh4.py && --flake8 _cspsh4.py && python3 -i _cspsh4.py
+    echo press Return to continue
+    read
+  done
 
 examples:
   _cspsh4.py
 """
-
-# TODO
-#
-# -2  # write def eval_csp(str) factories
-# -1  # collapse to line that fits
-#
 
 # code reviewed by people, and by Black and Flake8 bots
 
@@ -32,6 +31,7 @@ import difflib
 import itertools
 import os
 import pdb
+import re
 import sys
 import textwrap
 
@@ -197,6 +197,12 @@ def csp_unwrap(csp_got):
 # Declare a CSP Lisp
 #
 
+NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
+MARK_REGEX = r"(?P<mark>[(),:={|}μ•→⟨⟩])"
+BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
+
+SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
+
 
 class AfterProc(
     collections.namedtuple("AfterProc", "before after".split()), SomeKwArgs
@@ -241,6 +247,98 @@ class EventsProc(
 class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs):
 
     _csp_styles_ = ("", "{}", " = {}", "")
+
+
+#
+# Parse CSP source lines
+#
+
+
+def eval_csp_calls(source):
+    """Parse an entire Call Tree of CSP"""
+
+    call_tree = None  # TODO: test empty source
+
+    # drop the "\r" out of each "\r\n"
+
+    nix_chars = "\n".join(source.splitlines()) + "\n"
+
+    # split the source into names, marks, and blanks
+
+    matches = re.finditer(SHARDS_REGEX, string=nix_chars)
+    shards = list(CspShard(match.groupdict()) for match in matches)
+
+    taker = ShardsTaker()
+    taker.give_shards(shards)
+
+    while taker.peek_more():
+        taker.accept_blank_shards()
+        if taker.peek_more():
+
+            shard = taker.peek_one_shard()
+            assert shard.key == "name", shard
+            taker.take_one_shard()
+            taker.accept_blank_shards()
+
+            call_tree = Event(shard.value)
+
+            taker.take_beyond_shards()
+
+    return call_tree
+
+
+class CspShard(collections.namedtuple("Event", "key value".split())):
+    def __new__(cls, groupdict):
+
+        key = None
+        value = None
+
+        for (item_key, item_value) in groupdict.items():
+            if item_value is not None:
+                assert key is None, groupdict
+                assert value is None, groupdict
+
+                key = item_key
+                value = item_value
+
+        assert key is not None, groupdict
+
+        return super().__new__(cls, key=key, value=value)
+
+
+#
+# Sketch the wound, in wounded CSP source
+#
+
+
+def depth_opened(source):
+    """List marks opened but not closed"""
+
+    OPEN_MARKS = "{[("
+    open_regex = r"[{}]".format(re.escape(OPEN_MARKS))  # r"[\{\[\("
+    assert OPEN_MARKS == "".join(list(re.findall(open_regex, OPEN_MARKS)))
+
+    CLOSE_MARKS = ")]}"
+    close_regex = r"[{}]".format(re.escape(CLOSE_MARKS))  # r"[\)\]\}]"
+    assert CLOSE_MARKS == "".join(list(re.findall(close_regex, CLOSE_MARKS)))
+
+    marks = OPEN_MARKS + CLOSE_MARKS
+    regex = r"[{}]".format(re.escape(OPEN_MARKS))  # r"[\{\[\("r"\)\]\}]"
+    assert marks == "".join(list(re.findall(close_regex, CLOSE_MARKS)))
+
+    opening = ""
+    closing = ""
+    for mark in re.findall(regex, string=marks):
+        assert len(mark) == 1, repr(mark)
+
+        if mark in OPEN_MARKS:
+            opening += mark
+        elif mark == opening[-1:]:
+            opening = opening[:-1]
+        else:
+            closing += mark
+
+    return (closing, opening)
 
 
 #
@@ -409,6 +507,7 @@ class ShardsTaker(argparse.Namespace):
         count = len(self.shards)
         if count:
 
+            assert not self.shards, self.shards  # TODO: assert else raise
             raise IndexError("{} remaining shards".format(count))
 
     def peek_more(self):
@@ -430,7 +529,7 @@ class ShardsTaker(argparse.Namespace):
 
         while self.peek_more():
             shard = self.peek_one_shard()
-            if shard.strip():
+            if shard.value.strip():
 
                 break
 
@@ -582,20 +681,35 @@ def try_to_deep_style():
     for (index, tupled_want) in enumerate(tupled_wants):
         (py_want, csp_want) = tupled_want
 
-        csp_tree = eval(py_want)
+        # test parse as Py
+
+        py_tree = eval(py_want)
 
         # test print as Py
 
-        py_got = to_deep_py(csp_tree)
+        py_got = to_deep_py(py_tree)
 
         assert not stderr_print_diff(input=py_want, output=py_got)
 
         # test print as Csp
 
-        csp_got = to_deep_csp(csp_tree)
+        csp_got = to_deep_csp(py_tree)
         csp_got = csp_unwrap(csp_got)
 
         assert csp_got == csp_want, dict(csp_got=csp_got, csp_want=csp_want)
+
+        # test parse as Csp
+
+        if index == 0:
+
+            csp_tree = eval_csp_calls(csp_want)
+
+            assert csp_tree == py_tree, dict(
+                want_tree=to_deep_py(py_tree),  # same as "py_got", above
+                got_tree=to_deep_py(csp_tree),
+            )
+
+            stderr_print("passed", csp_want)
 
 
 #
