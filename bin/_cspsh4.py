@@ -12,8 +12,8 @@ workflow:
   while :; do
     date
     cd ~/Public/pybashish/bin && \
-      --black _cspsh4.py && --flake8 _cspsh4.py && python3 -i _cspsh4.py
-    echo press Return to continue
+      --black _cspsh4.py && --flake8 _cspsh4.py && python3 _cspsh4.py
+    echo 'press Control+D (EOF) to continue'
     read
   done
 
@@ -64,10 +64,10 @@ class Call:
 
         assert len(styles) >= 3, repr(styles)
 
-        self_name = type(self).__name__
+        self_type_name = type(self).__name__
 
         if False:
-            if self_name == "ChoiceTuple":
+            if self_type_name == "ChoiceTuple":
                 if styles != self._py_styles_:
                     pdb.set_trace()
 
@@ -78,7 +78,7 @@ class Call:
         if "{}" not in styles[0]:  # 1st
             chars += styles[0].format()
         else:
-            chars += styles[0].format(self_name)
+            chars += styles[0].format(self_type_name)
 
         zippeds = list(self._zip_())
         zipped_styles = styles[1:][:-1]
@@ -100,10 +100,10 @@ class Call:
             # Apply the chosen style
 
             count = style.count("{}")
-            assert count in (1, 2), (count, self_name)
+            assert count in (1, 2), (count, self_type_name)
 
             func_value = func(value)
-            if self_name == "ChoiceTuple":  # TODO: inelegant
+            if self_type_name == "ChoiceTuple":  # TODO: inelegant
                 func_value = csp_unwrap(func_value)
 
             if (count == 1) or (key is None):
@@ -236,6 +236,11 @@ class EventTuple(tuple, SomeArgs):
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
+    def __repr__(self):
+        self_type_name = type(self).__name__
+        repped = "{}{}".format(self_type_name, super().__repr__())
+        return repped
+
 
 class EventsProc(
     collections.namedtuple("EventsProc", "name events body".split()), SomeKwArgs
@@ -266,25 +271,72 @@ def eval_csp_calls(source):
     # split the source into names, marks, and blanks
 
     matches = re.finditer(SHARDS_REGEX, string=nix_chars)
-    shards = list(CspShard(match.groupdict()) for match in matches)
+    shards = list(CspShard(_.groupdict()) for _ in matches)
+    words = list(_ for _ in shards if _.key != "blanks")
 
     taker = ShardsTaker()
-    taker.give_shards(shards)
+    taker.give_shards(words)
 
     while taker.peek_more():
-        taker.accept_blank_shards()
         if taker.peek_more():
-
             shard = taker.peek_one_shard()
-            assert shard.key == "name", shard
-            taker.take_one_shard()
-            taker.accept_blank_shards()
 
-            call_tree = Event(shard.value)
+            if shard.key == "name":
+
+                taker.take_one_shard()
+                call_tree = Event(shard.value)
+
+            else:
+
+                assert shard.key == "mark"
+                assert shard.value == "{"
+                taker.take_one_shard()
+
+                events = list()
+
+                while True:
+                    shard = taker.peek_one_shard()
+
+                    if shard.key != "name":
+
+                        break
+
+                    taker.take_one_shard()
+
+                    event = Event(shard.value)
+                    events.append(event)
+
+                    shard = taker.peek_one_shard()
+                    if shard.key == "mark":
+                        if shard.value == ",":
+
+                            taker.take_one_shard()
+
+                            continue
+
+                    break
+
+                shard = taker.peek_one_shard()
+                assert shard.key == "mark"
+                assert shard.value == "}"
+                taker.take_one_shard()
+
+                call_tree = EventTuple(*events)
 
             taker.take_beyond_shards()
 
     return call_tree
+
+    _ = """
+
+        coin
+        {coin, choc, toffee}
+        choc → X
+        choc → X | toffee → X
+        coin → (choc → X | toffee → X)
+        VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
+
+    """
 
 
 class CspShard(collections.namedtuple("Event", "key value".split())):
@@ -683,33 +735,39 @@ def try_to_deep_style():
 
         # test parse as Py
 
-        py_tree = eval(py_want)
+        py_evalled = eval(py_want)
 
         # test print as Py
 
-        py_got = to_deep_py(py_tree)
+        py_got = to_deep_py(py_evalled)
 
         assert not stderr_print_diff(input=py_want, output=py_got)
 
         # test print as Csp
 
-        csp_got = to_deep_csp(py_tree)
+        csp_got = to_deep_csp(py_evalled)
         csp_got = csp_unwrap(csp_got)
 
         assert csp_got == csp_want, dict(csp_got=csp_got, csp_want=csp_want)
 
         # test parse as Csp
 
-        if index == 0:
+        if index > 1:
+            continue
 
-            csp_tree = eval_csp_calls(csp_want)
+        csp_evalled = eval_csp_calls(csp_want)
 
-            assert csp_tree == py_tree, dict(
-                want_tree=to_deep_py(py_tree),  # same as "py_got", above
-                got_tree=to_deep_py(csp_tree),
-            )
+        if csp_evalled != py_evalled:
+            stderr_print("csp_evalled", csp_evalled)
+            stderr_print("py_evalled", py_evalled)
+            pdb.set_trace()
 
-            stderr_print("passed", csp_want)
+        assert csp_evalled == py_evalled, dict(
+            want_deep_py=py_want,
+            got_deep_py=to_deep_py(csp_evalled),
+        )
+
+        stderr_print("passed", csp_want)
 
 
 #
