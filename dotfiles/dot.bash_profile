@@ -235,11 +235,12 @@ function --pwd () {
 # Work with input and output history
 #
 
+alias -- '--'='(set -xe; cat - >/dev/null;)'
 
 alias -- ','="--take-pbpipe-from --search-dotluck 'expand.py'"
 alias -- ',,'="--pbpaste-dotluck 'cat.py -entv'"
-alias -- '-'="--take-input-from --search-dotluck 'cd -'"
-alias -- '--'="--search-dotluck 'cd -'"
+alias -- ',,,'="--take-input-from --search-dotluck 'cd -'"
+alias -- ',,,,'="--search-dotluck 'cd -'"
 alias -- '@'="--pbpipe 'expand.py'"
 alias -- '@@'="--pbpaste 'cat.py -entv'"
 

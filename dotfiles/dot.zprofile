@@ -270,11 +270,12 @@ function --pwd () {
 # Work with input and output history
 #
 
+alias -- '--'='(set -xe; cat - >/dev/null;)'
 
 alias -- ','="--take-pbpipe-from --search-dotluck 'expand.py'"
 alias -- ',,'="--pbpaste-dotluck 'cat.py -entv'"
-alias -- '-'="--take-input-from --search-dotluck 'cd -'"
-alias -- '--'="--search-dotluck 'cd -'"
+alias -- ',,,'="--take-input-from --search-dotluck 'cd -'"
+alias -- ',,,,'="--search-dotluck 'cd -'"
 alias -- '@'="--pbpipe 'expand.py'"
 alias -- '@@'="--pbpaste 'cat.py -entv'"
 
@@ -777,6 +778,11 @@ function --edit-shifted-slash () {
 
 
 export PATH="${PATH:+$PATH:}$HOME/bin"
+
+# TODO: more trace in how these do what they do
+
+alias -- --futurize='futurize --no-diffs -wW $PWD'
+alias -- --2to3='2to3 --no-diffs -wW $PWD'
 
 alias -- --black='~/.venvs/pips/bin/black'
 
