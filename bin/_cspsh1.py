@@ -941,35 +941,36 @@ class SomeCspWords(CspWorker):
 # deffed in many files  # missing from docs.python.org
 class ShardsTaker(argparse.Namespace):
     """
-    Walk once thru source chars, as split
+    Walk once thru source chars, as split, working as yet another Lexxer
 
     Define "take" to mean require and consume
-    Define "peek" to mean look ahead if present, else into an infinite stream of None's
-    Define "accept" to mean take if given, and don't take if not given
+    Define "peek" to mean look ahead into the shards followed by infinitely many None's
+    Define "accept" to mean take if present, else quietly don't bother
     """
 
     def __init__(self, shards=()):
         self.shards = list(shards)  # the shards being peeked, taken, and accepted
 
     def give_shards(self, shards):
-        """Give shards"""
+        """Give shards, such as from r"(?P<...>...)+" via 'match.groupdict().items()'"""
 
         self.shards.extend(shards)
 
     def take_one_shard(self):
-        """Consume the next shard, without returning it"""
+        """Take one shard, and drop it, don't return it"""
 
         self.shards = self.shards[1:]
 
     def take_some_shards(self, count):
-        """Take a number of shards"""
+        """Take the next few shards, and drop them, don't return them"""
 
         self.shards = self.shards[count:]
 
     def peek_one_shard(self):
-        """Return the next shard, without consuming it"""
+        """Return the next shard, but without consuming it"""
 
-        if self.shards:  # infinitely many None's past the end
+        if self.shards:  # infinitely many None's past the last shard
+
             return self.shards[0]
 
     def peek_some_shards(self, count):
@@ -981,45 +982,55 @@ class ShardsTaker(argparse.Namespace):
         return some
 
     def peek_equal_shards(self, hopes):
-        """Return the next few"""
+        """Return the next few shards, but only if they equal our hopes"""
 
         some = self.peek_some_shards(len(hopes))
         if some == list(hopes):
+
             return True
 
     def take_beyond_shards(self):
-        """Do nothing if all shards consumed, else mystically crash"""
+        """Do nothing if all shards consumed, else raise mystic IndexError"""
 
-        assert not self.peek_more()
+        count = len(self.shards)
+        if count:
+
+            raise IndexError("{} remaining shards".format(count))
 
     def peek_more(self):
-        """Return True while shards remain"""
+        """Return True if more shards remain"""
 
-        more = bool(self.shards)
+        more = bool(self.shards)  # see also:  self.peek_more_shards
+
         return more
 
     def peek_more_shards(self):
-        """List remaining shards"""
+        """List zero or more remaining shards"""
 
-        more_shards = list(self.shards)
+        more_shards = list(self.shards)  # see also:  self.peek_more
+
         return more_shards
 
     def accept_blank_shards(self):
-        """Discard zero or more blank shards"""
+        """Drop zero or more blank shards"""
 
         while self.peek_more():
             shard = self.peek_one_shard()
             if shard.strip():
+
                 break
+
             self.take_one_shard()
 
     def peek_upto_blank_shard(self):
-        """Peek the non-blank shards here, if any"""
+        """List zero or more non-blank shards found here"""
 
         shards = list()
         for shard in self.shards:
             if not shard.strip():
+
                 break
+
             shards.append(shard)
 
         return shards
