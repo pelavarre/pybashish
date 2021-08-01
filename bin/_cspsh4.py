@@ -454,13 +454,17 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
 def eval_csp_calls(source):
     """Parse an entire Call Tree of CSP"""
 
-    # drop the "\r" out of each "\r\n"
+    # Drop the "\r" out of each "\r\n"
 
     nix_chars = "\n".join(source.splitlines()) + "\n"
 
-    # split the source into names, marks, and blanks
+    # Drop the comments
 
-    matches = re.finditer(SHARDS_REGEX, string=nix_chars)
+    chars = "\n".join(_.partition("#")[0] for _ in nix_chars.splitlines())
+
+    # Split the source into names, marks, and blanks
+
+    matches = re.finditer(SHARDS_REGEX, string=chars)
     shards = list(CspShard(_.groupdict()) for _ in matches)
     words = list(_ for _ in shards if _.key != "blanks")
 
@@ -476,13 +480,17 @@ def eval_csp_calls(source):
 
 class CspTaker:
     """
-    Walk once thru source chars, as split, working as yet another Yacc
+    Walk once through source chars, as split, working as yet another Yacc
     """
 
     def __init__(self, taker):
         self.taker = taker
 
     def accept_one(self):
+
+        taker = self.taker
+        if not taker.peek_more():
+            return
 
         proc_def = self.accept_proc_def()
         if proc_def:
@@ -622,7 +630,8 @@ def main(argv):
     parser = compile_argdoc(epi="workflow:")
     _ = parser.parse_args(argv[1:])
 
-    try_to_deep_style()
+    try_py_then_csp()
+    try_csp_then_py()
 
     stderr_print("+ exit 0")
 
@@ -723,7 +732,7 @@ def stderr_print_diff(**kwargs):
 # deffed in many files  # missing from docs.python.org
 class ShardsTaker(argparse.Namespace):
     """
-    Walk once thru source chars, as split, working as yet another Lexxer
+    Walk once through source chars, as split, working as yet another Lexxer
 
     Define "take" to mean require and consume
     Define "peek" to mean look ahead into the shards followed by infinitely many None's
@@ -824,10 +833,10 @@ class ShardsTaker(argparse.Namespace):
 #
 
 
-def try_to_deep_style():
-    """Translate to source lines of nests of Python calls, from Csp Tree"""
+def bootstrap_py_csp_fragments():
+    """Put a few fragments of Py Source, and their CSP Source, under test"""
 
-    # coin  # an event exists
+    # CSP Python of CSP:  coin  # an event exists
 
     want0 = textwrap.dedent(
         """
@@ -835,7 +844,7 @@ def try_to_deep_style():
         """
     ).strip()
 
-    # {coin, choc, toffee}  # an alphabet collects one event after another
+    # CSP Python of CSP:  {coin, choc, toffee}  # an alphabet collects events
 
     want1 = textwrap.dedent(
         """
@@ -847,7 +856,7 @@ def try_to_deep_style():
         """
     ).strip()
 
-    # choc → X  # event guards process
+    # CSP Python of CSP:  choc → X  # event guards process
 
     want11 = textwrap.dedent(
         """
@@ -858,7 +867,7 @@ def try_to_deep_style():
         """
     ).strip()
 
-    # choc → X | toffee → X  # events guard processes
+    # CSP Python of CSP:  choc → X | toffee → X  # events guard processes
 
     want20 = textwrap.dedent(
         """
@@ -875,7 +884,7 @@ def try_to_deep_style():
         """
     ).strip()
 
-    # coin → (choc → X | toffee → X)  # events guard processes
+    # CSP Python of CSP:  coin → (choc → X | toffee → X)  # events guard processes
 
     want2 = textwrap.dedent(
         """
@@ -897,7 +906,7 @@ def try_to_deep_style():
         """
     ).strip()
 
-    # VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
+    # CSP Python of CSP:  VMCT = μ X : {...} • (coin → (choc → X | toffee → X))
 
     want3 = textwrap.dedent(
         """
@@ -932,26 +941,30 @@ def try_to_deep_style():
         """
     ).strip()
 
-    # choose
+    # Same lines of CSP as above
 
-    py_wants = (want0, want1, want11, want20, want2, want3)
-
-    csp_wants = (
-        textwrap.dedent(
-            """
-            coin
-            {coin, choc, toffee}
-            choc → X
-            choc → X | toffee → X
-            coin → (choc → X | toffee → X)
-            VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
-            """
-        )
-        .strip()
-        .splitlines()
+    CSP_WANTS = textwrap.dedent(
+        """
+        coin
+        {coin, choc, toffee}
+        choc → X
+        choc → X | toffee → X
+        coin → (choc → X | toffee → X)
+        VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
+        """
     )
 
-    # test
+    # Return the fragments chosen
+
+    py_wants = (want0, want1, want11, want20, want2, want3)
+    csp_wants = CSP_WANTS.strip().splitlines()
+    return (py_wants, csp_wants)
+
+
+def try_py_then_csp():
+    """Translate from Py Source to Calls to Py Source, to Csp Source, to Csp Calls"""
+
+    (py_wants, csp_wants) = bootstrap_py_csp_fragments()
 
     tupled_wants = itertools.zip_longest(py_wants, csp_wants)
     for (index, tupled_want) in enumerate(tupled_wants):
@@ -971,7 +984,9 @@ def try_to_deep_style():
 
         csp_got = to_deep_csp(py_evalled)
 
-        assert csp_got == csp_want, dict(csp_got=csp_got, csp_want=csp_want)
+        assert csp_got == csp_want, argparse.Namespace(
+            csp_got=csp_got, csp_want=csp_want
+        )
 
         # test parse as Csp
 
@@ -982,10 +997,133 @@ def try_to_deep_style():
             stderr_print("py_evalled", py_evalled)
             pdb.set_trace()
 
-        assert csp_evalled == py_evalled, dict(
+        assert csp_evalled == py_evalled, argparse.Namespace(
             want_deep_py=py_want,
             got_deep_py=to_deep_py(csp_evalled),
         )
+
+
+def try_csp_then_py():
+    """Translate from CSP Source to Calls to Py Source, to Py Calls, to Csp Source"""
+
+    chars = OUR_BOOTSTRAP
+    chars += CHAPTER_1
+
+    csp_chars = textwrap.dedent(chars).strip()
+    csp_chars = "\n".join(_.partition("#")[0] for _ in csp_chars.splitlines())
+    csp_wants = (_.strip() for _ in csp_chars.splitlines() if _.strip())
+
+    for csp_want in csp_wants:
+        try:
+            csp_evalled = eval_csp_calls(csp_want)
+            py_got = to_deep_py(csp_evalled)
+            py_evalled = eval(py_got)
+            csp_got = to_deep_csp(py_evalled)
+            assert csp_got == csp_want, argparse.Namespace(
+                csp_want=csp_want, csp_got=csp_got
+            )
+        except Exception:
+            stderr_print("Failing at: {}".format(csp_want))
+            raise
+
+
+OUR_BOOTSTRAP = """
+
+    coin
+    {coin, choc, toffee}
+    choc → X
+    choc → X | toffee → X
+    coin → (choc → X | toffee → X)
+    VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
+
+"""
+
+CHAPTER_1 = """
+
+    #
+    # Chapter 1:  Processes
+    #
+
+
+    # 1.1 Introduction, p.1
+
+
+    # 1.1.1 Prefix, p.3
+
+    coin → STOP  # 1.1.1 X1
+    # coin → choc → coin → choc → STOP  # 1.1.1 X2
+
+    # CTR = (right → up → right → right → STOP)  # 1.1.1 X3
+
+    # x → y  # meaningless per process name 'y' is not upper case 'Y'
+    # P → Q  # meaningless per event name 'P' is not lower case 'p'
+
+    x → (y → STOP)
+
+
+    # 1.1.2 Recursion, p.4
+
+    # CLOCK = (tick → CLOCK)
+    # CLOCK = (tick → tick → tick → CLOCK)
+    CLOCK = μ X : {tick} • (tick → X)  # 1.1.2 X1
+
+    # VMS = (coin → (choc → VMS))  # 1.1.2 X2
+
+    # CH5A = (in5p → out2p → out1p → out2p → CH5A)  # 1.1.2 X3
+    # CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
+
+
+    # 1.1.3 Choice, p.7
+
+    # (up → STOP | right → right → up → STOP)  # 1.1.3 X1
+
+    # CH5C = in5p → (  # 1.1.3 X2
+    #     out1p → out1p → out1p → out2p → CH5C |
+    #     out2p → out1p → out2p → CH5C)
+
+    # (x → P | y → Q)
+
+    # VMCT = μ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
+
+    # VMC = (in2p → (large → VMC |  # 1.1.3 X4
+    #                small → out1p → VMC) |
+    #        in1p → (small → VMC |
+    #                in1p → (large → VMC |
+    #                        in1p → STOP)))
+
+    # VMCRED = μ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
+
+    # VMS2 = (coin → VMCRED)  # 1.1.3 X6
+
+    # COPYBIT = μ X • (in.0 → out.0 → X |  # 1.1.3 X7
+    #                  in.1 → out.1 → X)
+
+    # (x → P | y → Q | z → R)
+    # (x → P | x → Q)  # meaningless per choices not distinct: ['x', 'x']
+    # (x → P | y)  # meaningless per '| y)' is not '| y → Q'
+    # (x → P) | (y → Q)  # meaningless per | is not an operator on processes
+    # (x → P | (y → Q | z → R))
+
+    # RUN-A = (x:A → RUN-A)  # 1.1.3 X8
+
+
+    # 1.1.4 Mutual recursion, p.11
+
+    # αDD = αO = αL = {setorange, setlemon, orange, lemon}
+
+    # DD = (setorange → O | setlemon → L)  # 1.1.4 X1
+    # O = (orange → O | setlemon → L | setorange → O)
+    # L = (lemon → L | setorange → O | setlemon → L)
+
+    # CT0 = (up → CT1 | around → CT0)  # 1.1.4 X2
+    # CT1 = (up → CT2 | down → CT0)
+    # CT2 = (up → CT3 | down → CT1)
+
+    # CT0 = (around → CT0 | up → CT1)  # 1.1.4 X2  # Variation B
+    # CT1 = (down → CT0 | up → CT2)
+    # CT2 = (down → CT1 | up → CT3)
+
+"""
 
 
 #
