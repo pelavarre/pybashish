@@ -302,8 +302,6 @@ class EventTuple(tuple, SomeArgs):
     def accept_one_from(taker):
         """Accept zero or more Events as an Event Tuple"""
 
-        events = list()
-
         shards = taker.peek_more_shards()
         len_shards = 0
         if len_shards >= len(shards):
@@ -342,15 +340,51 @@ class EventTuple(tuple, SomeArgs):
         len_shards += 1
         taker.take_some_shards(len_shards)
 
-        events = EventTuple(*event_list)
-        return events
+        event_tuple = EventTuple(*event_list)
+        return event_tuple
 
 
 class EventsProc(
-    collections.namedtuple("EventsProc", "name events body".split()), SomeKwArgs
+    collections.namedtuple("EventsProc", "name alphabet body".split()), SomeKwArgs
 ):
+    """Accept an Events Proc to name a Pocket"""
 
     _csp_styles_ = ("", "μ {}", " : {}", " • {}", "")
+
+    def accept_one_from(taker):
+        """Accept an Events Proc to name a Pocket"""
+
+        shard = taker.peek_one_shard()
+
+        shard = taker.peek_one_shard()
+        if not shard:
+            return
+        if not shard.is_mark("μ"):
+            return
+        taker.take_one_shard()
+
+        shard = taker.peek_one_shard()
+        assert shard
+        assert shard.is_proc_name()
+        taker.take_one_shard()
+        name = shard.value
+
+        shard = taker.peek_one_shard()
+        assert shard.is_mark(":")
+        taker.take_one_shard()
+
+        alphabet = EventTuple.accept_one_from(taker)
+        assert alphabet
+
+        shard = taker.peek_one_shard()
+        assert shard.is_mark("•")
+        taker.take_one_shard()
+
+        body = Pocket.accept_one_from(taker)
+        assert body
+
+        events_proc = EventsProc(name, alphabet=alphabet, body=body)
+        return events_proc
 
 
 class Pocket(collections.namedtuple("Pocket", "pocketed".split()), SomeKwArgs):
@@ -358,9 +392,11 @@ class Pocket(collections.namedtuple("Pocket", "pocketed".split()), SomeKwArgs):
     _csp_styles_ = ("(", "{}", ")")
 
     def accept_one_from(taker):
-        """Accept an AfterProc between parentheses"""
+        """Accept a Choice Tuple or After Proc between parentheses"""
 
         shard = taker.peek_one_shard()
+        if not shard:
+            return
         if not shard.is_mark("("):
             return
         taker.take_one_shard()
@@ -384,6 +420,30 @@ class Pocket(collections.namedtuple("Pocket", "pocketed".split()), SomeKwArgs):
 class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs):
 
     _csp_styles_ = ("", "{}", " = {}", "")
+
+    def accept_one_from(taker):
+        """Accept a Proc Def to name an Events Proc"""
+
+        shards = taker.peek_more_shards()
+        if not shards[1:]:
+            return
+
+        if not shards[1].is_mark("="):
+            return
+
+        shard = taker.peek_one_shard()
+        if not shard.is_proc_name():
+            return
+        taker.take_one_shard()
+        name = shard.value
+
+        taker.take_one_shard()  # the mark "→"
+
+        body = EventsProc.accept_one_from(taker)
+        assert body
+
+        proc_def = ProcDef(name, body=body)
+        return proc_def
 
 
 #
@@ -413,20 +473,6 @@ def eval_csp_calls(source):
 
     return call
 
-    # TODO: delete this
-
-    _ = """
-
-        coin
-        {coin, choc, toffee}
-        choc → X
-        choc → X | toffee → X
-        coin → (choc → X | toffee → X)
-
-        VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
-
-    """
-
 
 class CspTaker:
     """
@@ -437,6 +483,10 @@ class CspTaker:
         self.taker = taker
 
     def accept_one(self):
+
+        proc_def = self.accept_proc_def()
+        if proc_def:
+            return proc_def
 
         after_proc = self.accept_after_proc()
         if after_proc:
@@ -449,9 +499,9 @@ class CspTaker:
         if event:
             return event
 
-        events = self.accept_event_tuple()
-        if events:
-            return events
+        event_tuple = self.accept_event_tuple()
+        if event_tuple:
+            return event_tuple
 
     def accept_after_proc(self):
         taker = self.taker
@@ -477,6 +527,11 @@ class CspTaker:
         taker = self.taker
         event_tuple = EventTuple.accept_one_from(taker)
         return event_tuple
+
+    def accept_proc_def(self):
+        taker = self.taker
+        proc_def = ProcDef.accept_one_from(taker)
+        return proc_def
 
     def take_eof(self):
         taker = self.taker
@@ -850,7 +905,7 @@ def try_to_deep_style():
             name="VMCT",
             body=EventsProc(
                 name="X",
-                events=EventTuple(
+                alphabet=EventTuple(
                     Event("coin"),
                     Event("choc"),
                     Event("toffee"),
@@ -920,9 +975,6 @@ def try_to_deep_style():
 
         # test parse as Csp
 
-        if index > 4:
-            continue
-
         csp_evalled = eval_csp_calls(csp_want)
 
         if csp_evalled != py_evalled:
@@ -934,8 +986,6 @@ def try_to_deep_style():
             want_deep_py=py_want,
             got_deep_py=to_deep_py(csp_evalled),
         )
-
-        stderr_print("passed", csp_want)
 
 
 #
