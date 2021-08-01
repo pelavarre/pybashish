@@ -98,8 +98,6 @@ class Call:
             assert count in (1, 2), (count, self_type_name)
 
             func_value = func(value)
-            if self_type_name == "ChoiceTuple":  # TODO: inelegant
-                func_value = csp_unwrap(func_value)
 
             if (count == 1) or (key is None):
                 styled = style.format(func_value)
@@ -178,15 +176,6 @@ def to_deep_py(obj, depth=0):
     return chars
 
 
-def csp_unwrap(csp_got):
-    """Drop the () enclosing parentheses"""
-
-    if csp_got.startswith("(") and csp_got.endswith(")"):
-        csp_got = csp_got[len("(") :][: -len(")")]
-
-    return csp_got
-
-
 #
 # Declare a CSP Lisp
 #
@@ -202,55 +191,47 @@ class AfterProc(
     collections.namedtuple("AfterProc", "before after".split()), SomeKwArgs
 ):
 
-    _csp_styles_ = ("(", "{}", " → {}", ")")
+    _csp_styles_ = ("", "{}", " → {}", "")
 
     def accept_one_from(taker):
         """Accept zero or more Events as an EventTuple"""
 
         shards = taker.peek_more_shards()
-        len_shards = 0
-        if len_shards >= len(shards):
+        if not shards[1:]:
             return
 
-        shard = shards[len_shards]
-        if not shard.is_event_name():
+        if not shards[1].is_mark("→"):
             return
 
-        len_shards += 1
-        if len_shards >= len(shards):
-            return
-        before = Event(shard.value)
-
-        shard = shards[len_shards]
-        if not shard.is_mark("→"):
+        before = Event.accept_one_from(taker)
+        if not before:
             return
 
-        len_shards += 1
-        if len_shards >= len(shards):
-            return
+        taker.take_one_shard()  # the mark "→"
 
-        shard = shards[len_shards]
-        if not shard.is_proc_name():
-            return
+        after = Pocket.accept_one_from(taker)
+        if not after:
+            after = DeffedProc.accept_one_from(taker)
+        assert after
 
-        len_shards += 1
-        after = DeffedProc(shard.value)
-
-        taker.take_some_shards(len_shards)
-
-        one_after_proc = AfterProc(before, after=after)
-        return one_after_proc
+        after_proc = AfterProc(before, after=after)
+        return after_proc
 
 
 class ChoiceTuple(tuple, SomeArgs):
 
-    _csp_styles_ = ("(", "{}", " | {}", ")")
+    _csp_styles_ = ("", "{}", " | {}", "")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
+    def __repr__(self):
+        self_type_name = type(self).__name__
+        repped = "{}{}".format(self_type_name, super().__repr__())
+        return repped
+
     def accept_one_from(taker, after_proc):
-        """Accept two or more After Procs as a ChoiceTuple"""
+        """Accept two or more After Procs as a Choice Tuple"""
 
         after_procs = list()
         after_procs.append(after_proc)
@@ -281,7 +262,7 @@ class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg)
     _csp_styles_ = ("", "{}", "")
 
     def accept_one_from(taker):
-        """Accept a proc name as an DeffedProc"""
+        """Accept a proc name as an Deffed Proc"""
 
         shard = taker.peek_one_shard()
         if shard.is_proc_name():
@@ -319,7 +300,7 @@ class EventTuple(tuple, SomeArgs):
         return repped
 
     def accept_one_from(taker):
-        """Accept zero or more Events as an EventTuple"""
+        """Accept zero or more Events as an Event Tuple"""
 
         events = list()
 
@@ -372,6 +353,34 @@ class EventsProc(
     _csp_styles_ = ("", "μ {}", " : {}", " • {}", "")
 
 
+class Pocket(collections.namedtuple("Pocket", "pocketed".split()), SomeKwArgs):
+
+    _csp_styles_ = ("(", "{}", ")")
+
+    def accept_one_from(taker):
+        """Accept an AfterProc between parentheses"""
+
+        shard = taker.peek_one_shard()
+        if not shard.is_mark("("):
+            return
+        taker.take_one_shard()
+
+        after_proc = AfterProc.accept_one_from(taker)
+        assert after_proc
+
+        pocketed = after_proc
+        choice_tuple = ChoiceTuple.accept_one_from(taker, after_proc=after_proc)
+        if choice_tuple:
+            pocketed = choice_tuple
+
+        shard = taker.peek_one_shard()
+        assert shard.is_mark(")")
+        taker.take_one_shard()
+
+        pocket = Pocket(pocketed)
+        return pocket
+
+
 class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs):
 
     _csp_styles_ = ("", "{}", " = {}", "")
@@ -411,9 +420,9 @@ def eval_csp_calls(source):
         coin
         {coin, choc, toffee}
         choc → X
-
         choc → X | toffee → X
         coin → (choc → X | toffee → X)
+
         VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
 
     """
@@ -817,14 +826,16 @@ def try_to_deep_style():
         """
         AfterProc(
             before=Event("coin"),
-            after=ChoiceTuple(
-                AfterProc(
-                    before=Event("choc"),
-                    after=DeffedProc("X"),
-                ),
-                AfterProc(
-                    before=Event("toffee"),
-                    after=DeffedProc("X"),
+            after=Pocket(
+                pocketed=ChoiceTuple(
+                    AfterProc(
+                        before=Event("choc"),
+                        after=DeffedProc("X"),
+                    ),
+                    AfterProc(
+                        before=Event("toffee"),
+                        after=DeffedProc("X"),
+                    ),
                 ),
             ),
         )
@@ -844,16 +855,20 @@ def try_to_deep_style():
                     Event("choc"),
                     Event("toffee"),
                 ),
-                body=AfterProc(
-                    before=Event("coin"),
-                    after=ChoiceTuple(
-                        AfterProc(
-                            before=Event("choc"),
-                            after=DeffedProc("X"),
-                        ),
-                        AfterProc(
-                            before=Event("toffee"),
-                            after=DeffedProc("X"),
+                body=Pocket(
+                    pocketed=AfterProc(
+                        before=Event("coin"),
+                        after=Pocket(
+                            pocketed=ChoiceTuple(
+                                AfterProc(
+                                    before=Event("choc"),
+                                    after=DeffedProc("X"),
+                                ),
+                                AfterProc(
+                                    before=Event("toffee"),
+                                    after=DeffedProc("X"),
+                                ),
+                            ),
                         ),
                     ),
                 ),
@@ -900,13 +915,12 @@ def try_to_deep_style():
         # test print as Csp
 
         csp_got = to_deep_csp(py_evalled)
-        csp_got = csp_unwrap(csp_got)
 
         assert csp_got == csp_want, dict(csp_got=csp_got, csp_want=csp_want)
 
         # test parse as Csp
 
-        if index > 3:
+        if index > 4:
             continue
 
         csp_evalled = eval_csp_calls(csp_want)
