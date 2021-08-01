@@ -249,6 +249,32 @@ class ChoiceTuple(tuple, SomeArgs):
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
+    def accept_one_from(taker, after_proc):
+        """Accept two or more After Procs as a ChoiceTuple"""
+
+        after_procs = list()
+        after_procs.append(after_proc)
+
+        while True:
+
+            shard = taker.peek_one_shard()
+            if not shard:
+                break
+            if not shard.is_mark("|"):
+                break
+
+            taker.take_one_shard()
+
+            next_after_proc = AfterProc.accept_one_from(taker)
+            assert next_after_proc
+            after_procs.append(next_after_proc)
+
+        if len(after_procs) <= 1:
+            return
+
+        choice_tuple = ChoiceTuple(*after_procs)
+        return choice_tuple
+
 
 class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg):
 
@@ -261,8 +287,8 @@ class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg)
         if shard.is_proc_name():
 
             taker.take_one_shard()
-            mention = DeffedProc(shard.value)
-            return mention
+            deffed_proc = DeffedProc(shard.value)
+            return deffed_proc
 
 
 class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
@@ -276,8 +302,8 @@ class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
         if shard.is_event_name():
 
             taker.take_one_shard()
-            one_event = Event(shard.value)
-            return one_event
+            event = Event(shard.value)
+            return event
 
 
 class EventTuple(tuple, SomeArgs):
@@ -307,7 +333,7 @@ class EventTuple(tuple, SomeArgs):
         if not shard.is_mark("{"):
             return
 
-        events = list()
+        event_list = list()
         while True:
 
             shard = shards[len_shards]
@@ -318,7 +344,7 @@ class EventTuple(tuple, SomeArgs):
             if len_shards >= len(shards):
                 break
 
-            events.append(Event(shard.value))
+            event_list.append(Event(shard.value))
 
             shard = shards[len_shards]
             if not shard.is_mark(","):
@@ -335,8 +361,8 @@ class EventTuple(tuple, SomeArgs):
         len_shards += 1
         taker.take_some_shards(len_shards)
 
-        some_events = EventTuple(*events)
-        return some_events
+        events = EventTuple(*event_list)
+        return events
 
 
 class EventsProc(
@@ -403,37 +429,45 @@ class CspTaker:
 
     def accept_one(self):
 
-        call = self.accept_after_proc()
-        if call:
-            return call
+        after_proc = self.accept_after_proc()
+        if after_proc:
+            choice_tuple = self.accept_choice_tuple(after_proc)
+            if choice_tuple:
+                return choice_tuple
+            return after_proc
 
-        call = self.accept_event()
-        if call:
-            return call
+        event = self.accept_event()
+        if event:
+            return event
 
-        call = self.accept_event_tuple()
-        if call:
-            return call
+        events = self.accept_event_tuple()
+        if events:
+            return events
 
     def accept_after_proc(self):
         taker = self.taker
-        one_after_proc = AfterProc.accept_one_from(taker)
-        return one_after_proc
+        after_proc = AfterProc.accept_one_from(taker)
+        return after_proc
+
+    def accept_choice_tuple(self, after_proc):
+        taker = self.taker
+        choice_tuple = ChoiceTuple.accept_one_from(taker, after_proc=after_proc)
+        return choice_tuple
 
     def accept_deffed_proc(self):
         taker = self.taker
-        mention = DeffedProc.accept_one_from(taker)
-        return mention
+        deffed_proc = DeffedProc.accept_one_from(taker)
+        return deffed_proc
 
     def accept_event(self):
         taker = self.taker
-        one_event = Event.accept_one_from(taker)
-        return one_event
+        event = Event.accept_one_from(taker)
+        return event
 
     def accept_event_tuple(self):
         taker = self.taker
-        some_events = EventTuple.accept_one_from(taker)
-        return some_events
+        event_tuple = EventTuple.accept_one_from(taker)
+        return event_tuple
 
     def take_eof(self):
         taker = self.taker
@@ -872,7 +906,7 @@ def try_to_deep_style():
 
         # test parse as Csp
 
-        if index > 2:
+        if index > 3:
             continue
 
         csp_evalled = eval_csp_calls(csp_want)
