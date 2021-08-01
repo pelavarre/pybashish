@@ -66,11 +66,6 @@ class Call:
 
         self_type_name = type(self).__name__
 
-        if False:
-            if self_type_name == "ChoiceTuple":
-                if styles != self._py_styles_:
-                    pdb.set_trace()
-
         # Open up, visit each Item or Value, and close out
 
         chars = ""
@@ -124,7 +119,6 @@ class Call:
         # Convert Tabs to Spaces
 
         spaced_chars = chars.replace("\t", DENT)
-
         return spaced_chars
 
 
@@ -210,6 +204,43 @@ class AfterProc(
 
     _csp_styles_ = ("(", "{}", " → {}", ")")
 
+    def accept_one_from(taker):
+        """Accept zero or more Events as an EventTuple"""
+
+        shards = taker.peek_more_shards()
+        len_shards = 0
+        if len_shards >= len(shards):
+            return
+
+        shard = shards[len_shards]
+        if not shard.is_event_name():
+            return
+
+        len_shards += 1
+        if len_shards >= len(shards):
+            return
+        before = Event(shard.value)
+
+        shard = shards[len_shards]
+        if not shard.is_mark("→"):
+            return
+
+        len_shards += 1
+        if len_shards >= len(shards):
+            return
+
+        shard = shards[len_shards]
+        if not shard.is_proc_name():
+            return
+
+        len_shards += 1
+        after = DeffedProc(shard.value)
+
+        taker.take_some_shards(len_shards)
+
+        one_after_proc = AfterProc(before, after=after)
+        return one_after_proc
+
 
 class ChoiceTuple(tuple, SomeArgs):
 
@@ -223,10 +254,30 @@ class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg)
 
     _csp_styles_ = ("", "{}", "")
 
+    def accept_one_from(taker):
+        """Accept a proc name as an DeffedProc"""
+
+        shard = taker.peek_one_shard()
+        if shard.is_proc_name():
+
+            taker.take_one_shard()
+            mention = DeffedProc(shard.value)
+            return mention
+
 
 class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
 
     _csp_styles_ = ("", "{}", "")
+
+    def accept_one_from(taker):
+        """Accept an event name as an Event"""
+
+        shard = taker.peek_one_shard()
+        if shard.is_event_name():
+
+            taker.take_one_shard()
+            one_event = Event(shard.value)
+            return one_event
 
 
 class EventTuple(tuple, SomeArgs):
@@ -240,6 +291,52 @@ class EventTuple(tuple, SomeArgs):
         self_type_name = type(self).__name__
         repped = "{}{}".format(self_type_name, super().__repr__())
         return repped
+
+    def accept_one_from(taker):
+        """Accept zero or more Events as an EventTuple"""
+
+        events = list()
+
+        shards = taker.peek_more_shards()
+        len_shards = 0
+        if len_shards >= len(shards):
+            return
+
+        shard = shards[len_shards]
+        len_shards += 1
+        if not shard.is_mark("{"):
+            return
+
+        events = list()
+        while True:
+
+            shard = shards[len_shards]
+            if not shard.is_event_name():
+                break
+
+            len_shards += 1
+            if len_shards >= len(shards):
+                break
+
+            events.append(Event(shard.value))
+
+            shard = shards[len_shards]
+            if not shard.is_mark(","):
+                break
+
+            len_shards += 1
+            if len_shards >= len(shards):
+                break
+
+        shard = shards[len_shards]
+        if not shard.is_mark("}"):
+            return
+
+        len_shards += 1
+        taker.take_some_shards(len_shards)
+
+        some_events = EventTuple(*events)
+        return some_events
 
 
 class EventsProc(
@@ -262,8 +359,6 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
 def eval_csp_calls(source):
     """Parse an entire Call Tree of CSP"""
 
-    call_tree = None  # TODO: test empty source
-
     # drop the "\r" out of each "\r\n"
 
     nix_chars = "\n".join(source.splitlines()) + "\n"
@@ -274,69 +369,75 @@ def eval_csp_calls(source):
     shards = list(CspShard(_.groupdict()) for _ in matches)
     words = list(_ for _ in shards if _.key != "blanks")
 
-    taker = ShardsTaker()
-    taker.give_shards(words)
+    shards_taker = ShardsTaker()
+    shards_taker.give_shards(words)
 
-    while taker.peek_more():
-        if taker.peek_more():
-            shard = taker.peek_one_shard()
+    csp_taker = CspTaker(shards_taker)
+    call = csp_taker.accept_one()
+    csp_taker.take_eof()
 
-            if shard.key == "name":
+    return call
 
-                taker.take_one_shard()
-                call_tree = Event(shard.value)
-
-            else:
-
-                assert shard.key == "mark"
-                assert shard.value == "{"
-                taker.take_one_shard()
-
-                events = list()
-
-                while True:
-                    shard = taker.peek_one_shard()
-
-                    if shard.key != "name":
-
-                        break
-
-                    taker.take_one_shard()
-
-                    event = Event(shard.value)
-                    events.append(event)
-
-                    shard = taker.peek_one_shard()
-                    if shard.key == "mark":
-                        if shard.value == ",":
-
-                            taker.take_one_shard()
-
-                            continue
-
-                    break
-
-                shard = taker.peek_one_shard()
-                assert shard.key == "mark"
-                assert shard.value == "}"
-                taker.take_one_shard()
-
-                call_tree = EventTuple(*events)
-
-            taker.take_beyond_shards()
-
-    return call_tree
+    # TODO: delete this
 
     _ = """
 
         coin
         {coin, choc, toffee}
         choc → X
+
         choc → X | toffee → X
         coin → (choc → X | toffee → X)
         VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
 
     """
+
+
+class CspTaker:
+    """
+    Walk once thru source chars, as split, working as yet another Yacc
+    """
+
+    def __init__(self, taker):
+        self.taker = taker
+
+    def accept_one(self):
+
+        call = self.accept_after_proc()
+        if call:
+            return call
+
+        call = self.accept_event()
+        if call:
+            return call
+
+        call = self.accept_event_tuple()
+        if call:
+            return call
+
+    def accept_after_proc(self):
+        taker = self.taker
+        one_after_proc = AfterProc.accept_one_from(taker)
+        return one_after_proc
+
+    def accept_deffed_proc(self):
+        taker = self.taker
+        mention = DeffedProc.accept_one_from(taker)
+        return mention
+
+    def accept_event(self):
+        taker = self.taker
+        one_event = Event.accept_one_from(taker)
+        return one_event
+
+    def accept_event_tuple(self):
+        taker = self.taker
+        some_events = EventTuple.accept_one_from(taker)
+        return some_events
+
+    def take_eof(self):
+        taker = self.taker
+        taker.take_beyond_shards()
 
 
 class CspShard(collections.namedtuple("Event", "key value".split())):
@@ -356,6 +457,25 @@ class CspShard(collections.namedtuple("Event", "key value".split())):
         assert key is not None, groupdict
 
         return super().__new__(cls, key=key, value=value)
+
+    def is_event_name(self):
+        if self.key == "name":
+            if self.value == self.value.lower():
+                return True
+
+    def is_proc_name(self):
+        if self.key == "name":
+            if self.value == self.value.upper():
+                return True
+
+    def is_mark(self, mark):
+        if self.key == "mark":
+            if self.value == mark:
+                return True
+
+    def strip(self):
+        stripped = self.value.strip()
+        return stripped
 
 
 #
@@ -581,7 +701,7 @@ class ShardsTaker(argparse.Namespace):
 
         while self.peek_more():
             shard = self.peek_one_shard()
-            if shard.value.strip():
+            if shard.strip():
 
                 break
 
@@ -752,7 +872,7 @@ def try_to_deep_style():
 
         # test parse as Csp
 
-        if index > 1:
+        if index > 2:
             continue
 
         csp_evalled = eval_csp_calls(csp_want)
