@@ -1156,7 +1156,7 @@ CHAPTER_1 = """
     coin → STOP  # 1.1.1 X1
     coin → choc → coin → choc → STOP  # 1.1.1 X2
 
-    # CTR = (right → up → right → right → STOP)  # 1.1.1 X3
+    CTR = (right → up → right → right → STOP)  # 1.1.1 X3
 
     # x → y  # meaningless per process name 'y' is not upper case 'Y'
     # P → Q  # meaningless per event name 'P' is not lower case 'p'
@@ -1167,13 +1167,13 @@ CHAPTER_1 = """
     # 1.1.2 Recursion, p.4
 
     CLOCK = (tick → CLOCK)
-    # CLOCK = (tick → tick → tick → CLOCK)
+    CLOCK = (tick → tick → tick → CLOCK)
     CLOCK = μ X : {tick} • (tick → X)  # 1.1.2 X1
 
-    # VMS = (coin → (choc → VMS))  # 1.1.2 X2
+    VMS = (coin → (choc → VMS))  # 1.1.2 X2
 
-    # CH5A = (in5p → out2p → out1p → out2p → CH5A)  # 1.1.2 X3
-    # CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
+    CH5A = (in5p → out2p → out1p → out2p → CH5A)  # 1.1.2 X3
+    CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
 
 
     # 1.1.3 Choice, p.7
@@ -1196,7 +1196,7 @@ CHAPTER_1 = """
 
     # VMCRED = μ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
 
-    # VMS2 = (coin → VMCRED)  # 1.1.3 X6
+    VMS2 = (coin → VMCRED)  # 1.1.3 X6
 
     # COPYBIT = μ X • (in.0 → out.0 → X |  # 1.1.3 X7
     #                  in.1 → out.1 → X)
@@ -1214,17 +1214,17 @@ CHAPTER_1 = """
 
     # αDD = αO = αL = {setorange, setlemon, orange, lemon}
 
-    # DD = (setorange → O | setlemon → L)  # 1.1.4 X1
+    DD = (setorange → O | setlemon → L)  # 1.1.4 X1
     # O = (orange → O | setlemon → L | setorange → O)
     # L = (lemon → L | setorange → O | setlemon → L)
 
-    # CT0 = (up → CT1 | around → CT0)  # 1.1.4 X2
-    # CT1 = (up → CT2 | down → CT0)
-    # CT2 = (up → CT3 | down → CT1)
+    CT0 = (up → CT1 | around → CT0)  # 1.1.4 X2
+    CT1 = (up → CT2 | down → CT0)
+    CT2 = (up → CT3 | down → CT1)
 
-    # CT0 = (around → CT0 | up → CT1)  # 1.1.4 X2  # Variation B
-    # CT1 = (down → CT0 | up → CT2)
-    # CT2 = (down → CT1 | up → CT3)
+    CT0 = (around → CT0 | up → CT1)  # 1.1.4 X2  # Variation B
+    CT1 = (down → CT0 | up → CT2)
+    CT2 = (down → CT1 | up → CT3)
 
 """
 
