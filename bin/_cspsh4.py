@@ -47,10 +47,10 @@ DENT = 4 * " "
 
 
 class Call:
-    """Collect the Args or KwArgs of a Call"""
+    """Order the Args or KwArgs of a Call"""
 
     def _to_deep_csp_(self):
-        """Format the entire Call Tree as CSP"""
+        """Format the entire Call Tree as Csp"""
         chars = self._to_deep_style_(styles=self._csp_styles_, func=to_deep_csp)
         return chars
 
@@ -60,11 +60,16 @@ class Call:
         return chars
 
     def _to_deep_style_(self, styles, func):
-        """Format the entire Call Tree as CSP or as Python"""
+        """Format the entire Call Tree as Csp or as Python"""
 
         assert len(styles) >= 3, repr(styles)
 
         self_type_name = type(self).__name__
+
+        if False:
+            if self_type_name == "OrderedEventTuple":
+                if func == to_deep_csp:
+                    pdb.set_trace()
 
         # Open up, visit each Item or Value, and close out
 
@@ -121,7 +126,7 @@ class Call:
 
 
 class SomeKwArgs(Call):
-    """Collect the KwArgs of a Call like a Collections Named Tuple"""
+    """Order the KwArgs of a Call like a Collections Named Tuple"""
 
     _py_styles_ = ("{}(\n", "\t{}={},\n", ")")
 
@@ -140,7 +145,7 @@ class OneKwArg(SomeKwArgs):
 
 
 class SomeArgs(Call):
-    """Collect the indexed Args of a Call like a Tuple"""
+    """Order the indexed Args of a Call like a Tuple"""
 
     _py_styles_ = ("{}(\n", "\t{},\n", ")")
 
@@ -153,7 +158,7 @@ class SomeArgs(Call):
 
 
 def to_deep_csp(obj):
-    """Format the entire Call Tree as CSP"""
+    """Format the entire Call Tree as Csp"""
 
     if hasattr(obj, "_to_deep_csp_"):
         chars = obj._to_deep_csp_()
@@ -177,7 +182,7 @@ def to_deep_py(obj, depth=0):
 
 
 #
-# Declare a CSP Lisp
+# Declare a Csp Lisp
 #
 
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
@@ -190,35 +195,49 @@ SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
 class AfterProc(
     collections.namedtuple("AfterProc", "before after".split()), SomeKwArgs
 ):
+    """Run a Process after an Event"""
 
     _csp_styles_ = ("", "{}", " → {}", "")
 
     def accept_one_from(taker):
-        """Accept zero or more Events as an EventTuple"""
 
-        shards = taker.peek_more_shards()
-        if not shards[1:]:
-            return
+        # Match one or more of an Event Name and a "→" "\u2192" Rightwards Arrow Mark
 
-        if not shards[1].is_mark("→"):
-            return
+        before = OrderedEventTuple.accept_one_from(taker)
+        if not before:
 
-        before = Event.accept_one_from(taker)
+            shards = taker.peek_more_shards(2)
+
+            if shards[1:]:
+                shard1 = shards[1]
+                if shard1.is_mark("→"):
+
+                    before = Event.accept_one_from(taker)
+
         if not before:
             return
 
-        taker.take_one_shard()  # the mark "→"
+        # Take one "→" "\u2192" Rightwards Arrow Mark
 
-        after = Pocket.accept_one_from(taker)
+        shard = taker.peek_one_shard()
+        assert shard and shard.is_mark("→")  # TODO:  Mark.take_one_from_(taker)
+        taker.take_one_shard()
+
+        # Take one Pocket Proc or Deffed Proc
+
+        after = PocketProc.accept_one_from(taker)
         if not after:
             after = DeffedProc.accept_one_from(taker)
         assert after
+
+        # Succeed
 
         after_proc = AfterProc(before, after=after)
         return after_proc
 
 
 class ChoiceTuple(tuple, SomeArgs):
+    """Choose 1 of N Processes"""
 
     _csp_styles_ = ("", "{}", " | {}", "")
 
@@ -231,7 +250,6 @@ class ChoiceTuple(tuple, SomeArgs):
         return repped
 
     def accept_one_from(taker, after_proc):
-        """Accept two or more After Procs as a Choice Tuple"""
 
         after_procs = list()
         after_procs.append(after_proc)
@@ -258,11 +276,11 @@ class ChoiceTuple(tuple, SomeArgs):
 
 
 class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg):
+    """Mention a Proc by Name"""
 
     _csp_styles_ = ("", "{}", "")
 
     def accept_one_from(taker):
-        """Accept a proc name as an Deffed Proc"""
 
         shard = taker.peek_one_shard()
         if shard.is_proc_name():
@@ -273,11 +291,11 @@ class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg)
 
 
 class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
+    """Name a thing that happens"""
 
     _csp_styles_ = ("", "{}", "")
 
     def accept_one_from(taker):
-        """Accept an event name as an Event"""
 
         shard = taker.peek_one_shard()
         if shard.is_event_name():
@@ -287,7 +305,9 @@ class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
             return event
 
 
-class EventTuple(tuple, SomeArgs):
+# TODO: sort classes alphabetically
+class UnorderedEventTuple(tuple, SomeArgs):
+    """Collect zero or more Events together"""
 
     _csp_styles_ = ("{{", "{}, ", "{}", "}}")
 
@@ -300,7 +320,6 @@ class EventTuple(tuple, SomeArgs):
         return repped
 
     def accept_one_from(taker):
-        """Accept zero or more Events as an Event Tuple"""
 
         shards = taker.peek_more_shards()
         len_shards = 0
@@ -340,19 +359,18 @@ class EventTuple(tuple, SomeArgs):
         len_shards += 1
         taker.take_some_shards(len_shards)
 
-        event_tuple = EventTuple(*event_list)
+        event_tuple = UnorderedEventTuple(*event_list)
         return event_tuple
 
 
 class EventsProc(
     collections.namedtuple("EventsProc", "name alphabet body".split()), SomeKwArgs
 ):
-    """Accept an Events Proc to name a Pocket"""
+    """Give a Name to a PocketProc choosing Events from an Alphabet"""
 
     _csp_styles_ = ("", "μ {}", " : {}", " • {}", "")
 
     def accept_one_from(taker):
-        """Accept an Events Proc to name a Pocket"""
 
         shard = taker.peek_one_shard()
 
@@ -373,26 +391,26 @@ class EventsProc(
         assert shard.is_mark(":")
         taker.take_one_shard()
 
-        alphabet = EventTuple.accept_one_from(taker)
+        alphabet = UnorderedEventTuple.accept_one_from(taker)
         assert alphabet
 
         shard = taker.peek_one_shard()
         assert shard.is_mark("•")
         taker.take_one_shard()
 
-        body = Pocket.accept_one_from(taker)
+        body = PocketProc.accept_one_from(taker)
         assert body
 
         events_proc = EventsProc(name, alphabet=alphabet, body=body)
         return events_proc
 
 
-class Pocket(collections.namedtuple("Pocket", "pocketed".split()), SomeKwArgs):
+class PocketProc(collections.namedtuple("PocketProc", "pocketed".split()), SomeKwArgs):
+    """Contain one AfterProc or a Choice between AfterProc's"""
 
     _csp_styles_ = ("(", "{}", ")")
 
     def accept_one_from(taker):
-        """Accept a Choice Tuple or After Proc between parentheses"""
 
         shard = taker.peek_one_shard()
         if not shard:
@@ -413,18 +431,88 @@ class Pocket(collections.namedtuple("Pocket", "pocketed".split()), SomeKwArgs):
         assert shard.is_mark(")")
         taker.take_one_shard()
 
-        pocket = Pocket(pocketed)
+        pocket = PocketProc(pocketed)
         return pocket
 
 
+class OrderedEventTuple(tuple, SomeArgs):
+    """Order two or more Events"""
+
+    _csp_styles_ = ("", "{} → ", "{}", "")
+
+    def __new__(cls, *args):
+        return super().__new__(cls, args)
+
+    def __repr__(self):
+        self_type_name = type(self).__name__
+        repped = "{}{}".format(self_type_name, super().__repr__())
+        return repped
+
+    def accept_one_from(taker):
+
+        # Require an Event Name and a "→" "\u2192" Rightwards Arrow Mark
+
+        shards = taker.peek_more_shards(3)  # TODO: pad with "" marks?
+
+        match = None
+        if shards:
+            shard0 = shards[0]
+            if shard0.is_event_name():
+
+                if shards[1:]:
+                    shard1 = shards[1]
+                    if shard1.is_mark("→"):
+
+                        match = None
+                        if shards:
+                            shard2 = shards[2]
+                            if shard2.is_event_name():
+
+                                match = True
+
+        if not match:
+            return
+
+        # Consume one or more pairs of "→" and Event Name
+
+        event_list = list()
+        event_list.append(Event(shard0.value))
+        taker.take_one_shard()
+
+        while True:
+
+            shards = taker.peek_more_shards(2)
+
+            match = None
+            if shards:
+                shard0 = shards[0]
+                if shard0.is_mark("→"):
+                    if shards[1:]:
+                        shard1 = shards[1]
+                        if shard1.is_event_name():
+                            match = True
+
+            if not match:
+                break
+
+            taker.take_some_shards(2)
+
+            event_list.append(Event(shard1.value))
+
+        # Succeed
+
+        event_tuple = OrderedEventTuple(*event_list)
+        return event_tuple
+
+
 class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs):
+    """Give a Name to a Pocket Proc or an Event Proc"""
 
     _csp_styles_ = ("", "{}", " = {}", "")
 
     def accept_one_from(taker):
-        """Accept a Proc Def to name an Events Proc"""
 
-        shards = taker.peek_more_shards()
+        shards = taker.peek_more_shards(2)
         if not shards[1:]:
             return
 
@@ -439,7 +527,9 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
 
         taker.take_one_shard()  # the mark "→"
 
-        body = EventsProc.accept_one_from(taker)
+        body = PocketProc.accept_one_from(taker)
+        if not body:
+            body = EventsProc.accept_one_from(taker)
         assert body
 
         proc_def = ProcDef(name, body=body)
@@ -447,12 +537,12 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
 
 
 #
-# Parse CSP source lines
+# Parse Csp source lines
 #
 
 
 def eval_csp_calls(source):
-    """Parse an entire Call Tree of CSP"""
+    """Parse an entire Call Tree of Csp"""
 
     # Drop the "\r" out of each "\r\n"
 
@@ -472,8 +562,12 @@ def eval_csp_calls(source):
     shards_taker.give_shards(words)
 
     csp_taker = CspTaker(shards_taker)
-    call = csp_taker.accept_one()
-    csp_taker.take_eof()
+    try:
+        call = csp_taker.accept_one()
+        csp_taker.take_eof()
+    except Exception:
+        stderr_print("Failing before consuming", shards_taker.shards)
+        raise
 
     return call
 
@@ -511,6 +605,10 @@ class CspTaker:
         if event_tuple:
             return event_tuple
 
+        deffed_proc = self.accept_deffed_proc()
+        if deffed_proc:
+            return deffed_proc
+
     def accept_after_proc(self):
         taker = self.taker
         after_proc = AfterProc.accept_one_from(taker)
@@ -533,7 +631,7 @@ class CspTaker:
 
     def accept_event_tuple(self):
         taker = self.taker
-        event_tuple = EventTuple.accept_one_from(taker)
+        event_tuple = UnorderedEventTuple.accept_one_from(taker)
         return event_tuple
 
     def accept_proc_def(self):
@@ -585,7 +683,7 @@ class CspShard(collections.namedtuple("Event", "key value".split())):
 
 
 #
-# Sketch the wound, in wounded CSP source
+# Sketch the wound, in wounded Csp source
 #
 
 
@@ -796,10 +894,12 @@ class ShardsTaker(argparse.Namespace):
 
         return more
 
-    def peek_more_shards(self):
+    def peek_more_shards(self, limit=0):
         """List zero or more remaining shards"""
 
         more_shards = list(self.shards)  # see also:  self.peek_more
+        if limit:
+            more_shards = more_shards[:limit]
 
         return more_shards
 
@@ -834,9 +934,9 @@ class ShardsTaker(argparse.Namespace):
 
 
 def bootstrap_py_csp_fragments():
-    """Put a few fragments of Py Source, and their CSP Source, under test"""
+    """Put a few fragments of Py Source, and their Csp Source, under test"""
 
-    # CSP Python of CSP:  coin  # an event exists
+    # Csp Python of Csp:  coin  # an event exists
 
     want0 = textwrap.dedent(
         """
@@ -844,11 +944,11 @@ def bootstrap_py_csp_fragments():
         """
     ).strip()
 
-    # CSP Python of CSP:  {coin, choc, toffee}  # an alphabet collects events
+    # Csp Python of Csp:  {coin, choc, toffee}  # an alphabet collects events
 
     want1 = textwrap.dedent(
         """
-        EventTuple(
+        UnorderedEventTuple(
             Event("coin"),
             Event("choc"),
             Event("toffee"),
@@ -856,7 +956,7 @@ def bootstrap_py_csp_fragments():
         """
     ).strip()
 
-    # CSP Python of CSP:  choc → X  # event guards process
+    # Csp Python of Csp:  choc → X  # event guards process
 
     want11 = textwrap.dedent(
         """
@@ -867,7 +967,7 @@ def bootstrap_py_csp_fragments():
         """
     ).strip()
 
-    # CSP Python of CSP:  choc → X | toffee → X  # events guard processes
+    # Csp Python of Csp:  choc → X | toffee → X  # events guard processes
 
     want20 = textwrap.dedent(
         """
@@ -884,13 +984,13 @@ def bootstrap_py_csp_fragments():
         """
     ).strip()
 
-    # CSP Python of CSP:  coin → (choc → X | toffee → X)  # events guard processes
+    # Csp Python of Csp:  coin → (choc → X | toffee → X)  # events guard processes
 
     want2 = textwrap.dedent(
         """
         AfterProc(
             before=Event("coin"),
-            after=Pocket(
+            after=PocketProc(
                 pocketed=ChoiceTuple(
                     AfterProc(
                         before=Event("choc"),
@@ -906,7 +1006,7 @@ def bootstrap_py_csp_fragments():
         """
     ).strip()
 
-    # CSP Python of CSP:  VMCT = μ X : {...} • (coin → (choc → X | toffee → X))
+    # Csp Python of Csp:  VMCT = μ X : {...} • (coin → (choc → X | toffee → X))
 
     want3 = textwrap.dedent(
         """
@@ -914,15 +1014,15 @@ def bootstrap_py_csp_fragments():
             name="VMCT",
             body=EventsProc(
                 name="X",
-                alphabet=EventTuple(
+                alphabet=UnorderedEventTuple(
                     Event("coin"),
                     Event("choc"),
                     Event("toffee"),
                 ),
-                body=Pocket(
+                body=PocketProc(
                     pocketed=AfterProc(
                         before=Event("coin"),
-                        after=Pocket(
+                        after=PocketProc(
                             pocketed=ChoiceTuple(
                                 AfterProc(
                                     before=Event("choc"),
@@ -941,7 +1041,7 @@ def bootstrap_py_csp_fragments():
         """
     ).strip()
 
-    # Same lines of CSP as above
+    # Same lines of Csp as above
 
     CSP_WANTS = textwrap.dedent(
         """
@@ -1004,7 +1104,7 @@ def try_py_then_csp():
 
 
 def try_csp_then_py():
-    """Translate from CSP Source to Calls to Py Source, to Py Calls, to Csp Source"""
+    """Translate from Csp Source to Calls to Py Source, to Py Calls, to Csp Source"""
 
     chars = OUR_BOOTSTRAP
     chars += CHAPTER_1
@@ -1014,6 +1114,7 @@ def try_csp_then_py():
     csp_wants = (_.strip() for _ in csp_chars.splitlines() if _.strip())
 
     for csp_want in csp_wants:
+        py_got = None
         try:
             csp_evalled = eval_csp_calls(csp_want)
             py_got = to_deep_py(csp_evalled)
@@ -1023,7 +1124,8 @@ def try_csp_then_py():
                 csp_want=csp_want, csp_got=csp_got
             )
         except Exception:
-            stderr_print("Failing at: {}".format(csp_want))
+            stderr_print("Failing at test of Csp: {}".format(csp_want))
+            stderr_print("Failing with Python of: {}".format(py_got))
             raise
 
 
@@ -1050,8 +1152,9 @@ CHAPTER_1 = """
 
     # 1.1.1 Prefix, p.3
 
+    STOP
     coin → STOP  # 1.1.1 X1
-    # coin → choc → coin → choc → STOP  # 1.1.1 X2
+    coin → choc → coin → choc → STOP  # 1.1.1 X2
 
     # CTR = (right → up → right → right → STOP)  # 1.1.1 X3
 
@@ -1063,7 +1166,7 @@ CHAPTER_1 = """
 
     # 1.1.2 Recursion, p.4
 
-    # CLOCK = (tick → CLOCK)
+    CLOCK = (tick → CLOCK)
     # CLOCK = (tick → tick → tick → CLOCK)
     CLOCK = μ X : {tick} • (tick → X)  # 1.1.2 X1
 
@@ -1124,6 +1227,18 @@ CHAPTER_1 = """
     # CT2 = (down → CT1 | up → CT3)
 
 """
+
+
+#
+# To do
+#
+
+
+# TODO: Slackji :: transliteration of Unicode Org names of the Csp Unicode symbols
+# TODO: Ascii transliteration of Csp Unicode
+
+# TODO: Align Class Names closer to CspBook Pdf
+# TODO: Pad "self.peek_more" to the limit with never-matched empty "" marks
 
 
 #
