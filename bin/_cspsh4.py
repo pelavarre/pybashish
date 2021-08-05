@@ -199,20 +199,15 @@ class AfterProc(
 
     _csp_styles_ = ("", "{}", " → {}", "")
 
-    def accept_one_from(taker):
+    def after_proc_from(taker):
 
         # Match one or more of an Event Name and a "→" "\u2192" Rightwards Arrow Mark
 
-        before = OrderedEventTuple.accept_one_from(taker)
+        before = OrderedEventTuple.ordered_event_tuple_from(taker)
         if not before:
-
             shards = taker.peek_more_shards(2)
-
-            if shards[1:]:
-                shard1 = shards[1]
-                if shard1.is_mark("→"):
-
-                    before = Event.accept_one_from(taker)
+            if shards[1].is_mark("→"):
+                before = Event.event_from(taker)
 
         if not before:
             return
@@ -225,9 +220,9 @@ class AfterProc(
 
         # Take one Pocket Proc or Deffed Proc
 
-        after = PocketProc.accept_one_from(taker)
+        after = PocketProc.pocket_proc_from(taker)
         if not after:
-            after = DeffedProc.accept_one_from(taker)
+            after = DeffedProc.deffed_proc_from(taker)
         assert after
 
         # Succeed
@@ -249,7 +244,7 @@ class ChoiceTuple(tuple, SomeArgs):
         repped = "{}{}".format(self_type_name, super().__repr__())
         return repped
 
-    def accept_one_from(taker, after_proc):
+    def choice_tuple_from(taker, after_proc):
 
         after_procs = list()
         after_procs.append(after_proc)
@@ -257,14 +252,12 @@ class ChoiceTuple(tuple, SomeArgs):
         while True:
 
             shard = taker.peek_one_shard()
-            if not shard:
-                break
             if not shard.is_mark("|"):
                 break
 
             taker.take_one_shard()
 
-            next_after_proc = AfterProc.accept_one_from(taker)
+            next_after_proc = AfterProc.after_proc_from(taker)
             assert next_after_proc
             after_procs.append(next_after_proc)
 
@@ -280,12 +273,12 @@ class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg)
 
     _csp_styles_ = ("", "{}", "")
 
-    def accept_one_from(taker):
+    def deffed_proc_from(taker):
 
         shard = taker.peek_one_shard()
         if shard.is_proc_name():
-
             taker.take_one_shard()
+
             deffed_proc = DeffedProc(shard.value)
             return deffed_proc
 
@@ -295,72 +288,31 @@ class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
 
     _csp_styles_ = ("", "{}", "")
 
-    def accept_one_from(taker):
+    def event_from(taker):
 
         shard = taker.peek_one_shard()
         if shard.is_event_name():
-
             taker.take_one_shard()
+
             event = Event(shard.value)
             return event
 
 
-# TODO: sort classes alphabetically
-class UnorderedEventTuple(tuple, SomeArgs):
-    """Collect zero or more Events together"""
+class EmptyMark(OneKwArg, collections.namedtuple("EmptyMark", "".split())):
+    """Name the empty string that ends, or is all of, the Csp source"""
 
-    _csp_styles_ = ("{{", "{}, ", "{}", "}}")
+    _csp_styles_ = ("", "")
 
-    def __new__(cls, *args):
-        return super().__new__(cls, args)
+    def empty_mark_from(taker):
 
-    def __repr__(self):
-        self_type_name = type(self).__name__
-        repped = "{}{}".format(self_type_name, super().__repr__())
-        return repped
+        shard = taker.peek_one_shard()
+        if shard.is_mark(""):
+            # taker.take_one_shard()  # nope, don't
 
-    def accept_one_from(taker):
+            empty_mark = EmptyMark()
+            assert not empty_mark
 
-        shards = taker.peek_more_shards()
-        len_shards = 0
-        if len_shards >= len(shards):
-            return
-
-        shard = shards[len_shards]
-        len_shards += 1
-        if not shard.is_mark("{"):
-            return
-
-        event_list = list()
-        while True:
-
-            shard = shards[len_shards]
-            if not shard.is_event_name():
-                break
-
-            len_shards += 1
-            if len_shards >= len(shards):
-                break
-
-            event_list.append(Event(shard.value))
-
-            shard = shards[len_shards]
-            if not shard.is_mark(","):
-                break
-
-            len_shards += 1
-            if len_shards >= len(shards):
-                break
-
-        shard = shards[len_shards]
-        if not shard.is_mark("}"):
-            return
-
-        len_shards += 1
-        taker.take_some_shards(len_shards)
-
-        event_tuple = UnorderedEventTuple(*event_list)
-        return event_tuple
+            return empty_mark
 
 
 class EventsProc(
@@ -370,69 +322,48 @@ class EventsProc(
 
     _csp_styles_ = ("", "μ {}", " : {}", " • {}", "")
 
-    def accept_one_from(taker):
+    def events_proc_from(taker):
 
-        shard = taker.peek_one_shard()
-
-        shard = taker.peek_one_shard()
-        if not shard:
-            return
+        shard = taker.peek_one_shard()  # Csp:  μ
         if not shard.is_mark("μ"):
             return
         taker.take_one_shard()
 
-        shard = taker.peek_one_shard()
+        shard = taker.peek_one_shard()  # such as Csp:  μ X
         assert shard
         assert shard.is_proc_name()
         taker.take_one_shard()
         name = shard.value
 
-        shard = taker.peek_one_shard()
-        assert shard.is_mark(":")
-        taker.take_one_shard()
+        alphabet = None  # TODO: lazily detail the Alphabet of EventsProc
+        shard = taker.peek_one_shard()  # such as Csp:  μ X : { ... } •
+        if shard.is_mark(":"):
+            taker.take_one_shard()
 
-        alphabet = UnorderedEventTuple.accept_one_from(taker)
-        assert alphabet
+            alphabet = UnorderedEventTuple.unordered_event_tuple_from(taker)
+            assert alphabet
 
-        shard = taker.peek_one_shard()
+        shard = taker.peek_one_shard()  # such as Csp:  μ X ... •
         assert shard.is_mark("•")
         taker.take_one_shard()
 
-        body = PocketProc.accept_one_from(taker)
+        body = PocketProc.pocket_proc_from(taker)  # such as Csp:  μ X ... • ( ... )
         assert body
+
+        if not alphabet:
+            lazy_events_proc = LazyEventsProc(name, body=body)
+            return lazy_events_proc
 
         events_proc = EventsProc(name, alphabet=alphabet, body=body)
         return events_proc
 
 
-class PocketProc(collections.namedtuple("PocketProc", "pocketed".split()), SomeKwArgs):
-    """Contain one AfterProc or a Choice between AfterProc's"""
+class LazyEventsProc(
+    collections.namedtuple("LazyEventsProc", "name body".split()), SomeKwArgs
+):
+    """Give a Name to a PocketProc choosing Events without declaring its Alphabet"""
 
-    _csp_styles_ = ("(", "{}", ")")
-
-    def accept_one_from(taker):
-
-        shard = taker.peek_one_shard()
-        if not shard:
-            return
-        if not shard.is_mark("("):
-            return
-        taker.take_one_shard()
-
-        after_proc = AfterProc.accept_one_from(taker)
-        assert after_proc
-
-        pocketed = after_proc
-        choice_tuple = ChoiceTuple.accept_one_from(taker, after_proc=after_proc)
-        if choice_tuple:
-            pocketed = choice_tuple
-
-        shard = taker.peek_one_shard()
-        assert shard.is_mark(")")
-        taker.take_one_shard()
-
-        pocket = PocketProc(pocketed)
-        return pocket
+    _csp_styles_ = ("", "μ {}", " • {}", "")
 
 
 class OrderedEventTuple(tuple, SomeArgs):
@@ -448,35 +379,25 @@ class OrderedEventTuple(tuple, SomeArgs):
         repped = "{}{}".format(self_type_name, super().__repr__())
         return repped
 
-    def accept_one_from(taker):
+    def ordered_event_tuple_from(taker):
 
         # Require an Event Name and a "→" "\u2192" Rightwards Arrow Mark
 
         shards = taker.peek_more_shards(3)  # TODO: pad with "" marks?
 
         match = None
-        if shards:
-            shard0 = shards[0]
-            if shard0.is_event_name():
-
-                if shards[1:]:
-                    shard1 = shards[1]
-                    if shard1.is_mark("→"):
-
-                        match = None
-                        if shards:
-                            shard2 = shards[2]
-                            if shard2.is_event_name():
-
-                                match = True
+        if shards[0].is_event_name():
+            if shards[1].is_mark("→"):
+                if shards[2].is_event_name():
+                    match = True
 
         if not match:
             return
 
-        # Consume one or more pairs of "→" and Event Name
+        # Accept one or more pairs of "→" and Event Name
 
         event_list = list()
-        event_list.append(Event(shard0.value))
+        event_list.append(Event(shards[0].value))
         taker.take_one_shard()
 
         while True:
@@ -484,20 +405,16 @@ class OrderedEventTuple(tuple, SomeArgs):
             shards = taker.peek_more_shards(2)
 
             match = None
-            if shards:
-                shard0 = shards[0]
-                if shard0.is_mark("→"):
-                    if shards[1:]:
-                        shard1 = shards[1]
-                        if shard1.is_event_name():
-                            match = True
+            if shards[0].is_mark("→"):
+                if shards[1].is_event_name():
+                    match = True
 
             if not match:
                 break
 
             taker.take_some_shards(2)
 
-            event_list.append(Event(shard1.value))
+            event_list.append(Event(shards[1].value))
 
         # Succeed
 
@@ -510,12 +427,9 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
 
     _csp_styles_ = ("", "{}", " = {}", "")
 
-    def accept_one_from(taker):
+    def proc_def_from(taker):
 
         shards = taker.peek_more_shards(2)
-        if not shards[1:]:
-            return
-
         if not shards[1].is_mark("="):
             return
 
@@ -527,13 +441,105 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
 
         taker.take_one_shard()  # the mark "→"
 
-        body = PocketProc.accept_one_from(taker)
+        body = PocketProc.pocket_proc_from(taker)
         if not body:
-            body = EventsProc.accept_one_from(taker)
+            body = EventsProc.events_proc_from(taker)
         assert body
 
         proc_def = ProcDef(name, body=body)
         return proc_def
+
+
+class PocketProc(collections.namedtuple("PocketProc", "pocketed".split()), SomeKwArgs):
+    """Contain one AfterProc or a Choice between AfterProc's"""
+
+    _csp_styles_ = ("(", "{}", ")")
+
+    def pocket_proc_from(taker):
+
+        shard = taker.peek_one_shard()
+        if not shard.is_mark("("):
+            return
+        taker.take_one_shard()
+
+        after_proc = AfterProc.after_proc_from(taker)
+        assert after_proc
+
+        pocketed = after_proc
+        choice_tuple = ChoiceTuple.choice_tuple_from(taker, after_proc=after_proc)
+        if choice_tuple:
+            pocketed = choice_tuple
+
+        shard = taker.peek_one_shard()
+        assert shard.is_mark(")")
+        taker.take_one_shard()
+
+        pocket = PocketProc(pocketed)
+        return pocket
+
+
+class UnorderedEventTuple(tuple, SomeArgs):
+    """Collect zero or more Events together"""
+
+    _csp_styles_ = ("{{", "{}, ", "{}", "}}")
+
+    def __new__(cls, *args):
+        return super().__new__(cls, args)
+
+    def __repr__(self):
+        self_type_name = type(self).__name__
+        repped = "{}{}".format(self_type_name, super().__repr__())
+        return repped
+
+    def unordered_event_tuple_from(taker):
+
+        # Open up with mark "{"
+
+        shard = taker.peek_one_shard()
+        if not shard.is_mark("{"):
+            return
+        taker.take_one_shard()
+
+        # Accept zero or more pairs of Event Name and ","
+
+        event_list = list()
+
+        while True:
+
+            shards = taker.peek_more_shards(2)
+
+            match = None
+            if shards[0].is_event_name():
+                if shards[1].is_mark(","):
+                    match = True
+
+            if not match:
+                break
+
+            taker.take_some_shards(2)
+
+            event_list.append(Event(shards[0].value))
+
+        # Accept one or zero final Event Name's
+
+        shard = taker.peek_one_shard()
+        assert shard
+        if shard.is_event_name():
+            taker.take_one_shard()
+
+            event_list.append(Event(shard.value))
+
+        # Require close down with mark "}"
+
+        shard = taker.peek_one_shard()
+        assert shard
+        assert shard.is_mark("}")
+        taker.take_one_shard()
+
+        # Succeed
+
+        event_tuple = UnorderedEventTuple(*event_list)
+        return event_tuple
 
 
 #
@@ -543,6 +549,9 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
 
 def eval_csp_calls(source):
     """Parse an entire Call Tree of Csp"""
+
+    if False:  # TODO: --verbose
+        stderr_print("cspsh: testing Csp:", source)
 
     # Drop the "\r" out of each "\r\n"
 
@@ -555,21 +564,43 @@ def eval_csp_calls(source):
     # Split the source into names, marks, and blanks
 
     matches = re.finditer(SHARDS_REGEX, string=chars)
-    shards = list(CspShard(_.groupdict()) for _ in matches)
-    words = list(_ for _ in shards if _.key != "blanks")
+    items = list(_to_item_from_groupdict_(_.groupdict()) for _ in matches)
+    split_shards = list(CspShard(*_) for _ in items)
+
+    leading_shards = list(_ for _ in split_shards if _.key != "blanks")
+
+    max_lookahead = 3
+    empty_shard = CspShard("mark", value="")
+    trailing_shards = max_lookahead * [empty_shard]
+
+    shards = leading_shards + trailing_shards
 
     shards_taker = ShardsTaker()
-    shards_taker.give_shards(words)
+    shards_taker.give_shards(shards)
 
     csp_taker = CspTaker(shards_taker)
+    if False:  # TODO: --verbose
+        stderr_print("cspsh: testing shards:", shards_taker.shards)
+
     try:
-        call = csp_taker.accept_one()
-        csp_taker.take_eof()
+        call = csp_taker.accept_one_call()  # might be a first EmptyMark
+        empty_mark = csp_taker.accept_empty_mark()
+        assert empty_mark is not None
     except Exception:
-        stderr_print("Failing before consuming", shards_taker.shards)
+        stderr_print("cspsh: failing before consuming:", shards_taker.shards)
         raise
 
     return call
+
+
+def _to_item_from_groupdict_(groupdict):
+    """Pick the 1 Item of Value Is Not None out of an Re FindIter GroupDict"""
+
+    items = list(_ for _ in groupdict.items() if _[-1] is not None)
+    assert len(items) == 1, groupdict
+
+    item = items[-1]
+    return item
 
 
 class CspTaker:
@@ -580,16 +611,33 @@ class CspTaker:
     def __init__(self, taker):
         self.taker = taker
 
-    def accept_one(self):
+    def accept_one_call(self):
 
+        call = self.accept_empty_mark()
+
+        call = call or self.accept_choice_tuple_or_after_proc()  # Csp:  ... → ... |
+
+        call = call or self.accept_proc_def()  # Csp:  ... =
+
+        call = call or self.accept_event_tuple()  # Csp:  { ...
+        call = call or self.accept_event()  # Csp:  <lowercase_name>
+        call = call or self.accept_deffed_proc()  # Csp:  <uppercase_name>
+
+        call = call or self.accept_pocket_proc()  # Csp:  ( ...
+
+        return call
+
+    def accept_empty_mark(self):  # end of source file
         taker = self.taker
-        if not taker.peek_more():
-            return
+        empty_mark = EmptyMark.empty_mark_from(taker)
+        return empty_mark
 
-        proc_def = self.accept_proc_def()
-        if proc_def:
-            return proc_def
+    def accept_proc_def(self):  # such as Csp:  VMCT = μ X : { ... } • ( ... )
+        taker = self.taker
+        proc_def = ProcDef.proc_def_from(taker)
+        return proc_def
 
+    def accept_choice_tuple_or_after_proc(self):  # (parse these with less backtracking)
         after_proc = self.accept_after_proc()
         if after_proc:
             choice_tuple = self.accept_choice_tuple(after_proc)
@@ -597,70 +645,41 @@ class CspTaker:
                 return choice_tuple
             return after_proc
 
-        event = self.accept_event()
-        if event:
-            return event
-
-        event_tuple = self.accept_event_tuple()
-        if event_tuple:
-            return event_tuple
-
-        deffed_proc = self.accept_deffed_proc()
-        if deffed_proc:
-            return deffed_proc
-
-    def accept_after_proc(self):
+    def accept_after_proc(self):  # such as:  choc → X
         taker = self.taker
-        after_proc = AfterProc.accept_one_from(taker)
+        after_proc = AfterProc.after_proc_from(taker)
         return after_proc
 
-    def accept_choice_tuple(self, after_proc):
+    def accept_choice_tuple(self, after_proc):  # such as Csp:  choc → X | toffee → X
         taker = self.taker
-        choice_tuple = ChoiceTuple.accept_one_from(taker, after_proc=after_proc)
+        choice_tuple = ChoiceTuple.choice_tuple_from(taker, after_proc=after_proc)
         return choice_tuple
 
-    def accept_deffed_proc(self):
+    def accept_event_tuple(self):  # such as Csp:  {coin, choc, toffee}
         taker = self.taker
-        deffed_proc = DeffedProc.accept_one_from(taker)
-        return deffed_proc
-
-    def accept_event(self):
-        taker = self.taker
-        event = Event.accept_one_from(taker)
-        return event
-
-    def accept_event_tuple(self):
-        taker = self.taker
-        event_tuple = UnorderedEventTuple.accept_one_from(taker)
+        event_tuple = UnorderedEventTuple.unordered_event_tuple_from(taker)
         return event_tuple
 
-    def accept_proc_def(self):
+    def accept_event(self):  # such as Csp:  coin
         taker = self.taker
-        proc_def = ProcDef.accept_one_from(taker)
-        return proc_def
+        event = Event.event_from(taker)
+        return event
 
-    def take_eof(self):
+    def accept_deffed_proc(self):  # such as Csp:  X
         taker = self.taker
-        taker.take_beyond_shards()
+        deffed_proc = DeffedProc.deffed_proc_from(taker)
+        return deffed_proc
+
+    def accept_pocket_proc(self):  # such as Csp:  ( ... )
+        taker = self.taker
+        pocket_proc = PocketProc.pocket_proc_from(taker)
+        return pocket_proc
 
 
-class CspShard(collections.namedtuple("Event", "key value".split())):
-    def __new__(cls, groupdict):
-
-        key = None
-        value = None
-
-        for (item_key, item_value) in groupdict.items():
-            if item_value is not None:
-                assert key is None, groupdict
-                assert value is None, groupdict
-
-                key = item_key
-                value = item_value
-
-        assert key is not None, groupdict
-
-        return super().__new__(cls, key=key, value=value)
+class CspShard(collections.namedtuple("CspShard", "key value".split())):
+    """
+    Carry a fragment of Csp Source Code
+    """
 
     def is_event_name(self):
         if self.key == "name":
@@ -725,13 +744,16 @@ def depth_opened(source):
 def main(argv):
     """Run from the command line"""
 
+    stderr_print("")
+    stderr_print("cspsh: hello")
+
     parser = compile_argdoc(epi="workflow:")
     _ = parser.parse_args(argv[1:])
 
     try_py_then_csp()
     try_csp_then_py()
 
-    stderr_print("+ exit 0")
+    stderr_print("cspsh: + exit 0")
 
 
 #
@@ -789,7 +811,7 @@ def exit_unless_main_doc_eq(parser):
         lines = list((_.rstrip() if _.endswith("\n") else _) for _ in diff_lines)
         stderr_print("\n".join(lines))
 
-        stderr_print("error: update main argdoc to match help, or vice versa")
+        stderr_print("error: cspsh: update main argdoc to match help, or vice versa")
 
         sys.exit(1)
 
@@ -894,12 +916,11 @@ class ShardsTaker(argparse.Namespace):
 
         return more
 
-    def peek_more_shards(self, limit=0):
+    def peek_more_shards(self, limit):
         """List zero or more remaining shards"""
 
         more_shards = list(self.shards)  # see also:  self.peek_more
-        if limit:
-            more_shards = more_shards[:limit]
+        more_shards = more_shards[:limit]
 
         return more_shards
 
@@ -920,7 +941,6 @@ class ShardsTaker(argparse.Namespace):
         shards = list()
         for shard in self.shards:
             if not shard.strip():
-
                 break
 
             shards.append(shard)
@@ -1093,8 +1113,8 @@ def try_py_then_csp():
         csp_evalled = eval_csp_calls(csp_want)
 
         if csp_evalled != py_evalled:
-            stderr_print("csp_evalled", csp_evalled)
-            stderr_print("py_evalled", py_evalled)
+            stderr_print("cspsh: csp_evalled", csp_evalled)
+            stderr_print("cspsh: py_evalled", py_evalled)
             pdb.set_trace()
 
         assert csp_evalled == py_evalled, argparse.Namespace(
@@ -1124,8 +1144,8 @@ def try_csp_then_py():
                 csp_want=csp_want, csp_got=csp_got
             )
         except Exception:
-            stderr_print("Failing at test of Csp: {}".format(csp_want))
-            stderr_print("Failing with Python of: {}".format(py_got))
+            stderr_print("cspsh: failing at test of Csp:  {}".format(csp_want))
+            stderr_print("cspsh: failing with Python of:  {}".format(py_got))
             raise
 
 
@@ -1158,8 +1178,8 @@ CHAPTER_1 = """
 
     CTR = (right → up → right → right → STOP)  # 1.1.1 X3
 
-    # x → y  # meaningless per process name 'y' is not upper case 'Y'
-    # P → Q  # meaningless per event name 'P' is not lower case 'p'
+    # x → y  # no, name 'y' is not upper case process name 'Y'
+    # P → Q  # no, name 'P' is not lower case event name 'p'
 
     x → (y → STOP)
 
@@ -1178,15 +1198,15 @@ CHAPTER_1 = """
 
     # 1.1.3 Choice, p.7
 
-    # (up → STOP | right → right → up → STOP)  # 1.1.3 X1
+    (up → STOP | right → right → up → STOP)  # 1.1.3 X1
 
     # CH5C = in5p → (  # 1.1.3 X2
     #     out1p → out1p → out1p → out2p → CH5C |
     #     out2p → out1p → out2p → CH5C)
 
-    # (x → P | y → Q)
+    (x → P | y → Q)
 
-    # VMCT = μ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
+    VMCT = μ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
 
     # VMC = (in2p → (large → VMC |  # 1.1.3 X4
     #                small → out1p → VMC) |
@@ -1202,9 +1222,9 @@ CHAPTER_1 = """
     #                  in.1 → out.1 → X)
 
     # (x → P | y → Q | z → R)
-    # (x → P | x → Q)  # meaningless per choices not distinct: ['x', 'x']
-    # (x → P | y)  # meaningless per '| y)' is not '| y → Q'
-    # (x → P) | (y → Q)  # meaningless per | is not an operator on processes
+    # (x → P | x → Q)  # no, choices not distinct: ['x', 'x']
+    # (x → P | y)  # no, '| y)' is not '| y → P'
+    # (x → P) | (y → Q)  # no, '|' is not an operator on processes
     # (x → P | (y → Q | z → R))
 
     # RUN-A = (x:A → RUN-A)  # 1.1.3 X8
