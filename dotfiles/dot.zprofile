@@ -272,11 +272,11 @@ function --pwd () {
 
 alias -- '--'='(set -xe; cat - >/dev/null;)'
 
-alias -- ','="--take-pbpipe-from --search-dotluck 'expand.py'"
+alias -- ','="--take-pbpipe-from --search-dotluck 'expand.py | tee /dev/tty'"
 alias -- ',,'="--pbpaste-dotluck 'cat.py -entv'"
 alias -- ',,,'="--take-input-from --search-dotluck 'cd -'"
 alias -- ',,,,'="--search-dotluck 'cd -'"
-alias -- '@'="--pbpipe 'expand.py'"
+alias -- '@'="--pbpipe 'expand.py |tee /dev/tty'"
 alias -- '@@'="--pbpaste 'cat.py -entv'"
 
 function --pbpaste () {
