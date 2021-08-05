@@ -66,11 +66,6 @@ class Call:
 
         self_type_name = type(self).__name__
 
-        if False:
-            if self_type_name == "OrderedEventTuple":
-                if func == to_deep_csp:
-                    pdb.set_trace()
-
         # Open up, visit each Item or Value, and close out
 
         chars = ""
@@ -82,6 +77,12 @@ class Call:
 
         zippeds = list(self._zip_())
         zipped_styles = styles[1:][:-1]
+
+        if False:
+            if self_type_name == "ChoiceTuple":
+                if func == to_deep_csp:
+                    if len(zippeds) > 2:
+                        pdb.set_trace()
 
         for zipped in zippeds:
             (index, key, value) = zipped
@@ -234,7 +235,7 @@ class AfterProc(
 class ChoiceTuple(tuple, SomeArgs):
     """Choose 1 of N Processes"""
 
-    _csp_styles_ = ("", "{}", " | {}", "")
+    _csp_styles_ = ("", "{} | ", "{}", "")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
@@ -257,9 +258,11 @@ class ChoiceTuple(tuple, SomeArgs):
 
             taker.take_one_shard()
 
-            next_after_proc = AfterProc.after_proc_from(taker)
-            assert next_after_proc
-            after_procs.append(next_after_proc)
+            next_proc = AfterProc.after_proc_from(taker)
+            if not next_proc:
+                next_proc = PocketProc.pocket_proc_from(taker)
+            assert next_proc
+            after_procs.append(next_proc)
 
         if len(after_procs) <= 1:
             return
@@ -1104,9 +1107,10 @@ def try_py_then_csp():
 
         csp_got = to_deep_csp(py_evalled)
 
-        assert csp_got == csp_want, argparse.Namespace(
-            csp_got=csp_got, csp_want=csp_want
-        )
+        if csp_got != csp_want:
+            stderr_print("cspsh: want Csp::  {!r}".format(csp_want))
+            stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
+            assert False
 
         # test parse as Csp
 
@@ -1115,7 +1119,6 @@ def try_py_then_csp():
         if csp_evalled != py_evalled:
             stderr_print("cspsh: csp_evalled", csp_evalled)
             stderr_print("cspsh: py_evalled", py_evalled)
-            pdb.set_trace()
 
         assert csp_evalled == py_evalled, argparse.Namespace(
             want_deep_py=py_want,
@@ -1140,9 +1143,10 @@ def try_csp_then_py():
             py_got = to_deep_py(csp_evalled)
             py_evalled = eval(py_got)
             csp_got = to_deep_csp(py_evalled)
-            assert csp_got == csp_want, argparse.Namespace(
-                csp_want=csp_want, csp_got=csp_got
-            )
+            if csp_got != csp_want:
+                stderr_print("cspsh: want Csp::  {!r}".format(csp_want))
+                stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
+                assert False
         except Exception:
             stderr_print("cspsh: failing at test of Csp:  {}".format(csp_want))
             stderr_print("cspsh: failing with Python of:  {}".format(py_got))
@@ -1214,18 +1218,18 @@ CHAPTER_1 = """
     #                in1p → (large → VMC |
     #                        in1p → STOP)))
 
-    # VMCRED = μ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
+    VMCRED = μ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
 
     VMS2 = (coin → VMCRED)  # 1.1.3 X6
 
     # COPYBIT = μ X • (in.0 → out.0 → X |  # 1.1.3 X7
     #                  in.1 → out.1 → X)
 
-    # (x → P | y → Q | z → R)
+    (x → P | y → Q | z → R)
     # (x → P | x → Q)  # no, choices not distinct: ['x', 'x']
     # (x → P | y)  # no, '| y)' is not '| y → P'
     # (x → P) | (y → Q)  # no, '|' is not an operator on processes
-    # (x → P | (y → Q | z → R))
+    (x → P | (y → Q | z → R))
 
     # RUN-A = (x:A → RUN-A)  # 1.1.3 X8
 
@@ -1235,8 +1239,8 @@ CHAPTER_1 = """
     # αDD = αO = αL = {setorange, setlemon, orange, lemon}
 
     DD = (setorange → O | setlemon → L)  # 1.1.4 X1
-    # O = (orange → O | setlemon → L | setorange → O)
-    # L = (lemon → L | setorange → O | setlemon → L)
+    O = (orange → O | setlemon → L | setorange → O)
+    L = (lemon → L | setorange → O | setlemon → L)
 
     CT0 = (up → CT1 | around → CT0)  # 1.1.4 X2
     CT1 = (up → CT2 | down → CT0)
@@ -1253,12 +1257,15 @@ CHAPTER_1 = """
 # To do
 #
 
+# TODO:  parse alphabet grammar:  α RUN-A x:A
+# TODO:  parse trace grammar:  ⟨ ... ⟩
+# TODO:  parse multi-line grammar
+# TODO:  emit Csp Source Repair Hints
 
-# TODO: Slackji :: transliteration of Unicode Org names of the Csp Unicode symbols
-# TODO: Ascii transliteration of Csp Unicode
+# TODO:  review grammar & grammar class names vs CspBook Pdf
 
-# TODO: Align Class Names closer to CspBook Pdf
-# TODO: Pad "self.peek_more" to the limit with never-matched empty "" marks
+# TODO:  Slackji :: transliteration of Unicode Org names of the Csp Unicode symbols
+# TODO:  Ascii transliteration of Csp Unicode
 
 
 #
