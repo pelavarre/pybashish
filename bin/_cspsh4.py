@@ -194,8 +194,8 @@ def to_deep_py(obj, depth=0):
 #
 # Declare a Csp Lisp Lexxer, in the way of Linux Lex
 #
-# Split the source into blank and nonblank shards
-# Take the nonblank shards as tokens
+# Split the Csp Source into blank and nonblank Shards,
+# and take the nonblank Shards as tokens into a Parser
 #
 
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
@@ -203,6 +203,9 @@ MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"
 BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
 
 SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
+
+OPENING_MARKS = "([{⟨"
+CLOSING_MARKS = ")]}⟩"
 
 
 #
@@ -737,10 +740,21 @@ class UnorderedEventTuple(ClassyTuple, SomeArgs):
 
 
 def eval_csp_calls(source):
-    """Parse an entire Call Tree of Csp"""
+    """Split and structure calls corresponding to Source Chars of Csp"""
 
-    if False:  # TODO: --verbose
-        stderr_print("cspsh: testing Csp:", source)
+    shards = split_csp(source)
+
+    (opened, closed) = balance_csp_shards(shards)
+    assert not closed, source
+    assert not opened, source
+
+    call = parse_csp_calls(source)  # TODO: stop repeating work of "split_csp"
+
+    return call  # may be falsey because empty, but is not None
+
+
+def split_csp(source):
+    """Split Csp Source into blank and nonblank, balanced and unbalanced, Shards"""
 
     # Drop the "\r" out of each "\r\n"
 
@@ -754,12 +768,61 @@ def eval_csp_calls(source):
 
     matches = re.finditer(SHARDS_REGEX, string=chars)
     items = list(_to_item_from_groupdict_(_.groupdict()) for _ in matches)
-    split_shards = list(CspShard(*_) for _ in items)
-    rejoined = "".join(_.value for _ in split_shards)
+    shards = list(CspShard(*_) for _ in items)
+
+    rejoined = "".join(_.value for _ in shards)
+    assert rejoined == chars  # TODO: cope more gracefully with new chars
+
+    return shards
+
+
+def balance_csp_shards(shards):
+    """Open up paired marks, close them down, and say what's missing"""
+
+    opened = ""
+    closed = ""
+    next_closing_mark = None
+
+    for shard in shards:
+
+        # Open up any opening mark
+
+        for mark in OPENING_MARKS:
+            if shard.is_mark(mark):
+                opened += mark
+                pair_index = OPENING_MARKS.index(mark)
+                next_closing_mark = CLOSING_MARKS[pair_index]
+
+                break
+
+        # Close down an open mark followed by its corresponding close mark
+
+        for mark in CLOSING_MARKS:
+
+            if shard.is_mark(mark):
+                if mark == next_closing_mark:
+                    opened = opened[:-1]
+
+                # List close marks given before a corresponding open mark
+
+                else:
+                    closed += mark
+
+                break
+
+    # Return ("", "") if balanced, else the extra open marks and extra close marks
+
+    return (opened, closed)
+
+
+def parse_csp_calls(source):
+    """Parse an entire Call Tree of Csp"""
+
+    shards = split_csp(source)
 
     # Pad the end of source with empty marks
 
-    leading_shards = list(_ for _ in split_shards if _.key != "blanks")
+    leading_shards = list(_ for _ in shards if _.key != "blanks")
 
     lookahead = 5
     empty_shard = CspShard("mark", value="")
@@ -776,23 +839,17 @@ def eval_csp_calls(source):
 
     # Convert Csp to Call Tree
 
-    if False:
-        if "α" in source:
-            pdb.set_trace()
-
-    if False:  # TODO: --verbose
-        stderr_print("cspsh: testing shards:", shards_taker.shards)
-
     try:
 
-        assert rejoined == source  # TODO: cope more gracefully with new chars
         call = csp_taker.accept_one_call()  # might be a first EmptyMark
+        assert call is not None
+
         empty_mark = csp_taker.accept_empty_mark()
         assert empty_mark is not None
 
     except Exception:
 
-        stderr_print("cspsh: failing while testing:", repr(source))
+        stderr_print("cspsh: failing in 'parse_csp_calls' of :", repr(source))
 
         heads = shards[: -len(shards_taker.shards)]
         rejoined_heads = " ".join(_.value for _ in heads)
@@ -803,9 +860,9 @@ def eval_csp_calls(source):
 
         raise
 
-    #
+    # Succeed
 
-    return call
+    return call  # may be falsey because empty, but is not None
 
 
 def _to_item_from_groupdict_(groupdict):
@@ -848,7 +905,9 @@ class CspTaker:
         if call is None:
             call = self.accept_traced_event_tuple()  # Csp:  ⟨ ...
 
-        return call
+        #TODO: add tests that cause 'call = None' here
+
+        return call  # may be falsey because empty, but is not None
 
     def accept_after_proc(self):  # such as Csp:  choc → X
         taker = self.taker
@@ -1530,6 +1589,7 @@ CHAPTER_1 = """
 # To do
 #
 
+# TODO:  regex-lex the comments too, don't drop them via 'str.partition'
 # TODO:  parse multi-line grammar
 # TODO:  emit Csp Source Repair Hints
 
