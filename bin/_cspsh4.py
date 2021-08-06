@@ -200,9 +200,10 @@ def to_deep_py(obj, depth=0):
 
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
 MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"
+COMMENT_REGEX = r"(?P<comment>#[^\n]+)"
 BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
 
-SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
+SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, COMMENT_REGEX, BLANKS_REGEX])
 
 OPENING_MARKS = "([{⟨"
 CLOSING_MARKS = ")]}⟩"
@@ -745,8 +746,8 @@ def eval_csp_calls(source):
     shards = split_csp(source)
 
     (opened, closed) = balance_csp_shards(shards)
-    assert not closed, source
-    assert not opened, source
+    assert not closed, (closed, opened, source)
+    assert not opened, (closed, opened, source)
 
     call = parse_csp_calls(source)  # TODO: stop repeating work of "split_csp"
 
@@ -758,20 +759,20 @@ def split_csp(source):
 
     # Drop the "\r" out of each "\r\n"
 
-    nix_chars = "\n".join(source.splitlines()) + "\n"
+    chars = "\n".join(source.splitlines()) + "\n"
 
-    # Drop the comments
-
-    chars = "\n".join(_.partition("#")[0] for _ in nix_chars.splitlines())
-
-    # Split the source into names, marks, and blanks
+    # Split the source into names, marks, comments, and blanks
 
     matches = re.finditer(SHARDS_REGEX, string=chars)
     items = list(_to_item_from_groupdict_(_.groupdict()) for _ in matches)
     shards = list(CspShard(*_) for _ in items)
 
+    # Require no chars dropped
+
     rejoined = "".join(_.value for _ in shards)
     assert rejoined == chars  # TODO: cope more gracefully with new chars
+
+    # Succeed
 
     return shards
 
@@ -905,7 +906,7 @@ class CspTaker:
         if call is None:
             call = self.accept_traced_event_tuple()  # Csp:  ⟨ ...
 
-        #TODO: add tests that cause 'call = None' here
+        # TODO: add tests that cause 'call = None' here
 
         return call  # may be falsey because empty, but is not None
 
@@ -1589,7 +1590,6 @@ CHAPTER_1 = """
 # To do
 #
 
-# TODO:  regex-lex the comments too, don't drop them via 'str.partition'
 # TODO:  parse multi-line grammar
 # TODO:  emit Csp Source Repair Hints
 
