@@ -183,7 +183,10 @@ def to_deep_py(obj, depth=0):
 
 
 #
-# Declare a Csp Lisp
+# Declare a Csp Lisp Lexxer, in the way of Linux Lex
+#
+# Split the source into blank and nonblank shards
+# Take the nonblank shards as tokens
 #
 
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
@@ -191,6 +194,12 @@ MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"
 BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
 
 SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
+
+
+#
+# Declare a Csp Lisp Parser, in the way of Linux Yacc,
+# but by Recursive Descent with Lots of Lookahead
+#
 
 
 class AfterProc(
@@ -206,9 +215,16 @@ class AfterProc(
 
         before = OrderedEventTuple.ordered_event_tuple_from(taker)
         if not before:
-            shards = taker.peek_more_shards(2)
+            shards = taker.peek_more_shards(5)
+
+            match = None
             if shards[1].is_mark("→"):
-                before = Event.event_from(taker)
+                match = True  # x → P
+            elif shards[1].is_mark(":") and shards[4].is_mark("→"):
+                match = True  # x : α P → P
+
+            if match:
+                before = ChosenEvent.chosen_event_or_event_from(taker)
 
         if not before:
             return
@@ -334,6 +350,51 @@ class ChoiceTuple(tuple, SomeArgs):
 
         choice_tuple = ChoiceTuple(*after_procs)
         return choice_tuple
+
+    def choice_tuple_or_after_proc_from(taker):
+
+        after_proc = AfterProc.after_proc_from(taker)
+        if after_proc:
+            choice_tuple = ChoiceTuple.choice_tuple_from(taker, after_proc=after_proc)
+            if choice_tuple:
+                return choice_tuple
+            return after_proc
+
+
+class ChosenEvent(
+    collections.namedtuple("ChosenEvent", "event_name argot_name".split()), SomeKwArgs
+):
+    """Define a Name for an Event chosen from the Argot of a Proc"""
+
+    _csp_styles_ = ("", "{}", ":{}", "")
+
+    def chosen_event_from(taker):
+
+        shards = taker.peek_more_shards(2)
+        if not shards[1].is_mark(":"):
+            return
+
+        shard = taker.peek_one_shard()
+        if not shard.is_event_name():
+            return
+        taker.take_one_shard()
+        event_name = shard.value
+
+        taker.take_one_shard()  # the mark ":"
+
+        argot_name = ArgotName.argot_name_from(taker)
+
+        chosen_event = ChosenEvent(event_name, argot_name=argot_name)
+        return chosen_event
+
+    def chosen_event_or_event_from(taker):
+
+        chosen_event = ChosenEvent.chosen_event_from(taker)
+        if chosen_event:
+            return chosen_event
+
+        event = Event.event_from(taker)
+        return event
 
 
 class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg):
@@ -544,13 +605,7 @@ class PocketProc(collections.namedtuple("PocketProc", "pocketed".split()), SomeK
             return
         taker.take_one_shard()
 
-        after_proc = AfterProc.after_proc_from(taker)
-        assert after_proc
-
-        pocketed = after_proc
-        choice_tuple = ChoiceTuple.choice_tuple_from(taker, after_proc=after_proc)
-        if choice_tuple:
-            pocketed = choice_tuple
+        pocketed = ChoiceTuple.choice_tuple_or_after_proc_from(taker)
 
         shard = taker.peek_one_shard()
         assert shard.is_mark(")")
@@ -654,15 +709,15 @@ def eval_csp_calls(source):
 
     leading_shards = list(_ for _ in split_shards if _.key != "blanks")
 
-    max_lookahead = 3
+    lookahead = 5
     empty_shard = CspShard("mark", value="")
-    trailing_shards = max_lookahead * [empty_shard]
+    trailing_shards = lookahead * [empty_shard]
 
     shards = leading_shards + trailing_shards
 
     # Start up one parser
 
-    shards_taker = ShardsTaker()
+    shards_taker = ShardsTaker(lookahead)
     shards_taker.give_shards(shards)
 
     csp_taker = CspTaker(shards_taker)
@@ -729,7 +784,7 @@ class CspTaker:
 
         call = call or self.accept_argot_name_or_def()  # Csp:  α ...
         call = call or self.accept_event_tuple()  # Csp:  { ...
-        call = call or self.accept_event()  # Csp:  <lowercase_name>
+        call = call or self.accept_chosen_event_or_event()  # Csp:  <lowercase_name>
         call = call or self.accept_deffed_proc()  # Csp:  <uppercase_name>
 
         call = call or self.accept_pocket_proc()  # Csp:  ( ...
@@ -755,13 +810,10 @@ class CspTaker:
         choice_tuple = ChoiceTuple.choice_tuple_from(taker, after_proc=after_proc)
         return choice_tuple
 
-    def accept_choice_tuple_or_after_proc(self):  # (parse these with less backtracking)
-        after_proc = self.accept_after_proc()
-        if after_proc:
-            choice_tuple = self.accept_choice_tuple(after_proc)
-            if choice_tuple:
-                return choice_tuple
-            return after_proc
+    def accept_choice_tuple_or_after_proc(self):
+        taker = self.taker
+        call = ChoiceTuple.choice_tuple_or_after_proc_from(taker)
+        return call
 
     def accept_deffed_proc(self):  # such as Csp:  X
         taker = self.taker
@@ -773,9 +825,9 @@ class CspTaker:
         empty_mark = EmptyMark.empty_mark_from(taker)
         return empty_mark
 
-    def accept_event(self):  # such as Csp:  coin
+    def accept_chosen_event_or_event(self):  # such as Csp 'x:A' or 'coin'
         taker = self.taker
-        event = Event.event_from(taker)
+        event = ChosenEvent.chosen_event_or_event_from(taker)
         return event
 
     def accept_event_tuple(self):  # such as Csp:  {coin, choc, toffee}
@@ -977,8 +1029,9 @@ class ShardsTaker(argparse.Namespace):
     Define "accept" to mean take if present, else quietly don't bother
     """
 
-    def __init__(self, shards=()):
-        self.shards = list(shards)  # the shards being peeked, taken, and accepted
+    def __init__(self, lookahead):
+        self.lookahead = int(lookahead)
+        self.shards = list()  # the shards being peeked, taken, and accepted
 
     def give_shards(self, shards):
         """Give shards, such as from r"(?P<...>...)+" via 'match.groupdict().items()'"""
@@ -1036,6 +1089,8 @@ class ShardsTaker(argparse.Namespace):
 
     def peek_more_shards(self, limit):
         """List zero or more remaining shards"""
+
+        assert limit <= self.lookahead
 
         more_shards = list(self.shards)  # see also:  self.peek_more
         more_shards = more_shards[:limit]
@@ -1347,7 +1402,7 @@ CHAPTER_1 = """
     (x → P | (y → Q | z → R))
 
     αRUNNER = {coin, choc, toffee}
-    # RUNNER = (x:αRUNNER → RUNNER)  # 1.1.3 X8
+    RUNNER = (x:αRUNNER → RUNNER)  # 1.1.3 X8
 
 
     # 1.1.4 Mutual recursion, p.11
@@ -1366,6 +1421,35 @@ CHAPTER_1 = """
     CT1 = (down → CT0 | up → CT2)
     CT2 = (down → CT1 | up → CT3)
 
+
+    # 1.2 Pictures
+
+
+    # 1.3 Laws
+
+
+    # 1.4 Implementation of Processes
+
+
+    # 1.5 Traces
+
+    # ⟨coin,choc,coin,choc⟩  # 1.5 X1
+
+    # ⟨coin,choc,coin⟩  # 1.5 X2
+
+    # ⟨⟩  # 1.5 X3
+
+    # ⟨⟩  # 1.5 X4.1
+    # ⟨in2p⟩  # 1.5 X4.2.1
+    # ⟨in1p⟩  # 1.5 X4.2.2
+    # ⟨in2p,large⟩  # 1.5 X4.3.1
+    # ⟨in2p,small⟩  # 1.5 X4.3.2
+    # ⟨in1p,in1p⟩  # 1.5 X4.3.3
+    # ⟨in1p,small⟩  # 1.5 X4.3.4
+
+    # ⟨in1p, in1p, in1p⟩  # 1.5 X5.1
+    # ⟨in1p, in1p, in1p, x⟩  # 1.5 X5.2
+
 """
 
 
@@ -1373,7 +1457,6 @@ CHAPTER_1 = """
 # To do
 #
 
-# TODO:  parse alphabet grammar:  α RUN-A x:A
 # TODO:  parse trace grammar:  ⟨ ... ⟩
 # TODO:  parse multi-line grammar
 # TODO:  emit Csp Source Repair Hints
