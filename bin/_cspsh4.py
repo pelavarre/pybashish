@@ -187,7 +187,7 @@ def to_deep_py(obj, depth=0):
 #
 
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
-MARK_REGEX = r"(?P<mark>[(),:={|}μ•→⟨⟩])"
+MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"
 BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
 
 SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
@@ -196,13 +196,13 @@ SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, BLANKS_REGEX])
 class AfterProc(
     collections.namedtuple("AfterProc", "before after".split()), SomeKwArgs
 ):
-    """Run a Process after an Event"""
+    """Run a Proc after an Event"""
 
     _csp_styles_ = ("", "{}", " → {}", "")
 
     def after_proc_from(taker):
 
-        # Match one or more of an Event Name and a "→" "\u2192" Rightwards Arrow Mark
+        # Take one or more of an Event Name and a "→" "\u2192" Rightwards Arrow Mark
 
         before = OrderedEventTuple.ordered_event_tuple_from(taker)
         if not before:
@@ -232,8 +232,73 @@ class AfterProc(
         return after_proc
 
 
+class ArgotDef(collections.namedtuple("ArgotDef", "before after".split()), SomeKwArgs):
+    """Detail an Alphabet of Events after listing Names for the Alphabet"""
+
+    _csp_styles_ = ("", "{} = ", "{}", "")
+
+    def argot_def_from(taker, argot_name):
+
+        # Take one or more Argot Names, each marked by "α"
+
+        argot_names = list()
+        argot_names.append(argot_name)
+
+        while True:
+
+            shards = taker.peek_more_shards(2)
+
+            if not shards[0].is_mark("="):
+                break
+            if not shards[1].is_mark("α"):
+                break
+
+            taker.take_one_shard()  # just the "=", not also the "α"
+
+            next_argot_name = ArgotName.argot_name_from(taker)
+            assert next_argot_name
+            argot_names.append(next_argot_name)
+
+        if len(argot_names) <= 1:
+            return
+
+        before = OrderedArgotNameTuple(*argot_names)
+
+        # Take one "=" "\u003D" Equals Sign
+
+        shard = taker.peek_one_shard()
+        assert shard and shard.is_mark("=")
+        taker.take_one_shard()
+
+        # Take one Alphabet
+
+        after = UnorderedEventTuple.unordered_event_tuple_from(taker)
+
+        argot_def = ArgotDef(before, after=after)
+        return argot_def
+
+
+class ArgotName(collections.namedtuple("ArgotName", "deffed_proc".split()), SomeKwArgs):
+    """Pick an Alphabet of Events out of a Deffed Proc"""
+
+    _csp_styles_ = ("α", "{}", "")
+
+    def argot_name_from(taker):
+
+        shard = taker.peek_one_shard()
+        if not shard.is_mark("α"):
+            return
+        taker.take_one_shard()
+
+        deffed_proc = DeffedProc.deffed_proc_from(taker)
+        assert deffed_proc
+
+        argot_name = ArgotName(deffed_proc)
+        return argot_name
+
+
 class ChoiceTuple(tuple, SomeArgs):
-    """Choose 1 of N Processes"""
+    """Choose 1 of N Proc's"""
 
     _csp_styles_ = ("", "{} | ", "{}", "")
 
@@ -258,11 +323,11 @@ class ChoiceTuple(tuple, SomeArgs):
 
             taker.take_one_shard()
 
-            next_proc = AfterProc.after_proc_from(taker)
-            if not next_proc:
-                next_proc = PocketProc.pocket_proc_from(taker)
-            assert next_proc
-            after_procs.append(next_proc)
+            next_after_proc = AfterProc.after_proc_from(taker)
+            if not next_after_proc:
+                next_after_proc = PocketProc.pocket_proc_from(taker)
+            assert next_after_proc
+            after_procs.append(next_after_proc)
 
         if len(after_procs) <= 1:
             return
@@ -369,6 +434,20 @@ class LazyEventsProc(
     _csp_styles_ = ("", "μ {}", " • {}", "")
 
 
+class OrderedArgotNameTuple(tuple, SomeArgs):
+    """Order two or more Argot Names"""
+
+    _csp_styles_ = ("", "{} = ", "{}", "")
+
+    def __new__(cls, *args):
+        return super().__new__(cls, args)
+
+    def __repr__(self):
+        self_type_name = type(self).__name__
+        repped = "{}{}".format(self_type_name, super().__repr__())
+        return repped
+
+
 class OrderedEventTuple(tuple, SomeArgs):
     """Order two or more Events"""
 
@@ -384,7 +463,7 @@ class OrderedEventTuple(tuple, SomeArgs):
 
     def ordered_event_tuple_from(taker):
 
-        # Require an Event Name and a "→" "\u2192" Rightwards Arrow Mark
+        # Require one "→" "\u2192" Rightwards Arrow Mark in between two Event Names
 
         shards = taker.peek_more_shards(3)  # TODO: pad with "" marks?
 
@@ -569,6 +648,9 @@ def eval_csp_calls(source):
     matches = re.finditer(SHARDS_REGEX, string=chars)
     items = list(_to_item_from_groupdict_(_.groupdict()) for _ in matches)
     split_shards = list(CspShard(*_) for _ in items)
+    rejoined = "".join(_.value for _ in split_shards)
+
+    # Pad the end of source with empty marks
 
     leading_shards = list(_ for _ in split_shards if _.key != "blanks")
 
@@ -578,20 +660,43 @@ def eval_csp_calls(source):
 
     shards = leading_shards + trailing_shards
 
+    # Start up one parser
+
     shards_taker = ShardsTaker()
     shards_taker.give_shards(shards)
 
     csp_taker = CspTaker(shards_taker)
+
+    # Convert Csp to Call Tree
+
+    if False:
+        if "α" in source:
+            pdb.set_trace()
+
     if False:  # TODO: --verbose
         stderr_print("cspsh: testing shards:", shards_taker.shards)
 
     try:
+
+        assert rejoined == source  # TODO: cope more gracefully with new chars
         call = csp_taker.accept_one_call()  # might be a first EmptyMark
         empty_mark = csp_taker.accept_empty_mark()
         assert empty_mark is not None
+
     except Exception:
-        stderr_print("cspsh: failing before consuming:", shards_taker.shards)
+
+        stderr_print("cspsh: failing while testing:", repr(source))
+
+        heads = shards[: -len(shards_taker.shards)]
+        rejoined_heads = " ".join(_.value for _ in heads)
+        rejoined_tails = " ".join(_.value for _ in shards_taker.shards)
+
+        stderr_print("cspsh: failing after taking:", rejoined_heads)
+        stderr_print("cspsh: failing before taking:", rejoined_tails)
+
         raise
+
+    #
 
     return call
 
@@ -622,6 +727,7 @@ class CspTaker:
 
         call = call or self.accept_proc_def()  # Csp:  ... =
 
+        call = call or self.accept_argot_name_or_def()  # Csp:  α ...
         call = call or self.accept_event_tuple()  # Csp:  { ...
         call = call or self.accept_event()  # Csp:  <lowercase_name>
         call = call or self.accept_deffed_proc()  # Csp:  <uppercase_name>
@@ -630,15 +736,24 @@ class CspTaker:
 
         return call
 
-    def accept_empty_mark(self):  # end of source file
+    def accept_after_proc(self):  # such as Csp:  choc → X
         taker = self.taker
-        empty_mark = EmptyMark.empty_mark_from(taker)
-        return empty_mark
+        after_proc = AfterProc.after_proc_from(taker)
+        return after_proc
 
-    def accept_proc_def(self):  # such as Csp:  VMCT = μ X : { ... } • ( ... )
+    def accept_argot_name_or_def(self):  # such as Csp:  αF = {orange, lemon}
         taker = self.taker
-        proc_def = ProcDef.proc_def_from(taker)
-        return proc_def
+        argot_name = ArgotName.argot_name_from(taker)
+        if argot_name:
+            argot_def = ArgotDef.argot_def_from(taker, argot_name)
+            if argot_def:
+                return argot_def
+            return argot_name
+
+    def accept_choice_tuple(self, after_proc):  # such as Csp:  choc → X | toffee → X
+        taker = self.taker
+        choice_tuple = ChoiceTuple.choice_tuple_from(taker, after_proc=after_proc)
+        return choice_tuple
 
     def accept_choice_tuple_or_after_proc(self):  # (parse these with less backtracking)
         after_proc = self.accept_after_proc()
@@ -648,30 +763,30 @@ class CspTaker:
                 return choice_tuple
             return after_proc
 
-    def accept_after_proc(self):  # such as:  choc → X
+    def accept_deffed_proc(self):  # such as Csp:  X
         taker = self.taker
-        after_proc = AfterProc.after_proc_from(taker)
-        return after_proc
+        deffed_proc = DeffedProc.deffed_proc_from(taker)
+        return deffed_proc
 
-    def accept_choice_tuple(self, after_proc):  # such as Csp:  choc → X | toffee → X
+    def accept_empty_mark(self):  # end of source file
         taker = self.taker
-        choice_tuple = ChoiceTuple.choice_tuple_from(taker, after_proc=after_proc)
-        return choice_tuple
-
-    def accept_event_tuple(self):  # such as Csp:  {coin, choc, toffee}
-        taker = self.taker
-        event_tuple = UnorderedEventTuple.unordered_event_tuple_from(taker)
-        return event_tuple
+        empty_mark = EmptyMark.empty_mark_from(taker)
+        return empty_mark
 
     def accept_event(self):  # such as Csp:  coin
         taker = self.taker
         event = Event.event_from(taker)
         return event
 
-    def accept_deffed_proc(self):  # such as Csp:  X
+    def accept_event_tuple(self):  # such as Csp:  {coin, choc, toffee}
         taker = self.taker
-        deffed_proc = DeffedProc.deffed_proc_from(taker)
-        return deffed_proc
+        event_tuple = UnorderedEventTuple.unordered_event_tuple_from(taker)
+        return event_tuple
+
+    def accept_proc_def(self):  # such as Csp:  VMCT = μ X : { ... } • ( ... )
+        taker = self.taker
+        proc_def = ProcDef.proc_def_from(taker)
+        return proc_def
 
     def accept_pocket_proc(self):  # such as Csp:  ( ... )
         taker = self.taker
@@ -979,7 +1094,7 @@ def bootstrap_py_csp_fragments():
         """
     ).strip()
 
-    # Csp Python of Csp:  choc → X  # event guards process
+    # Csp Python of Csp:  choc → X  # event guards proc
 
     want11 = textwrap.dedent(
         """
@@ -990,7 +1105,7 @@ def bootstrap_py_csp_fragments():
         """
     ).strip()
 
-    # Csp Python of Csp:  choc → X | toffee → X  # events guard processes
+    # Csp Python of Csp:  choc → X | toffee → X  # events guard proc's
 
     want20 = textwrap.dedent(
         """
@@ -1007,7 +1122,7 @@ def bootstrap_py_csp_fragments():
         """
     ).strip()
 
-    # Csp Python of Csp:  coin → (choc → X | toffee → X)  # events guard processes
+    # Csp Python of Csp:  coin → (choc → X | toffee → X)  # events guard proc's
 
     want2 = textwrap.dedent(
         """
@@ -1236,7 +1351,7 @@ CHAPTER_1 = """
 
     # 1.1.4 Mutual recursion, p.11
 
-    # αDD = αO = αL = {setorange, setlemon, orange, lemon}
+    αDD = αO = αL = {setorange, setlemon, orange, lemon}
 
     DD = (setorange → O | setlemon → L)  # 1.1.4 X1
     O = (orange → O | setlemon → L | setorange → O)
