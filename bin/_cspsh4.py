@@ -259,10 +259,10 @@ class ArgotDef(collections.namedtuple("ArgotDef", "before after".split()), SomeK
             assert next_argot_name
             argot_names.append(next_argot_name)
 
-        if len(argot_names) <= 1:
-            return
-
-        before = OrderedArgotNameTuple(*argot_names)
+        if argot_names[1:]:
+            before = OrderedArgotNameTuple(*argot_names)
+        else:
+            before = argot_name
 
         # Take one "=" "\u003D" Equals Sign
 
@@ -329,7 +329,7 @@ class ChoiceTuple(tuple, SomeArgs):
             assert next_after_proc
             after_procs.append(next_after_proc)
 
-        if len(after_procs) <= 1:
+        if not after_procs[1:]:
             return
 
         choice_tuple = ChoiceTuple(*after_procs)
@@ -1346,7 +1346,8 @@ CHAPTER_1 = """
     # (x → P) | (y → Q)  # no, '|' is not an operator on processes
     (x → P | (y → Q | z → R))
 
-    # RUN-A = (x:A → RUN-A)  # 1.1.3 X8
+    αRUNNER = {coin, choc, toffee}
+    # RUNNER = (x:αRUNNER → RUNNER)  # 1.1.3 X8
 
 
     # 1.1.4 Mutual recursion, p.11
