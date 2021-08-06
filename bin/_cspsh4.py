@@ -126,6 +126,15 @@ class Call:
         return spaced_chars
 
 
+class ClassyTuple(tuple):
+    """Work like a Tuple, but when Classname is Not "tuple", say so"""
+
+    def __repr__(self):
+        self_type_name = type(self).__name__
+        repped = "{}{}".format(self_type_name, super().__repr__())
+        return repped
+
+
 class SomeKwArgs(Call):
     """Order the KwArgs of a Call like a Collections Named Tuple"""
 
@@ -313,18 +322,13 @@ class ArgotName(collections.namedtuple("ArgotName", "deffed_proc".split()), Some
         return argot_name
 
 
-class ChoiceTuple(tuple, SomeArgs):
+class ChoiceTuple(ClassyTuple, SomeArgs):
     """Choose 1 of N Proc's"""
 
     _csp_styles_ = ("", "{} | ", "{}", "")
 
-    def __new__(cls, *args):
+    def __new__(cls, *args):  # move these 'def __new__' into ClassyTuple somehow?
         return super().__new__(cls, args)
-
-    def __repr__(self):
-        self_type_name = type(self).__name__
-        repped = "{}{}".format(self_type_name, super().__repr__())
-        return repped
 
     def choice_tuple_from(taker, after_proc):
 
@@ -495,7 +499,7 @@ class LazyEventsProc(
     _csp_styles_ = ("", "μ {}", " • {}", "")
 
 
-class OrderedArgotNameTuple(tuple, SomeArgs):
+class OrderedArgotNameTuple(ClassyTuple, SomeArgs):
     """Order two or more Argot Names"""
 
     _csp_styles_ = ("", "{} = ", "{}", "")
@@ -503,24 +507,14 @@ class OrderedArgotNameTuple(tuple, SomeArgs):
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
-    def __repr__(self):
-        self_type_name = type(self).__name__
-        repped = "{}{}".format(self_type_name, super().__repr__())
-        return repped
 
-
-class OrderedEventTuple(tuple, SomeArgs):
+class OrderedEventTuple(ClassyTuple, SomeArgs):
     """Order two or more Events"""
 
     _csp_styles_ = ("", "{} → ", "{}", "")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
-
-    def __repr__(self):
-        self_type_name = type(self).__name__
-        repped = "{}{}".format(self_type_name, super().__repr__())
-        return repped
 
     def ordered_event_tuple_from(taker):
 
@@ -615,18 +609,74 @@ class PocketProc(collections.namedtuple("PocketProc", "pocketed".split()), SomeK
         return pocket
 
 
-class UnorderedEventTuple(tuple, SomeArgs):
+class TracedEventTuple(ClassyTuple, SomeArgs):  # TODO: combine with OrderedEventTuple
+    """Order two or more Events"""
+
+    _csp_styles_ = ("⟨", "{},", "{}", "⟩")
+
+    def __new__(cls, *args):
+        return super().__new__(cls, args)
+
+    def traced_event_tuple_from(taker):
+
+        # Open up with mark "⟨"
+
+        shard = taker.peek_one_shard()
+        if not shard.is_mark("⟨"):
+            return
+        taker.take_one_shard()
+
+        # Accept zero or more pairs of Event Name and ","
+
+        event_list = list()
+
+        while True:
+
+            shards = taker.peek_more_shards(2)
+
+            match = None
+            if shards[0].is_event_name():
+                if shards[1].is_mark(","):
+                    match = True
+
+            if not match:
+                break
+
+            taker.take_some_shards(2)
+
+            event_list.append(Event(shards[0].value))
+
+        # Accept one or zero final Event Name's
+
+        shard = taker.peek_one_shard()
+        assert shard
+        if shard.is_event_name():
+            taker.take_one_shard()
+
+            event_list.append(Event(shard.value))
+
+        # TODO: Accept extra "," mark before close mark "⟩"
+
+        # Require close down with mark "⟩"
+
+        shard = taker.peek_one_shard()
+        assert shard
+        assert shard.is_mark("⟩")
+        taker.take_one_shard()
+
+        # Succeed
+
+        event_tuple = TracedEventTuple(*event_list)
+        return event_tuple
+
+
+class UnorderedEventTuple(ClassyTuple, SomeArgs):
     """Collect zero or more Events together"""
 
     _csp_styles_ = ("{{", "{}, ", "{}", "}}")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
-
-    def __repr__(self):
-        self_type_name = type(self).__name__
-        repped = "{}{}".format(self_type_name, super().__repr__())
-        return repped
 
     def unordered_event_tuple_from(taker):
 
@@ -665,6 +715,8 @@ class UnorderedEventTuple(tuple, SomeArgs):
             taker.take_one_shard()
 
             event_list.append(Event(shard.value))
+
+        # TODO: Accept extra "," mark before close mark "}"
 
         # Require close down with mark "}"
 
@@ -783,11 +835,18 @@ class CspTaker:
         call = call or self.accept_proc_def()  # Csp:  ... =
 
         call = call or self.accept_argot_name_or_def()  # Csp:  α ...
-        call = call or self.accept_event_tuple()  # Csp:  { ...
         call = call or self.accept_chosen_event_or_event()  # Csp:  <lowercase_name>
         call = call or self.accept_deffed_proc()  # Csp:  <uppercase_name>
 
         call = call or self.accept_pocket_proc()  # Csp:  ( ...
+
+        if not call:  # TODO: matched empty tuples are falsey, but should they be?
+            assert call is None
+
+        if call is None:
+            call = self.accept_event_tuple()  # Csp:  { ...
+        if call is None:
+            call = self.accept_traced_event_tuple()  # Csp:  ⟨ ...
 
         return call
 
@@ -815,6 +874,11 @@ class CspTaker:
         call = ChoiceTuple.choice_tuple_or_after_proc_from(taker)
         return call
 
+    def accept_chosen_event_or_event(self):  # such as Csp 'x:A' or 'coin'
+        taker = self.taker
+        event = ChosenEvent.chosen_event_or_event_from(taker)
+        return event
+
     def accept_deffed_proc(self):  # such as Csp:  X
         taker = self.taker
         deffed_proc = DeffedProc.deffed_proc_from(taker)
@@ -824,11 +888,6 @@ class CspTaker:
         taker = self.taker
         empty_mark = EmptyMark.empty_mark_from(taker)
         return empty_mark
-
-    def accept_chosen_event_or_event(self):  # such as Csp 'x:A' or 'coin'
-        taker = self.taker
-        event = ChosenEvent.chosen_event_or_event_from(taker)
-        return event
 
     def accept_event_tuple(self):  # such as Csp:  {coin, choc, toffee}
         taker = self.taker
@@ -844,6 +903,17 @@ class CspTaker:
         taker = self.taker
         pocket_proc = PocketProc.pocket_proc_from(taker)
         return pocket_proc
+
+    def accept_traced_event_tuple(self):  # such as Csp: ⟨ ... ⟩
+        taker = self.taker
+        traced_event_tuple = TracedEventTuple.traced_event_tuple_from(taker)
+
+        if False:
+            if traced_event_tuple is not None:
+                if not traced_event_tuple:
+                    pdb.set_trace()
+
+        return traced_event_tuple
 
 
 class CspShard(collections.namedtuple("CspShard", "key value".split())):
@@ -1428,27 +1498,30 @@ CHAPTER_1 = """
     # 1.3 Laws
 
 
-    # 1.4 Implementation of Processes
+    # 1.4 Implementation of processes
 
 
     # 1.5 Traces
 
-    # ⟨coin,choc,coin,choc⟩  # 1.5 X1
+    ⟨coin,choc,coin,choc⟩  # 1.5 X1
 
-    # ⟨coin,choc,coin⟩  # 1.5 X2
+    ⟨coin,choc,coin⟩  # 1.5 X2
 
-    # ⟨⟩  # 1.5 X3
+    ⟨⟩  # 1.5 X3
 
-    # ⟨⟩  # 1.5 X4.1
-    # ⟨in2p⟩  # 1.5 X4.2.1
-    # ⟨in1p⟩  # 1.5 X4.2.2
-    # ⟨in2p,large⟩  # 1.5 X4.3.1
-    # ⟨in2p,small⟩  # 1.5 X4.3.2
-    # ⟨in1p,in1p⟩  # 1.5 X4.3.3
-    # ⟨in1p,small⟩  # 1.5 X4.3.4
+    ⟨⟩  # 1.5 X4.1
+    ⟨in2p⟩  # 1.5 X4.2.1
+    ⟨in1p⟩  # 1.5 X4.2.2
+    ⟨in2p,large⟩  # 1.5 X4.3.1
+    ⟨in2p,small⟩  # 1.5 X4.3.2
+    ⟨in1p,in1p⟩  # 1.5 X4.3.3
+    ⟨in1p,small⟩  # 1.5 X4.3.4
 
-    # ⟨in1p, in1p, in1p⟩  # 1.5 X5.1
-    # ⟨in1p, in1p, in1p, x⟩  # 1.5 X5.2
+    ⟨in1p,in1p,in1p⟩  # 1.5 X5.1
+    ⟨in1p,in1p,in1p,x⟩  # 1.5 X5.2
+
+
+    # 1.6 Operations on traces
 
 """
 
@@ -1457,7 +1530,6 @@ CHAPTER_1 = """
 # To do
 #
 
-# TODO:  parse trace grammar:  ⟨ ... ⟩
 # TODO:  parse multi-line grammar
 # TODO:  emit Csp Source Repair Hints
 
