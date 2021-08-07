@@ -222,6 +222,12 @@ class AfterProc(
 
     _csp_styles_ = ("", "{}", " → {}", "")
 
+    def event_menu(self):
+        before = self.before
+        menu = before.event_menu()
+        return menu
+
+    @staticmethod
     def after_proc_from(taker):
 
         # Take one or more of an Event Name and a "→" "\u2192" Rightwards Arrow Mark
@@ -274,6 +280,7 @@ class ArgotDef(collections.namedtuple("ArgotDef", "before after".split()), SomeK
 
     _csp_styles_ = ("", "{} = ", "{}", "")
 
+    @staticmethod
     def argot_def_from(taker, argot_name):
 
         # Take one or more Argot Names, each marked by "α"
@@ -320,6 +327,7 @@ class ArgotName(collections.namedtuple("ArgotName", "deffed_proc".split()), Some
 
     _csp_styles_ = ("α", "{}", "")
 
+    @staticmethod
     def argot_name_from(taker):
 
         shard = taker.peek_one_shard()
@@ -342,10 +350,24 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
     def __new__(cls, *args):  # move these 'def __new__' into ClassyTuple somehow?
         return super().__new__(cls, args)
 
+    def event_menu(self):
+
+        menu = OrderedEventTuple()
+        for choice in self:
+
+            choice_menu = choice.event_menu()
+            # menu += OrderedEventTuple(choice_menu)  # TODO: does this work?
+            menu = OrderedEventTuple(*(tuple(menu) + tuple(choice_menu)))
+
+        return menu
+
+    @staticmethod
     def choice_tuple_from(taker, after_proc):
 
         after_procs = list()
         after_procs.append(after_proc)
+
+        #
 
         while True:
 
@@ -364,9 +386,26 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
         if not after_procs[1:]:
             return
 
+        #
+
         choice_tuple = ChoiceTuple(*after_procs)
+
+        names_set = set()
+        for event in choice_tuple.event_menu():
+            if not hasattr(event, "name"):
+                pdb.set_trace()
+            name = event.name
+
+            if name in names_set:
+                collision = [name, name]  # twice or more
+                hint = "no, choices not distinct: {}".format(collision)
+                raise CspHint(hint)
+
+            names_set.add(name)
+
         return choice_tuple
 
+    @staticmethod
     def choice_tuple_or_after_proc_from(taker):
 
         after_proc = AfterProc.after_proc_from(taker)
@@ -384,6 +423,7 @@ class ChosenEvent(
 
     _csp_styles_ = ("", "{}", ":{}", "")
 
+    @staticmethod
     def chosen_event_from(taker):
 
         shards = taker.peek_more_shards(2)
@@ -403,6 +443,7 @@ class ChosenEvent(
         chosen_event = ChosenEvent(event_name, argot_name=argot_name)
         return chosen_event
 
+    @staticmethod
     def chosen_event_or_event_from(taker):
 
         chosen_event = ChosenEvent.chosen_event_from(taker)
@@ -418,6 +459,7 @@ class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg)
 
     _csp_styles_ = ("", "{}", "")
 
+    @staticmethod
     def deffed_proc_from(taker):
 
         shard = taker.peek_one_shard()
@@ -433,6 +475,7 @@ class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
 
     _csp_styles_ = ("", "{}", "")
 
+    @staticmethod
     def event_from(taker):
 
         shard = taker.peek_one_shard()
@@ -442,12 +485,17 @@ class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
             event = Event(shard.value)
             return event
 
+    def event_menu(self):
+        menu = OrderedEventTuple(self)
+        return menu
+
 
 class EmptyMark(OneKwArg, collections.namedtuple("EmptyMark", "".split())):
     """Name the empty string that ends, or is all of, the Csp source"""
 
     _csp_styles_ = ("", "")
 
+    @staticmethod
     def empty_mark_from(taker):
 
         shard = taker.peek_one_shard()
@@ -467,6 +515,7 @@ class EventsProc(
 
     _csp_styles_ = ("", "μ {}", " : {}", " • {}", "")
 
+    @staticmethod
     def events_proc_from(taker):
 
         shard = taker.peek_one_shard()  # Csp:  μ
@@ -528,6 +577,15 @@ class OrderedEventTuple(ClassyTuple, SomeArgs):
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
+    def event_menu(self):
+
+        if not self:
+            return OrderedEventTuple()
+
+        menu = self[0].event_menu()
+        return menu
+
+    @staticmethod
     def ordered_event_tuple_from(taker):
 
         # Require one "→" "\u2192" Rightwards Arrow Mark in between two Event Names
@@ -576,6 +634,7 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
 
     _csp_styles_ = ("", "{}", " = {}", "")
 
+    @staticmethod
     def proc_def_from(taker):
 
         shards = taker.peek_more_shards(2)
@@ -606,6 +665,12 @@ class PocketProc(collections.namedtuple("PocketProc", "pocketed".split()), SomeK
 
     _csp_styles_ = ("(", "{}", ")")
 
+    def event_menu(self):
+        pocketed = self.pocketed
+        menu = pocketed.event_menu()
+        return menu
+
+    @staticmethod
     def pocket_proc_from(taker):
 
         shard = taker.peek_one_shard()
@@ -631,6 +696,7 @@ class TracedEventTuple(ClassyTuple, SomeArgs):  # TODO: combine with OrderedEven
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
+    @staticmethod
     def traced_event_tuple_from(taker):
 
         # Open up with mark "⟨"
@@ -692,6 +758,7 @@ class UnorderedEventTuple(ClassyTuple, SomeArgs):
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
+    @staticmethod
     def unordered_event_tuple_from(taker):
 
         # Open up with mark "{"
@@ -932,7 +999,7 @@ class CspTaker:
 
         empty_mark = self.accept_empty_mark()
         if empty_mark is None:
-            if isinstance(call, DeffedProc):
+            if isinstance(call, DeffedProc):  # TODO: more polymorphic than "isinstance"
                 deffed_proc = call
                 if self.peek_is_mark("→"):
                     raise csp_hint_event_over_deffed_proc(deffed_proc)
@@ -1521,6 +1588,15 @@ def try_csp_then_py():
 
         csp_laters = list()
 
+        # Pick 0 or 1 raised Exception's out of the test source
+
+        tail_chars = chars[chars.index(csp_line) :]
+        tail_line = tail_chars.splitlines()[0]
+        tail_comment = tail_line.partition("#")[-1]
+        want_str_exc = None
+        if tail_comment.startswith(" no, "):
+            want_str_exc = tail_comment[len("#") :].strip()
+
         # Test a closed fragment of Csp source
 
         py_got = None
@@ -1533,6 +1609,7 @@ def try_csp_then_py():
             csp_want = csp_want.replace("\t", " ")
 
             csp_evalled = eval_csp_calls(csp_joined)
+            assert not want_str_exc, want_str_exc
 
             py_got = to_deep_py(csp_evalled)
 
@@ -1548,16 +1625,12 @@ def try_csp_then_py():
 
             got_str_exc = str(exc)
 
-            tail_chars = chars[chars.index(csp_line) :]
-            tail_line = tail_chars.splitlines()[0]
-            tail_comment = tail_line.partition("#")[-1]
-            want_str_exc = tail_comment[len("#") :].strip()
-
             assert got_str_exc == want_str_exc, (want_str_exc, got_str_exc)
 
         except Exception:
 
             stderr_print("cspsh: failing at test of Csp:  {}".format(csp_want))
+            stderr_print("cspsh: failing to raise:  {}".format(want_str_exc))
             stderr_print("cspsh: failing with Python of:  {}".format(py_got))
 
             raise
@@ -1640,7 +1713,7 @@ CHAPTER_1 = """
                      in.1 → out.1 → X)
 
     (x → P | y → Q | z → R)
-    # (x → P | x → Q)  # no, choices not distinct: ['x', 'x']
+    (x → P | x → Q)  # no, choices not distinct: ['x', 'x']
     # (x → P | y)  # no, '| y)' is not '| y → P'
     # (x → P) | (y → Q)  # no, '|' is not an operator on processes
     (x → P | (y → Q | z → R))
