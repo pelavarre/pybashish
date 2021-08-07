@@ -196,7 +196,8 @@ class SourceCell(Cell):
 
             str_reply = str(reply)
             if isinstance(down, str):
-                str_reply = '"{}"'.format(reply)
+                if func == format_as_python:  # TODO: inelegant
+                    str_reply = '"{}"'.format(reply)
 
             if key is None:
                 formatted = reply_format.format(str_reply)
@@ -239,18 +240,20 @@ def format_as_python(cell, replies=None):
     return py
 
 
+class InlinePythonCell(PythonCell, KwArgsCell):
+    """Format a Python Cell as a fragment of a single Sourceline"""
+
+    _py_style_ = Style(head="{}(", first="{}", middle=", {}", tail=")")
+
+
 class KwArgsPythonCell(PythonCell, KwArgsCell):
-    """Like an inline Python Cell, but spilled across lines of KwArgs"""
+    """Spill the KwArgs of a Python Cell across some Sourcelines"""
 
     _py_style_ = Style(head="{}(\n", middle="\t{}={},\n", tail=")")
 
 
-class OneKwArgPythonCell(PythonCell, KwArgsCell):
-    _py_style_ = Style(head="{}(", middle="{}", tail=")")
-
-
 class ArgsPythonCell(PythonCell, ArgsCell):
-    """Like an inline Python Cell, but spilled across lines of Args"""
+    """Spill the Args of a Python Cell across some Sourcelines"""
 
     _py_style_ = Style(head="{}(\n", middle="\t{},\n", tail=")")
 
@@ -270,25 +273,21 @@ class CspCell(SourceCell):
         return csp
 
 
-def format_as_csp(cell, replies):
+def format_as_csp(cell, replies=None):
     py = cell._as_csp_(replies)
     return py
 
 
-class KwArgsCspCell(CspCell, KwArgsCell):
-    """Like an inline Csp Cell, but spilled across lines of KwArgs"""
-
-    _py_style_ = Style(head="{}(\n", middle="\t{}={},\n", tail=")")
+class InlineCspCell(CspCell, InlinePythonCell):
+    """Format a Cell of KwArgs as Csp Source, and its Python inline"""
 
 
-class OneKwArgCspCell(CspCell, KwArgsCell):
-    _py_style_ = Style(head="{}(", middle="{}", tail=")")
+class KwArgsCspCell(CspCell, KwArgsPythonCell):
+    """Format a Cell of KwArgs as Csp Source, and spill its Python over Sourcelines"""
 
 
-class ArgsCspCell(CspCell, ArgsCell):
-    """Like an inline Csp Cell, but spilled across lines of Args"""
-
-    _py_style_ = Style(head="{}(\n", middle="\t{},\n", tail=")")
+class ArgsCspCell(CspCell, ArgsPythonCell):
+    """Format a Cell of Args as Csp Source, and spill its Python over Sourcelines"""
 
 
 #
@@ -387,7 +386,7 @@ class ClassyTuple(tuple):
         return repped
 
 
-class SomeKwArgs(LegacyCell, KwArgsPythonCell, KwArgsCspCell):
+class SomeKwArgs(LegacyCell, KwArgsCspCell):
     """Order the KwArgs of a Cell like a Collections Named Tuple"""
 
     def _zip_(self):
@@ -398,7 +397,7 @@ class SomeKwArgs(LegacyCell, KwArgsPythonCell, KwArgsCspCell):
             yield (index, key, value)
 
 
-class OneKwArg(LegacyCell, OneKwArgPythonCell, OneKwArgCspCell):
+class OneKwArg(LegacyCell, InlineCspCell):
     """Like SomeKwArgs, but styled differently"""
 
     def _zip_(self):
@@ -409,7 +408,7 @@ class OneKwArg(LegacyCell, OneKwArgPythonCell, OneKwArgCspCell):
             yield (index, key, value)
 
 
-class SomeArgs(LegacyCell, ArgsPythonCell, ArgsCspCell):
+class SomeArgs(LegacyCell, ArgsCspCell):
     """Order the indexed Args of a Cell like a Tuple"""
 
     def _downs_(self):
@@ -468,6 +467,7 @@ class AfterProc(
     """Run a Proc after an Event"""
 
     _csp_styles_ = ("", "{}", " → {}", "")
+    _csp_style_ = Style(first="{}", middle=" → {}")
 
     def _to_compiled_(self):
 
@@ -540,6 +540,7 @@ class ArgotDef(collections.namedtuple("ArgotDef", "before after".split()), SomeK
     """Detail an Alphabet of Events after listing Names for the Alphabet"""
 
     _csp_styles_ = ("", "{} = ", "{}", "")
+    _csp_style_ = Style(first="{}", middle=" = {}")
 
     @staticmethod
     def argot_def_from(taker, argot_name):
@@ -587,6 +588,7 @@ class ArgotName(collections.namedtuple("ArgotName", "deffed_proc".split()), Some
     """Pick an Alphabet of Events out of a Deffed Proc"""
 
     _csp_styles_ = ("α", "{}", "")
+    _csp_style_ = Style(first="α{}")
 
     @staticmethod
     def argot_name_from(taker):
@@ -607,6 +609,7 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
     """Choose 1 of N Proc's"""
 
     _csp_styles_ = ("", "{} | ", "{}", "")
+    _csp_style_ = Style(first="{}", middle=" | {}")
 
     def __new__(cls, *args):  # move these 'def __new__' into ClassyTuple somehow?
         return super().__new__(cls, args)
@@ -711,6 +714,7 @@ class ChosenEvent(
     """Define a Name for an Event chosen from the Argot of a Proc"""
 
     _csp_styles_ = ("", "{}", ":{}", "")
+    _csp_style_ = Style(first="{}", last=":{}")
 
     @staticmethod
     def chosen_event_from(taker):
@@ -747,6 +751,7 @@ class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg)
     """Mention a Proc by Name"""
 
     _csp_styles_ = ("", "{}", "")
+    _csp_style_ = Style(first="{}", middle=" → {}")
 
     @staticmethod
     def deffed_proc_from(taker):
@@ -763,6 +768,7 @@ class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
     """Name a thing that happens"""
 
     _csp_styles_ = ("", "{}", "")
+    _csp_style_ = Style(middle="{}")
 
     @staticmethod
     def event_from(taker):
@@ -803,6 +809,7 @@ class EventsProc(
     """Give a Name to a PocketProc choosing Events from an Alphabet"""
 
     _csp_styles_ = ("", "μ {}", " : {}", " • {}", "")
+    _csp_style_ = Style(first="μ {}", middle=" : {}", last=" • {}")
 
     @staticmethod
     def events_proc_from(taker):
@@ -847,12 +854,14 @@ class LazyEventsProc(
     """Give a Name to a PocketProc choosing Events without declaring its Alphabet"""
 
     _csp_styles_ = ("", "μ {}", " • {}", "")
+    _csp_style_ = Style(first="μ {}", last=" • {}")
 
 
 class OrderedArgotNameTuple(ClassyTuple, SomeArgs):
     """Order two or more Argot Names"""
 
     _csp_styles_ = ("", "{} = ", "{}", "")
+    _csp_style_ = Style(first="{}", middle=" = {}")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
@@ -862,6 +871,7 @@ class OrderedEventTuple(ClassyTuple, SomeArgs):
     """Order two or more Events"""
 
     _csp_styles_ = ("", "{} → ", "{}", "")
+    _csp_style_ = Style(first="{}", middle=" → {}")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
@@ -922,6 +932,7 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
     """Give a Name to a Pocket Proc or an Event Proc"""
 
     _csp_styles_ = ("", "{}", " = {}", "")
+    _csp_style_ = Style(first="{}", middle=" = {}")
 
     @staticmethod
     def proc_def_from(taker):
@@ -953,6 +964,7 @@ class PocketProc(collections.namedtuple("PocketProc", "pocketed".split()), SomeK
     """Contain one AfterProc or a Choice between AfterProc's"""
 
     _csp_styles_ = ("(", "{}", ")")
+    _csp_style_ = Style(head="(", middle="{}", tail=")")
 
     def event_menu(self):
         pocketed = self.pocketed
@@ -981,6 +993,7 @@ class TracedEventTuple(ClassyTuple, SomeArgs):  # TODO: combine with OrderedEven
     """Order two or more Events"""
 
     _csp_styles_ = ("⟨", "{},", "{}", "⟩")
+    _csp_style_ = Style(head="⟨", first="{}", middle=",{}", tail="⟩")  # "⟨⟩", not "()"
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
@@ -1043,6 +1056,7 @@ class UnorderedEventTuple(ClassyTuple, SomeArgs):
     """Collect zero or more Events together"""
 
     _csp_styles_ = ("{{", "{}, ", "{}", "}}")
+    _csp_style_ = Style(head="{{", first="{}", middle=", {}", tail="}}")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
@@ -1877,6 +1891,9 @@ def try_py_then_csp():
 
         csp_got = to_deep_csp(py_evalled)
 
+        alt_csp_got = format_as_csp(py_evalled)
+        assert alt_csp_got == csp_got, (print(csp_got), print(alt_csp_got))
+
         if csp_got != csp_want:
             stderr_print("cspsh: want Csp::  {!r}".format(csp_want))
             stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
@@ -1963,6 +1980,9 @@ def try_csp_then_py():
                 stderr_print("cspsh: want Csp::  {!r}".format(csp_want))
                 stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
                 assert False
+
+            alt_csp_got = format_as_csp(py_evalled)
+            assert alt_csp_got == csp_got, (repr(csp_got), repr(alt_csp_got))
 
         except CspHint as exc:
 
