@@ -35,20 +35,234 @@ import re
 import sys
 import textwrap
 
-_ = pdb
+
+def b():
+    pdb.set_trace()
 
 
 #
-# Think in Lisp, while coding in Python
+# Declare a Lisp layered on top of Python,
+# to form an Abstract Syntax Tree graph of Cells of Args and KwArgs,
+# such as:
+#
+#       Add(1, Divide(dividend=2, divisor=3))  # 1 + 2/3
 #
 
 
 DENT = 4 * " "
 
 
-class Call:
-    """Order the Args or KwArgs of a Call"""
+class Cell:
+    """Collect and order the Args or KwArgs children of a Cell of an Ast"""
 
+    def _bonds_(self):
+        """Yield each Bond to a child Cell, in order"""
+        bonds = tuple()
+        return bonds
+
+    def _choose_formats_(self, style, replies):
+        """Choose a format for each bond"""
+
+        # Default to drop the head and middle and tail
+
+        head = "" if (style.head is None) else style.head
+        middle = "" if (style.middle is None) else style.middle
+        tail = "" if (style.tail is None) else style.tail
+
+        # Default same as middle for first and last
+
+        first = middle if (style.first is None) else style.first
+        last = middle if (style.last is None) else style.last
+
+        # Choose a style for each bond
+
+        formats = list()
+        formats.append(head)
+
+        last_index = len(replies) - 1
+        for (index, bond) in enumerate(replies):
+            if index == 0:
+                formats.append(first)  # say a single bond is more a first, less a last
+            elif index == last_index:
+                formats.append(last)
+            else:
+                formats.append(middle)
+
+        formats.append(tail)
+
+        # Succeed
+
+        assert len(formats[1:][:-1]) == len(replies)
+        return formats
+
+    def _grok_(self, func):
+        """Call a Func at this Cell, to make sense of the Replies from that Func"""
+        replies = self._replies_(func)
+        reply = func(cell=self, replies=replies)
+        return reply
+
+    def _replies_(self, func):
+        """Call a Func at each Bond in order"""
+
+        replies = list()
+        for bond in self._bonds_():
+            down = bond.down
+
+            down_reply = down
+            if hasattr(down, "_grok_"):
+                down_reply = down._grok_(func)
+
+            replies.append(down_reply)
+
+        return replies
+
+
+class Bond(collections.namedtuple("Bond", "up, key, down".split(", "))):
+    """Point a parent Cell down to a child Cell, & back up again"""
+
+
+STYLE_FIELDS = "head, first, middle, last, tail".split(", ")
+
+
+class Style(
+    collections.namedtuple(
+        "Style", STYLE_FIELDS, defaults=(len(STYLE_FIELDS) * (None,))
+    ),
+):
+    """Say how to format an Abstract Syntax Tree graph (Ast) as Source Code"""
+
+
+class KwArgsCell(Cell):
+    """Collect and order the keyed KwArgs children of a Cell"""
+
+    def _bonds_(self):
+        """Yield each Bond to a child Cell, in order"""
+
+        up = self
+        for key in self._keys_():
+            down = getattr(self, key)
+            bond = Bond(up, key=key, down=down)
+            yield bond
+
+    def _keys_(self):
+        keys = self._fields  # from collections.namedtuple
+        return keys
+
+
+class ArgsCell(Cell):
+    """Collect and order the indexed Args children of a Cell"""
+
+    def _bonds_(self):
+        """Yield each Bond to a child Cell, in order"""
+
+        up = self
+        key = None
+        for down in self._downs_():
+            bond = Bond(up, key=key, down=down)
+            yield bond
+
+    def _downs_(self):
+        """Yield each child Cell in order"""
+
+
+class PythonCell(Cell):
+    """Format the Graph rooted by the Cell, as Python source of our Lisp on Python"""
+
+    def _as_python_(cell, replies=None):
+        """Format a Cell as Python"""
+
+        # Pull the replies from the whole Graph, if missing
+
+        if replies is None:
+            py = cell._grok_(func=format_as_python)
+            return py
+
+        # Else knit the replies together
+
+        bonds = cell._bonds_()
+
+        cell_type_name = type(cell).__name__
+        formats = cell._choose_formats_(style=cell._py_style_, replies=replies)
+
+        assert len(replies) == len(replies)
+        assert len(formats[1:][:-1]) == len(replies)
+
+        chars = ""
+        chars += formats[0].format(cell_type_name)
+
+        for (bond, reply, reply_format) in zip(bonds, replies, formats[1:][:-1]):
+            key = bond.key
+            down = bond.down
+
+            str_reply = str(reply)
+            if isinstance(down, str):
+                str_reply = '"{}"'.format(reply)
+
+            if key is None:
+                formatted = reply_format.format(str_reply)
+            elif reply_format.count("{}") < 2:
+                formatted = reply_format.format(str_reply)
+            else:
+                formatted = reply_format.format(key, str_reply)
+
+            # Indent each Item or Value
+
+            dented = formatted
+            if "\n" in formatted:
+                dented = "\n\t".join(formatted.splitlines()) + "\n"
+
+            chars += dented
+
+        chars += formats[-1].format()
+
+        spaced_chars = chars.expandtabs(tabsize=len(DENT))
+        return spaced_chars
+
+
+def format_as_python(cell, replies):
+    py = cell._as_python_(replies)
+    return py
+
+
+class KwArgsPythonCell(PythonCell, KwArgsCell):
+    """Like an inline Python Cell, but spilled across lines of KwArgs"""
+
+    _py_style_ = Style(head="{}(\n", middle="\t{}={},\n", tail=")")
+
+
+class OneKwArgPythonCell(PythonCell, KwArgsCell):
+
+    _py_style_ = Style(head="{}(", middle="{}", tail=")")
+
+
+class ArgsPythonCell(PythonCell, ArgsCell):
+    """Like an inline Python Cell, but spilled across lines of Args"""
+
+    _py_style_ = Style(head="{}(\n", middle="\t{},\n", tail=")")
+
+
+class CspCell(Cell):
+    """Format the Graph rooted by the Cell, as Csp source"""
+
+    _kwargs_py_styles_ = Style(head="{}(\n", middle="\t{}={},\n", tail=")")
+
+    _args_spilled_py_styles_ = Style(head="{}(\n", middle="\t{},\n", tail=")")
+    _args_joined_py_styles_ = Style(head="{}(\n", middle="\t{},\n", tail=")")
+
+    def _as_csp_(self):
+        """Format a Cell as Python"""
+        csp = format_as_csp(cell=self)
+        return csp
+
+
+def format_as_csp(cell):
+    """Format a Cell as Python"""
+
+    py = cell._grok_(format_as_csp)
+    return py
+
+
+class LegacyCell(Cell):
     def _to_compiled_(self):
         """Eval some more, after lexxing and parsing"""
         for zipped in self._zip_():
@@ -59,17 +273,17 @@ class Call:
                 assert isinstance(value, str)
 
     def _to_deep_csp_(self):
-        """Format the entire Call Tree as Csp"""
+        """Format a Cell as Csp"""
         chars = self._to_deep_style_(styles=self._csp_styles_, func=to_deep_csp)
         return chars
 
     def _to_deep_py_(self):
-        """Format the entire Call Tree as Python"""
+        """Format a Cell Tree as Python"""
         chars = self._to_deep_style_(styles=self._py_styles_, func=to_deep_py)
         return chars
 
     def _to_deep_style_(self, styles, func):
-        """Format the entire Call Tree as Csp or as Python"""
+        """Format a Cell Tree as Csp or as Python"""
 
         assert len(styles) >= 3, repr(styles)
 
@@ -144,8 +358,8 @@ class ClassyTuple(tuple):
         return repped
 
 
-class SomeKwArgs(Call):
-    """Order the KwArgs of a Call like a Collections Named Tuple"""
+class SomeKwArgs(LegacyCell, KwArgsPythonCell):
+    """Order the KwArgs of a Cell like a Collections Named Tuple"""
 
     _py_styles_ = ("{}(\n", "\t{}={},\n", ")")
 
@@ -157,16 +371,29 @@ class SomeKwArgs(Call):
             yield (index, key, value)
 
 
-class OneKwArg(SomeKwArgs):
+class OneKwArg(LegacyCell, OneKwArgPythonCell):
     """Like SomeKwArgs, but styled differently"""
 
     _py_styles_ = ("{}(", "{}", ")")
 
+    def _zip_(self):
+        """Yield each (index, key, value) of the Named Tuple in order"""
 
-class SomeArgs(Call):
-    """Order the indexed Args of a Call like a Tuple"""
+        for (index, key) in enumerate(self._fields):  # from collections.namedtuple
+            value = getattr(self, key)
+            yield (index, key, value)
+
+
+class SomeArgs(LegacyCell, ArgsPythonCell):
+    """Order the indexed Args of a Cell like a Tuple"""
 
     _py_styles_ = ("{}(\n", "\t{},\n", ")")
+
+    def _downs_(self):
+        """Yield each child Cell in order"""
+
+        for cell in self:
+            yield cell
 
     def _zip_(self):
         """Yield each (index, key, value) of the Tuple, always with None as the key"""
@@ -177,7 +404,7 @@ class SomeArgs(Call):
 
 
 def to_deep_csp(obj):
-    """Format the entire Call Tree as Csp"""
+    """Format a Cell as Csp"""
 
     if hasattr(obj, "_to_deep_csp_"):
         chars = obj._to_deep_csp_()
@@ -189,7 +416,7 @@ def to_deep_csp(obj):
 
 
 def to_deep_py(obj, depth=0):
-    """Format the entire Call Tree as Python"""
+    """Format a Cell as Python"""
 
     if hasattr(obj, "_to_deep_py_"):
         chars = obj._to_deep_py_()
@@ -1633,6 +1860,9 @@ def try_py_then_csp():
 
         py_got = to_deep_py(py_evalled)
 
+        alt_py_got = py_evalled._as_python_()
+        assert py_got == alt_py_got, (print(py_got), print(alt_py_got))
+
         assert not stderr_print_diff(input=py_want, output=py_got)
 
         # test print as Csp
@@ -1714,6 +1944,9 @@ def try_csp_then_py():
             assert not want_str_exc, (want_str_exc, None)
 
             py_got = to_deep_py(csp_evalled)
+
+            alt_py_got = csp_evalled._as_python_()
+            assert py_got == alt_py_got, (print(py_got), print(alt_py_got))
 
             py_evalled = eval(py_got)
 
@@ -1884,8 +2117,6 @@ CHAPTER_1 = """
 #
 # To do
 #
-
-# TODO:  put the Ordered Tuple's in place always, even to contain 0 or 1 or 2
 
 # TODO:  exit into interactive Repl
 
