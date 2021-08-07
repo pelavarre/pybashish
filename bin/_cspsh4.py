@@ -49,6 +49,15 @@ DENT = 4 * " "
 class Call:
     """Order the Args or KwArgs of a Call"""
 
+    def _to_compiled_(self):
+        """Eval some more, after lexxing and parsing"""
+        for zipped in self._zip_():
+            (index, key, value) = zipped
+            if hasattr(value, "_to_compiled_"):
+                value._to_compiled_()
+            else:
+                assert isinstance(value, str)
+
     def _to_deep_csp_(self):
         """Format the entire Call Tree as Csp"""
         chars = self._to_deep_style_(styles=self._csp_styles_, func=to_deep_csp)
@@ -222,6 +231,15 @@ class AfterProc(
 
     _csp_styles_ = ("", "{}", " → {}", "")
 
+    def _to_compiled_(self):
+
+        (before, after) = (self.before, self.after)
+
+        if isinstance(after, EmptyMark):
+            assert isinstance(before, OrderedEventTuple)
+            ordered_event_tuple = before
+            raise csp_hint_proc_over_event(ordered_event_tuple[-1])
+
     def event_menu(self):
         before = self.before
         menu = before.event_menu()
@@ -246,7 +264,8 @@ class AfterProc(
 
             if match:
                 chosen_event_or_event = ChosenEvent.chosen_event_or_event_from(taker)
-                before = chosen_event_or_event
+                if chosen_event_or_event:
+                    before = chosen_event_or_event
 
         if not before:
             return
@@ -256,18 +275,22 @@ class AfterProc(
         shard = taker.peek_one_shard()
 
         if not shard.is_mark("→"):
-            if ordered_event_tuple:
-                raise csp_hint_proc_over_event(ordered_event_tuple[-1])
 
-        assert shard.is_mark("→")  # TODO:  Mark.take_one_from_(taker)
-        taker.take_one_shard()
+            assert ordered_event_tuple  # TODO: inelegant
+            after = EmptyMark()
 
-        # Take one Pocket Proc or Deffed Proc
+        else:
 
-        after = PocketProc.pocket_proc_from(taker)
-        if not after:
-            after = DeffedProc.deffed_proc_from(taker)
-        assert after
+            assert shard.is_mark("→")  # TODO:  Mark.take_one_from_(taker)
+            taker.take_one_shard()
+
+            # Take one Pocket Proc or Deffed Proc
+
+            after = PocketProc.pocket_proc_from(taker)
+            if not after:
+                after = DeffedProc.deffed_proc_from(taker)
+
+        assert after is not None
 
         # Succeed
 
@@ -350,6 +373,41 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
     def __new__(cls, *args):  # move these 'def __new__' into ClassyTuple somehow?
         return super().__new__(cls, args)
 
+    def _to_compiled_(self):
+
+        # Visit each Choice
+
+        for choice in self:
+
+            # Reject Event in place of Proc
+
+            if isinstance(choice, Event):
+                event = choice
+                raise csp_hint_choice_after_proc_over_event(event)
+
+            # Reject PocketProc in place of After Proc
+
+            if isinstance(choice, PocketProc):
+                pocket_proc = choice
+                raise csp_hint_choice_after_proc_over_pocket_proc(pocket_proc)
+
+        # Reject conflicting choices
+
+        menu = self.event_menu()
+        names = sorted(_.name for _ in menu)
+
+        dupes = list(
+            names[_]
+            for _ in range(len(names))
+            if (
+                ((_ > 0) and (names[_ - 1] == names[_]))
+                or ((_ < (len(names) - 1)) and (names[_] == names[_ + 1]))
+            )
+        )
+
+        if dupes:
+            raise csp_hint_choice_dupes(dupes)
+
     def event_menu(self):
 
         menu = OrderedEventTuple()
@@ -364,8 +422,8 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
     @staticmethod
     def choice_tuple_from(taker, after_proc):
 
-        after_procs = list()
-        after_procs.append(after_proc)
+        choices = list()
+        choices.append(after_proc)
 
         #
 
@@ -378,37 +436,24 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
 
             next_after_proc = AfterProc.after_proc_from(taker)
 
+            next_choice = next_after_proc
             if not next_after_proc:
                 event = Event.event_from(taker)
-                if event:
-                    raise csp_hint_choice_after_proc_over_event(event)
-                pocket_proc = PocketProc.pocket_proc_from(taker)
-                if pocket_proc:
-                    raise csp_hint_choice_after_proc_over_pocket_proc(pocket_proc)
+                next_choice = event
+                if not event:
+                    pocket_proc = PocketProc.pocket_proc_from(taker)
+                    next_choice = pocket_proc
+                    assert pocket_proc
 
-            assert next_after_proc
-            after_procs.append(next_after_proc)
+            assert next_choice
+            choices.append(next_choice)
 
-        if not after_procs[1:]:
+        if not choices[1:]:
             return
 
         #
 
-        choice_tuple = ChoiceTuple(*after_procs)
-        menu = choice_tuple.event_menu()
-
-        names = sorted(_.name for _ in menu)
-        dupes = list(
-            names[_]
-            for _ in range(len(names))
-            if (
-                ((_ > 0) and (names[_ - 1] == names[_]))
-                or ((_ < (len(names) - 1)) and (names[_] == names[_ + 1]))
-            )
-        )
-        if dupes:
-            raise csp_hint_choice_dupes(dupes)
-
+        choice_tuple = ChoiceTuple(*choices)
         return choice_tuple
 
     @staticmethod
@@ -823,7 +868,11 @@ class UnorderedEventTuple(ClassyTuple, SomeArgs):
 #
 
 
-def eval_csp_calls(source):
+class CspHint(Exception):  # TODO: say more here, maybe do more here too?
+    pass
+
+
+def eval_csp_call(source):
     """Split and structure calls corresponding to Source Chars of Csp"""
 
     shards = split_csp(source)
@@ -832,7 +881,9 @@ def eval_csp_calls(source):
     assert not closed, (closed, opened, source)
     assert not opened, (closed, opened, source)
 
-    call = parse_csp_calls(source)  # TODO: stop repeating work of "split_csp"
+    call = parse_csp_call(source)  # TODO: stop repeating work of "split_csp"
+
+    compile_csp_call(call)
 
     return call  # may be falsey because empty, but is not None
 
@@ -858,6 +909,16 @@ def split_csp(source):
     # Succeed
 
     return shards
+
+
+def _to_item_from_groupdict_(groupdict):
+    """Pick the 1 Item of Value Is Not None out of an Re FindIter GroupDict"""
+
+    items = list(_ for _ in groupdict.items() if _[-1] is not None)
+    assert len(items) == 1, groupdict
+
+    item = items[-1]
+    return item
 
 
 def balance_csp_shards(shards):
@@ -899,7 +960,7 @@ def balance_csp_shards(shards):
     return (opened, closed)
 
 
-def parse_csp_calls(source):
+def parse_csp_call(source):
     """Parse an entire Call Tree of Csp"""
 
     shards = split_csp(source)
@@ -938,7 +999,7 @@ def parse_csp_calls(source):
 
     except Exception:
 
-        stderr_print("cspsh: failing in 'parse_csp_calls' of :", repr(source))
+        stderr_print("cspsh: failing in 'parse_csp_call' of :", repr(source))
 
         heads = shards[: -len(shards_taker.shards)]
         rejoined_heads = " ".join(_.value for _ in heads)
@@ -954,18 +1015,8 @@ def parse_csp_calls(source):
     return call  # may be falsey because empty, but is not None
 
 
-def _to_item_from_groupdict_(groupdict):
-    """Pick the 1 Item of Value Is Not None out of an Re FindIter GroupDict"""
-
-    items = list(_ for _ in groupdict.items() if _[-1] is not None)
-    assert len(items) == 1, groupdict
-
-    item = items[-1]
-    return item
-
-
-class CspHint(Exception):  # TODO: say more here, maybe do more here too?
-    pass
+def compile_csp_call(call):
+    call._to_compiled_()
 
 
 # TODO: move this above 'class Call'?
@@ -988,8 +1039,8 @@ class CspTaker:
         call = call or self.accept_proc_def()  # Csp:  ... =
 
         call = call or self.accept_argot_name_or_def()  # Csp:  α ...
-        call = call or self.accept_chosen_event_or_event()  # Csp:  <lowercase_name>
-        call = call or self.accept_deffed_proc()  # Csp:  <uppercase_name>
+        call = call or self.accept_chosen_event_or_event()  # Csp:  x  # Csp:  x:αP
+        call = call or self.accept_deffed_proc()  # Csp:  P
 
         call = call or self.accept_pocket_proc()  # Csp:  ( ...
 
@@ -1595,7 +1646,7 @@ def try_py_then_csp():
 
         # test parse as Csp
 
-        csp_evalled = eval_csp_calls(csp_want)
+        csp_evalled = eval_csp_call(csp_want)
 
         if csp_evalled != py_evalled:
             stderr_print("cspsh: csp_evalled", csp_evalled)
@@ -1659,8 +1710,8 @@ def try_csp_then_py():
             csp_want = csp_want.replace("\n", " ")
             csp_want = csp_want.replace("\t", " ")
 
-            csp_evalled = eval_csp_calls(csp_joined)
-            assert not want_str_exc, want_str_exc
+            csp_evalled = eval_csp_call(csp_joined)
+            assert not want_str_exc, (want_str_exc, None)
 
             py_got = to_deep_py(csp_evalled)
 
@@ -1685,6 +1736,11 @@ def try_csp_then_py():
             stderr_print("cspsh: failing with Python of:  {}".format(py_got))
 
             raise
+
+        if False:
+            if "x:αP" in csp_joined:
+                pdb.set_trace()
+                pass
 
     # Require no input lines leftover
 
@@ -1769,6 +1825,7 @@ CHAPTER_1 = """
     (x → P) | (y → Q)  # no, '| (y' process choice is not '| y' event choice
     (x → P | (y → Q | z → R))  # no, '| (y' process choice is not '| y' event choice
 
+    x:αP
     αRUNNER = {coin, choc, toffee}
     RUNNER = (x:αRUNNER → RUNNER)  # 1.1.3 X8
 
@@ -1828,9 +1885,13 @@ CHAPTER_1 = """
 # To do
 #
 
-# TODO:  defer type checks of Csp Source Repair Hints till after parse
+# TODO:  put the Ordered Tuple's in place always, even to contain 0 or 1 or 2
+
+# TODO:  exit into interactive Repl
 
 # TODO:  review grammar & grammar class names vs CspBook Pdf
+
+# TODO:  code more methods, less branches on 'if isinstance('
 
 # TODO:  Slackji :: transliteration of Unicode Org names of the Csp Unicode symbols
 # TODO:  Ascii transliteration of Csp Unicode
