@@ -43,6 +43,8 @@ def b():
 #
 # Declare a Lisp layered on top of Python
 #
+
+#
 # Form an Abstract Syntax Tree graph of Cells of Args and KwArgs, such as:
 #
 #       Add(1, Divide(dividend=2, divisor=3))  # 1 + 2/3
@@ -98,7 +100,7 @@ class Cell:
     def _grok_(self, func):
         """Call a Func at this Cell, to make sense of the Replies from that Func"""
         replies = self._replies_(func)
-        reply = func(cell=self, replies=replies)
+        reply = func(self, replies=replies)
         return reply
 
     def _replies_(self, func):
@@ -133,7 +135,7 @@ class Style(
 
 
 class KwArgsCell(Cell):
-    """Collect and order the keyed KwArgs children of a Cell"""
+    """Collect and order the keyed KwArgs children of this Cell"""
 
     def _bonds_(self):
         """Yield each Bond to a child Cell, in order"""
@@ -150,7 +152,7 @@ class KwArgsCell(Cell):
 
 
 class ArgsCell(Cell):
-    """Collect and order the indexed Args children of a Cell"""
+    """Collect and order the indexed Args children of this Cell"""
 
     def _bonds_(self):
         """Yield each Bond to a child Cell, in order"""
@@ -169,7 +171,7 @@ class SourceCell(Cell):
     """Format the Graph rooted by the Cell, as Source Chars of our Lisp on Python"""
 
     def _as_source_(cell, func, replies, style):
-        """Format a Cell as Source Chars"""
+        """Format this Cell as Source Chars"""
 
         # Pull the replies from the whole Graph, if missing
 
@@ -229,31 +231,32 @@ class PythonCell(SourceCell):
     """Like a SourceCell, but specifically for Python"""
 
     def _as_python_(self, replies=None):
-        """Format a Cell as Py Source Chars"""
+        """Format this Cell as Py Source Chars"""
         func = format_as_python
         py = self._as_source_(func, replies=replies, style=self._py_style_)
         return py
 
 
 def format_as_python(cell, replies=None):
+    """Format a Cell as Python Source Chars"""
     py = cell._as_python_(replies)
     return py
 
 
 class InlinePythonCell(PythonCell, KwArgsCell):
-    """Format a Python Cell as a fragment of a single Sourceline"""
+    """Format this Cell as a fragment of a single Python Sourceline"""
 
     _py_style_ = Style(head="{}(", first="{}", middle=", {}", tail=")")
 
 
 class KwArgsPythonCell(PythonCell, KwArgsCell):
-    """Spill the KwArgs of a Python Cell across some Sourcelines"""
+    """Spill the KwArgs of a this Cell across some Python Sourcelines"""
 
     _py_style_ = Style(head="{}(\n", middle="\t{}={},\n", tail=")")
 
 
 class ArgsPythonCell(PythonCell, ArgsCell):
-    """Spill the Args of a Python Cell across some Sourcelines"""
+    """Spill the Args of this Cell across some Python Sourcelines"""
 
     _py_style_ = Style(head="{}(\n", middle="\t{},\n", tail=")")
 
@@ -267,15 +270,32 @@ class CspCell(SourceCell):
     """Like a SourceCell, but specifically for Csp"""
 
     def _as_csp_(self, replies=None):
-        """Format a Cell as Csp Source Chars"""
+        """Format this Cell as Csp Source Chars"""
         func = format_as_csp
         csp = self._as_source_(func, replies=replies, style=self._csp_style_)
         return csp
 
+    def _compile_csp_cell_(self):
+        """Complete a compile-time evaluation of this Csp Cell"""
+        _ = self._replies_(func=compile_csp_cell)
+
 
 def format_as_csp(cell, replies=None):
+    """Format a Cell as Csp Source Chars"""
     py = cell._as_csp_(replies)
     return py
+
+
+def compile_csp_cell(down, replies=None):
+    """Complete a compile-time evaluation of a Csp Cell"""
+
+    _ = replies
+
+    if hasattr(down, "_compile_csp_cell_"):
+        reply = down._compile_csp_cell_()
+        return reply
+
+    assert isinstance(down, str)
 
 
 class InlineCspCell(CspCell, InlinePythonCell):
@@ -295,88 +315,6 @@ class ArgsCspCell(CspCell, ArgsPythonCell):
 #
 
 
-class LegacyCell(Cell):
-    def _to_compiled_(self):
-        """Eval some more, after lexxing and parsing"""
-        for zipped in self._zip_():
-            (index, key, value) = zipped
-            if hasattr(value, "_to_compiled_"):
-                value._to_compiled_()
-            else:
-                assert isinstance(value, str)
-
-    def _to_deep_csp_(self):
-        """Format a Cell as Csp"""
-        chars = self._to_deep_style_(styles=self._csp_styles_, func=to_deep_csp)
-        return chars
-
-    def _to_deep_style_(self, styles, func):
-        """Format a Cell Tree as Csp or as Python"""
-
-        assert len(styles) >= 3, repr(styles)
-
-        self_type_name = type(self).__name__
-
-        # Open up, visit each Item or Value, and close out
-
-        chars = ""
-
-        if "{}" not in styles[0]:  # 1st
-            chars += styles[0].format()
-        else:
-            chars += styles[0].format(self_type_name)
-
-        zippeds = list(self._zip_())
-        zipped_styles = styles[1:][:-1]
-
-        if False:
-            if self_type_name == "ChoiceTuple":
-                if func == to_deep_csp:
-                    if len(zippeds) > 2:
-                        pdb.set_trace()
-
-        for zipped in zippeds:
-            (index, key, value) = zipped
-
-            # Choose a style for the zipped Item or Value
-
-            zipped_style_index = -1  # end with the last zipped style
-            if len(zipped_styles) > 1:
-                if index < (len(zippeds) - 1):
-                    zipped_style_index = index  # step through the styles
-                    if index >= (len(zipped_styles) - 1):
-                        zipped_style_index = -2  # but don't step past the 2nd to last
-
-            style = zipped_styles[zipped_style_index]
-
-            # Apply the chosen style
-
-            count = style.count("{}")
-            assert count in (1, 2), (count, self_type_name)
-
-            func_value = func(value)
-
-            if (count == 1) or (key is None):
-                styled = style.format(func_value)
-            else:
-                styled = style.format(key, func_value)
-
-            # Indent each Item or Value
-
-            dented = styled
-            if "\n" in styled:
-                dented = "\n\t".join(styled.splitlines()) + "\n"
-
-            chars += dented
-
-        chars += styles[-1].format()  # Last
-
-        # Convert Tabs to Spaces
-
-        spaced_chars = chars.replace("\t", DENT)
-        return spaced_chars
-
-
 class ClassyTuple(tuple):
     """Work like a Tuple, but when Classname is Not "tuple", say so"""
 
@@ -386,29 +324,7 @@ class ClassyTuple(tuple):
         return repped
 
 
-class SomeKwArgs(LegacyCell, KwArgsCspCell):
-    """Order the KwArgs of a Cell like a Collections Named Tuple"""
-
-    def _zip_(self):
-        """Yield each (index, key, value) of the Named Tuple in order"""
-
-        for (index, key) in enumerate(self._fields):  # from collections.namedtuple
-            value = getattr(self, key)
-            yield (index, key, value)
-
-
-class OneKwArg(LegacyCell, InlineCspCell):
-    """Like SomeKwArgs, but styled differently"""
-
-    def _zip_(self):
-        """Yield each (index, key, value) of the Named Tuple in order"""
-
-        for (index, key) in enumerate(self._fields):  # from collections.namedtuple
-            value = getattr(self, key)
-            yield (index, key, value)
-
-
-class SomeArgs(LegacyCell, ArgsCspCell):
+class SomeArgs(ArgsCspCell):
     """Order the indexed Args of a Cell like a Tuple"""
 
     def _downs_(self):
@@ -416,25 +332,6 @@ class SomeArgs(LegacyCell, ArgsCspCell):
 
         for cell in self:
             yield cell
-
-    def _zip_(self):
-        """Yield each (index, key, value) of the Tuple, always with None as the key"""
-
-        key = None
-        for (index, value) in enumerate(self):
-            yield (index, key, value)
-
-
-def to_deep_csp(obj):
-    """Format a Cell as Csp"""
-
-    if hasattr(obj, "_to_deep_csp_"):
-        chars = obj._to_deep_csp_()
-    else:
-        assert isinstance(obj, str), type(obj)
-        chars = "{}".format(obj)  # TODO: too easily goes wrong
-
-    return chars
 
 
 #
@@ -462,14 +359,15 @@ CLOSING_MARKS = ")]}⟩"
 
 
 class AfterProc(
-    collections.namedtuple("AfterProc", "before after".split()), SomeKwArgs
+    KwArgsCspCell,
+    collections.namedtuple("AfterProc", "before after".split()),
 ):
     """Run a Proc after an Event"""
 
     _csp_styles_ = ("", "{}", " → {}", "")
     _csp_style_ = Style(first="{}", middle=" → {}")
 
-    def _to_compiled_(self):
+    def _compile_csp_cell_(self):
 
         (before, after) = (self.before, self.after)
 
@@ -536,7 +434,10 @@ class AfterProc(
         return after_proc
 
 
-class ArgotDef(collections.namedtuple("ArgotDef", "before after".split()), SomeKwArgs):
+class ArgotDef(
+    KwArgsCspCell,
+    collections.namedtuple("ArgotDef", "before after".split()),
+):
     """Detail an Alphabet of Events after listing Names for the Alphabet"""
 
     _csp_styles_ = ("", "{} = ", "{}", "")
@@ -584,7 +485,10 @@ class ArgotDef(collections.namedtuple("ArgotDef", "before after".split()), SomeK
         return argot_def
 
 
-class ArgotName(collections.namedtuple("ArgotName", "deffed_proc".split()), SomeKwArgs):
+class ArgotName(
+    KwArgsCspCell,
+    collections.namedtuple("ArgotName", "deffed_proc".split()),
+):
     """Pick an Alphabet of Events out of a Deffed Proc"""
 
     _csp_styles_ = ("α", "{}", "")
@@ -614,7 +518,7 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
     def __new__(cls, *args):  # move these 'def __new__' into ClassyTuple somehow?
         return super().__new__(cls, args)
 
-    def _to_compiled_(self):
+    def _compile_csp_cell_(self):
 
         # Visit each Choice
 
@@ -709,7 +613,8 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
 
 
 class ChosenEvent(
-    collections.namedtuple("ChosenEvent", "event_name argot_name".split()), SomeKwArgs
+    KwArgsCspCell,
+    collections.namedtuple("ChosenEvent", "event_name argot_name".split()),
 ):
     """Define a Name for an Event chosen from the Argot of a Proc"""
 
@@ -747,7 +652,10 @@ class ChosenEvent(
         return event
 
 
-class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg):
+class DeffedProc(
+    InlineCspCell,
+    collections.namedtuple("DeffedProc", "name".split()),
+):
     """Mention a Proc by Name"""
 
     _csp_styles_ = ("", "{}", "")
@@ -764,7 +672,10 @@ class DeffedProc(collections.namedtuple("DeffedProc", "name".split()), OneKwArg)
             return deffed_proc
 
 
-class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
+class Event(
+    InlineCspCell,
+    collections.namedtuple("Event", "name".split()),
+):
     """Name a thing that happens"""
 
     _csp_styles_ = ("", "{}", "")
@@ -785,7 +696,10 @@ class Event(OneKwArg, collections.namedtuple("Event", "name".split())):
         return menu
 
 
-class EmptyMark(OneKwArg, collections.namedtuple("EmptyMark", "".split())):
+class EmptyMark(
+    InlineCspCell,
+    collections.namedtuple("EmptyMark", "".split()),
+):
     """Name the empty string that ends, or is all of, the Csp source"""
 
     _csp_styles_ = ("", "")
@@ -804,7 +718,8 @@ class EmptyMark(OneKwArg, collections.namedtuple("EmptyMark", "".split())):
 
 
 class EventsProc(
-    collections.namedtuple("EventsProc", "name alphabet body".split()), SomeKwArgs
+    KwArgsCspCell,
+    collections.namedtuple("EventsProc", "name alphabet body".split()),
 ):
     """Give a Name to a PocketProc choosing Events from an Alphabet"""
 
@@ -849,7 +764,8 @@ class EventsProc(
 
 
 class LazyEventsProc(
-    collections.namedtuple("LazyEventsProc", "name body".split()), SomeKwArgs
+    KwArgsCspCell,
+    collections.namedtuple("LazyEventsProc", "name body".split()),
 ):
     """Give a Name to a PocketProc choosing Events without declaring its Alphabet"""
 
@@ -928,7 +844,10 @@ class OrderedEventTuple(ClassyTuple, SomeArgs):
         return event_tuple
 
 
-class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs):
+class ProcDef(
+    KwArgsCspCell,
+    collections.namedtuple("ProcDef", "name body".split()),
+):
     """Give a Name to a Pocket Proc or an Event Proc"""
 
     _csp_styles_ = ("", "{}", " = {}", "")
@@ -960,7 +879,9 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
         return proc_def
 
 
-class PocketProc(collections.namedtuple("PocketProc", "pocketed".split()), SomeKwArgs):
+class PocketProc(
+    collections.namedtuple("PocketProc", "pocketed".split()), KwArgsCspCell
+):
     """Contain one AfterProc or a Choice between AfterProc's"""
 
     _csp_styles_ = ("(", "{}", ")")
@@ -1135,7 +1056,7 @@ def eval_csp_call(source):
 
     call = parse_csp_call(source)  # TODO: stop repeating work of "split_csp"
 
-    compile_csp_call(call)
+    compile_csp_cell(call)
 
     return call  # may be falsey because empty, but is not None
 
@@ -1267,8 +1188,9 @@ def parse_csp_call(source):
     return call  # may be falsey because empty, but is not None
 
 
-def compile_csp_call(call):
-    call._to_compiled_()
+#
+#
+#
 
 
 # TODO: move this above 'class Call'?
@@ -1889,11 +1811,7 @@ def try_py_then_csp():
 
         # test print as Csp
 
-        csp_got = to_deep_csp(py_evalled)
-
-        alt_csp_got = format_as_csp(py_evalled)
-        assert alt_csp_got == csp_got, (print(csp_got), print(alt_csp_got))
-
+        csp_got = format_as_csp(py_evalled)
         if csp_got != csp_want:
             stderr_print("cspsh: want Csp::  {!r}".format(csp_want))
             stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
@@ -1908,8 +1826,8 @@ def try_py_then_csp():
             stderr_print("cspsh: py_evalled", py_evalled)
 
         assert csp_evalled == py_evalled, argparse.Namespace(
-            want_deep_py=py_want,
-            got_deep_py=format_as_python(csp_evalled),
+            want_py=py_want,
+            got_py=format_as_python(csp_evalled),
         )
 
 
@@ -1975,14 +1893,11 @@ def try_csp_then_py():
 
             py_evalled = eval(py_got)
 
-            csp_got = to_deep_csp(py_evalled)
+            csp_got = format_as_csp(py_evalled)
             if csp_got != csp_want:
                 stderr_print("cspsh: want Csp::  {!r}".format(csp_want))
                 stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
                 assert False
-
-            alt_csp_got = format_as_csp(py_evalled)
-            assert alt_csp_got == csp_got, (repr(csp_got), repr(alt_csp_got))
 
         except CspHint as exc:
 
