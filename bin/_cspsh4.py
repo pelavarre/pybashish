@@ -906,6 +906,8 @@ class CspTaker:
 
     def accept_one_call(self):
 
+        #
+
         call = self.accept_empty_mark()
 
         call = call or self.accept_choice_tuple_or_after_proc()  # Csp:  ... → ... |
@@ -925,6 +927,15 @@ class CspTaker:
             call = self.accept_event_tuple()  # Csp:  { ...
         if call is None:
             call = self.accept_traced_event_tuple()  # Csp:  ⟨ ...
+
+        #
+
+        empty_mark = self.accept_empty_mark()
+        if empty_mark is None:
+            if isinstance(call, DeffedProc):
+                deffed_proc = call
+                if self.peek_is_mark("→"):
+                    raise csp_hint_event_over_deffed_proc(deffed_proc)
 
         # TODO: add tests that cause 'call = None' here
 
@@ -995,6 +1006,12 @@ class CspTaker:
 
         return traced_event_tuple
 
+    def peek_is_mark(self, mark):
+        taker = self.taker
+        shard = taker.peek_one_shard()
+        if shard.is_mark(mark):
+            return shard
+
 
 class CspShard(collections.namedtuple("CspShard", "key value".split())):
     """
@@ -1030,6 +1047,19 @@ def csp_hint_proc_over_event(event):
     got_proc = "name {!r}".format(event_name)
     want_proc = "upper case process name {!r}".format(proc_name)
     hint = "no, {} is not {}".format(got_proc, want_proc)
+
+    raise CspHint(hint)
+
+
+def csp_hint_event_over_deffed_proc(deffed_proc):
+    """say no, 'P' is not lower case event name 'p'"""
+
+    proc_name = deffed_proc.name
+    event_name = proc_name.lower()
+
+    got_event = "name {!r}".format(proc_name)
+    want_event = "lower case event name {!r}".format(event_name)
+    hint = "no, {} is not {}".format(got_event, want_event)
 
     raise CspHint(hint)
 
@@ -1567,7 +1597,7 @@ CHAPTER_1 = """
     CTR = (right → up → right → right → STOP)  # 1.1.1 X3
 
     x → y  # no, name 'y' is not upper case process name 'Y'
-    # P → Q  # no, name 'P' is not lower case event name 'p'
+    P → Q  # no, name 'P' is not lower case event name 'p'
 
     x → (y → STOP)
 
