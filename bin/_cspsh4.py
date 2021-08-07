@@ -155,16 +155,18 @@ class ArgsCell(Cell):
     """Collect and order the indexed Args children of this Cell"""
 
     def _bonds_(self):
-        """Yield each Bond to a child Cell, in order"""
+        """Yield each child Cell in order"""
 
         up = self
-        key = None
-        for down in self._downs_():
-            bond = Bond(up, key=key, down=down)
-            yield bond
+        for key in self._keys_():  # rarely more than one key
+            downs_list = getattr(self, key)
+            for down in downs_list:
+                bond = Bond(up, key=None, down=down)
+                yield bond
 
-    def _downs_(self):
-        """Yield each child Cell in order"""
+    def _keys_(self):
+        keys = self._fields  # from collections.namedtuple
+        return keys
 
 
 class SourceCell(Cell):
@@ -311,30 +313,6 @@ class ArgsCspCell(CspCell, ArgsPythonCell):
 
 
 #
-#
-#
-
-
-class ClassyTuple(tuple):
-    """Work like a Tuple, but when Classname is Not "tuple", say so"""
-
-    def __repr__(self):
-        self_type_name = type(self).__name__
-        repped = "{}{}".format(self_type_name, super().__repr__())
-        return repped
-
-
-class SomeArgs(ArgsCspCell):
-    """Order the indexed Args of a Cell like a Tuple"""
-
-    def _downs_(self):
-        """Yield each child Cell in order"""
-
-        for cell in self:
-            yield cell
-
-
-#
 # Declare a Csp Lisp Lexxer, in the way of Linux Lex
 #
 # Split the Csp Source into blank and nonblank Shards,
@@ -364,7 +342,6 @@ class AfterProc(
 ):
     """Run a Proc after an Event"""
 
-    _csp_styles_ = ("", "{}", " → {}", "")
     _csp_style_ = Style(first="{}", middle=" → {}")
 
     def _compile_csp_cell_(self):
@@ -374,7 +351,7 @@ class AfterProc(
         if isinstance(after, EmptyMark):
             assert isinstance(before, OrderedEventTuple)
             ordered_event_tuple = before
-            raise csp_hint_proc_over_event(ordered_event_tuple[-1])
+            raise csp_hint_proc_over_event(ordered_event_tuple.events[-1])
 
     def event_menu(self):
         before = self.before
@@ -440,7 +417,6 @@ class ArgotDef(
 ):
     """Detail an Alphabet of Events after listing Names for the Alphabet"""
 
-    _csp_styles_ = ("", "{} = ", "{}", "")
     _csp_style_ = Style(first="{}", middle=" = {}")
 
     @staticmethod
@@ -491,7 +467,6 @@ class ArgotName(
 ):
     """Pick an Alphabet of Events out of a Deffed Proc"""
 
-    _csp_styles_ = ("α", "{}", "")
     _csp_style_ = Style(first="α{}")
 
     @staticmethod
@@ -509,20 +484,22 @@ class ArgotName(
         return argot_name
 
 
-class ChoiceTuple(ClassyTuple, SomeArgs):
+class ChoiceTuple(  # FIXME: TODO: don't name these classes 'class ~Tuple:'
+    ArgsCspCell,
+    collections.namedtuple("ChoiceTuple", "choices".split()),
+):
     """Choose 1 of N Proc's"""
 
-    _csp_styles_ = ("", "{} | ", "{}", "")
     _csp_style_ = Style(first="{}", middle=" | {}")
 
-    def __new__(cls, *args):  # move these 'def __new__' into ClassyTuple somehow?
+    def __new__(cls, *args):  # pull these 'def __new__' from ArgsCspCell somehow?
         return super().__new__(cls, args)
 
     def _compile_csp_cell_(self):
 
         # Visit each Choice
 
-        for choice in self:
+        for choice in self.choices:
 
             # Reject Event in place of Proc
 
@@ -539,7 +516,7 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
         # Reject conflicting choices
 
         menu = self.event_menu()
-        names = sorted(_.name for _ in menu)
+        names = sorted(_.name for _ in menu.events)
 
         dupes = list(
             names[_]
@@ -556,11 +533,17 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
     def event_menu(self):
 
         menu = OrderedEventTuple()
-        for choice in self:
+        for choice in self.choices:
 
             choice_menu = choice.event_menu()
+
             # menu += OrderedEventTuple(choice_menu)  # TODO: does this work?
-            menu = OrderedEventTuple(*(tuple(menu) + tuple(choice_menu)))
+            if not menu.events:
+                menu = choice_menu
+            else:
+                menu = OrderedEventTuple(
+                    *(tuple(menu.events) + tuple(choice_menu.events))
+                )
 
         return menu
 
@@ -618,7 +601,6 @@ class ChosenEvent(
 ):
     """Define a Name for an Event chosen from the Argot of a Proc"""
 
-    _csp_styles_ = ("", "{}", ":{}", "")
     _csp_style_ = Style(first="{}", last=":{}")
 
     @staticmethod
@@ -658,7 +640,6 @@ class DeffedProc(
 ):
     """Mention a Proc by Name"""
 
-    _csp_styles_ = ("", "{}", "")
     _csp_style_ = Style(first="{}", middle=" → {}")
 
     @staticmethod
@@ -678,7 +659,6 @@ class Event(
 ):
     """Name a thing that happens"""
 
-    _csp_styles_ = ("", "{}", "")
     _csp_style_ = Style(middle="{}")
 
     @staticmethod
@@ -702,8 +682,6 @@ class EmptyMark(
 ):
     """Name the empty string that ends, or is all of, the Csp source"""
 
-    _csp_styles_ = ("", "")
-
     @staticmethod
     def empty_mark_from(taker):
 
@@ -723,7 +701,6 @@ class EventsProc(
 ):
     """Give a Name to a PocketProc choosing Events from an Alphabet"""
 
-    _csp_styles_ = ("", "μ {}", " : {}", " • {}", "")
     _csp_style_ = Style(first="μ {}", middle=" : {}", last=" • {}")
 
     @staticmethod
@@ -769,24 +746,27 @@ class LazyEventsProc(
 ):
     """Give a Name to a PocketProc choosing Events without declaring its Alphabet"""
 
-    _csp_styles_ = ("", "μ {}", " • {}", "")
     _csp_style_ = Style(first="μ {}", last=" • {}")
 
 
-class OrderedArgotNameTuple(ClassyTuple, SomeArgs):
+class OrderedArgotNameTuple(
+    ArgsCspCell,
+    collections.namedtuple("OrderedArgotNameTuple", "argot_names".split()),
+):
     """Order two or more Argot Names"""
 
-    _csp_styles_ = ("", "{} = ", "{}", "")
     _csp_style_ = Style(first="{}", middle=" = {}")
 
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
 
-class OrderedEventTuple(ClassyTuple, SomeArgs):
+class OrderedEventTuple(
+    ArgsCspCell,
+    collections.namedtuple("OrderedEventTuple", "events".split()),
+):
     """Order two or more Events"""
 
-    _csp_styles_ = ("", "{} → ", "{}", "")
     _csp_style_ = Style(first="{}", middle=" → {}")
 
     def __new__(cls, *args):
@@ -794,10 +774,10 @@ class OrderedEventTuple(ClassyTuple, SomeArgs):
 
     def event_menu(self):
 
-        if not self:
+        if not self.events:
             return OrderedEventTuple()
 
-        menu = self[0].event_menu()
+        menu = self.events[0].event_menu()
         return menu
 
     @staticmethod
@@ -850,7 +830,6 @@ class ProcDef(
 ):
     """Give a Name to a Pocket Proc or an Event Proc"""
 
-    _csp_styles_ = ("", "{}", " = {}", "")
     _csp_style_ = Style(first="{}", middle=" = {}")
 
     @staticmethod
@@ -884,7 +863,6 @@ class PocketProc(
 ):
     """Contain one AfterProc or a Choice between AfterProc's"""
 
-    _csp_styles_ = ("(", "{}", ")")
     _csp_style_ = Style(head="(", middle="{}", tail=")")
 
     def event_menu(self):
@@ -910,10 +888,12 @@ class PocketProc(
         return pocket
 
 
-class TracedEventTuple(ClassyTuple, SomeArgs):  # TODO: combine with OrderedEventTuple
+class TracedEventTuple(
+    ArgsCspCell,
+    collections.namedtuple("TracedEventTuple", "events".split()),
+):  # TODO: combine with OrderedEventTuple
     """Order two or more Events"""
 
-    _csp_styles_ = ("⟨", "{},", "{}", "⟩")
     _csp_style_ = Style(head="⟨", first="{}", middle=",{}", tail="⟩")  # "⟨⟩", not "()"
 
     def __new__(cls, *args):
@@ -973,10 +953,12 @@ class TracedEventTuple(ClassyTuple, SomeArgs):  # TODO: combine with OrderedEven
         return event_tuple
 
 
-class UnorderedEventTuple(ClassyTuple, SomeArgs):
+class UnorderedEventTuple(
+    ArgsCspCell,
+    collections.namedtuple("UnorderedEventTuple", "events".split()),
+):
     """Collect zero or more Events together"""
 
-    _csp_styles_ = ("{{", "{}, ", "{}", "}}")
     _csp_style_ = Style(head="{{", first="{}", middle=", {}", tail="}}")
 
     def __new__(cls, *args):
@@ -1364,7 +1346,7 @@ def csp_hint_choice_after_proc_over_pocket_proc(pocket_proc):
     menu = pocket_proc.event_menu()
     assert menu  # hmm, may be unreliable
 
-    event = menu[0]
+    event = menu.events[0]
     hint = "no, '| ({}' process choice is not '| {}' event choice".format(
         event.name, event.name
     )
