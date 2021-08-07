@@ -395,19 +395,19 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
         #
 
         choice_tuple = ChoiceTuple(*after_procs)
+        menu = choice_tuple.event_menu()
 
-        names_set = set()
-        for event in choice_tuple.event_menu():
-            if not hasattr(event, "name"):
-                pdb.set_trace()
-            name = event.name
-
-            if name in names_set:
-                collision = [name, name]  # twice or more
-                hint = "no, choices not distinct: {}".format(collision)
-                raise CspHint(hint)
-
-            names_set.add(name)
+        names = sorted(_.name for _ in menu)
+        dupes = list(
+            names[_]
+            for _ in range(len(names))
+            if (
+                ((_ > 0) and (names[_ - 1] == names[_]))
+                or ((_ < (len(names) - 1)) and (names[_] == names[_ + 1]))
+            )
+        )
+        if dupes:
+            raise csp_hint_choice_dupes(dupes)
 
         return choice_tuple
 
@@ -1124,7 +1124,7 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
 
 
 def csp_hint_choice_after_proc_over_event(event):
-    """say no, 'y'"""
+    """Reject Event Without Proc in place of After Proc of Choice"""
 
     hint = "no, '| {}' event is not '| {} → P' guarded process".format(
         event.name, event.name
@@ -1134,7 +1134,7 @@ def csp_hint_choice_after_proc_over_event(event):
 
 
 def csp_hint_choice_after_proc_over_pocket_proc(pocket_proc):
-    """say no, 'y'"""
+    """Reject Pocket Proc in place of After Proc of Choice"""
 
     menu = pocket_proc.event_menu()
     assert menu  # hmm, may be unreliable
@@ -1147,8 +1147,17 @@ def csp_hint_choice_after_proc_over_pocket_proc(pocket_proc):
     raise CspHint(hint)
 
 
+def csp_hint_choice_dupes(dupes):
+    """Reject conflicting Events of Choice"""
+
+    str_dupes = ", ".join(["..."] + dupes + ["..."])
+    hint = "no, choices not distinct: {{ {} }}".format(str_dupes)
+
+    raise CspHint(hint)
+
+
 def csp_hint_event_over_deffed_proc(deffed_proc):
-    """say no, 'P' is not lower case event name 'p'"""
+    """Reject Deffed Proc in place of Event"""
 
     proc_name = deffed_proc.name
     event_name = proc_name.lower()
@@ -1161,7 +1170,7 @@ def csp_hint_event_over_deffed_proc(deffed_proc):
 
 
 def csp_hint_proc_over_event(event):
-    """say no, 'y' is not upper case process name 'Y'"""
+    """Reject Event in place of Deffed Proc"""
 
     event_name = event.name
     proc_name = event.name.upper()
@@ -1755,7 +1764,7 @@ CHAPTER_1 = """
                      in.1 → out.1 → X)
 
     (x → P | y → Q | z → R)
-    (x → P | x → Q)  # no, choices not distinct: ['x', 'x']
+    (x → P | x → Q)  # no, choices not distinct: { ..., x, x, ... }
     (x → P | y)  # no, '| y' event is not '| y → P' guarded process
     (x → P) | (y → Q)  # no, '| (y' process choice is not '| y' event choice
     (x → P | (y → Q | z → R))  # no, '| (y' process choice is not '| y' event choice
