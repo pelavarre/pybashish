@@ -374,12 +374,18 @@ class ChoiceTuple(ClassyTuple, SomeArgs):
             shard = taker.peek_one_shard()
             if not shard.is_mark("|"):
                 break
-
             taker.take_one_shard()
 
             next_after_proc = AfterProc.after_proc_from(taker)
+
             if not next_after_proc:
-                next_after_proc = PocketProc.pocket_proc_from(taker)
+                event = Event.event_from(taker)
+                if event:
+                    raise csp_hint_choice_after_proc_over_event(event)
+                pocket_proc = PocketProc.pocket_proc_from(taker)
+                if pocket_proc:
+                    raise csp_hint_choice_after_proc_over_pocket_proc(pocket_proc)
+
             assert next_after_proc
             after_procs.append(next_after_proc)
 
@@ -999,10 +1005,22 @@ class CspTaker:
 
         empty_mark = self.accept_empty_mark()
         if empty_mark is None:
+
             if isinstance(call, DeffedProc):  # TODO: more polymorphic than "isinstance"
                 deffed_proc = call
                 if self.peek_is_mark("→"):
                     raise csp_hint_event_over_deffed_proc(deffed_proc)
+
+            if isinstance(call, PocketProc):
+                if self.peek_is_mark("|"):
+                    taker = self.taker
+                    taker.take_one_shard()
+                    next_pocket_proc = self.accept_pocket_proc()
+                    if next_pocket_proc:
+                        raise csp_hint_choice_after_proc_over_pocket_proc(
+                            next_pocket_proc
+                        )
+                    assert next_pocket_proc  # unreliable
 
         # TODO: add tests that cause 'call = None' here
 
@@ -1105,15 +1123,26 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
         return stripped
 
 
-def csp_hint_proc_over_event(event):
-    """say no, 'y' is not upper case process name 'Y'"""
+def csp_hint_choice_after_proc_over_event(event):
+    """say no, 'y'"""
 
-    event_name = event.name
-    proc_name = event.name.upper()
+    hint = "no, '| {}' event is not '| {} → P' guarded process".format(
+        event.name, event.name
+    )
 
-    got_proc = "name {!r}".format(event_name)
-    want_proc = "upper case process name {!r}".format(proc_name)
-    hint = "no, {} is not {}".format(got_proc, want_proc)
+    raise CspHint(hint)
+
+
+def csp_hint_choice_after_proc_over_pocket_proc(pocket_proc):
+    """say no, 'y'"""
+
+    menu = pocket_proc.event_menu()
+    assert menu  # hmm, may be unreliable
+
+    event = menu[0]
+    hint = "no, '| ({}' process choice is not '| {}' event choice".format(
+        event.name, event.name
+    )
 
     raise CspHint(hint)
 
@@ -1127,6 +1156,19 @@ def csp_hint_event_over_deffed_proc(deffed_proc):
     got_event = "name {!r}".format(proc_name)
     want_event = "lower case event name {!r}".format(event_name)
     hint = "no, {} is not {}".format(got_event, want_event)
+
+    raise CspHint(hint)
+
+
+def csp_hint_proc_over_event(event):
+    """say no, 'y' is not upper case process name 'Y'"""
+
+    event_name = event.name
+    proc_name = event.name.upper()
+
+    got_proc = "name {!r}".format(event_name)
+    want_proc = "upper case process name {!r}".format(proc_name)
+    hint = "no, {} is not {}".format(got_proc, want_proc)
 
     raise CspHint(hint)
 
@@ -1714,9 +1756,9 @@ CHAPTER_1 = """
 
     (x → P | y → Q | z → R)
     (x → P | x → Q)  # no, choices not distinct: ['x', 'x']
-    # (x → P | y)  # no, '| y)' is not '| y → P'
-    # (x → P) | (y → Q)  # no, '|' is not an operator on processes
-    (x → P | (y → Q | z → R))
+    (x → P | y)  # no, '| y' event is not '| y → P' guarded process
+    (x → P) | (y → Q)  # no, '| (y' process choice is not '| y' event choice
+    (x → P | (y → Q | z → R))  # no, '| (y' process choice is not '| y' event choice
 
     αRUNNER = {coin, choc, toffee}
     RUNNER = (x:αRUNNER → RUNNER)  # 1.1.3 X8
@@ -1777,7 +1819,7 @@ CHAPTER_1 = """
 # To do
 #
 
-# TODO:  emit Csp Source Repair Hints
+# TODO:  defer type checks of Csp Source Repair Hints till after parse
 
 # TODO:  review grammar & grammar class names vs CspBook Pdf
 
