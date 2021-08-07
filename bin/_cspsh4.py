@@ -585,6 +585,8 @@ class ProcDef(collections.namedtuple("ProcDef", "name body".split()), SomeKwArgs
         body = PocketProc.pocket_proc_from(taker)
         if not body:
             body = EventsProc.events_proc_from(taker)
+            if not body:
+                body = ChoiceTuple.choice_tuple_or_after_proc_from(taker)
         assert body
 
         proc_def = ProcDef(name, body=body)
@@ -931,8 +933,8 @@ class CspTaker:
 
     def accept_choice_tuple_or_after_proc(self):
         taker = self.taker
-        call = ChoiceTuple.choice_tuple_or_after_proc_from(taker)
-        return call
+        choice_tuple_or_after_proc = ChoiceTuple.choice_tuple_or_after_proc_from(taker)
+        return choice_tuple_or_after_proc
 
     def accept_chosen_event_or_event(self):  # such as Csp 'x:A' or 'coin'
         taker = self.taker
@@ -1429,28 +1431,66 @@ def try_py_then_csp():
 def try_csp_then_py():
     """Translate from Csp Source to Calls to Py Source, to Py Calls, to Csp Source"""
 
+    # Collect input lines
+
     chars = OUR_BOOTSTRAP
     chars += CHAPTER_1
+    chars = textwrap.dedent(chars).strip()
 
-    csp_chars = textwrap.dedent(chars).strip()
-    csp_chars = "\n".join(_.partition("#")[0] for _ in csp_chars.splitlines())
-    csp_wants = (_.strip() for _ in csp_chars.splitlines() if _.strip())
+    csp_chars = "\n".join(_.partition("#")[0] for _ in chars.splitlines())
+    csp_lines = (_.strip() for _ in csp_chars.splitlines() if _.strip())
+    # TODO: teach the comments and blanks to survive the parse
 
-    for csp_want in csp_wants:
+    # Visit each input line
+
+    csp_laters = list()
+    for csp_line in csp_lines:
+
+        # Join input lines til all ( [ { ⟨ marks closed by ) ] } ⟩ marks
+
+        csp_laters.append(csp_line)
+        csp_joined = "\n".join(csp_laters)
+
+        shards = split_csp(csp_joined)
+        (opened, closed) = balance_csp_shards(shards)
+        assert not closed, (closed, opened, csp_line)
+
+        if opened:
+            continue
+
+        csp_laters = list()
+
+        # Test a closed fragment of Csp source
+
         py_got = None
+
         try:
-            csp_evalled = eval_csp_calls(csp_want)
+
+            csp_evalled = eval_csp_calls(csp_joined)
             py_got = to_deep_py(csp_evalled)
             py_evalled = eval(py_got)
+
+            csp_want = csp_joined
+            csp_want = csp_want.replace("(\n", "(")  # TODO: grossly inelegant
+            csp_want = csp_want.replace("\n", " ")
+            csp_want = csp_want.replace("\t", " ")
+
             csp_got = to_deep_csp(py_evalled)
             if csp_got != csp_want:
                 stderr_print("cspsh: want Csp::  {!r}".format(csp_want))
                 stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
                 assert False
+
         except Exception:
+
             stderr_print("cspsh: failing at test of Csp:  {}".format(csp_want))
             stderr_print("cspsh: failing with Python of:  {}".format(py_got))
+
             raise
+
+    # Require no input lines leftover
+
+    assert not csp_laters
 
 
 OUR_BOOTSTRAP = """
@@ -1504,26 +1544,26 @@ CHAPTER_1 = """
 
     (up → STOP | right → right → up → STOP)  # 1.1.3 X1
 
-    # CH5C = in5p → (  # 1.1.3 X2
-    #     out1p → out1p → out1p → out2p → CH5C |
-    #     out2p → out1p → out2p → CH5C)
+    CH5C = in5p → (  # 1.1.3 X2
+        out1p → out1p → out1p → out2p → CH5C |
+        out2p → out1p → out2p → CH5C)
 
     (x → P | y → Q)
 
     VMCT = μ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
 
-    # VMC = (in2p → (large → VMC |  # 1.1.3 X4
-    #                small → out1p → VMC) |
-    #        in1p → (small → VMC |
-    #                in1p → (large → VMC |
-    #                        in1p → STOP)))
+    VMC = (in2p → (large → VMC |  # 1.1.3 X4
+                   small → out1p → VMC) |
+           in1p → (small → VMC |
+                   in1p → (large → VMC |
+                           in1p → STOP)))
 
     VMCRED = μ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
 
     VMS2 = (coin → VMCRED)  # 1.1.3 X6
 
-    # COPYBIT = μ X • (in.0 → out.0 → X |  # 1.1.3 X7
-    #                  in.1 → out.1 → X)
+    COPYBIT = μ X • (in.0 → out.0 → X |  # 1.1.3 X7
+                     in.1 → out.1 → X)
 
     (x → P | y → Q | z → R)
     # (x → P | x → Q)  # no, choices not distinct: ['x', 'x']
@@ -1590,7 +1630,6 @@ CHAPTER_1 = """
 # To do
 #
 
-# TODO:  parse multi-line grammar
 # TODO:  emit Csp Source Repair Hints
 
 # TODO:  review grammar & grammar class names vs CspBook Pdf
