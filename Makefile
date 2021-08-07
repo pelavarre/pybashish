@@ -11,6 +11,8 @@ default: black flake8 test-once
 	@echo 'git commit --all --amend'
 	@echo 'git status'
 	:
+	git describe --always --dirty
+	:
 	: make: passed
 	:
 

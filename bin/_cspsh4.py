@@ -226,8 +226,10 @@ class AfterProc(
 
         # Take one or more of an Event Name and a "→" "\u2192" Rightwards Arrow Mark
 
-        before = OrderedEventTuple.ordered_event_tuple_from(taker)
-        if not before:
+        ordered_event_tuple = OrderedEventTuple.ordered_event_tuple_from(taker)
+
+        before = ordered_event_tuple
+        if not ordered_event_tuple:
             shards = taker.peek_more_shards(5)
 
             match = None
@@ -237,7 +239,8 @@ class AfterProc(
                 match = True  # x : α P → P
 
             if match:
-                before = ChosenEvent.chosen_event_or_event_from(taker)
+                chosen_event_or_event = ChosenEvent.chosen_event_or_event_from(taker)
+                before = chosen_event_or_event
 
         if not before:
             return
@@ -245,7 +248,12 @@ class AfterProc(
         # Take one "→" "\u2192" Rightwards Arrow Mark
 
         shard = taker.peek_one_shard()
-        assert shard and shard.is_mark("→")  # TODO:  Mark.take_one_from_(taker)
+
+        if not shard.is_mark("→"):
+            if ordered_event_tuple:
+                raise csp_hint_proc_over_event(ordered_event_tuple[-1])
+
+        assert shard.is_mark("→")  # TODO:  Mark.take_one_from_(taker)
         taker.take_one_shard()
 
         # Take one Pocket Proc or Deffed Proc
@@ -296,7 +304,7 @@ class ArgotDef(collections.namedtuple("ArgotDef", "before after".split()), SomeK
         # Take one "=" "\u003D" Equals Sign
 
         shard = taker.peek_one_shard()
-        assert shard and shard.is_mark("=")
+        assert shard.is_mark("=")
         taker.take_one_shard()
 
         # Take one Alphabet
@@ -845,10 +853,15 @@ def parse_csp_calls(source):
     try:
 
         call = csp_taker.accept_one_call()  # might be a first EmptyMark
+
         assert call is not None
 
         empty_mark = csp_taker.accept_empty_mark()
         assert empty_mark is not None
+
+    except CspHint:
+
+        raise
 
     except Exception:
 
@@ -878,6 +891,11 @@ def _to_item_from_groupdict_(groupdict):
     return item
 
 
+class CspHint(Exception):  # TODO: say more here, maybe do more here too?
+    pass
+
+
+# TODO: move this above 'class Call'?
 class CspTaker:
     """
     Walk once through source chars, as split, working as yet another Yacc
@@ -1001,6 +1019,19 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
     def strip(self):
         stripped = self.value.strip()
         return stripped
+
+
+def csp_hint_proc_over_event(event):
+    """say no, 'y' is not upper case process name 'Y'"""
+
+    event_name = event.name
+    proc_name = event.name.upper()
+
+    got_proc = "name {!r}".format(event_name)
+    want_proc = "upper case process name {!r}".format(proc_name)
+    hint = "no, {} is not {}".format(got_proc, want_proc)
+
+    raise CspHint(hint)
 
 
 #
@@ -1466,20 +1497,33 @@ def try_csp_then_py():
 
         try:
 
-            csp_evalled = eval_csp_calls(csp_joined)
-            py_got = to_deep_py(csp_evalled)
-            py_evalled = eval(py_got)
-
             csp_want = csp_joined
             csp_want = csp_want.replace("(\n", "(")  # TODO: grossly inelegant
             csp_want = csp_want.replace("\n", " ")
             csp_want = csp_want.replace("\t", " ")
+
+            csp_evalled = eval_csp_calls(csp_joined)
+
+            py_got = to_deep_py(csp_evalled)
+
+            py_evalled = eval(py_got)
 
             csp_got = to_deep_csp(py_evalled)
             if csp_got != csp_want:
                 stderr_print("cspsh: want Csp::  {!r}".format(csp_want))
                 stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
                 assert False
+
+        except CspHint as exc:
+
+            got_str_exc = str(exc)
+
+            tail_chars = chars[chars.index(csp_line) :]
+            tail_line = tail_chars.splitlines()[0]
+            tail_comment = tail_line.partition("#")[-1]
+            want_str_exc = tail_comment[len("#") :].strip()
+
+            assert got_str_exc == want_str_exc, (want_str_exc, got_str_exc)
 
         except Exception:
 
@@ -1522,7 +1566,7 @@ CHAPTER_1 = """
 
     CTR = (right → up → right → right → STOP)  # 1.1.1 X3
 
-    # x → y  # no, name 'y' is not upper case process name 'Y'
+    x → y  # no, name 'y' is not upper case process name 'Y'
     # P → Q  # no, name 'P' is not lower case event name 'p'
 
     x → (y → STOP)
