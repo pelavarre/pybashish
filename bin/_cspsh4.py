@@ -41,9 +41,9 @@ def b():
 
 
 #
-# Declare a Lisp layered on top of Python,
-# to form an Abstract Syntax Tree graph of Cells of Args and KwArgs,
-# such as:
+# Declare a Lisp layered on top of Python
+#
+# Form an Abstract Syntax Tree graph of Cells of Args and KwArgs, such as:
 #
 #       Add(1, Divide(dividend=2, divisor=3))  # 1 + 2/3
 #
@@ -165,16 +165,16 @@ class ArgsCell(Cell):
         """Yield each child Cell in order"""
 
 
-class PythonCell(Cell):
-    """Format the Graph rooted by the Cell, as Python source of our Lisp on Python"""
+class SourceCell(Cell):
+    """Format the Graph rooted by the Cell, as Source Chars of our Lisp on Python"""
 
-    def _as_python_(cell, replies=None):
-        """Format a Cell as Python"""
+    def _as_source_(cell, func, replies, style):
+        """Format a Cell as Source Chars"""
 
         # Pull the replies from the whole Graph, if missing
 
         if replies is None:
-            py = cell._grok_(func=format_as_python)
+            py = cell._grok_(func=func)
             return py
 
         # Else knit the replies together
@@ -182,7 +182,7 @@ class PythonCell(Cell):
         bonds = cell._bonds_()
 
         cell_type_name = type(cell).__name__
-        formats = cell._choose_formats_(style=cell._py_style_, replies=replies)
+        formats = cell._choose_formats_(style, replies=replies)
 
         assert len(replies) == len(replies)
         assert len(formats[1:][:-1]) == len(replies)
@@ -219,7 +219,22 @@ class PythonCell(Cell):
         return spaced_chars
 
 
-def format_as_python(cell, replies):
+#
+# Declare a Python layered on Lisp layered on Python
+#
+
+
+class PythonCell(SourceCell):
+    """Like a SourceCell, but specifically for Python"""
+
+    def _as_python_(self, replies=None):
+        """Format a Cell as Py Source Chars"""
+        func = format_as_python
+        py = self._as_source_(func, replies=replies, style=self._py_style_)
+        return py
+
+
+def format_as_python(cell, replies=None):
     py = cell._as_python_(replies)
     return py
 
@@ -231,7 +246,6 @@ class KwArgsPythonCell(PythonCell, KwArgsCell):
 
 
 class OneKwArgPythonCell(PythonCell, KwArgsCell):
-
     _py_style_ = Style(head="{}(", middle="{}", tail=")")
 
 
@@ -241,25 +255,45 @@ class ArgsPythonCell(PythonCell, ArgsCell):
     _py_style_ = Style(head="{}(\n", middle="\t{},\n", tail=")")
 
 
-class CspCell(Cell):
-    """Format the Graph rooted by the Cell, as Csp source"""
+#
+# Declare a Csp layered on Lisp layered on Python
+#
 
-    _kwargs_py_styles_ = Style(head="{}(\n", middle="\t{}={},\n", tail=")")
 
-    _args_spilled_py_styles_ = Style(head="{}(\n", middle="\t{},\n", tail=")")
-    _args_joined_py_styles_ = Style(head="{}(\n", middle="\t{},\n", tail=")")
+class CspCell(SourceCell):
+    """Like a SourceCell, but specifically for Csp"""
 
-    def _as_csp_(self):
-        """Format a Cell as Python"""
-        csp = format_as_csp(cell=self)
+    def _as_csp_(self, replies=None):
+        """Format a Cell as Csp Source Chars"""
+        func = format_as_csp
+        csp = self._as_source_(func, replies=replies, style=self._csp_style_)
         return csp
 
 
-def format_as_csp(cell):
-    """Format a Cell as Python"""
-
-    py = cell._grok_(format_as_csp)
+def format_as_csp(cell, replies):
+    py = cell._as_csp_(replies)
     return py
+
+
+class KwArgsCspCell(CspCell, KwArgsCell):
+    """Like an inline Csp Cell, but spilled across lines of KwArgs"""
+
+    _py_style_ = Style(head="{}(\n", middle="\t{}={},\n", tail=")")
+
+
+class OneKwArgCspCell(CspCell, KwArgsCell):
+    _py_style_ = Style(head="{}(", middle="{}", tail=")")
+
+
+class ArgsCspCell(CspCell, ArgsCell):
+    """Like an inline Csp Cell, but spilled across lines of Args"""
+
+    _py_style_ = Style(head="{}(\n", middle="\t{},\n", tail=")")
+
+
+#
+#
+#
 
 
 class LegacyCell(Cell):
@@ -275,11 +309,6 @@ class LegacyCell(Cell):
     def _to_deep_csp_(self):
         """Format a Cell as Csp"""
         chars = self._to_deep_style_(styles=self._csp_styles_, func=to_deep_csp)
-        return chars
-
-    def _to_deep_py_(self):
-        """Format a Cell Tree as Python"""
-        chars = self._to_deep_style_(styles=self._py_styles_, func=to_deep_py)
         return chars
 
     def _to_deep_style_(self, styles, func):
@@ -358,11 +387,9 @@ class ClassyTuple(tuple):
         return repped
 
 
-class SomeKwArgs(LegacyCell, KwArgsPythonCell):
+class SomeKwArgs(LegacyCell, KwArgsPythonCell, KwArgsCspCell):
     """Order the KwArgs of a Cell like a Collections Named Tuple"""
 
-    _py_styles_ = ("{}(\n", "\t{}={},\n", ")")
-
     def _zip_(self):
         """Yield each (index, key, value) of the Named Tuple in order"""
 
@@ -371,11 +398,9 @@ class SomeKwArgs(LegacyCell, KwArgsPythonCell):
             yield (index, key, value)
 
 
-class OneKwArg(LegacyCell, OneKwArgPythonCell):
+class OneKwArg(LegacyCell, OneKwArgPythonCell, OneKwArgCspCell):
     """Like SomeKwArgs, but styled differently"""
 
-    _py_styles_ = ("{}(", "{}", ")")
-
     def _zip_(self):
         """Yield each (index, key, value) of the Named Tuple in order"""
 
@@ -384,10 +409,8 @@ class OneKwArg(LegacyCell, OneKwArgPythonCell):
             yield (index, key, value)
 
 
-class SomeArgs(LegacyCell, ArgsPythonCell):
+class SomeArgs(LegacyCell, ArgsPythonCell, ArgsCspCell):
     """Order the indexed Args of a Cell like a Tuple"""
-
-    _py_styles_ = ("{}(\n", "\t{},\n", ")")
 
     def _downs_(self):
         """Yield each child Cell in order"""
@@ -411,18 +434,6 @@ def to_deep_csp(obj):
     else:
         assert isinstance(obj, str), type(obj)
         chars = "{}".format(obj)  # TODO: too easily goes wrong
-
-    return chars
-
-
-def to_deep_py(obj, depth=0):
-    """Format a Cell as Python"""
-
-    if hasattr(obj, "_to_deep_py_"):
-        chars = obj._to_deep_py_()
-    else:
-        assert isinstance(obj, str), type(obj)
-        chars = '"{}"'.format(obj)  # TODO: too easily goes wrong
 
     return chars
 
@@ -1858,10 +1869,7 @@ def try_py_then_csp():
 
         # test print as Py
 
-        py_got = to_deep_py(py_evalled)
-
-        alt_py_got = py_evalled._as_python_()
-        assert py_got == alt_py_got, (print(py_got), print(alt_py_got))
+        py_got = py_evalled._as_python_()
 
         assert not stderr_print_diff(input=py_want, output=py_got)
 
@@ -1884,7 +1892,7 @@ def try_py_then_csp():
 
         assert csp_evalled == py_evalled, argparse.Namespace(
             want_deep_py=py_want,
-            got_deep_py=to_deep_py(csp_evalled),
+            got_deep_py=format_as_python(csp_evalled),
         )
 
 
@@ -1943,7 +1951,7 @@ def try_csp_then_py():
             csp_evalled = eval_csp_call(csp_joined)
             assert not want_str_exc, (want_str_exc, None)
 
-            py_got = to_deep_py(csp_evalled)
+            py_got = format_as_python(csp_evalled)
 
             alt_py_got = csp_evalled._as_python_()
             assert py_got == alt_py_got, (print(py_got), print(alt_py_got))
