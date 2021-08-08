@@ -469,22 +469,22 @@ alias -- '..'='cd .. && (dirs -p |head -1)'
 
 alias -- '?'="echo -n '? '>/dev/tty && cat -"  # press ⌃D for Yes, ⌃C for No
 
-function --jqd () {
+function -jqd () {
     : :: 'guess the initials of the person at the keyboard'
     echo 'jqd'  # J Q Doe
 }  # redefined by ~/.zprofile-zsecrets
 
-function --cp () {
+function -cp () {
     : :: 'back up to date-author-time stamp'
     local F="$1"
-    local JQD=$(--jqd)
+    local JQD=$(-jqd)
     (set -xe; cp -ipR "$F" "$F~$(date +%m%d$JQD%H%M%S)~")
 }
 
-function --mv () {
+function -mv () {
     : :: 'back up to date-author-time stamp and remove'
     local F="$1"
-    local JQD=$(--jqd)
+    local JQD=$(-jqd)
     (set -xe; mv -i "$F" "$F~$(date +%m%d$JQD%H%M%S)~")
 }
 

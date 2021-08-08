@@ -30,6 +30,9 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 " \ Esc => cancel the :set hlsearch highlighting of all search hits on screen
 :nnoremap <Bslash><esc> :noh<return>
 
+" \ e => reload, if no changes not-saved
+:nnoremap <Bslash>e :e<return>
+
 " \ i => toggle ignoring case in searches, but depends on :set nosmartcase
 :nnoremap <Bslash>i :set invignorecase<return>
 
