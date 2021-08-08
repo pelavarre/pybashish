@@ -392,9 +392,9 @@ class AfterProc(
         return after_proc
 
 
-class ArgotDef(
+class LegacyArgotDef(
     KwArgsCspCell,
-    collections.namedtuple("ArgotDef", "before after".split()),
+    collections.namedtuple("LegacyArgotDef", "before after".split()),
 ):
     """Detail an Alphabet of Events after listing Names for the Alphabet"""
 
@@ -438,7 +438,7 @@ class ArgotDef(
 
         after = UnorderedEventTuple.unordered_event_tuple_from(taker)
 
-        argot_def = ArgotDef(before, after=after)
+        argot_def = LegacyArgotDef(before, after=after)
         return argot_def
 
 
@@ -484,7 +484,7 @@ class ChoiceTuple(  # FIXME: TODO: don't name these classes 'class ~Tuple:'
 
             # Reject Event in place of Proc
 
-            if isinstance(choice, Event):
+            if isinstance(choice, LegacyEvent):
                 event = choice
                 raise csp_hint_choice_after_proc_over_event(event)
 
@@ -547,7 +547,7 @@ class ChoiceTuple(  # FIXME: TODO: don't name these classes 'class ~Tuple:'
 
             next_choice = next_after_proc
             if not next_after_proc:
-                event = Event.event_from(taker)
+                event = LegacyEvent.event_from(taker)
                 next_choice = event
                 if not event:
                     pocket_proc = PocketProc.pocket_proc_from(taker)
@@ -611,7 +611,7 @@ class ChosenEvent(
         if chosen_event:
             return chosen_event
 
-        event = Event.event_from(taker)
+        event = LegacyEvent.event_from(taker)
         return event
 
 
@@ -634,9 +634,9 @@ class DeffedProc(
             return deffed_proc
 
 
-class Event(
+class LegacyEvent(
     InlineCspCell,
-    collections.namedtuple("Event", "name".split()),
+    collections.namedtuple("LegacyEvent", "name".split()),
 ):
     """Name a thing that happens"""
 
@@ -649,7 +649,7 @@ class Event(
         if shard.is_event_name():
             taker.take_one_shard()
 
-            event = Event(shard.value)
+            event = LegacyEvent(shard.value)
             return event
 
     def event_menu(self):
@@ -780,7 +780,7 @@ class OrderedEventTuple(
         # Accept one or more pairs of "→" and Event Name
 
         event_list = list()
-        event_list.append(Event(shards[0].value))
+        event_list.append(LegacyEvent(shards[0].value))
         taker.take_one_shard()
 
         while True:
@@ -797,7 +797,7 @@ class OrderedEventTuple(
 
             taker.take_some_shards(2)
 
-            event_list.append(Event(shards[1].value))
+            event_list.append(LegacyEvent(shards[1].value))
 
         # Succeed
 
@@ -805,9 +805,9 @@ class OrderedEventTuple(
         return event_tuple
 
 
-class ProcDef(
+class LegacyProcDef(
     KwArgsCspCell,
-    collections.namedtuple("ProcDef", "name body".split()),
+    collections.namedtuple("LegacyProcDef", "name body".split()),
 ):
     """Give a Name to a Pocket Proc or an Event Proc"""
 
@@ -835,7 +835,7 @@ class ProcDef(
                 body = ChoiceTuple.choice_tuple_or_after_proc_from(taker)
         assert body
 
-        proc_def = ProcDef(name, body=body)
+        proc_def = LegacyProcDef(name, body=body)
         return proc_def
 
 
@@ -908,7 +908,7 @@ class TracedEventTuple(
 
             taker.take_some_shards(2)
 
-            event_list.append(Event(shards[0].value))
+            event_list.append(LegacyEvent(shards[0].value))
 
         # Accept one or zero final Event Name's
 
@@ -917,7 +917,7 @@ class TracedEventTuple(
         if shard.is_event_name():
             taker.take_one_shard()
 
-            event_list.append(Event(shard.value))
+            event_list.append(LegacyEvent(shard.value))
 
         # TODO: Accept extra "," mark before close mark "⟩"
 
@@ -973,7 +973,7 @@ class UnorderedEventTuple(
 
             taker.take_some_shards(2)
 
-            event_list.append(Event(shards[0].value))
+            event_list.append(LegacyEvent(shards[0].value))
 
         # Accept one or zero final Event Name's
 
@@ -982,7 +982,7 @@ class UnorderedEventTuple(
         if shard.is_event_name():
             taker.take_one_shard()
 
-            event_list.append(Event(shard.value))
+            event_list.append(LegacyEvent(shard.value))
 
         # TODO: Accept extra "," mark before close mark "}"
 
@@ -1119,7 +1119,8 @@ class CellJoiner:
         self.givebacks = list()
         self.snapshots = list()
 
-        self.top_call = None
+        func = CspCellJoiner._eof_
+        self._enter_(func)  # Push one Frame into the Call Stack, don't leave it empty
 
     def _enter_(self, func, *args, **kwargs):
         """Snapshot at entry, before trying to match"""
@@ -1133,8 +1134,15 @@ class CellJoiner:
         givebacks = self.givebacks
         snapshots = self.snapshots
 
+        # Choose a Class to represent the Match
+
+        cell_classname = title_camel_case_from_skidded(func.__name__)
+        cell_class = eval(cell_classname)
+
+        # Push one Frame into the Call Stack
+
         call = list()
-        call.append(func)
+        call.append(cell_class)
         calls.append(call)
 
         giveback = taker._snapshot_()
@@ -1171,22 +1179,72 @@ class CellJoiner:
         givebacks = self.givebacks
         snapshots = self.snapshots
 
+        # Pop one Frame out of the Call Stack
+
         call = calls.pop()
         giveback = givebacks.pop()
         snapshot = snapshots.pop()
 
         assert snapshot is None  # else lacking some:  self._rollback_()
 
+        # Restore Snapshot from Entry, and then Fail
+
         if not result:
+            taker._restore_(giveback)
 
-            taker._restore_(giveback)  # Restore entry & fail
+            return
 
-        else:
+        # Form a Cell
 
-            if calls:  # Serve as Arg of Caller
-                calls[-1].append(call)
-            else:  # Else serve as Top Call
-                self.top_call = call
+        if False:
+
+            cell_class = call[0]
+
+            kwargs = dict()
+            for arg in call[1:]:
+                skidded = skidded_from_camel_case(type(arg).__name__)
+                arg_name = skidded.strip("_")  # convert to namedtuple field names
+                assert arg_name not in kwargs.keys()
+                kwargs[arg_name] = arg
+
+            stderr_print(cell_class, kwargs)
+            cell = cell_class(**kwargs)
+
+            _ = cell
+
+        # Append Self as an Arg, and then Succeed
+
+        calls[-1].append(call)
+
+
+def skidded_from_camel_case(chars):
+    """Convert such names as '_EndOfFile' to such as '_end_of_file'"""
+
+    cases = list()
+    for (index, ch) in enumerate(chars):
+        lowered = ch.lower()
+
+        if ch != lowered:
+            if cases and cases[-1] != "_":
+                cases.append("_")
+        cases.append(lowered)
+
+    skidded_case = "".join(cases)
+    return skidded_case
+
+
+def title_camel_case_from_skidded(chars):
+    """Convert such names as '_end_of_file' to such as '_EndOfFile'"""
+
+    heads = len(chars) - len(chars.lstrip("_"))
+    tails = len(chars) - len(chars.rstrip("_"))
+
+    words = list()
+    for (index, word) in enumerate(chars.strip("_").split("_")):
+        words.append(word.title())
+
+    camel_case = (heads * "_") + "".join(words) + (tails * "_")
+    return camel_case
 
 
 class CspCellJoiner(CellJoiner):
@@ -1489,6 +1547,161 @@ class CspParser(CspCellJoiner):
                 stderr_print("need 'x → P| y → Q' got {!r}".format(fit + misfit))
 
 
+class _Eof_(KwArgsCspCell):
+    pass
+
+
+class _Name_(KwArgsCspCell):
+    pass
+
+
+class _Lowered_(KwArgsCspCell):
+    pass
+
+
+class _Uppered_(KwArgsCspCell):
+    pass
+
+
+class _Mark_(KwArgsCspCell):
+    pass
+
+
+class ParsedCspCell(KwArgsCspCell):
+    pass
+
+
+class Event(ParsedCspCell):
+    pass
+
+
+class EventSet(ParsedCspCell):
+    pass
+
+
+class Transcript(ParsedCspCell):
+    pass
+
+
+class Proc(ParsedCspCell, collections.namedtuple("Proc", "name".split())):
+    """
+    def __new__(cls, uppered, name):
+        return super().__new__(cls, name=name)
+    """
+
+
+class Argot(ParsedCspCell):
+    pass
+
+
+class Aliases(ParsedCspCell):
+    pass
+
+
+class ArgotDef(ParsedCspCell):
+    pass
+
+
+class ArgotEvent(ParsedCspCell):
+    pass
+
+
+class Step(ParsedCspCell):
+    pass
+
+
+class Prolog(ParsedCspCell):
+    pass
+
+
+class Epilog(ParsedCspCell):
+    pass
+
+
+class Prong(ParsedCspCell):
+    pass
+
+
+class Fork(ParsedCspCell):
+    pass
+
+
+class ProcDef(ParsedCspCell):
+    pass
+
+
+class Body(ParsedCspCell, collections.namedtuple("Body", "bodied".split())):
+    def __new__(cls, proc=None, focused=None, blurred=None, fork=None, pocket=None):
+
+        arg_set = set([proc, focused, blurred, fork, pocket])
+        arg_set.remove(None)
+
+        args = list(arg_set)
+        assert len(args) == 1, args
+        arg = args[0]
+
+        return super().__new__(cls, bodied=arg)
+
+
+class Focused(ParsedCspCell):
+    pass
+
+
+class Blurred(ParsedCspCell):
+    pass
+
+
+class Pocketable(ParsedCspCell):
+    pass
+
+
+class Pocket(ParsedCspCell):
+    pass
+
+
+class Frag(ParsedCspCell):
+    pass
+
+
+class Csp(ParsedCspCell):
+    pass
+
+
+_ = """
+s AfterProc(
+_csp_style_ = Style(first="{}", middle=" → {}")
+s LegacyArgotDef(
+_csp_style_ = Style(first="{}", middle=" = {}")
+s ArgotName(
+_csp_style_ = Style(first="α{}")
+s ChoiceTuple(  # FIXME: TODO: don't name these classes 'class ~Tuple:'
+_csp_style_ = Style(first="{}", middle=" | {}")
+s ChosenEvent(
+_csp_style_ = Style(first="{}", last=":{}")
+s DeffedProc(
+_csp_style_ = Style(first="{}", middle=" → {}")
+s LegacyEvent(
+_csp_style_ = Style(middle="{}")
+s EmptyMark(
+s EventsProc(
+_csp_style_ = Style(first="μ {}", middle=" : {}", last=" • {}")
+s LazyEventsProc(
+_csp_style_ = Style(first="μ {}", last=" • {}")
+s OrderedArgotNameTuple(
+_csp_style_ = Style(first="{}", middle=" = {}")
+s OrderedEventTuple(
+_csp_style_ = Style(first="{}", middle=" → {}")
+s LegacyProcDef(
+_csp_style_ = Style(first="{}", middle=" = {}")
+s PocketProc(
+_csp_style_ = Style(head="(", middle="{}", tail=")")
+s TracedEventTuple(
+_csp_style_ = Style(head="⟨", first="{}", middle=",{}", tail="⟩")  # "⟨⟩", not "()"
+s UnorderedEventTuple(
+_csp_style_ = Style(head="{{", first="{}", middle=", {}", tail="}}")
+"""
+
+
 #
 # Split and parse and compile Csp Source
 #
@@ -1643,7 +1856,7 @@ class LegacyCspTaker:
         taker = self.taker
         argot_name = ArgotName.argot_name_from(taker)
         if argot_name:
-            argot_def = ArgotDef.argot_def_from(taker, argot_name)
+            argot_def = LegacyArgotDef.argot_def_from(taker, argot_name)
             if argot_def:
                 return argot_def
             return argot_name
@@ -1680,7 +1893,7 @@ class LegacyCspTaker:
 
     def accept_proc_def(self):  # such as Csp:  VMCT = μ X : { ... } • ( ... )
         taker = self.taker
-        proc_def = ProcDef.proc_def_from(taker)
+        proc_def = LegacyProcDef.proc_def_from(taker)
         return proc_def
 
     def accept_pocket_proc(self):  # such as Csp:  ( ... )
@@ -2034,9 +2247,9 @@ def bootstrap_py_csp_fragments():
     want1 = textwrap.dedent(
         """
         UnorderedEventTuple(
-            Event("coin"),
-            Event("choc"),
-            Event("toffee"),
+            LegacyEvent("coin"),
+            LegacyEvent("choc"),
+            LegacyEvent("toffee"),
         )
         """
     ).strip()
@@ -2046,7 +2259,7 @@ def bootstrap_py_csp_fragments():
     want11 = textwrap.dedent(
         """
         AfterProc(
-            before=Event("choc"),
+            before=LegacyEvent("choc"),
             after=DeffedProc("X"),
         )
         """
@@ -2058,11 +2271,11 @@ def bootstrap_py_csp_fragments():
         """
         ChoiceTuple(
             AfterProc(
-                before=Event("choc"),
+                before=LegacyEvent("choc"),
                 after=DeffedProc("X"),
             ),
             AfterProc(
-                before=Event("toffee"),
+                before=LegacyEvent("toffee"),
                 after=DeffedProc("X"),
             ),
         )
@@ -2074,15 +2287,15 @@ def bootstrap_py_csp_fragments():
     want2 = textwrap.dedent(
         """
         AfterProc(
-            before=Event("coin"),
+            before=LegacyEvent("coin"),
             after=PocketProc(
                 pocketed=ChoiceTuple(
                     AfterProc(
-                        before=Event("choc"),
+                        before=LegacyEvent("choc"),
                         after=DeffedProc("X"),
                     ),
                     AfterProc(
-                        before=Event("toffee"),
+                        before=LegacyEvent("toffee"),
                         after=DeffedProc("X"),
                     ),
                 ),
@@ -2095,26 +2308,26 @@ def bootstrap_py_csp_fragments():
 
     want3 = textwrap.dedent(
         """
-        ProcDef(
+        LegacyProcDef(
             name="VMCT",
             body=EventsProc(
                 name="X",
                 alphabet=UnorderedEventTuple(
-                    Event("coin"),
-                    Event("choc"),
-                    Event("toffee"),
+                    LegacyEvent("coin"),
+                    LegacyEvent("choc"),
+                    LegacyEvent("toffee"),
                 ),
                 body=PocketProc(
                     pocketed=AfterProc(
-                        before=Event("coin"),
+                        before=LegacyEvent("coin"),
                         after=PocketProc(
                             pocketed=ChoiceTuple(
                                 AfterProc(
-                                    before=Event("choc"),
+                                    before=LegacyEvent("choc"),
                                     after=DeffedProc("X"),
                                 ),
                                 AfterProc(
-                                    before=Event("toffee"),
+                                    before=LegacyEvent("toffee"),
                                     after=DeffedProc("X"),
                                 ),
                             ),
