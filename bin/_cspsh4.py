@@ -1174,7 +1174,9 @@ class CellJoiner:
 
         call = calls.pop()
         giveback = givebacks.pop()
-        snapshots.pop()
+        snapshot = snapshots.pop()
+
+        assert snapshot is None  # else lacking some:  self._rollback_()
 
         if not result:
 
@@ -1292,6 +1294,13 @@ class CspParser(CspCellJoiner):
     (x → P | (y → Q | z → R))  # no, '| (y' process choice is not '| y' event choice
     """
 
+    def _rejoined(self):
+        """TODO: show before/after sense of place"""
+        taker = self.taker
+        shards = taker.shards
+        rejoined = " ".join(_.value for _ in shards)
+        return rejoined
+
     @_traceable_
     def event(self):
         """event = _lowered_ _name_"""
@@ -1383,11 +1392,43 @@ class CspParser(CspCellJoiner):
     @_traceable_
     def fork(self):
         """fork = prong { '|' prong }"""
+
         if self.prong():
+
             self._checkpoint_()
             while self._mark_("|") and self.prong():
                 self._checkpoint_()
+            self._rollback_()
+
+            self._checkpoint_()
+            if self._mark_("|") and (self.prolog() or self._mark_("(")):
+
+                self._rollback_()
+                self._checkpoint_()
+
+                taker = self.taker
+
+                shard = taker.peek_one_shard()
+
+                shards = taker._given
+                rejoined = " ".join(_.value for _ in shards)
+
+                heads = shards[: -len(taker.shards)]
+                rejoined_heads = " ".join(_.value for _ in heads)
+
+                stderr_print(
+                    "yea got:  fork {} before {!r} @ {}".format(
+                        rejoined_heads, shard.value, rejoined
+                    )
+                )
+
+            self._rollback_()
+
             return True
+
+        if self.prolog() and not self._mark_("→"):
+            given = " ".join(_.value for _ in self.taker._given)
+            stderr_print("yea got:  prolog without '→' @", given)
 
     #
 
@@ -1450,7 +1491,26 @@ class CspParser(CspCellJoiner):
     @_traceable_
     def csp(self):
         """csp = frag _eof_"""
-        return self.frag() and self._eof_()
+
+        if self.frag():
+            if self._eof_():
+                return True
+
+            taker = self.taker
+
+            shard = taker.peek_one_shard()
+
+            shards = taker._given
+            rejoined = " ".join(_.value for _ in shards)
+
+            heads = shards[: -len(taker.shards)]
+            rejoined_heads = " ".join(_.value for _ in heads)
+
+            stderr_print(
+                "yea got:  frag {} before {!r} @ {}".format(
+                    rejoined_heads, shard.value, rejoined
+                )
+            )
 
 
 #
@@ -1564,6 +1624,7 @@ class LegacyCspTaker:
 
         if not ok:
             stderr_print("not grammar parsing: ", rejoined)
+            stderr_print("")
 
             # shards = taker.shards
             # heads = shards[: -len(taker2.shards)]
@@ -1791,7 +1852,9 @@ def main(argv):
     """Run from the command line"""
 
     stderr_print("")
+    stderr_print("")
     stderr_print("cspsh: hello")
+    stderr_print("")
 
     parser = compile_argdoc(epi="workflow:")
     _ = parser.parse_args(argv[1:])
@@ -2203,6 +2266,9 @@ def try_csp_then_py():
     chars = OUR_BOOTSTRAP
     chars += CHAPTER_1
     chars = textwrap.dedent(chars).strip()
+
+    if False:
+        chars = "x → y"
 
     csp_chars = "\n".join(_.partition("#")[0] for _ in chars.splitlines())
     csp_lines = (_.strip() for _ in csp_chars.splitlines() if _.strip())
