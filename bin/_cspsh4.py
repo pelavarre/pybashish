@@ -10,10 +10,9 @@ optional arguments:
 
 workflow:
   while :; do
-    date
     cd ~/Public/pybashish/bin && \
+      echo| python3 -m pdb _cspsh4.py && \
       --black _cspsh4.py && --flake8 _cspsh4.py && python3 _cspsh4.py
-    echo 'press Control+D (EOF) to continue'
     read
   done
 
@@ -1031,7 +1030,7 @@ def split_csp(source):
 
     # Require no chars dropped
 
-    rejoined = "".join(_.value for _ in shards)
+    rejoined = "".join(_.value for _ in shards)  # a la ._split_misfit_
     assert rejoined == chars  # TODO: cope more gracefully with new chars
 
     # Succeed
@@ -1276,31 +1275,6 @@ class CspParser(CspCellJoiner):
 
     """  # our grammar in a Backus-Naur Form (BNF)
 
-    # x → y  # prong prolog wo epilog  => hint need epilog
-    # P → Q  # proc w '→' epilog  => hint need prolog
-    #
-    # ( x → P | y )  # fork w '|' event  => hint need epilog
-    # ( x → P ) | ( y → Q )  # pocket w '|' epilog  => hint need guard
-    # ( x → P | ( y → Q | z → R ) ) # fork w '|' epilog  => hint need guard
-
-    _ = """
-    x → y  # no, name 'y' is not upper case process name 'Y'
-    P → Q  # no, name 'P' is not lower case event name 'p'
-
-    (x → P | x → Q)  # no, choices not distinct: { ..., x, x, ... }
-
-    (x → P | y)  # no, '| y' event is not '| y → P' guarded process
-    (x → P) | (y → Q)  # no, '| (y' process choice is not '| y' event choice
-    (x → P | (y → Q | z → R))  # no, '| (y' process choice is not '| y' event choice
-    """
-
-    def _rejoined(self):
-        """TODO: show before/after sense of place"""
-        taker = self.taker
-        shards = taker.shards
-        rejoined = " ".join(_.value for _ in shards)
-        return rejoined
-
     @_traceable_
     def event(self):
         """event = _lowered_ _name_"""
@@ -1402,33 +1376,26 @@ class CspParser(CspCellJoiner):
 
             self._checkpoint_()
             if self._mark_("|") and (self.prolog() or self._mark_("(")):
-
                 self._rollback_()
                 self._checkpoint_()
 
                 taker = self.taker
+                (fit, misfit) = taker._split_misfit_()
+                stderr_print("inside {!r}".format(fit + misfit))
 
-                shard = taker.peek_one_shard()
-
-                shards = taker._given
-                rejoined = " ".join(_.value for _ in shards)
-
-                heads = shards[: -len(taker.shards)]
-                rejoined_heads = " ".join(_.value for _ in heads)
-
-                stderr_print(
-                    "yea got:  fork {} before {!r} @ {}".format(
-                        rejoined_heads, shard.value, rejoined
-                    )
-                )
+                stderr_print("need '| x → P', got '{}'".format(misfit))
 
             self._rollback_()
 
             return True
 
         if self.prolog() and not self._mark_("→"):
-            given = " ".join(_.value for _ in self.taker._given)
-            stderr_print("yea got:  prolog without '→' @", given)
+
+            taker = self.taker
+            (fit, misfit) = taker._split_misfit_()
+            stderr_print("inside {!r}".format(fit + misfit))
+
+            stderr_print("need '→ P', got '{}'".format(misfit))
 
     #
 
@@ -1497,20 +1464,29 @@ class CspParser(CspCellJoiner):
                 return True
 
             taker = self.taker
+            (fit, misfit) = taker._split_misfit_()
+            stderr_print("inside {!r}".format(fit + misfit))
 
-            shard = taker.peek_one_shard()
+            #
 
-            shards = taker._given
-            rejoined = " ".join(_.value for _ in shards)
+            self._checkpoint_()
+            need_prolog = self._mark_("→") and self.epilog()
+            self._rollback_()
 
-            heads = shards[: -len(taker.shards)]
-            rejoined_heads = " ".join(_.value for _ in heads)
+            if need_prolog:
 
-            stderr_print(
-                "yea got:  frag {} before {!r} @ {}".format(
-                    rejoined_heads, shard.value, rejoined
-                )
-            )
+                stderr_print("need 'x →' got {!r}".format(fit.rstrip() + " →"))
+
+                return
+
+            #
+
+            self._checkpoint_()
+            need_fork = self._mark_("|") and self.frag()
+            self._rollback_()
+
+            if need_fork:
+                stderr_print("need 'x → P| y → Q' got {!r}".format(fit + misfit))
 
 
 #
@@ -1555,10 +1531,16 @@ def parse_csp_cell(source):
 
     # Start up one Parser
 
-    shards_taker = ShardsTaker(lookahead)
-    shards_taker.give_shards(shards)
+    shard_taker = CspShardTaker(shards, lookahead=lookahead)
+    csp_taker = LegacyCspTaker(shard_taker)
 
-    csp_taker = LegacyCspTaker(shards_taker)
+    # TODO: keep this, cut legacy
+    taker2 = CspShardTaker(shards, lookahead=lookahead)
+    parser2 = CspParser(taker2)
+    ok = parser2.csp()
+    if not ok:
+        stderr_print("not grammar parsing")  # : ", source)
+        stderr_print("")
 
     # Convert Csp to Call Graph
 
@@ -1580,9 +1562,9 @@ def parse_csp_cell(source):
 
         stderr_print("cspsh: failing in 'parse_csp_cell' of :", repr(source))
 
-        heads = shards[: -len(shards_taker.shards)]
+        heads = shards[: -len(shard_taker.tails)]
         rejoined_heads = " ".join(_.value for _ in heads)
-        rejoined_tails = " ".join(_.value for _ in shards_taker.shards)
+        rejoined_tails = " ".join(_.value for _ in shard_taker.tails)
 
         stderr_print("cspsh: failing after taking:", rejoined_heads)
         stderr_print("cspsh: failing before taking:", rejoined_tails)
@@ -1600,41 +1582,12 @@ def parse_csp_cell(source):
 
 
 class LegacyCspTaker:
-    """
-    Walk once through source chars, as split, working as yet another Yacc
-    """
+    """Walk once through source chars, as split, working as yet another Yacc"""
 
     def __init__(self, taker):
         self.taker = taker
 
     def accept_one_cell(self):
-
-        #
-
-        taker = self.taker
-        taker2 = ShardsTaker(taker.lookahead)
-        taker2.give_shards(list(taker.shards))
-
-        parser = CspParser(taker2)
-
-        rejoined = " ".join(_.value for _ in parser.taker.shards)
-        _ = rejoined
-
-        ok = parser.csp()
-
-        if not ok:
-            stderr_print("not grammar parsing: ", rejoined)
-            stderr_print("")
-
-            # shards = taker.shards
-            # heads = shards[: -len(taker2.shards)]
-            # rejoined_heads = " ".join(_.value for _ in heads)
-            # rejoined_tails = " ".join(_.value for _ in taker2.shards)
-
-            # stderr_print("    after: ", rejoined_heads)
-            # stderr_print("    before: ", rejoined_tails)
-
-        #
 
         cell = self.accept_empty_mark()
 
@@ -1754,9 +1707,7 @@ class LegacyCspTaker:
 
 
 class CspShard(collections.namedtuple("CspShard", "key value".split())):
-    """
-    Carry a fragment of Csp Source Code
-    """
+    """Carry a fragment of Csp Source Code"""
 
     def is_event_name(self):  # TODO: delete legacy
         if self.key == "name":
@@ -1776,12 +1727,6 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
         if self.key == "mark":
             if self.value == mark:
                 return True
-
-    def strip(self):
-        stripped = self.value.strip()
-        if stripped:
-            assert self.is_mark("")  # TODO: simplify legacy
-        return stripped
 
 
 def csp_hint_choice_after_proc_over_event(event):
@@ -1959,68 +1904,57 @@ def stderr_print_diff(**kwargs):
 
 
 # deffed in many files  # missing from docs.python.org
-class ShardsTaker(argparse.Namespace):
+class ShardTaker(argparse.Namespace):
     """
-    Walk once through source chars, as split, working as yet another Lexxer
+    Walk once through Source Chars, as split, working as yet another Lexxer
 
     Define "take" to mean require and consume
     Define "peek" to mean look ahead into the shards followed by infinitely many None's
     Define "accept" to mean take if present, else quietly don't bother
+
+    Work well with Source Chars
+    as split by 'match.groupdict().items()' of 'import re',
+    per reg-ex'es of r"(?P<...>...)+"
     """
 
-    def __init__(self, lookahead):
-        self.lookahead = int(lookahead)
-        self.shards = list()  # the shards being peeked, taken, and accepted
+    # TODO: delete the methods we're not testing here
 
-        self._given = list()
-        self._untaken = list()
+    def __init__(self, shards, lookahead):
+        self.lookahead = int(lookahead)
+        self.heads = list(shards)
+        self.tails = list(shards)
 
     def _snapshot_(self):
         """Take a snapshot of shards remaining"""
-        _untaken = self._untaken
-
-        snapshot = list(self.shards)
-
-        if len(snapshot) < len(_untaken):
-            self._untaken = list(snapshot)
-
+        snapshot = list(self.tails)
         return snapshot
 
     def _restore_(self, snapshot):
         """Restore a snapshot of shards remaining"""
-        self.shards = snapshot
-
-    def give_shards(self, shards):
-        """Give shards, such as from r"(?P<...>...)+" via 'match.groupdict().items()'"""
-
-        self_shards = self.shards  # TODO: ugly
-        self_shards.extend(shards)
-
-        self._given = list(self_shards)
-        self._untaken = list()
+        self.tails = snapshot
 
     def take_one_shard(self):
         """Take one shard, and drop it, don't return it"""
 
-        self.shards = self.shards[1:]
+        self.tails = self.tails[1:]
 
     def take_some_shards(self, count):
         """Take the next few shards, and drop them, don't return them"""
 
-        self.shards = self.shards[count:]
+        self.tails = self.tails[count:]
 
     def peek_one_shard(self):
         """Return the next shard, but without consuming it"""
 
-        if self.shards:  # infinitely many None's past the last shard
+        if self.tails:  # infinitely many None's past the last shard
 
-            return self.shards[0]
+            return self.tails[0]
 
     def peek_some_shards(self, count):
         """Return the next few shards, without consuming them"""
 
         nones = count * [None]
-        some = (self.shards[:count] + nones)[:count]
+        some = (self.tails[:count] + nones)[:count]
 
         return some
 
@@ -2035,16 +1969,16 @@ class ShardsTaker(argparse.Namespace):
     def take_beyond_shards(self):
         """Do nothing if all shards consumed, else raise mystic IndexError"""
 
-        count = len(self.shards)
+        count = len(self.tails)
         if count:
 
-            assert not self.shards, self.shards  # TODO: assert else raise
+            assert not self.tails, self.tails  # TODO: assert else raise
             raise IndexError("{} remaining shards".format(count))
 
     def peek_more(self):
         """Return True if more shards remain"""
 
-        more = bool(self.shards)  # see also:  self.peek_more_shards
+        more = bool(self.tails)  # see also:  self.peek_more_shards
 
         return more
 
@@ -2053,33 +1987,30 @@ class ShardsTaker(argparse.Namespace):
 
         assert limit <= self.lookahead
 
-        more_shards = list(self.shards)  # see also:  self.peek_more
+        more_shards = list(self.tails)  # see also:  self.peek_more
         more_shards = more_shards[:limit]
 
         return more_shards
 
-    def accept_blank_shards(self):
-        """Drop zero or more blank shards"""
 
-        while self.peek_more():
-            shard = self.peek_one_shard()
-            if shard.strip():
+# TODO: Shuffle this up after substituting Composition for Inheritance
+class CspShardTaker(ShardTaker):
+    """
+    Walk once through Source Chars, as split into CspShard's, working as a Lexxer
+    """
 
-                break
+    def _split_misfit_(self):
+        """Split a format of the source taken from a format of what remains"""
 
-            self.take_one_shard()
+        before = " ".join(_.value for _ in self.heads[: -len(self.tails)])
+        after = " ".join(_.value for _ in self.tails).rstrip()
 
-    def peek_upto_blank_shard(self):
-        """List zero or more non-blank shards found here"""
+        fit = (before + " ") if after else before
+        misfit = after
 
-        shards = list()
-        for shard in self.shards:
-            if not shard.strip():
-                break
+        # TODO: mmm ugly drop of lookahead padding
 
-            shards.append(shard)
-
-        return shards
+        return (fit, misfit)
 
 
 #
@@ -2429,6 +2360,7 @@ CHAPTER_1 = """
     (x → P | x → Q)  # no, choices not distinct: { ..., x, x, ... }
     (x → P | y)  # no, '| y' event is not '| y → P' guarded process
     (x → P) | (y → Q)  # no, '| (y' process choice is not '| y' event choice
+    # (x → P) | y → Q  # no
     (x → P | (y → Q | z → R))  # no, '| (y' process choice is not '| y' event choice
 
     x:αP → STOP
@@ -2492,9 +2424,9 @@ CHAPTER_1 = """
 #
 
 # TODO:  emit a graph from the Bnf parser
-# TODO:  pull Csp repair hints from the Bnf parser
 # TODO:  format the Bnf graph as Csp
 # TODO:  format the Bnf graph as Python
+# TODO:  pull Csp repair hints from the Bnf parser
 # TODO:  delete the legacy parser
 
 # TODO:  exit into interactive Repl
