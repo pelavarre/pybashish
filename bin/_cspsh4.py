@@ -28,6 +28,7 @@ import __main__
 import argparse
 import collections
 import difflib
+import functools
 import itertools
 import os
 import pdb
@@ -41,11 +42,11 @@ def b():
 
 
 #
-# Declare a Lisp layered on top of Python
+# Cover Python with a layer of Lisp
 #
 
 #
-# Form an Abstract Syntax Tree graph of Cells of Args and KwArgs, such as:
+# Form an Abstract Syntax Tree (AST) graph of Cells of Args and KwArgs, such as:
 #
 #       Add(1, Divide(dividend=2, divisor=3))  # 1 + 2/3
 #
@@ -98,13 +99,13 @@ class Cell:
         return formats
 
     def _grok_(self, func):
-        """Call a Func at this Cell, to make sense of the Replies from that Func"""
+        """Call a Func on this Cell, to make sense of the Replies from that Func"""
         replies = self._replies_(func)
         reply = func(self, replies=replies)
         return reply
 
     def _replies_(self, func):
-        """Call a Func at each Bond in order"""
+        """Call a Func on the Cell down the Bond, for each Bond in order"""
 
         replies = list()
         for bond in self._bonds_():
@@ -131,7 +132,7 @@ class Style(
         "Style", STYLE_FIELDS, defaults=(len(STYLE_FIELDS) * (None,))
     ),
 ):
-    """Say how to format an Abstract Syntax Tree graph (Ast) as Source Code"""
+    """Say how to format an Abstract Syntax Tree graph (AST) as Source Code"""
 
 
 class KwArgsCell(Cell):
@@ -175,7 +176,7 @@ class SourceCell(Cell):
     def _as_source_(cell, func, replies, style):
         """Format this Cell as Source Chars"""
 
-        # Pull the replies from the whole Graph, if missing
+        # Pull the Replies from the whole Graph, if not chosen
 
         if replies is None:
             py = cell._grok_(func=func)
@@ -225,7 +226,7 @@ class SourceCell(Cell):
 
 
 #
-# Declare a Python layered on Lisp layered on Python
+# Cover Lisp on Python with a second Layer of Python
 #
 
 
@@ -264,7 +265,7 @@ class ArgsPythonCell(PythonCell, ArgsCell):
 
 
 #
-# Declare a Csp layered on Lisp layered on Python
+# Cover Lisp on Python with a Layer of Csp
 #
 
 
@@ -313,26 +314,7 @@ class ArgsCspCell(CspCell, ArgsPythonCell):
 
 
 #
-# Declare a Csp Lisp Lexxer, in the way of Linux Lex
-#
-# Split the Csp Source into blank and nonblank Shards,
-# and take the nonblank Shards as tokens into a Parser
-#
-
-NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
-MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"
-COMMENT_REGEX = r"(?P<comment>#[^\n]+)"
-BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
-
-SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, COMMENT_REGEX, BLANKS_REGEX])
-
-OPENING_MARKS = "([{⟨"
-CLOSING_MARKS = ")]}⟩"
-
-
-#
-# Declare a Csp Lisp Parser, in the way of Linux Yacc,
-# but by Recursive Descent with Lots of Lookahead
+# Voluminous legacy, soon abandoned
 #
 
 
@@ -1019,28 +1001,19 @@ class UnorderedEventTuple(
 
 
 #
-# Parse Csp source lines
+# Split Csp Source into blank and nonblank, balanced and unbalanced, Shards
 #
 
 
-class CspHint(Exception):  # TODO: say more here, maybe do more here too?
-    pass
+NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
+MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"
+COMMENT_REGEX = r"(?P<comment>#[^\n]+)"
+BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
 
+SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, COMMENT_REGEX, BLANKS_REGEX])
 
-def eval_csp_call(source):
-    """Split and structure calls corresponding to Source Chars of Csp"""
-
-    shards = split_csp(source)
-
-    (opened, closed) = balance_csp_shards(shards)
-    assert not closed, (closed, opened, source)
-    assert not opened, (closed, opened, source)
-
-    call = parse_csp_call(source)  # TODO: stop repeating work of "split_csp"
-
-    compile_csp_cell(call)
-
-    return call  # may be falsey because empty, but is not None
+OPENING_MARKS = "([{⟨"
+CLOSING_MARKS = ")]}⟩"
 
 
 def split_csp(source):
@@ -1077,7 +1050,7 @@ def _to_item_from_groupdict_(groupdict):
 
 
 def balance_csp_shards(shards):
-    """Open up paired marks, close them down, and say what's missing"""
+    """Open up paired marks, close them down, & say what's missing or extra"""
 
     opened = ""
     closed = ""
@@ -1115,12 +1088,402 @@ def balance_csp_shards(shards):
     return (opened, closed)
 
 
-def parse_csp_call(source):
-    """Parse an entire Call Tree of Csp"""
+#
+# Join Shards of Csp Source into an Abstract Syntax Tree graph
+#
+
+
+def parser(func):
+    pass
+
+
+def _traceable_(func):
+    """Call '_enter_' before, and call '_exit_' after"""
+
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        self._enter_(func, *args, **kwargs)
+        result = func(self, *args, **kwargs)
+        self._exit_(func, result=result)
+        return result
+
+    return wrapper
+
+
+class CellJoiner:
+    """Join Shards of Source into an Abstract Syntax Tree graph"""
+
+    def __init__(self, taker):
+        self.taker = taker
+
+        self.calls = list()
+        self.givebacks = list()
+        self.snapshots = list()
+
+        self.top_call = None
+
+    def _enter_(self, func, *args, **kwargs):
+        """Snapshot at entry, before trying to match"""
+
+        _ = args
+        _ = kwargs
+
+        taker = self.taker
+
+        calls = self.calls
+        givebacks = self.givebacks
+        snapshots = self.snapshots
+
+        call = list()
+        call.append(func)
+        calls.append(call)
+
+        giveback = taker._snapshot_()
+        givebacks.append(giveback)
+
+        snapshot = None
+        snapshots.append(snapshot)
+
+    def _checkpoint_(self):
+        """Snapshot while matching, before rolling back"""
+
+        taker = self.taker
+        snapshots = self.snapshots
+
+        snapshots[-1] = taker._snapshot_()
+
+    def _rollback_(self):
+        """Rollback to last snapshot"""
+
+        taker = self.taker
+        snapshots = self.snapshots
+
+        snapshot = snapshots[-1]
+        taker._restore_(snapshot)
+
+        snapshots[-1] = None
+
+    def _exit_(self, func, result):
+        """Succeed & add self as next arg of call, else restore entry & fail"""
+
+        taker = self.taker
+
+        calls = self.calls
+        givebacks = self.givebacks
+        snapshots = self.snapshots
+
+        call = calls.pop()
+        giveback = givebacks.pop()
+        snapshots.pop()
+
+        if not result:
+
+            taker._restore_(giveback)  # Restore entry & fail
+
+        else:
+
+            if calls:  # Serve as Arg of Caller
+                calls[-1].append(call)
+            else:  # Else serve as Top Call
+                self.top_call = call
+
+
+class CspCellJoiner(CellJoiner):
+    """Join Shards of Csp Source into an Abstract Syntax Tree graph"""
+
+    @_traceable_
+    def _eof_(self):
+        """Match end-of-source & return True, else don't"""
+
+        taker = self.taker
+        shard = taker.peek_one_shard()
+        if shard.is_mark(""):
+            return True
+
+    @_traceable_
+    def _name_(self):
+        """Take a Name & return True, else don't"""
+
+        taker = self.taker
+        shard = taker.peek_one_shard()
+        if shard.is_name():
+            taker.take_one_shard()
+            return True
+
+    @_traceable_
+    def _lowered_(self):
+        """Return True if at a Name or Mark that can go upper and is lower"""
+        taker = self.taker
+        shard = taker.peek_one_shard()
+        value = shard.value
+        islower = (value != value.upper()) and (value == value.lower())
+        return islower
+
+    @_traceable_
+    def _uppered_(self):
+        """Return True if at a Name or Mark that can go lower and is upper"""
+        taker = self.taker
+        shard = taker.peek_one_shard()
+        value = shard.value
+        islower = (value != value.lower()) and (value == value.upper())
+        return islower
+
+    @_traceable_
+    def _mark_(self, chars):
+        """Take a Mark equal to the Chars & return True, else don't"""
+
+        taker = self.taker
+        shard = taker.peek_one_shard()
+        if shard.is_mark(chars):
+            taker.take_one_shard()
+            return True
+
+
+class CspParser(CspCellJoiner):
+    """Parse Shards of Csp Source per our Csp Grammar"""
+
+    _grammar_ = """
+
+        event = _lowered_ _name_
+        event_set = '{' { event ',' } [ event ] '}'
+        transcript = '⟨' { event ',' } [ event ] '⟩'
+
+        proc = _uppered_ _name_
+
+        argot = 'α' proc
+        aliases = argot { '=' argot }
+        argot_def = aliases '=' event_set
+        argot_event =  event ':' argot
+
+        step = argot_event | event
+        prolog = step { '→' step }
+        epilog = proc | pocket
+        prong = prolog '→' epilog
+        fork = prong { '|' prong }
+
+        proc_def = proc '=' body
+        body = proc | focused | blurred | fork | pocket
+        focused = 'μ' proc ':' event_set '•' pocket
+        blurred = 'μ' proc '•' pocket
+
+        pocketable = fork | body
+        pocket = '(' pocketable ')'
+
+        frag = transcript | event_set | proc_def | argot_def | pocketable
+        csp = frag _eof_
+
+    """  # our grammar in a Backus-Naur Form (BNF)
+
+    # x → y  # prong prolog wo epilog  => hint need epilog
+    # P → Q  # proc w '→' epilog  => hint need prolog
+    #
+    # ( x → P | y )  # fork w '|' event  => hint need epilog
+    # ( x → P ) | ( y → Q )  # pocket w '|' epilog  => hint need guard
+    # ( x → P | ( y → Q | z → R ) ) # fork w '|' epilog  => hint need guard
+
+    _ = """
+    x → y  # no, name 'y' is not upper case process name 'Y'
+    P → Q  # no, name 'P' is not lower case event name 'p'
+
+    (x → P | x → Q)  # no, choices not distinct: { ..., x, x, ... }
+
+    (x → P | y)  # no, '| y' event is not '| y → P' guarded process
+    (x → P) | (y → Q)  # no, '| (y' process choice is not '| y' event choice
+    (x → P | (y → Q | z → R))  # no, '| (y' process choice is not '| y' event choice
+    """
+
+    @_traceable_
+    def event(self):
+        """event = _lowered_ _name_"""
+        return self._lowered_() and self._name_()
+
+    @_traceable_
+    def event_set(self):
+        """event_set = '{' { event ',' } [ event ] '}'"""
+        if self._mark_("{"):
+            self._checkpoint_()
+            while self.event() and self._mark_(","):
+                self._checkpoint_()
+            self._rollback_()
+            self.event()
+            return self._mark_("}")
+
+    @_traceable_
+    def transcript(self):
+        """transcript = '⟨' { event ',' } [ event ] '⟩'"""
+        if self._mark_("⟨"):
+            self._checkpoint_()
+            while self.event() and self._mark_(","):
+                self._checkpoint_()
+            self._rollback_()
+            self.event()
+            return self._mark_("⟩")
+
+    #
+
+    @_traceable_
+    def proc(self):
+        """proc = _uppered_ _name_"""
+        return self._uppered_() and self._name_()
+
+    #
+
+    @_traceable_
+    def argot(self):
+        """argot = 'α' proc"""
+        return self._mark_("α") and self.proc()
+
+    @_traceable_
+    def aliases(self):
+        """aliases = argot { '=' argot }"""
+        if self.argot():
+            self._checkpoint_()
+            while self._mark_("=") and self.argot():
+                self._checkpoint_()
+            self._rollback_()
+            return True
+
+    @_traceable_
+    def argot_def(self):
+        """argot_def = aliases '=' event_set"""
+        return self.aliases() and self._mark_("=") and self.event_set()
+
+    @_traceable_
+    def argot_event(self):
+        """argot_event =  event ':' argot"""
+        return self.event() and self._mark_(":") and self.argot()
+
+    #
+
+    @_traceable_
+    def step(self):
+        """step = argot_event | event"""
+        return self.argot_event() or self.event()
+
+    @_traceable_
+    def prolog(self):
+        """prolog = step { '→' step }"""
+        if self.step():
+            self._checkpoint_()
+            while self._mark_("→") and self.step():
+                self._checkpoint_()
+            self._rollback_()
+            return True
+
+    @_traceable_
+    def epilog(self):
+        """epilog = proc | pocket"""
+        return self.proc() or self.pocket()
+
+    @_traceable_
+    def prong(self):
+        """prong = prolog '→' epilog"""
+        return self.prolog() and self._mark_("→") and self.epilog()
+
+    @_traceable_
+    def fork(self):
+        """fork = prong { '|' prong }"""
+        if self.prong():
+            self._checkpoint_()
+            while self._mark_("|") and self.prong():
+                self._checkpoint_()
+            return True
+
+    #
+
+    @_traceable_
+    def proc_def(self):
+        """proc_def = proc '=' body"""
+        return self.proc() and self._mark_("=") and self.body()
+
+    @_traceable_
+    def body(self):
+        """body = proc | focused | blurred | fork | pocket"""
+        return (
+            self.proc()
+            or self.focused()
+            or self.blurred()
+            or self.fork()
+            or self.pocket()
+        )
+
+    @_traceable_
+    def focused(self):
+        """focused = 'μ' proc ':' event_set '•' pocket"""
+        return (
+            self._mark_("μ")
+            and self.proc()
+            and self._mark_(":")
+            and self.event_set()
+            and self._mark_("•")
+            and self.pocket()
+        )
+
+    @_traceable_
+    def blurred(self):
+        """blurred = 'μ' proc '•' pocket"""
+        return self._mark_("μ") and self.proc() and self._mark_("•") and self.pocket()
+
+    #
+
+    @_traceable_
+    def pocketable(self):
+        """pocketable = fork | body"""
+        return self.fork() or self.body()
+
+    @_traceable_
+    def pocket(self):
+        """pocket = '(' pocketable ')'"""
+        return self._mark_("(") and self.pocketable() and self._mark_(")")
+
+    @_traceable_
+    def frag(self):
+        """frag = transcript | event_set | proc_def | argot_def | pocketable"""
+        return (
+            self.transcript()
+            or self.event_set()
+            or self.proc_def()
+            or self.argot_def()
+            or self.pocketable()
+        )
+
+    @_traceable_
+    def csp(self):
+        """csp = frag _eof_"""
+        return self.frag() and self._eof_()
+
+
+#
+# Split and parse and compile Csp Source
+#
+
+
+class CspHint(Exception):
+    """Suggest how to repair some Csp Source so it lexxes, parses, and compiles"""
+
+
+def eval_csp_cell(source):
+    """Split and structure Cells corresponding to Source Chars of Csp"""
 
     shards = split_csp(source)
 
-    # Pad the end of source with empty marks
+    (opened, closed) = balance_csp_shards(shards)
+    assert not closed, (closed, opened, source)
+    assert not opened, (closed, opened, source)
+
+    cell = parse_csp_cell(source)  # TODO: stop repeating the work of "split_csp"
+
+    compile_csp_cell(cell)
+
+    return cell
+
+
+def parse_csp_cell(source):
+    """Parse the Source to form a Graph rooted by one Cell, & return that root Cell"""
+
+    shards = split_csp(source)
+
+    # Pad the end of Source with empty Marks
 
     leading_shards = list(_ for _ in shards if _.key != "blanks")
 
@@ -1130,20 +1493,21 @@ def parse_csp_call(source):
 
     shards = leading_shards + trailing_shards
 
-    # Start up one parser
+    # Start up one Parser
 
     shards_taker = ShardsTaker(lookahead)
     shards_taker.give_shards(shards)
 
-    csp_taker = CspTaker(shards_taker)
+    csp_taker = LegacyCspTaker(shards_taker)
 
-    # Convert Csp to Call Tree
+    # Convert Csp to Call Graph
 
     try:
 
-        call = csp_taker.accept_one_call()  # might be a first EmptyMark
+        # b()
+        cell = csp_taker.accept_one_cell()  # might be a first EmptyMark
 
-        assert call is not None
+        assert cell is not None
 
         empty_mark = csp_taker.accept_empty_mark()
         assert empty_mark is not None
@@ -1154,7 +1518,7 @@ def parse_csp_call(source):
 
     except Exception:
 
-        stderr_print("cspsh: failing in 'parse_csp_call' of :", repr(source))
+        stderr_print("cspsh: failing in 'parse_csp_cell' of :", repr(source))
 
         heads = shards[: -len(shards_taker.shards)]
         rejoined_heads = " ".join(_.value for _ in heads)
@@ -1167,7 +1531,7 @@ def parse_csp_call(source):
 
     # Succeed
 
-    return call  # may be falsey because empty, but is not None
+    return cell
 
 
 #
@@ -1175,8 +1539,7 @@ def parse_csp_call(source):
 #
 
 
-# TODO: move this above 'class Call'?
-class CspTaker:
+class LegacyCspTaker:
     """
     Walk once through source chars, as split, working as yet another Yacc
     """
@@ -1184,41 +1547,65 @@ class CspTaker:
     def __init__(self, taker):
         self.taker = taker
 
-    def accept_one_call(self):
+    def accept_one_cell(self):
 
         #
 
-        call = self.accept_empty_mark()
+        taker = self.taker
+        taker2 = ShardsTaker(taker.lookahead)
+        taker2.give_shards(list(taker.shards))
 
-        call = call or self.accept_choice_tuple_or_after_proc()  # Csp:  ... → ... |
+        parser = CspParser(taker2)
 
-        call = call or self.accept_proc_def()  # Csp:  ... =
+        rejoined = " ".join(_.value for _ in parser.taker.shards)
+        _ = rejoined
 
-        call = call or self.accept_argot_name_or_def()  # Csp:  α ...
-        call = call or self.accept_chosen_event_or_event()  # Csp:  x  # Csp:  x:αP
-        call = call or self.accept_deffed_proc()  # Csp:  P
+        ok = parser.csp()
 
-        call = call or self.accept_pocket_proc()  # Csp:  ( ...
+        if not ok:
+            stderr_print("not grammar parsing: ", rejoined)
 
-        if not call:  # TODO: matched empty tuples are falsey, but should they be?
-            assert call is None
+            # shards = taker.shards
+            # heads = shards[: -len(taker2.shards)]
+            # rejoined_heads = " ".join(_.value for _ in heads)
+            # rejoined_tails = " ".join(_.value for _ in taker2.shards)
 
-        if call is None:
-            call = self.accept_event_tuple()  # Csp:  { ...
-        if call is None:
-            call = self.accept_traced_event_tuple()  # Csp:  ⟨ ...
+            # stderr_print("    after: ", rejoined_heads)
+            # stderr_print("    before: ", rejoined_tails)
+
+        #
+
+        cell = self.accept_empty_mark()
+
+        cell = cell or self.accept_choice_tuple_or_after_proc()  # Csp:  ... → ... |
+
+        cell = cell or self.accept_proc_def()  # Csp:  ... =
+
+        cell = cell or self.accept_argot_name_or_def()  # Csp:  α ...
+        cell = cell or self.accept_chosen_event_or_event()  # Csp:  x  # Csp:  x:αP
+        cell = cell or self.accept_deffed_proc()  # Csp:  P
+
+        cell = cell or self.accept_pocket_proc()  # Csp:  ( ...
+
+        if not cell:  # TODO: matched empty tuples are falsey, but should they be?
+            assert cell is None
+
+        if cell is None:
+            cell = self.accept_event_tuple()  # Csp:  { ...
+        if cell is None:
+            cell = self.accept_traced_event_tuple()  # Csp:  ⟨ ...
 
         #
 
         empty_mark = self.accept_empty_mark()
         if empty_mark is None:
 
-            if isinstance(call, DeffedProc):  # TODO: more polymorphic than "isinstance"
-                deffed_proc = call
+            if isinstance(cell, DeffedProc):  # TODO: more polymorphic than "isinstance"
+                deffed_proc = cell
                 if self.peek_is_mark("→"):
                     raise csp_hint_event_over_deffed_proc(deffed_proc)
 
-            if isinstance(call, PocketProc):
+            if isinstance(cell, PocketProc):
                 if self.peek_is_mark("|"):
                     taker = self.taker
                     taker.take_one_shard()
@@ -1229,9 +1616,9 @@ class CspTaker:
                         )
                     assert next_pocket_proc  # unreliable
 
-        # TODO: add tests that cause 'call = None' here
+        # TODO: add tests that cause 'cell = None' here
 
-        return call  # may be falsey because empty, but is not None
+        return cell
 
     def accept_after_proc(self):  # such as Csp:  choc → X
         taker = self.taker
@@ -1310,15 +1697,19 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
     Carry a fragment of Csp Source Code
     """
 
-    def is_event_name(self):
+    def is_event_name(self):  # TODO: delete legacy
         if self.key == "name":
             if self.value == self.value.lower():
                 return True
 
-    def is_proc_name(self):
+    def is_proc_name(self):  # TODO: delete legacy
         if self.key == "name":
             if self.value == self.value.upper():
                 return True
+
+    def is_name(self):
+        if self.key == "name":
+            return True
 
     def is_mark(self, mark):
         if self.key == "mark":
@@ -1327,6 +1718,8 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
 
     def strip(self):
         stripped = self.value.strip()
+        if stripped:
+            assert self.is_mark("")  # TODO: simplify legacy
         return stripped
 
 
@@ -1387,41 +1780,6 @@ def csp_hint_proc_over_event(event):
     hint = "no, {} is not {}".format(got_proc, want_proc)
 
     raise CspHint(hint)
-
-
-#
-# Sketch the wound, in wounded Csp source
-#
-
-
-def depth_opened(source):
-    """List marks opened but not closed"""
-
-    OPEN_MARKS = "{[("
-    open_regex = r"[{}]".format(re.escape(OPEN_MARKS))  # r"[\{\[\("
-    assert OPEN_MARKS == "".join(list(re.findall(open_regex, OPEN_MARKS)))
-
-    CLOSE_MARKS = ")]}"
-    close_regex = r"[{}]".format(re.escape(CLOSE_MARKS))  # r"[\)\]\}]"
-    assert CLOSE_MARKS == "".join(list(re.findall(close_regex, CLOSE_MARKS)))
-
-    marks = OPEN_MARKS + CLOSE_MARKS
-    regex = r"[{}]".format(re.escape(OPEN_MARKS))  # r"[\{\[\("r"\)\]\}]"
-    assert marks == "".join(list(re.findall(close_regex, CLOSE_MARKS)))
-
-    opening = ""
-    closing = ""
-    for mark in re.findall(regex, string=marks):
-        assert len(mark) == 1, repr(mark)
-
-        if mark in OPEN_MARKS:
-            opening += mark
-        elif mark == opening[-1:]:
-            opening = opening[:-1]
-        else:
-            closing += mark
-
-    return (closing, opening)
 
 
 #
@@ -1551,10 +1909,32 @@ class ShardsTaker(argparse.Namespace):
         self.lookahead = int(lookahead)
         self.shards = list()  # the shards being peeked, taken, and accepted
 
+        self._given = list()
+        self._untaken = list()
+
+    def _snapshot_(self):
+        """Take a snapshot of shards remaining"""
+        _untaken = self._untaken
+
+        snapshot = list(self.shards)
+
+        if len(snapshot) < len(_untaken):
+            self._untaken = list(snapshot)
+
+        return snapshot
+
+    def _restore_(self, snapshot):
+        """Restore a snapshot of shards remaining"""
+        self.shards = snapshot
+
     def give_shards(self, shards):
         """Give shards, such as from r"(?P<...>...)+" via 'match.groupdict().items()'"""
 
-        self.shards.extend(shards)
+        self_shards = self.shards  # TODO: ugly
+        self_shards.extend(shards)
+
+        self._given = list(self_shards)
+        self._untaken = list()
 
     def take_one_shard(self):
         """Take one shard, and drop it, don't return it"""
@@ -1651,7 +2031,7 @@ def bootstrap_py_csp_fragments():
 
     want0 = textwrap.dedent(
         """
-        Event("coin")
+        DeffedProc("X")
         """
     ).strip()
 
@@ -1756,19 +2136,21 @@ def bootstrap_py_csp_fragments():
 
     CSP_WANTS = textwrap.dedent(
         """
-        coin
+        X
         {coin, choc, toffee}
         choc → X
         choc → X | toffee → X
         coin → (choc → X | toffee → X)
         VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
         """
-    )
+    ).strip()
+
+    assert textwrap.dedent(OUR_BOOTSTRAP).strip() == CSP_WANTS
 
     # Return the fragments chosen
 
     py_wants = (want0, want1, want11, want20, want2, want3)
-    csp_wants = CSP_WANTS.strip().splitlines()
+    csp_wants = CSP_WANTS.splitlines()
     return (py_wants, csp_wants)
 
 
@@ -1801,7 +2183,7 @@ def try_py_then_csp():
 
         # test parse as Csp
 
-        csp_evalled = eval_csp_call(csp_want)
+        csp_evalled = eval_csp_cell(csp_want)
 
         if csp_evalled != py_evalled:
             stderr_print("cspsh: csp_evalled", csp_evalled)
@@ -1865,7 +2247,7 @@ def try_csp_then_py():
             csp_want = csp_want.replace("\n", " ")
             csp_want = csp_want.replace("\t", " ")
 
-            csp_evalled = eval_csp_call(csp_joined)
+            csp_evalled = eval_csp_cell(csp_joined)
             assert not want_str_exc, (want_str_exc, None)
 
             py_got = format_as_python(csp_evalled)
@@ -1907,7 +2289,7 @@ def try_csp_then_py():
 
 OUR_BOOTSTRAP = """
 
-    coin
+    X
     {coin, choc, toffee}
     choc → X
     choc → X | toffee → X
@@ -1983,7 +2365,7 @@ CHAPTER_1 = """
     (x → P) | (y → Q)  # no, '| (y' process choice is not '| y' event choice
     (x → P | (y → Q | z → R))  # no, '| (y' process choice is not '| y' event choice
 
-    x:αP
+    x:αP → STOP
     αRUNNER = {coin, choc, toffee}
     RUNNER = (x:αRUNNER → RUNNER)  # 1.1.3 X8
 
@@ -2043,10 +2425,14 @@ CHAPTER_1 = """
 # To do
 #
 
+# TODO:  emit a graph from the Bnf parser
+# TODO:  pull Csp repair hints from the Bnf parser
+# TODO:  format the Bnf graph as Csp
+# TODO:  format the Bnf graph as Python
+# TODO:  delete the legacy parser
+
 # TODO:  exit into interactive Repl
-
 # TODO:  review grammar & grammar class names vs CspBook Pdf
-
 # TODO:  code more methods, less branches on 'if isinstance('
 
 # TODO:  Slackji :: transliteration of Unicode Org names of the Csp Unicode symbols
