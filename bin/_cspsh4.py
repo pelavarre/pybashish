@@ -27,7 +27,6 @@ import __main__
 import argparse
 import collections
 import difflib
-import functools
 import itertools
 import os
 import pdb
@@ -271,13 +270,19 @@ class ArgsPythonCell(PythonCell, ArgsCell):
 class CspCell(SourceCell):
     """Like a SourceCell, but specifically for Csp"""
 
+    _csp_style_ = Style(middle="{}")
+
+    def __str__(self):
+        csp = self._as_csp_()
+        return csp
+
     def _as_csp_(self, replies=None):
         """Format this Cell as Csp Source Chars"""
         func = format_as_csp
         csp = self._as_source_(func, replies=replies, style=self._csp_style_)
         return csp
 
-    def _compile_csp_cell_(self):
+    def _compile_(self):
         """Complete a compile-time evaluation of this Csp Cell"""
         _ = self._replies_(func=compile_csp_cell)
 
@@ -293,8 +298,8 @@ def compile_csp_cell(down, replies=None):
 
     _ = replies
 
-    if hasattr(down, "_compile_csp_cell_"):
-        reply = down._compile_csp_cell_()
+    if hasattr(down, "_compile_"):
+        reply = down._compile_()
         return reply
 
     assert isinstance(down, str)
@@ -311,692 +316,710 @@ class KwArgsCspCell(CspCell, KwArgsPythonCell):
 class ArgsCspCell(CspCell, ArgsPythonCell):
     """Format a Cell of Args as Csp Source, and spill its Python over Sourcelines"""
 
-
-#
-# Voluminous legacy, soon abandoned
-#
-
-
-class AfterProc(
-    KwArgsCspCell,
-    collections.namedtuple("AfterProc", "before after".split()),
-):
-    """Run a Proc after an Event"""
-
-    _csp_style_ = Style(first="{}", middle=" → {}")
-
-    def _compile_csp_cell_(self):
-
-        (before, after) = (self.before, self.after)
-
-        if isinstance(after, EmptyMark):
-            assert isinstance(before, OrderedEventTuple)
-            ordered_event_tuple = before
-            raise csp_hint_proc_over_event(ordered_event_tuple.events[-1])
-
-    def event_menu(self):
-        before = self.before
-        menu = before.event_menu()
-        return menu
-
-    @staticmethod
-    def after_proc_from(taker):
-
-        # Take one or more of an Event Name and a "→" "\u2192" Rightwards Arrow Mark
-
-        ordered_event_tuple = OrderedEventTuple.ordered_event_tuple_from(taker)
-
-        before = ordered_event_tuple
-        if not ordered_event_tuple:
-            shards = taker.peek_more_shards(5)
-
-            match = None
-            if shards[1].is_mark("→"):
-                match = True  # x → P
-            elif shards[1].is_mark(":") and shards[4].is_mark("→"):
-                match = True  # x : α P → P
-
-            if match:
-                chosen_event_or_event = ChosenEvent.chosen_event_or_event_from(taker)
-                if chosen_event_or_event:
-                    before = chosen_event_or_event
-
-        if not before:
-            return
-
-        # Take one "→" "\u2192" Rightwards Arrow Mark
-
-        shard = taker.peek_one_shard()
-
-        if not shard.is_mark("→"):
-
-            assert ordered_event_tuple  # TODO: inelegant
-            after = EmptyMark()
-
-        else:
-
-            assert shard.is_mark("→")  # TODO:  Mark.take_one_from_(taker)
-            taker.take_one_shard()
-
-            # Take one Pocket Proc or Deffed Proc
-
-            after = PocketProc.pocket_proc_from(taker)
-            if not after:
-                after = DeffedProc.deffed_proc_from(taker)
-
-        assert after is not None
-
-        # Succeed
-
-        after_proc = AfterProc(before, after=after)
-        return after_proc
-
-
-class LegacyArgotDef(
-    KwArgsCspCell,
-    collections.namedtuple("LegacyArgotDef", "before after".split()),
-):
-    """Detail an Alphabet of Events after listing Names for the Alphabet"""
-
-    _csp_style_ = Style(first="{}", middle=" = {}")
-
-    @staticmethod
-    def argot_def_from(taker, argot_name):
-
-        # Take one or more Argot Names, each marked by "α"
-
-        argot_names = list()
-        argot_names.append(argot_name)
-
-        while True:
-
-            shards = taker.peek_more_shards(2)
-
-            if not shards[0].is_mark("="):
-                break
-            if not shards[1].is_mark("α"):
-                break
-
-            taker.take_one_shard()  # just the "=", not also the "α"
-
-            next_argot_name = ArgotName.argot_name_from(taker)
-            assert next_argot_name
-            argot_names.append(next_argot_name)
-
-        if argot_names[1:]:
-            before = OrderedArgotNameTuple(*argot_names)
-        else:
-            before = argot_name
-
-        # Take one "=" "\u003D" Equals Sign
-
-        shard = taker.peek_one_shard()
-        assert shard.is_mark("=")
-        taker.take_one_shard()
-
-        # Take one Alphabet
-
-        after = UnorderedEventTuple.unordered_event_tuple_from(taker)
-
-        argot_def = LegacyArgotDef(before, after=after)
-        return argot_def
-
-
-class ArgotName(
-    KwArgsCspCell,
-    collections.namedtuple("ArgotName", "deffed_proc".split()),
-):
-    """Pick an Alphabet of Events out of a Deffed Proc"""
-
-    _csp_style_ = Style(first="α{}")
-
-    @staticmethod
-    def argot_name_from(taker):
-
-        shard = taker.peek_one_shard()
-        if not shard.is_mark("α"):
-            return
-        taker.take_one_shard()
-
-        deffed_proc = DeffedProc.deffed_proc_from(taker)
-        assert deffed_proc
-
-        argot_name = ArgotName(deffed_proc)
-        return argot_name
-
-
-class ChoiceTuple(  # FIXME: TODO: don't name these classes 'class ~Tuple:'
-    ArgsCspCell,
-    collections.namedtuple("ChoiceTuple", "choices".split()),
-):
-    """Choose 1 of N Proc's"""
-
-    _csp_style_ = Style(first="{}", middle=" | {}")
-
-    def __new__(cls, *args):  # pull these 'def __new__' from ArgsCspCell somehow?
-        return super().__new__(cls, args)
-
-    def _compile_csp_cell_(self):
-
-        # Visit each Choice
-
-        for choice in self.choices:
-
-            # Reject Event in place of Proc
-
-            if isinstance(choice, LegacyEvent):
-                event = choice
-                raise csp_hint_choice_after_proc_over_event(event)
-
-            # Reject PocketProc in place of After Proc
-
-            if isinstance(choice, PocketProc):
-                pocket_proc = choice
-                raise csp_hint_choice_after_proc_over_pocket_proc(pocket_proc)
-
-        # Reject conflicting choices
-
-        menu = self.event_menu()
-        names = sorted(_.name for _ in menu.events)
-
-        dupes = list(
-            names[_]
-            for _ in range(len(names))
-            if (
-                ((_ > 0) and (names[_ - 1] == names[_]))
-                or ((_ < (len(names) - 1)) and (names[_] == names[_ + 1]))
-            )
-        )
-
-        if dupes:
-            raise csp_hint_choice_dupes(dupes)
-
-    def event_menu(self):
-
-        menu = OrderedEventTuple()
-        for choice in self.choices:
-
-            choice_menu = choice.event_menu()
-
-            # menu += OrderedEventTuple(choice_menu)  # TODO: does this work?
-            if not menu.events:
-                menu = choice_menu
-            else:
-                menu = OrderedEventTuple(
-                    *(tuple(menu.events) + tuple(choice_menu.events))
-                )
-
-        return menu
-
-    @staticmethod
-    def choice_tuple_from(taker, after_proc):
-
-        choices = list()
-        choices.append(after_proc)
-
-        #
-
-        while True:
-
-            shard = taker.peek_one_shard()
-            if not shard.is_mark("|"):
-                break
-            taker.take_one_shard()
-
-            next_after_proc = AfterProc.after_proc_from(taker)
-
-            next_choice = next_after_proc
-            if not next_after_proc:
-                event = LegacyEvent.event_from(taker)
-                next_choice = event
-                if not event:
-                    pocket_proc = PocketProc.pocket_proc_from(taker)
-                    next_choice = pocket_proc
-                    assert pocket_proc
-
-            assert next_choice
-            choices.append(next_choice)
-
-        if not choices[1:]:
-            return
-
-        #
-
-        choice_tuple = ChoiceTuple(*choices)
-        return choice_tuple
-
-    @staticmethod
-    def choice_tuple_or_after_proc_from(taker):
-
-        after_proc = AfterProc.after_proc_from(taker)
-        if after_proc:
-            choice_tuple = ChoiceTuple.choice_tuple_from(taker, after_proc=after_proc)
-            if choice_tuple:
-                return choice_tuple
-            return after_proc
-
-
-class ChosenEvent(
-    KwArgsCspCell,
-    collections.namedtuple("ChosenEvent", "event_name argot_name".split()),
-):
-    """Define a Name for an Event chosen from the Argot of a Proc"""
-
-    _csp_style_ = Style(first="{}", last=":{}")
-
-    @staticmethod
-    def chosen_event_from(taker):
-
-        shards = taker.peek_more_shards(2)
-        if not shards[1].is_mark(":"):
-            return
-
-        shard = taker.peek_one_shard()
-        if not shard.is_event_name():
-            return
-        taker.take_one_shard()
-        event_name = shard.value
-
-        taker.take_one_shard()  # the mark ":"
-
-        argot_name = ArgotName.argot_name_from(taker)
-
-        chosen_event = ChosenEvent(event_name, argot_name=argot_name)
-        return chosen_event
-
-    @staticmethod
-    def chosen_event_or_event_from(taker):
-
-        chosen_event = ChosenEvent.chosen_event_from(taker)
-        if chosen_event:
-            return chosen_event
-
-        event = LegacyEvent.event_from(taker)
-        return event
-
-
-class DeffedProc(
-    InlineCspCell,
-    collections.namedtuple("DeffedProc", "name".split()),
-):
-    """Mention a Proc by Name"""
-
-    _csp_style_ = Style(first="{}", middle=" → {}")
-
-    @staticmethod
-    def deffed_proc_from(taker):
-
-        shard = taker.peek_one_shard()
-        if shard.is_proc_name():
-            taker.take_one_shard()
-
-            deffed_proc = DeffedProc(shard.value)
-            return deffed_proc
-
-
-class LegacyEvent(
-    InlineCspCell,
-    collections.namedtuple("LegacyEvent", "name".split()),
-):
-    """Name a thing that happens"""
-
-    _csp_style_ = Style(middle="{}")
-
-    @staticmethod
-    def event_from(taker):
-
-        shard = taker.peek_one_shard()
-        if shard.is_event_name():
-            taker.take_one_shard()
-
-            event = LegacyEvent(shard.value)
-            return event
-
-    def event_menu(self):
-        menu = OrderedEventTuple(self)
-        return menu
-
-
-class EmptyMark(
-    InlineCspCell,
-    collections.namedtuple("EmptyMark", "".split()),
-):
-    """Name the empty string that ends, or is all of, the Csp source"""
-
-    @staticmethod
-    def empty_mark_from(taker):
-
-        shard = taker.peek_one_shard()
-        if shard.is_mark(""):
-            # taker.take_one_shard()  # nope, don't
-
-            empty_mark = EmptyMark()
-            assert not empty_mark
-
-            return empty_mark
-
-
-class EventsProc(
-    KwArgsCspCell,
-    collections.namedtuple("EventsProc", "name alphabet body".split()),
-):
-    """Give a Name to a PocketProc choosing Events from an Alphabet"""
-
-    _csp_style_ = Style(first="μ {}", middle=" : {}", last=" • {}")
-
-    @staticmethod
-    def events_proc_from(taker):
-
-        shard = taker.peek_one_shard()  # Csp:  μ
-        if not shard.is_mark("μ"):
-            return
-        taker.take_one_shard()
-
-        shard = taker.peek_one_shard()  # such as Csp:  μ X
-        assert shard
-        assert shard.is_proc_name()
-        taker.take_one_shard()
-        name = shard.value
-
-        alphabet = None  # TODO: lazily detail the Alphabet of EventsProc
-        shard = taker.peek_one_shard()  # such as Csp:  μ X : { ... } •
-        if shard.is_mark(":"):
-            taker.take_one_shard()
-
-            alphabet = UnorderedEventTuple.unordered_event_tuple_from(taker)
-            assert alphabet
-
-        shard = taker.peek_one_shard()  # such as Csp:  μ X ... •
-        assert shard.is_mark("•")
-        taker.take_one_shard()
-
-        body = PocketProc.pocket_proc_from(taker)  # such as Csp:  μ X ... • ( ... )
-        assert body
-
-        if not alphabet:
-            lazy_events_proc = LazyEventsProc(name, body=body)
-            return lazy_events_proc
-
-        events_proc = EventsProc(name, alphabet=alphabet, body=body)
-        return events_proc
-
-
-class LazyEventsProc(
-    KwArgsCspCell,
-    collections.namedtuple("LazyEventsProc", "name body".split()),
-):
-    """Give a Name to a PocketProc choosing Events without declaring its Alphabet"""
-
-    _csp_style_ = Style(first="μ {}", last=" • {}")
-
-
-class OrderedArgotNameTuple(
-    ArgsCspCell,
-    collections.namedtuple("OrderedArgotNameTuple", "argot_names".split()),
-):
-    """Order two or more Argot Names"""
-
-    _csp_style_ = Style(first="{}", middle=" = {}")
-
     def __new__(cls, *args):
         return super().__new__(cls, args)
 
 
-class OrderedEventTuple(
-    ArgsCspCell,
-    collections.namedtuple("OrderedEventTuple", "events".split()),
-):
-    """Order two or more Events"""
+#
+# Join Shards of Csp Source into an Abstract Syntax Tree graph
+#
 
-    _csp_style_ = Style(first="{}", middle=" → {}")
 
-    def __new__(cls, *args):
-        return super().__new__(cls, args)
+class SourceRepairHint(Exception):
+    """Suggest how to repair Source so it more lexxes, parses, & compiles"""
 
-    def event_menu(self):
 
-        if not self.events:
-            return OrderedEventTuple()
+class ParserBot:
+    """
+    Walk once through Source Chars, as split, working as yet another Yacc
 
-        menu = self.events[0].event_menu()
-        return menu
+    Say "take" to mean require and consume
+    Say "accept" to mean take if present, else return None
+    Say "peek" to mean detect and return a copy, but do Not consume
+    Say "at" to mean detect, but do Not consume
 
-    @staticmethod
-    def ordered_event_tuple_from(taker):
+    Let the caller ask to backtrack indefinitely far,
+    like after each failure to complete a partial match
 
-        # Require one "→" "\u2192" Rightwards Arrow Mark in between two Event Names
+    Work especially well with Source Chars
+    as split by 'match.groupdict().items()' of 'import re',
+    per reg-ex'es of r"(?P<...>...)+"
+    """
 
-        shards = taker.peek_more_shards(3)  # TODO: pad with "" marks?
+    def __init__(self, tails):
+        self.tails = list(tails)
+        self.heads = list(self.tails)
 
-        match = None
-        if shards[0].is_event_name():
-            if shards[1].is_mark("→"):
-                if shards[2].is_event_name():
-                    match = True
+    def _snapshot_(self):
+        """Set up '_restore_' to push back everything taken since '_snapshot_'"""
 
-        if not match:
+        snapshot = list(self.tails)
+
+        return snapshot
+
+    def _restore_(self, snapshot):
+        """Push back everything taken since set up by '_snapshot_'"""
+
+        self.tails[::] = snapshot
+
+    def _split_misfit_(self):
+        """Split a format of the source taken from a format of what remains"""
+
+        before = " ".join(_.value for _ in self.heads[: -len(self.tails)])
+        after = " ".join(_.value for _ in self.tails).rstrip()
+
+        fit = (before + " ") if (before and after) else before
+        misfit = after
+
+        # TODO: mmm ugly drop of lookahead padding
+
+        return (fit, misfit)
+
+    def accept_between(self, cls, head, sep, end, tail):
+        """between = head { item sep } [ item ] [ end ] tail"""
+
+        items = list()
+
+        snapshot = self._snapshot_()
+
+        # Require head
+
+        if head and not self.accept_mark(head):
+            self._restore_(snapshot)
             return
 
-        # Accept one or more pairs of "→" and Event Name
+        # Match item { sep item }
 
-        event_list = list()
-        event_list.append(LegacyEvent(shards[0].value))
-        taker.take_one_shard()
+        item = self.accept_one(cls)  # indefinite lookahead
+        if item:
+            commit = self._snapshot_()
+
+            while item:
+                commit = self._snapshot_()
+                items.append(item)
+
+                if sep and not self.accept_mark(sep):
+                    break
+
+                item = self.accept_one(cls)  # more indefinite lookahead
+                if not item:
+                    break
+
+            self._restore_(commit)
+
+        # Allow end
+
+        if end:
+            _ = self.accept_mark(end)
+
+        # Require tail
+
+        if tail and not self.accept_mark(tail):
+            self._restore_(snapshot)
+            return
+
+        # Succeed with a truthy or falsey list of items
+
+        return items
+
+    def accept_one(self, cls):
+        """Form and take Cls if present, else return None"""
+
+        cell = cls._accept_one_(self)
+
+        return cell
+
+    def accept_mark(self, chars):
+        """Accept a Mark, if present"""
+
+        tail = self.peek_one_tail()
+        if tail and tail.is_mark(chars):
+            self.take_one_tail()
+            return True
+
+    def accept_some(self, cls, sep):
+        """some = item { sep item }"""
+
+        items = list()
+
+        item = self.accept_one(cls)
+        if not item:  # require one or more
+            return
 
         while True:
+            commit = self._snapshot_()
+            items.append(item)
 
-            shards = taker.peek_more_shards(2)
-
-            match = None
-            if shards[0].is_mark("→"):
-                if shards[1].is_event_name():
-                    match = True
-
-            if not match:
+            if sep and not self.accept_mark(sep):  # falsey sep's not much tested
                 break
 
-            taker.take_some_shards(2)
+            item = self.accept_one(cls)  # indefinite lookahead
+            if not item:
+                break
 
-            event_list.append(LegacyEvent(shards[1].value))
+        self._restore_(commit)
 
-        # Succeed
+        return items
 
-        event_tuple = OrderedEventTuple(*event_list)
-        return event_tuple
+    def at_one(self, cls):
+        """Form Cls if present, else return None, but don't take it yet"""
+
+        snapshot = self._snapshot_()
+        cell = cls._accept_one_(self)
+        self._restore_(snapshot)
+
+        return cell
+
+    def at_mark(self, chars):
+        """Return truthy if Mark present, but don't take it yet"""
+
+        tail = self.peek_one_tail()
+        if tail and tail.is_mark(chars):
+            return True
+
+        if not tail and not chars:
+            return True
+
+    def form_plural(self, cls, items):
+        """Return the first and only item, else flatten then wrap in plural Cls"""
+
+        if len(items) == 1:
+            return items[0]
+
+        return cls(*items)
+
+    def peek_one_tail(self):
+        """Return the next Tail, else None"""
+
+        tails = self.tails
+
+        if tails:
+            tail = tails[0]
+            return tail
+
+    def suggest(self, hint):
+        """Form an Exception to repair Source so it more lexxes, parses, & compiles"""
+
+        return SourceRepairHint(hint)
+
+    def take_one_tail(self):
+        """Consume the next Tail, else raise IndexError"""
+
+        tails = self.tails
+
+        tails[::] = tails[1:]
 
 
-class LegacyProcDef(
-    KwArgsCspCell,
-    collections.namedtuple("LegacyProcDef", "name body".split()),
+#
+# Say how to parse the atoms of Csp:  Event names and Proc names
+#
+
+
+class Event(
+    InlineCspCell,
+    collections.namedtuple("Event", "name".split(", ")),
 ):
-    """Give a Name to a Pocket Proc or an Event Proc"""
+    """Accept one Event name, if present"""
 
-    _csp_style_ = Style(first="{}", middle=" = {}")
-
-    @staticmethod
-    def proc_def_from(taker):
-
-        shards = taker.peek_more_shards(2)
-        if not shards[1].is_mark("="):
-            return
-
-        shard = taker.peek_one_shard()
-        if not shard.is_proc_name():
-            return
-        taker.take_one_shard()
-        name = shard.value
-
-        taker.take_one_shard()  # the mark "→"
-
-        body = PocketProc.pocket_proc_from(taker)
-        if not body:
-            body = EventsProc.events_proc_from(taker)
-            if not body:
-                body = ChoiceTuple.choice_tuple_or_after_proc_from(taker)
-        assert body
-
-        proc_def = LegacyProcDef(name, body=body)
-        return proc_def
-
-
-class PocketProc(
-    collections.namedtuple("PocketProc", "pocketed".split()), KwArgsCspCell
-):
-    """Contain one AfterProc or a Choice between AfterProc's"""
-
-    _csp_style_ = Style(head="(", middle="{}", tail=")")
-
-    def event_menu(self):
-        pocketed = self.pocketed
-        menu = pocketed.event_menu()
+    def _menu_(self):
+        menu = (self,)
         return menu
 
-    @staticmethod
-    def pocket_proc_from(taker):
+    @classmethod
+    def _accept_one_(cls, bot):
 
-        shard = taker.peek_one_shard()
-        if not shard.is_mark("("):
-            return
-        taker.take_one_shard()
+        tail = bot.peek_one_tail()
+        if tail:
+            name = tail.peek_event_name()
+            if name is not None:
+                bot.take_one_tail()
 
-        pocketed = ChoiceTuple.choice_tuple_or_after_proc_from(taker)
-
-        shard = taker.peek_one_shard()
-        assert shard.is_mark(")")
-        taker.take_one_shard()
-
-        pocket = PocketProc(pocketed)
-        return pocket
+                return Event(name)
 
 
-class TracedEventTuple(
+class Proc(
+    InlineCspCell,
+    collections.namedtuple("Proc", "name".split(", ")),
+):
+    """Accept one Proc name, if present"""
+
+    @classmethod
+    def _accept_one_(cls, bot):
+
+        tail = bot.peek_one_tail()
+        if tail:
+            name = tail.peek_proc_name()
+            if name is not None:
+                bot.take_one_tail()
+
+                return Proc(name)
+
+
+#
+# Doc our Grammar in a Backus Naur Form (BNF)
+#
+# Speak in terms of Event name, Proc name, and Mark's
+#
+
+
+_grammar_ = """
+
+    transcript = '⟨' { event ',' } [ event ] '⟩'
+    alphabet = '{' { event ',' } [ event ] '}'
+
+    argot = 'α' proc
+    aliases = argot { '=' argot }
+    argot_def = aliases '=' alphabet
+    argot_event =  event ':' argot
+
+    step = argot_event | event
+    prolog = step { '→' step }
+    epilog = proc | pocket
+    prong = prolog '→' epilog
+    fork = prong { '|' prong }
+
+    proc_def = proc '=' body
+    body = proc | focused | blurred | fork | pocket
+    focused = 'μ' proc ':' alphabet '•' pocket
+    blurred = 'μ' proc '•' pocket
+
+    pocketable = fork | body
+    pocket = '(' pocketable ')'
+
+    frag = transcript | alphabet | proc_def | argot_def | pocketable
+    csp = frag ''
+
+"""
+
+
+#
+
+
+class Transcript(
     ArgsCspCell,
-    collections.namedtuple("TracedEventTuple", "events".split()),
-):  # TODO: combine with OrderedEventTuple
-    """Order two or more Events"""
+    collections.namedtuple("Transcript", "events".split(", ")),
+):
+    """transcript = '⟨' { event ',' } [ event ] '⟩'"""
 
     _csp_style_ = Style(head="⟨", first="{}", middle=",{}", tail="⟩")  # "⟨⟩", not "()"
 
-    def __new__(cls, *args):
-        return super().__new__(cls, args)
+    @classmethod
+    def _accept_one_(cls, bot):
+        events = bot.accept_between(Event, head="⟨", sep=",", end=",", tail="⟩")
+        if events is not None:
+            return Transcript(*events)
 
-    @staticmethod
-    def traced_event_tuple_from(taker):
-
-        # Open up with mark "⟨"
-
-        shard = taker.peek_one_shard()
-        if not shard.is_mark("⟨"):
-            return
-        taker.take_one_shard()
-
-        # Accept zero or more pairs of Event Name and ","
-
-        event_list = list()
-
-        while True:
-
-            shards = taker.peek_more_shards(2)
-
-            match = None
-            if shards[0].is_event_name():
-                if shards[1].is_mark(","):
-                    match = True
-
-            if not match:
-                break
-
-            taker.take_some_shards(2)
-
-            event_list.append(LegacyEvent(shards[0].value))
-
-        # Accept one or zero final Event Name's
-
-        shard = taker.peek_one_shard()
-        assert shard
-        if shard.is_event_name():
-            taker.take_one_shard()
-
-            event_list.append(LegacyEvent(shard.value))
-
-        # TODO: Accept extra "," mark before close mark "⟩"
-
-        # Require close down with mark "⟩"
-
-        shard = taker.peek_one_shard()
-        assert shard
-        assert shard.is_mark("⟩")
-        taker.take_one_shard()
-
-        # Succeed
-
-        event_tuple = TracedEventTuple(*event_list)
-        return event_tuple
+    # "⟨" "\u27E8" Mathematical Left Angle Bracket
+    # "⟩" "\u28E9" Mathematical Right Angle Bracket
 
 
-class UnorderedEventTuple(
+class Alphabet(
     ArgsCspCell,
-    collections.namedtuple("UnorderedEventTuple", "events".split()),
+    collections.namedtuple("Alphabet", "events".split(", ")),
 ):
-    """Collect zero or more Events together"""
+    """alphabet = '{' { event ',' } [ event ] '}'"""
 
     _csp_style_ = Style(head="{{", first="{}", middle=", {}", tail="}}")
 
-    def __new__(cls, *args):
-        return super().__new__(cls, args)
+    def _compile_(self):  # TODO: merge suggest dupes
+        events = self.events
 
-    @staticmethod
-    def unordered_event_tuple_from(taker):
+        dupes = duplicates(sorted(_.name for _ in events))
+        if dupes:
+            event_names = "...".split() + dupes + "...".split()
+            str_event_names = ", ".join(event_names)
+            hint = "need distinct event names, not {{{}}}".format(str_event_names)
+            raise SourceRepairHint(hint)
 
-        # Open up with mark "{"
+    @classmethod
+    def _accept_one_(cls, bot):
+        events = bot.accept_between(Event, head="{", sep=",", end=",", tail="}")
+        if events is not None:
+            return Alphabet(*events)
 
-        shard = taker.peek_one_shard()
-        if not shard.is_mark("{"):
-            return
-        taker.take_one_shard()
 
-        # Accept zero or more pairs of Event Name and ","
+#
 
-        event_list = list()
 
-        while True:
+class Argot(
+    KwArgsCspCell,
+    collections.namedtuple("Argot", "proc".split(", ")),
+):
 
-            shards = taker.peek_more_shards(2)
+    """argot = 'α' proc"""
 
-            match = None
-            if shards[0].is_event_name():
-                if shards[1].is_mark(","):
-                    match = True
+    _csp_style_ = Style(first="α{}")
 
-            if not match:
-                break
+    @classmethod
+    def _accept_one_(cls, bot):
+        snapshot = bot._snapshot_()
 
-            taker.take_some_shards(2)
+        if bot.accept_mark("α"):
+            if proc := bot.accept_one(Proc):
+                return Argot(proc)
 
-            event_list.append(LegacyEvent(shards[0].value))
+        bot._restore_(snapshot)
 
-        # Accept one or zero final Event Name's
+    # "α" "\u03B1" Greek Small Letter Alpha
 
-        shard = taker.peek_one_shard()
-        assert shard
-        if shard.is_event_name():
-            taker.take_one_shard()
 
-            event_list.append(LegacyEvent(shard.value))
+class ArgotAliases(
+    ArgsCspCell,
+    collections.namedtuple("ArgotAliases", "aliases".split(", ")),
+):
+    """argot_aliases = argot { '=' argot }"""
 
-        # TODO: Accept extra "," mark before close mark "}"
+    _csp_style_ = Style(first="{}", middle=" = {}")
 
-        # Require close down with mark "}"
+    def _compile_(self):  # TODO: merge suggest dupes
+        argots = self.aliases
 
-        shard = taker.peek_one_shard()
-        assert shard
-        assert shard.is_mark("}")
-        taker.take_one_shard()
+        dupes = duplicates(sorted(_.proc.name for _ in argots))
+        if dupes:
+            argot_names = "...".split() + dupes + "...".split()
+            str_argot_names = ", ".join(argot_names)
+            hint = "need distinct argot names, not {{{}}}".format(str_argot_names)
+            raise SourceRepairHint(hint)
 
-        # Succeed
+    @classmethod
+    def _accept_one_(cls, bot):
+        aliases = bot.accept_some(Argot, sep="=")
+        if aliases:
+            cell = bot.form_plural(ArgotAliases, items=aliases)
+            return cell
 
-        event_tuple = UnorderedEventTuple(*event_list)
-        return event_tuple
+
+class ArgotDef(
+    KwArgsCspCell,
+    collections.namedtuple("ArgotDef", "argot_aliases, alphabet".split(", ")),
+):
+    """argot_def = argot_aliases '=' alphabet"""
+
+    _csp_style_ = Style(first="{}", last=" = {}")
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        snapshot = bot._snapshot_()
+
+        if argot_aliases := bot.accept_one(ArgotAliases):
+            if bot.accept_mark("="):
+                if alphabet := bot.accept_one(Alphabet):
+                    return ArgotDef(argot_aliases, alphabet=alphabet)
+
+        bot._restore_(snapshot)
+
+
+class ArgotEvent(
+    KwArgsCspCell,
+    collections.namedtuple("ArgotEvent", "event, argot".split(", ")),
+):
+    """argot_event =  event ':' argot"""
+
+    _csp_style_ = Style(first="{}", last=":{}")
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        snapshot = bot._snapshot_()
+
+        if event := bot.accept_one(Event):
+            if bot.accept_mark(":"):
+                if argot := bot.accept_one(Argot):
+                    return ArgotEvent(event, argot=argot)
+
+        bot._restore_(snapshot)
+
+
+#
+
+
+class Step(
+    KwArgsCspCell,
+    collections.namedtuple("Step", list()),
+):
+    """step = argot_event | event"""
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        if argot_event := bot.accept_one(ArgotEvent):
+            return argot_event
+        elif event := bot.accept_one(Event):
+            return event
+
+
+class Prolog(
+    ArgsCspCell,
+    collections.namedtuple("Prolog", "steps".split(", ")),
+):
+    """prolog = step { '→' step }"""
+
+    _csp_style_ = Style(first="{}", middle=" → {}")
+
+    def _menu_(self):
+        steps = self.steps
+        menu = (steps[0],)
+        return menu
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        steps = bot.accept_some(Step, sep="→")
+        if steps:
+            cell = bot.form_plural(Prolog, items=steps)
+            return cell
+
+    # "→" "\u2192" Rightwards Arrow
+
+
+class Epilog(
+    KwArgsCspCell,
+    collections.namedtuple("Epilog", list()),
+):
+    """epilog = proc | pocket"""
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        if proc := bot.accept_one(Proc):
+            return proc
+        elif pocket := bot.accept_one(Pocket):
+            return pocket
+
+
+class Prong(
+    KwArgsCspCell,
+    collections.namedtuple("Prong", "prolog, epilog".split(", ")),
+):
+    """prong = prolog '→' epilog"""
+
+    _csp_style_ = Style(first="{}", last=" → {}")
+
+    def _menu_(self):
+        prolog = self.prolog
+        menu = prolog._menu_()
+        return menu
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        snapshot = bot._snapshot_()
+
+        if prolog := bot.accept_one(Prolog):
+            if bot.accept_mark("→"):
+                if epilog := bot.accept_one(Epilog):
+                    return Prong(prolog, epilog=epilog)
+
+        bot._restore_(snapshot)
+
+    # "→" "\u2192" Rightwards Arrow
+
+
+class Fork(
+    ArgsCspCell,
+    collections.namedtuple("Fork", "prongs".split(", ")),
+):
+    """fork = prong { '|' prong }"""
+
+    _csp_style_ = Style(first="{}", middle=" | {}")
+
+    def _compile_(self):  # TODO: merge suggest dupes
+        menu = self._menu_()
+
+        dupes = duplicates(sorted(_.name for _ in menu))
+        if dupes:
+            choices = "...".split() + dupes + "...".split()
+            str_choices = ", ".join(choices)
+            hint = "need distinct choices, not {{{}}}".format(str_choices)
+            raise SourceRepairHint(hint)
+
+    def _menu_(self):
+        events = list()
+        for prong in self.prongs:
+            events.extend(prong._menu_())
+        menu = tuple(events)
+        return menu
+
+    @classmethod
+    def _accept_one_(cls, bot):
+
+        prongs = bot.accept_some(Prong, sep="|")
+        if prongs:
+            fork_or_prong = bot.form_plural(Fork, items=prongs)
+
+            if bot.at_one(Prolog) or bot.at_mark("("):
+                hint = "need '| x → P' prong after fork {}".format(fork_or_prong)
+                raise bot.suggest(hint)
+
+            return fork_or_prong
+
+        if (prolog := bot.at_one(Prolog)) and not bot.at_mark("→"):
+            hint = "need '→ P' proc after prolog '{}'".format(prolog)
+            raise bot.suggest(hint)
+
+    # "→" "\u2192" Rightwards Arrow
+
+
+class ProcDef(
+    KwArgsCspCell,
+    collections.namedtuple("ProcDef", "proc, proc_body".split(", ")),
+):
+    """proc_def = proc '=' body"""
+
+    _csp_style_ = Style(first="{}", last=" = {}")
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        snapshot = bot._snapshot_()
+
+        if proc := bot.accept_one(Proc):
+            if bot.accept_mark("="):
+                if proc_body := bot.accept_one(ProcBody):
+                    return ProcDef(proc, proc_body=proc_body)
+
+        bot._restore_(snapshot)
+
+
+class ProcBody(
+    KwArgsCspCell,
+    collections.namedtuple("ProcBody", "body".split(", ")),
+):
+    """proc_body = proc | focused | blurred | fork | pocket"""
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        if proc := bot.accept_one(Proc):
+            return proc
+        elif focused := bot.accept_one(Focused):
+            return focused
+        elif blurred := bot.accept_one(Blurred):
+            return blurred
+        elif fork := bot.accept_one(Fork):
+            return fork
+        elif pocket := bot.accept_one(Pocket):
+            return pocket
+
+
+class Focused(
+    KwArgsCspCell,
+    collections.namedtuple("Focused", "proc, alphabet, pocket".split(", ")),
+):
+    """focused = 'μ' proc ':' alphabet '•' pocket"""
+
+    _csp_style_ = Style(first="μ {}", middle=" : {}", last=" • {}")
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        snapshot = bot._snapshot_()
+
+        if bot.accept_mark("μ"):
+            if proc := bot.accept_one(Proc):
+                if bot.accept_mark(":"):
+                    if alphabet := bot.accept_one(Alphabet):
+                        if bot.accept_mark("•"):
+                            if pocket := bot.accept_one(Pocket):
+                                return Focused(proc, alphabet=alphabet, pocket=pocket)
+
+        bot._restore_(snapshot)
+
+
+class Blurred(
+    KwArgsCspCell,
+    collections.namedtuple("Blurred", "proc, pocket".split(", ")),
+):
+    """blurred = 'μ' proc '•' pocket"""
+
+    _csp_style_ = Style(first="μ {}", last=" • {}")
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        snapshot = bot._snapshot_()
+
+        if bot.accept_mark("μ"):
+            if proc := bot.accept_one(Proc):
+                if bot.accept_mark("•"):
+                    if pocket := bot.accept_one(Pocket):
+                        return Blurred(proc, pocket=pocket)
+
+        bot._restore_(snapshot)
+
+
+#
+
+
+class Pocketable(
+    KwArgsCspCell,
+    collections.namedtuple("Pocketable", list()),
+):
+    """pocketable = fork | body"""
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        if fork := bot.accept_one(Fork):
+            return fork
+        elif proc_body := bot.accept_one(ProcBody):
+            return proc_body
+
+
+class Pocket(
+    KwArgsCspCell,
+    collections.namedtuple("Pocket", "pocketable".split(", ")),
+):
+    """pocket = '(' pocketable ')'"""
+
+    _csp_style_ = Style(head="(", middle="{}", tail=")")
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        snapshot = bot._snapshot_()
+
+        if bot.accept_mark("("):
+            if pocketable := bot.accept_one(Pocketable):
+                if bot.accept_mark(")"):
+                    return Pocket(pocketable)
+
+        bot._restore_(snapshot)
+
+
+#
+
+
+class Frag(
+    KwArgsCspCell,
+    collections.namedtuple("Frag", list()),
+):
+    """frag = transcript | alphabet | proc_def | argot_def | pocketable"""
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        if transcript := bot.accept_one(Transcript):
+            return transcript
+        elif alphabet := bot.accept_one(Alphabet):
+            return alphabet
+        elif proc_def := bot.accept_one(ProcDef):
+            return proc_def
+        elif argot_def := bot.accept_one(ArgotDef):
+            return argot_def
+        elif pocketable := bot.accept_one(Pocketable):
+            return pocketable
+
+
+class Csp(
+    KwArgsCspCell,
+    collections.namedtuple("Csp", list()),
+):
+    """csp = frag ''"""  # match empty '' mark at end-of-source
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        snapshot = bot._snapshot_()
+
+        if frag := bot.accept_one(Frag):
+            if bot.at_mark(""):
+                return frag
+
+            if bot.at_mark("→"):
+                hint = "need 'x → P | y → Q' choice, not 'P | Q'"
+                raise bot.suggest(hint)
+
+        bot._restore_(snapshot)
+
+    # "→" "\u2192" Rightwards Arrow
 
 
 #
@@ -1087,628 +1110,36 @@ def balance_csp_shards(shards):
     return (opened, closed)
 
 
-#
-# Join Shards of Csp Source into an Abstract Syntax Tree graph
-#
-
-
-def parser(func):
-    pass
-
-
-def _traceable_(func):
-    """Call '_enter_' before, and call '_exit_' after"""
-
-    @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
-        self._enter_(func, *args, **kwargs)
-        result = func(self, *args, **kwargs)
-        self._exit_(func, result=result)
-        return result
-
-    return wrapper
-
-
-class CellJoiner:
-    """Join Shards of Source into an Abstract Syntax Tree graph"""
-
-    def __init__(self, taker):
-        self.taker = taker
-
-        self.calls = list()
-        self.givebacks = list()
-        self.snapshots = list()
-
-        func = CspCellJoiner._eof_
-        self._enter_(func)  # Push one Frame into the Call Stack, don't leave it empty
-
-    def _enter_(self, func, *args, **kwargs):
-        """Snapshot at entry, before trying to match"""
-
-        _ = args
-        _ = kwargs
-
-        taker = self.taker
-
-        calls = self.calls
-        givebacks = self.givebacks
-        snapshots = self.snapshots
-
-        # Choose a Class to represent the Match
-
-        cell_classname = title_camel_case_from_skidded(func.__name__)
-        cell_class = eval(cell_classname)
-
-        # Push one Frame into the Call Stack
-
-        call = list()
-        call.append(cell_class)
-        calls.append(call)
-
-        giveback = taker._snapshot_()
-        givebacks.append(giveback)
-
-        snapshot = None
-        snapshots.append(snapshot)
-
-    def _checkpoint_(self):
-        """Snapshot while matching, before rolling back"""
-
-        taker = self.taker
-        snapshots = self.snapshots
-
-        snapshots[-1] = taker._snapshot_()
-
-    def _rollback_(self):
-        """Rollback to last snapshot"""
-
-        taker = self.taker
-        snapshots = self.snapshots
-
-        snapshot = snapshots[-1]
-        taker._restore_(snapshot)
-
-        snapshots[-1] = None
-
-    def _exit_(self, func, result):
-        """Succeed & add self as next arg of call, else restore entry & fail"""
-
-        taker = self.taker
-
-        calls = self.calls
-        givebacks = self.givebacks
-        snapshots = self.snapshots
-
-        # Pop one Frame out of the Call Stack
-
-        call = calls.pop()
-        giveback = givebacks.pop()
-        snapshot = snapshots.pop()
-
-        assert snapshot is None  # else lacking some:  self._rollback_()
-
-        # Restore Snapshot from Entry, and then Fail
-
-        if not result:
-            taker._restore_(giveback)
-
-            return
-
-        # Form a Cell
-
-        if False:
-
-            cell_class = call[0]
-
-            kwargs = dict()
-            for arg in call[1:]:
-                skidded = skidded_from_camel_case(type(arg).__name__)
-                arg_name = skidded.strip("_")  # convert to namedtuple field names
-                assert arg_name not in kwargs.keys()
-                kwargs[arg_name] = arg
-
-            stderr_print(cell_class, kwargs)
-            cell = cell_class(**kwargs)
-
-            _ = cell
-
-        # Append Self as an Arg, and then Succeed
-
-        calls[-1].append(call)
-
-
-def skidded_from_camel_case(chars):
-    """Convert such names as '_EndOfFile' to such as '_end_of_file'"""
-
-    cases = list()
-    for (index, ch) in enumerate(chars):
-        lowered = ch.lower()
-
-        if ch != lowered:
-            if cases and cases[-1] != "_":
-                cases.append("_")
-        cases.append(lowered)
-
-    skidded_case = "".join(cases)
-    return skidded_case
-
-
-def title_camel_case_from_skidded(chars):
-    """Convert such names as '_end_of_file' to such as '_EndOfFile'"""
-
-    heads = len(chars) - len(chars.lstrip("_"))
-    tails = len(chars) - len(chars.rstrip("_"))
-
-    words = list()
-    for (index, word) in enumerate(chars.strip("_").split("_")):
-        words.append(word.title())
-
-    camel_case = (heads * "_") + "".join(words) + (tails * "_")
-    return camel_case
-
-
-class CspCellJoiner(CellJoiner):
-    """Join Shards of Csp Source into an Abstract Syntax Tree graph"""
-
-    @_traceable_
-    def _eof_(self):
-        """Match end-of-source & return True, else don't"""
-
-        taker = self.taker
-        shard = taker.peek_one_shard()
-        if shard.is_mark(""):
-            return True
-
-    @_traceable_
-    def _name_(self):
-        """Take a Name & return True, else don't"""
-
-        taker = self.taker
-        shard = taker.peek_one_shard()
-        if shard.is_name():
-            taker.take_one_shard()
-            return True
-
-    @_traceable_
-    def _lowered_(self):
-        """Return True if at a Name or Mark that can go upper and is lower"""
-        taker = self.taker
-        shard = taker.peek_one_shard()
-        value = shard.value
-        islower = (value != value.upper()) and (value == value.lower())
-        return islower
-
-    @_traceable_
-    def _uppered_(self):
-        """Return True if at a Name or Mark that can go lower and is upper"""
-        taker = self.taker
-        shard = taker.peek_one_shard()
-        value = shard.value
-        islower = (value != value.lower()) and (value == value.upper())
-        return islower
-
-    @_traceable_
-    def _mark_(self, chars):
-        """Take a Mark equal to the Chars & return True, else don't"""
-
-        taker = self.taker
-        shard = taker.peek_one_shard()
-        if shard.is_mark(chars):
-            taker.take_one_shard()
-            return True
-
-
-class CspParser(CspCellJoiner):
-    """Parse Shards of Csp Source per our Csp Grammar"""
-
-    _grammar_ = """
-
-        event = _lowered_ _name_
-        event_set = '{' { event ',' } [ event ] '}'
-        transcript = '⟨' { event ',' } [ event ] '⟩'
-
-        proc = _uppered_ _name_
-
-        argot = 'α' proc
-        aliases = argot { '=' argot }
-        argot_def = aliases '=' event_set
-        argot_event =  event ':' argot
-
-        step = argot_event | event
-        prolog = step { '→' step }
-        epilog = proc | pocket
-        prong = prolog '→' epilog
-        fork = prong { '|' prong }
-
-        proc_def = proc '=' body
-        body = proc | focused | blurred | fork | pocket
-        focused = 'μ' proc ':' event_set '•' pocket
-        blurred = 'μ' proc '•' pocket
-
-        pocketable = fork | body
-        pocket = '(' pocketable ')'
-
-        frag = transcript | event_set | proc_def | argot_def | pocketable
-        csp = frag _eof_
-
-    """  # our grammar in a Backus-Naur Form (BNF)
-
-    @_traceable_
-    def event(self):
-        """event = _lowered_ _name_"""
-        return self._lowered_() and self._name_()
-
-    @_traceable_
-    def event_set(self):
-        """event_set = '{' { event ',' } [ event ] '}'"""
-        if self._mark_("{"):
-            self._checkpoint_()
-            while self.event() and self._mark_(","):
-                self._checkpoint_()
-            self._rollback_()
-            self.event()
-            return self._mark_("}")
-
-    @_traceable_
-    def transcript(self):
-        """transcript = '⟨' { event ',' } [ event ] '⟩'"""
-        if self._mark_("⟨"):
-            self._checkpoint_()
-            while self.event() and self._mark_(","):
-                self._checkpoint_()
-            self._rollback_()
-            self.event()
-            return self._mark_("⟩")
-
-    #
-
-    @_traceable_
-    def proc(self):
-        """proc = _uppered_ _name_"""
-        return self._uppered_() and self._name_()
-
-    #
-
-    @_traceable_
-    def argot(self):
-        """argot = 'α' proc"""
-        return self._mark_("α") and self.proc()
-
-    @_traceable_
-    def aliases(self):
-        """aliases = argot { '=' argot }"""
-        if self.argot():
-            self._checkpoint_()
-            while self._mark_("=") and self.argot():
-                self._checkpoint_()
-            self._rollback_()
-            return True
-
-    @_traceable_
-    def argot_def(self):
-        """argot_def = aliases '=' event_set"""
-        return self.aliases() and self._mark_("=") and self.event_set()
-
-    @_traceable_
-    def argot_event(self):
-        """argot_event =  event ':' argot"""
-        return self.event() and self._mark_(":") and self.argot()
-
-    #
-
-    @_traceable_
-    def step(self):
-        """step = argot_event | event"""
-        return self.argot_event() or self.event()
-
-    @_traceable_
-    def prolog(self):
-        """prolog = step { '→' step }"""
-        if self.step():
-            self._checkpoint_()
-            while self._mark_("→") and self.step():
-                self._checkpoint_()
-            self._rollback_()
-            return True
-
-    @_traceable_
-    def epilog(self):
-        """epilog = proc | pocket"""
-        return self.proc() or self.pocket()
-
-    @_traceable_
-    def prong(self):
-        """prong = prolog '→' epilog"""
-        return self.prolog() and self._mark_("→") and self.epilog()
-
-    @_traceable_
-    def fork(self):
-        """fork = prong { '|' prong }"""
-
-        if self.prong():
-
-            self._checkpoint_()
-            while self._mark_("|") and self.prong():
-                self._checkpoint_()
-            self._rollback_()
-
-            self._checkpoint_()
-            if self._mark_("|") and (self.prolog() or self._mark_("(")):
-                self._rollback_()
-                self._checkpoint_()
-
-                taker = self.taker
-                (fit, misfit) = taker._split_misfit_()
-                stderr_print("inside {!r}".format(fit + misfit))
-
-                stderr_print("need '| x → P', got '{}'".format(misfit))
-
-            self._rollback_()
-
-            return True
-
-        if self.prolog() and not self._mark_("→"):
-
-            taker = self.taker
-            (fit, misfit) = taker._split_misfit_()
-            stderr_print("inside {!r}".format(fit + misfit))
-
-            stderr_print("need '→ P', got '{}'".format(misfit))
-
-    #
-
-    @_traceable_
-    def proc_def(self):
-        """proc_def = proc '=' body"""
-        return self.proc() and self._mark_("=") and self.body()
-
-    @_traceable_
-    def body(self):
-        """body = proc | focused | blurred | fork | pocket"""
-        return (
-            self.proc()
-            or self.focused()
-            or self.blurred()
-            or self.fork()
-            or self.pocket()
-        )
-
-    @_traceable_
-    def focused(self):
-        """focused = 'μ' proc ':' event_set '•' pocket"""
-        return (
-            self._mark_("μ")
-            and self.proc()
-            and self._mark_(":")
-            and self.event_set()
-            and self._mark_("•")
-            and self.pocket()
-        )
-
-    @_traceable_
-    def blurred(self):
-        """blurred = 'μ' proc '•' pocket"""
-        return self._mark_("μ") and self.proc() and self._mark_("•") and self.pocket()
-
-    #
-
-    @_traceable_
-    def pocketable(self):
-        """pocketable = fork | body"""
-        return self.fork() or self.body()
-
-    @_traceable_
-    def pocket(self):
-        """pocket = '(' pocketable ')'"""
-        return self._mark_("(") and self.pocketable() and self._mark_(")")
-
-    @_traceable_
-    def frag(self):
-        """frag = transcript | event_set | proc_def | argot_def | pocketable"""
-        return (
-            self.transcript()
-            or self.event_set()
-            or self.proc_def()
-            or self.argot_def()
-            or self.pocketable()
-        )
-
-    @_traceable_
-    def csp(self):
-        """csp = frag _eof_"""
-
-        if self.frag():
-            if self._eof_():
+class CspShard(collections.namedtuple("CspShard", "key value".split())):
+    """Carry a fragment of Csp Source Code"""
+
+    def is_mark(self, chars):
+        if self.key == "mark":
+            if self.value == chars:
                 return True
 
-            taker = self.taker
-            (fit, misfit) = taker._split_misfit_()
-            stderr_print("inside {!r}".format(fit + misfit))
-
-            #
-
-            self._checkpoint_()
-            need_prolog = self._mark_("→") and self.epilog()
-            self._rollback_()
-
-            if need_prolog:
-
-                stderr_print("need 'x →' got {!r}".format(fit.rstrip() + " →"))
-
-                return
-
-            #
-
-            self._checkpoint_()
-            need_fork = self._mark_("|") and self.frag()
-            self._rollback_()
-
-            if need_fork:
-                stderr_print("need 'x → P| y → Q' got {!r}".format(fit + misfit))
-
-
-class _Eof_(KwArgsCspCell):
-    pass
-
-
-class _Name_(KwArgsCspCell):
-    pass
-
-
-class _Lowered_(KwArgsCspCell):
-    pass
-
-
-class _Uppered_(KwArgsCspCell):
-    pass
-
-
-class _Mark_(KwArgsCspCell):
-    pass
-
-
-class ParsedCspCell(KwArgsCspCell):
-    pass
-
-
-class Event(ParsedCspCell):
-    pass
-
-
-class EventSet(ParsedCspCell):
-    pass
-
-
-class Transcript(ParsedCspCell):
-    pass
-
-
-class Proc(ParsedCspCell, collections.namedtuple("Proc", "name".split())):
-    """
-    def __new__(cls, uppered, name):
-        return super().__new__(cls, name=name)
-    """
-
-
-class Argot(ParsedCspCell):
-    pass
-
-
-class Aliases(ParsedCspCell):
-    pass
-
-
-class ArgotDef(ParsedCspCell):
-    pass
-
-
-class ArgotEvent(ParsedCspCell):
-    pass
-
-
-class Step(ParsedCspCell):
-    pass
-
-
-class Prolog(ParsedCspCell):
-    pass
-
-
-class Epilog(ParsedCspCell):
-    pass
-
-
-class Prong(ParsedCspCell):
-    pass
-
-
-class Fork(ParsedCspCell):
-    pass
-
-
-class ProcDef(ParsedCspCell):
-    pass
-
-
-class Body(ParsedCspCell, collections.namedtuple("Body", "bodied".split())):
-    def __new__(cls, proc=None, focused=None, blurred=None, fork=None, pocket=None):
-
-        arg_set = set([proc, focused, blurred, fork, pocket])
-        arg_set.remove(None)
-
-        args = list(arg_set)
-        assert len(args) == 1, args
-        arg = args[0]
-
-        return super().__new__(cls, bodied=arg)
-
-
-class Focused(ParsedCspCell):
-    pass
-
-
-class Blurred(ParsedCspCell):
-    pass
-
-
-class Pocketable(ParsedCspCell):
-    pass
-
-
-class Pocket(ParsedCspCell):
-    pass
-
-
-class Frag(ParsedCspCell):
-    pass
-
-
-class Csp(ParsedCspCell):
-    pass
-
-
-_ = """
-s AfterProc(
-_csp_style_ = Style(first="{}", middle=" → {}")
-s LegacyArgotDef(
-_csp_style_ = Style(first="{}", middle=" = {}")
-s ArgotName(
-_csp_style_ = Style(first="α{}")
-s ChoiceTuple(  # FIXME: TODO: don't name these classes 'class ~Tuple:'
-_csp_style_ = Style(first="{}", middle=" | {}")
-s ChosenEvent(
-_csp_style_ = Style(first="{}", last=":{}")
-s DeffedProc(
-_csp_style_ = Style(first="{}", middle=" → {}")
-s LegacyEvent(
-_csp_style_ = Style(middle="{}")
-s EmptyMark(
-s EventsProc(
-_csp_style_ = Style(first="μ {}", middle=" : {}", last=" • {}")
-s LazyEventsProc(
-_csp_style_ = Style(first="μ {}", last=" • {}")
-s OrderedArgotNameTuple(
-_csp_style_ = Style(first="{}", middle=" = {}")
-s OrderedEventTuple(
-_csp_style_ = Style(first="{}", middle=" → {}")
-s LegacyProcDef(
-_csp_style_ = Style(first="{}", middle=" = {}")
-s PocketProc(
-_csp_style_ = Style(head="(", middle="{}", tail=")")
-s TracedEventTuple(
-_csp_style_ = Style(head="⟨", first="{}", middle=",{}", tail="⟩")  # "⟨⟩", not "()"
-s UnorderedEventTuple(
-_csp_style_ = Style(head="{{", first="{}", middle=", {}", tail="}}")
-"""
+    def peek_event_name(self):
+        """Return the Chars of the Name if it lexxes as a Csp Proc Name"""
+        if self.key == "name":
+            name = self.value
+
+            if name.upper() != name:  # could be upper
+                if name == name.lower():  # is lower
+                    return name
+
+    def peek_proc_name(self):
+        """Return the Chars of the Name if it lexxes as a Csp Event Name"""
+        if self.key == "name":
+            name = self.value
+
+            if name.lower() != name:  # could be lower
+                if name == name.upper():  # is upper
+                    return name
 
 
 #
 # Split and parse and compile Csp Source
 #
-
-
-class CspHint(Exception):
-    """Suggest how to repair some Csp Source so it lexxes, parses, and compiles"""
 
 
 def eval_csp_cell(source):
@@ -1731,274 +1162,41 @@ def parse_csp_cell(source):
     """Parse the Source to form a Graph rooted by one Cell, & return that root Cell"""
 
     shards = split_csp(source)
-
-    # Pad the end of Source with empty Marks
-
-    leading_shards = list(_ for _ in shards if _.key != "blanks")
-
-    lookahead = 5
-    empty_shard = CspShard("mark", value="")
-    trailing_shards = lookahead * [empty_shard]
-
-    shards = leading_shards + trailing_shards
-
-    # Start up one Parser
-
-    shard_taker = CspShardTaker(shards, lookahead=lookahead)
-    csp_taker = LegacyCspTaker(shard_taker)
-
-    # TODO: keep this, cut legacy
-    taker2 = CspShardTaker(shards, lookahead=lookahead)
-    parser2 = CspParser(taker2)
-    ok = parser2.csp()
-    if not ok:
-        stderr_print("not grammar parsing")  # : ", source)
-        stderr_print("")
-
-    # Convert Csp to Call Graph
+    tails = list(_ for _ in shards if _.key != "blanks")
+    bot = ParserBot(tails)
 
     try:
 
-        # b()
-        cell = csp_taker.accept_one_cell()  # might be a first EmptyMark
+        csp = bot.accept_one(Csp)
+        if not csp:
+            raise SourceRepairHint("need hint from some smarter parser")
 
-        assert cell is not None
+        if not bot.at_mark(""):
+            raise SourceRepairHint("need hint for less source")
 
-        empty_mark = csp_taker.accept_empty_mark()
-        assert empty_mark is not None
-
-    except CspHint:
+    except SourceRepairHint:
 
         raise
 
     except Exception:
 
-        stderr_print("cspsh: failing in 'parse_csp_cell' of :", repr(source))
+        (fit, misfit) = bot._split_misfit_()
+        alt_source = fit + misfit
 
-        heads = shards[: -len(shard_taker.tails)]
-        rejoined_heads = " ".join(_.value for _ in heads)
-        rejoined_tails = " ".join(_.value for _ in shard_taker.tails)
-
-        stderr_print("cspsh: failing after taking:", rejoined_heads)
-        stderr_print("cspsh: failing before taking:", rejoined_tails)
+        stderr_print("cspsh: CspSyntaxError in:", alt_source)
+        stderr_print("cspsh: CspSyntaxError fit:", fit)
+        stderr_print("cspsh: CspSyntaxError misfit:", misfit)
 
         raise
 
     # Succeed
 
-    return cell
+    return csp
 
 
 #
 #
 #
-
-
-class LegacyCspTaker:
-    """Walk once through source chars, as split, working as yet another Yacc"""
-
-    def __init__(self, taker):
-        self.taker = taker
-
-    def accept_one_cell(self):
-
-        cell = self.accept_empty_mark()
-
-        cell = cell or self.accept_choice_tuple_or_after_proc()  # Csp:  ... → ... |
-
-        cell = cell or self.accept_proc_def()  # Csp:  ... =
-
-        cell = cell or self.accept_argot_name_or_def()  # Csp:  α ...
-        cell = cell or self.accept_chosen_event_or_event()  # Csp:  x  # Csp:  x:αP
-        cell = cell or self.accept_deffed_proc()  # Csp:  P
-
-        cell = cell or self.accept_pocket_proc()  # Csp:  ( ...
-
-        if not cell:  # TODO: matched empty tuples are falsey, but should they be?
-            assert cell is None
-
-        if cell is None:
-            cell = self.accept_event_tuple()  # Csp:  { ...
-        if cell is None:
-            cell = self.accept_traced_event_tuple()  # Csp:  ⟨ ...
-
-        #
-
-        empty_mark = self.accept_empty_mark()
-        if empty_mark is None:
-
-            if isinstance(cell, DeffedProc):  # TODO: more polymorphic than "isinstance"
-                deffed_proc = cell
-                if self.peek_is_mark("→"):
-                    raise csp_hint_event_over_deffed_proc(deffed_proc)
-
-            if isinstance(cell, PocketProc):
-                if self.peek_is_mark("|"):
-                    taker = self.taker
-                    taker.take_one_shard()
-                    next_pocket_proc = self.accept_pocket_proc()
-                    if next_pocket_proc:
-                        raise csp_hint_choice_after_proc_over_pocket_proc(
-                            next_pocket_proc
-                        )
-                    assert next_pocket_proc  # unreliable
-
-        # TODO: add tests that cause 'cell = None' here
-
-        return cell
-
-    def accept_after_proc(self):  # such as Csp:  choc → X
-        taker = self.taker
-        after_proc = AfterProc.after_proc_from(taker)
-        return after_proc
-
-    def accept_argot_name_or_def(self):  # such as Csp:  αF = {orange, lemon}
-        taker = self.taker
-        argot_name = ArgotName.argot_name_from(taker)
-        if argot_name:
-            argot_def = LegacyArgotDef.argot_def_from(taker, argot_name)
-            if argot_def:
-                return argot_def
-            return argot_name
-
-    def accept_choice_tuple(self, after_proc):  # such as Csp:  choc → X | toffee → X
-        taker = self.taker
-        choice_tuple = ChoiceTuple.choice_tuple_from(taker, after_proc=after_proc)
-        return choice_tuple
-
-    def accept_choice_tuple_or_after_proc(self):
-        taker = self.taker
-        choice_tuple_or_after_proc = ChoiceTuple.choice_tuple_or_after_proc_from(taker)
-        return choice_tuple_or_after_proc
-
-    def accept_chosen_event_or_event(self):  # such as Csp 'x:A' or 'coin'
-        taker = self.taker
-        event = ChosenEvent.chosen_event_or_event_from(taker)
-        return event
-
-    def accept_deffed_proc(self):  # such as Csp:  X
-        taker = self.taker
-        deffed_proc = DeffedProc.deffed_proc_from(taker)
-        return deffed_proc
-
-    def accept_empty_mark(self):  # end of source file
-        taker = self.taker
-        empty_mark = EmptyMark.empty_mark_from(taker)
-        return empty_mark
-
-    def accept_event_tuple(self):  # such as Csp:  {coin, choc, toffee}
-        taker = self.taker
-        event_tuple = UnorderedEventTuple.unordered_event_tuple_from(taker)
-        return event_tuple
-
-    def accept_proc_def(self):  # such as Csp:  VMCT = μ X : { ... } • ( ... )
-        taker = self.taker
-        proc_def = LegacyProcDef.proc_def_from(taker)
-        return proc_def
-
-    def accept_pocket_proc(self):  # such as Csp:  ( ... )
-        taker = self.taker
-        pocket_proc = PocketProc.pocket_proc_from(taker)
-        return pocket_proc
-
-    def accept_traced_event_tuple(self):  # such as Csp: ⟨ ... ⟩
-        taker = self.taker
-        traced_event_tuple = TracedEventTuple.traced_event_tuple_from(taker)
-
-        if False:
-            if traced_event_tuple is not None:
-                if not traced_event_tuple:
-                    pdb.set_trace()
-
-        return traced_event_tuple
-
-    def peek_is_mark(self, mark):
-        taker = self.taker
-        shard = taker.peek_one_shard()
-        if shard.is_mark(mark):
-            return shard
-
-
-class CspShard(collections.namedtuple("CspShard", "key value".split())):
-    """Carry a fragment of Csp Source Code"""
-
-    def is_event_name(self):  # TODO: delete legacy
-        if self.key == "name":
-            if self.value == self.value.lower():
-                return True
-
-    def is_proc_name(self):  # TODO: delete legacy
-        if self.key == "name":
-            if self.value == self.value.upper():
-                return True
-
-    def is_name(self):
-        if self.key == "name":
-            return True
-
-    def is_mark(self, mark):
-        if self.key == "mark":
-            if self.value == mark:
-                return True
-
-
-def csp_hint_choice_after_proc_over_event(event):
-    """Reject Event Without Proc in place of After Proc of Choice"""
-
-    hint = "no, '| {}' event is not '| {} → P' guarded process".format(
-        event.name, event.name
-    )
-
-    raise CspHint(hint)
-
-
-def csp_hint_choice_after_proc_over_pocket_proc(pocket_proc):
-    """Reject Pocket Proc in place of After Proc of Choice"""
-
-    menu = pocket_proc.event_menu()
-    assert menu  # hmm, may be unreliable
-
-    event = menu.events[0]
-    hint = "no, '| ({}' process choice is not '| {}' event choice".format(
-        event.name, event.name
-    )
-
-    raise CspHint(hint)
-
-
-def csp_hint_choice_dupes(dupes):
-    """Reject conflicting Events of Choice"""
-
-    str_dupes = ", ".join(["..."] + dupes + ["..."])
-    hint = "no, choices not distinct: {{ {} }}".format(str_dupes)
-
-    raise CspHint(hint)
-
-
-def csp_hint_event_over_deffed_proc(deffed_proc):
-    """Reject Deffed Proc in place of Event"""
-
-    proc_name = deffed_proc.name
-    event_name = proc_name.lower()
-
-    got_event = "name {!r}".format(proc_name)
-    want_event = "lower case event name {!r}".format(event_name)
-    hint = "no, {} is not {}".format(got_event, want_event)
-
-    raise CspHint(hint)
-
-
-def csp_hint_proc_over_event(event):
-    """Reject Event in place of Deffed Proc"""
-
-    event_name = event.name
-    proc_name = event.name.upper()
-
-    got_proc = "name {!r}".format(event_name)
-    want_proc = "upper case process name {!r}".format(proc_name)
-    hint = "no, {} is not {}".format(got_proc, want_proc)
-
-    raise CspHint(hint)
 
 
 #
@@ -2048,6 +1246,22 @@ def compile_argdoc(epi):
 
     exit_unless_main_doc_eq(parser)
     return parser
+
+
+# deffed in many files  # missing from docs.python.org
+def duplicates(items):
+    """Keep the items that show up more than once in a row, drop the rest"""
+
+    dupes = list(
+        items[_]
+        for _ in range(len(items))
+        if (
+            ((_ > 0) and (items[_ - 1] == items[_]))
+            or ((_ < (len(items) - 1)) and (items[_] == items[_ + 1]))
+        )
+    )
+
+    return dupes
 
 
 # deffed in many files  # missing from docs.python.org
@@ -2116,116 +1330,6 @@ def stderr_print_diff(**kwargs):
     return diff_lines
 
 
-# deffed in many files  # missing from docs.python.org
-class ShardTaker(argparse.Namespace):
-    """
-    Walk once through Source Chars, as split, working as yet another Lexxer
-
-    Define "take" to mean require and consume
-    Define "peek" to mean look ahead into the shards followed by infinitely many None's
-    Define "accept" to mean take if present, else quietly don't bother
-
-    Work well with Source Chars
-    as split by 'match.groupdict().items()' of 'import re',
-    per reg-ex'es of r"(?P<...>...)+"
-    """
-
-    # TODO: delete the methods we're not testing here
-
-    def __init__(self, shards, lookahead):
-        self.lookahead = int(lookahead)
-        self.heads = list(shards)
-        self.tails = list(shards)
-
-    def _snapshot_(self):
-        """Take a snapshot of shards remaining"""
-        snapshot = list(self.tails)
-        return snapshot
-
-    def _restore_(self, snapshot):
-        """Restore a snapshot of shards remaining"""
-        self.tails = snapshot
-
-    def take_one_shard(self):
-        """Take one shard, and drop it, don't return it"""
-
-        self.tails = self.tails[1:]
-
-    def take_some_shards(self, count):
-        """Take the next few shards, and drop them, don't return them"""
-
-        self.tails = self.tails[count:]
-
-    def peek_one_shard(self):
-        """Return the next shard, but without consuming it"""
-
-        if self.tails:  # infinitely many None's past the last shard
-
-            return self.tails[0]
-
-    def peek_some_shards(self, count):
-        """Return the next few shards, without consuming them"""
-
-        nones = count * [None]
-        some = (self.tails[:count] + nones)[:count]
-
-        return some
-
-    def peek_equal_shards(self, hopes):
-        """Return the next few shards, but only if they equal our hopes"""
-
-        some = self.peek_some_shards(len(hopes))
-        if some == list(hopes):
-
-            return True
-
-    def take_beyond_shards(self):
-        """Do nothing if all shards consumed, else raise mystic IndexError"""
-
-        count = len(self.tails)
-        if count:
-
-            assert not self.tails, self.tails  # TODO: assert else raise
-            raise IndexError("{} remaining shards".format(count))
-
-    def peek_more(self):
-        """Return True if more shards remain"""
-
-        more = bool(self.tails)  # see also:  self.peek_more_shards
-
-        return more
-
-    def peek_more_shards(self, limit):
-        """List zero or more remaining shards"""
-
-        assert limit <= self.lookahead
-
-        more_shards = list(self.tails)  # see also:  self.peek_more
-        more_shards = more_shards[:limit]
-
-        return more_shards
-
-
-# TODO: Shuffle this up after substituting Composition for Inheritance
-class CspShardTaker(ShardTaker):
-    """
-    Walk once through Source Chars, as split into CspShard's, working as a Lexxer
-    """
-
-    def _split_misfit_(self):
-        """Split a format of the source taken from a format of what remains"""
-
-        before = " ".join(_.value for _ in self.heads[: -len(self.tails)])
-        after = " ".join(_.value for _ in self.tails).rstrip()
-
-        fit = (before + " ") if after else before
-        misfit = after
-
-        # TODO: mmm ugly drop of lookahead padding
-
-        return (fit, misfit)
-
-
 #
 # Self test
 #
@@ -2238,7 +1342,7 @@ def bootstrap_py_csp_fragments():
 
     want0 = textwrap.dedent(
         """
-        DeffedProc("X")
+        Proc("X")
         """
     ).strip()
 
@@ -2246,10 +1350,10 @@ def bootstrap_py_csp_fragments():
 
     want1 = textwrap.dedent(
         """
-        UnorderedEventTuple(
-            LegacyEvent("coin"),
-            LegacyEvent("choc"),
-            LegacyEvent("toffee"),
+        Alphabet(
+            Event("coin"),
+            Event("choc"),
+            Event("toffee"),
         )
         """
     ).strip()
@@ -2258,9 +1362,9 @@ def bootstrap_py_csp_fragments():
 
     want11 = textwrap.dedent(
         """
-        AfterProc(
-            before=LegacyEvent("choc"),
-            after=DeffedProc("X"),
+        Prong(
+            prolog=Event("choc"),
+            epilog=Proc("X"),
         )
         """
     ).strip()
@@ -2269,14 +1373,14 @@ def bootstrap_py_csp_fragments():
 
     want20 = textwrap.dedent(
         """
-        ChoiceTuple(
-            AfterProc(
-                before=LegacyEvent("choc"),
-                after=DeffedProc("X"),
+        Fork(
+            Prong(
+                prolog=Event("choc"),
+                epilog=Proc("X"),
             ),
-            AfterProc(
-                before=LegacyEvent("toffee"),
-                after=DeffedProc("X"),
+            Prong(
+                prolog=Event("toffee"),
+                epilog=Proc("X"),
             ),
         )
         """
@@ -2286,17 +1390,17 @@ def bootstrap_py_csp_fragments():
 
     want2 = textwrap.dedent(
         """
-        AfterProc(
-            before=LegacyEvent("coin"),
-            after=PocketProc(
-                pocketed=ChoiceTuple(
-                    AfterProc(
-                        before=LegacyEvent("choc"),
-                        after=DeffedProc("X"),
+        Prong(
+            prolog=Event("coin"),
+            epilog=Pocket(
+                pocketable=Fork(
+                    Prong(
+                        prolog=Event("choc"),
+                        epilog=Proc("X"),
                     ),
-                    AfterProc(
-                        before=LegacyEvent("toffee"),
-                        after=DeffedProc("X"),
+                    Prong(
+                        prolog=Event("toffee"),
+                        epilog=Proc("X"),
                     ),
                 ),
             ),
@@ -2308,27 +1412,27 @@ def bootstrap_py_csp_fragments():
 
     want3 = textwrap.dedent(
         """
-        LegacyProcDef(
-            name="VMCT",
-            body=EventsProc(
-                name="X",
-                alphabet=UnorderedEventTuple(
-                    LegacyEvent("coin"),
-                    LegacyEvent("choc"),
-                    LegacyEvent("toffee"),
+        ProcDef(
+            proc=Proc("VMCT"),
+            proc_body=Focused(
+                proc=Proc("X"),
+                alphabet=Alphabet(
+                    Event("coin"),
+                    Event("choc"),
+                    Event("toffee"),
                 ),
-                body=PocketProc(
-                    pocketed=AfterProc(
-                        before=LegacyEvent("coin"),
-                        after=PocketProc(
-                            pocketed=ChoiceTuple(
-                                AfterProc(
-                                    before=LegacyEvent("choc"),
-                                    after=DeffedProc("X"),
+                pocket=Pocket(
+                    pocketable=Prong(
+                        prolog=Event("coin"),
+                        epilog=Pocket(
+                            pocketable=Fork(
+                                Prong(
+                                    prolog=Event("choc"),
+                                    epilog=Proc("X"),
                                 ),
-                                AfterProc(
-                                    before=LegacyEvent("toffee"),
-                                    after=DeffedProc("X"),
+                                Prong(
+                                    prolog=Event("toffee"),
+                                    epilog=Proc("X"),
                                 ),
                             ),
                         ),
@@ -2370,6 +1474,16 @@ def try_py_then_csp():
     for (index, tupled_want) in enumerate(tupled_wants):
         (py_want, csp_want) = tupled_want
 
+        if False:
+            if index < 0:
+                continue
+
+        if False:
+            csp_line = csp_want  # simple, here
+            stderr_print(
+                "cspsh: try_py_then_csp: testing {}:  {}".format(index, csp_line)
+            )
+
         # test parse as Py
 
         py_evalled = eval(py_want)
@@ -2390,7 +1504,11 @@ def try_py_then_csp():
 
         # test parse as Csp
 
-        csp_evalled = eval_csp_cell(csp_want)
+        try:
+            csp_evalled = eval_csp_cell(csp_want)
+        except Exception:
+            stderr_print("cspsh: csp_want", csp_want)
+            raise
 
         if csp_evalled != py_evalled:
             stderr_print("cspsh: csp_evalled", csp_evalled)
@@ -2421,7 +1539,10 @@ def try_csp_then_py():
     # Visit each input line
 
     csp_laters = list()
-    for csp_line in csp_lines:
+    for (index, csp_line) in enumerate(csp_lines):
+
+        if False:  # if index < 0:
+            continue
 
         # Join input lines til all ( [ { ⟨ marks closed by ) ] } ⟩ marks
 
@@ -2442,9 +1563,10 @@ def try_csp_then_py():
         tail_chars = chars[chars.index(csp_line) :]
         tail_line = tail_chars.splitlines()[0]
         tail_comment = tail_line.partition("#")[-1]
+
         want_str_exc = None
         if tail_comment.startswith(" no, "):
-            want_str_exc = tail_comment[len("#") :].strip()
+            want_str_exc = tail_comment[len(" no, ") :].strip()
 
         # Test a closed fragment of Csp source
 
@@ -2456,6 +1578,13 @@ def try_csp_then_py():
             csp_want = csp_want.replace("(\n", "(")  # TODO: grossly inelegant
             csp_want = csp_want.replace("\n", " ")
             csp_want = csp_want.replace("\t", " ")
+
+            if False:
+                stderr_print(
+                    "cspsh: try_csp_then_py: testing {}:  {}".format(index, csp_want)
+                )
+                if want_str_exc is not None:
+                    stderr_print("cspsh: try_csp_then_py: wanting:", want_str_exc)
 
             csp_evalled = eval_csp_cell(csp_joined)
             assert not want_str_exc, (want_str_exc, None)
@@ -2473,7 +1602,7 @@ def try_csp_then_py():
                 stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
                 assert False
 
-        except CspHint as exc:
+        except SourceRepairHint as exc:
 
             got_str_exc = str(exc)
 
@@ -2482,7 +1611,8 @@ def try_csp_then_py():
         except Exception:
 
             stderr_print("cspsh: failing at test of Csp:  {}".format(csp_want))
-            stderr_print("cspsh: failing to raise:  {}".format(want_str_exc))
+            if want_str_exc:
+                stderr_print("cspsh: failing to raise:  {}".format(want_str_exc))
             stderr_print("cspsh: failing with Python of:  {}".format(py_got))
 
             raise
@@ -2526,8 +1656,8 @@ CHAPTER_1 = """
 
     CTR = (right → up → right → right → STOP)  # 1.1.1 X3
 
-    x → y  # no, name 'y' is not upper case process name 'Y'
-    P → Q  # no, name 'P' is not lower case event name 'p'
+    x → y  # no, need '→ P' proc after prolog 'x → y'
+    P → Q  # no, need 'x → P | y → Q' choice, not 'P | Q'
 
     x → (y → STOP)
 
@@ -2570,11 +1700,12 @@ CHAPTER_1 = """
                      in.1 → out.1 → X)
 
     (x → P | y → Q | z → R)
-    (x → P | x → Q)  # no, choices not distinct: { ..., x, x, ... }
-    (x → P | y)  # no, '| y' event is not '| y → P' guarded process
-    (x → P) | (y → Q)  # no, '| (y' process choice is not '| y' event choice
-    # (x → P) | y → Q  # no
-    (x → P | (y → Q | z → R))  # no, '| (y' process choice is not '| y' event choice
+
+    (x → P | x → Q)  # no, need distinct choices, not {..., x, x, ...}
+    (x → P | y)  # no, need hint from some smarter parser
+    (x → P) | (y → Q)  # no, need hint from some smarter parser
+    (x → P) | y → Q  # no, need hint from some smarter parser
+    (x → P | (y → Q | z → R))  # no, need hint from some smarter parser
 
     x:αP → STOP
     αRUNNER = {coin, choc, toffee}
@@ -2636,11 +1767,7 @@ CHAPTER_1 = """
 # To do
 #
 
-# TODO:  emit a graph from the Bnf parser
-# TODO:  format the Bnf graph as Csp
-# TODO:  format the Bnf graph as Python
-# TODO:  pull Csp repair hints from the Bnf parser
-# TODO:  delete the legacy parser
+# TODO:  solve hinting for parse failures near choice
 
 # TODO:  exit into interactive Repl
 # TODO:  review grammar & grammar class names vs CspBook Pdf
