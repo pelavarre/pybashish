@@ -75,7 +75,7 @@ def eval_csp(csp):
     assert not closed, (closed, opened, csp)
     assert not opened, (closed, opened, csp)
 
-    cell = parse_csp(csp)  # TODO: stop repeating the work of "split_csp"
+    cell = parse_csp(csp)  # TODO: stop rerunning 'split_csp' inside 'parse_csp'
 
     compile_csp_cell(cell)
 
@@ -116,7 +116,7 @@ def split_csp(source):
     # Require no chars dropped
 
     rejoined = "".join(_.value for _ in shards)  # a la ._split_misfit_
-    assert rejoined == chars  # TODO: cope more gracefully with new chars
+    assert rejoined == chars  # TODO: welcome new chars not yet found in MARK_REGEX
 
     # Succeed
 
@@ -217,31 +217,31 @@ def parse_csp(csp):
 
     try:
 
-        csp = bot.accept_one(Csp)
-        if not csp:
-            raise SourceRepairHint("need hint from some smarter parser")
+        cell = bot.accept_one(Frag)
 
+        if not cell:
+            raise csp_bot_hint_csp_none(bot)
         if not bot.at_mark(""):
-            raise SourceRepairHint("need hint for less source")
+            raise csp_bot_hint_csp_more(bot, cell=cell)
 
-    except SourceRepairHint:
+    except Exception as exc:
 
-        raise
+        if False:  # TODO: go invent more accurate strong Source Repair Hints
 
-    except Exception:
+            (fit, misfit) = bot._split_misfit_()
+            alt_source = fit + misfit
 
-        (fit, misfit) = bot._split_misfit_()
-        alt_source = fit + misfit
-
-        stderr_print("cspsh: CspSyntaxError in:", alt_source)
-        stderr_print("cspsh: CspSyntaxError fit:", fit)
-        stderr_print("cspsh: CspSyntaxError misfit:", misfit)
+            stderr_print("cspsh: exc: {}({!r})".format(type(exc).__name__, exc))
+            stderr_print("cspsh: in:", alt_source)
+            stderr_print("cspsh: fit:", fit)
+            stderr_print("cspsh: misfit:", misfit)
+            stderr_print("")
 
         raise
 
     # Succeed
 
-    return csp
+    return cell
 
 
 #
@@ -351,8 +351,8 @@ class SourceCell(Cell):
             down = bond.down
 
             str_reply = str(reply)
-            if isinstance(down, str):
-                if func == format_as_py:  # TODO: inelegant
+            if isinstance(down, str):  # TODO: 'isinstance' should be method
+                if func == format_as_py:  # TODO: inelegant to override str for func
                     str_reply = '"{}"'.format(reply)
 
             if key is None:
@@ -501,7 +501,7 @@ def compile_csp_cell(down, replies=None):
         reply = down._compile_()
         return reply
 
-    assert isinstance(down, str)
+    assert isinstance(down, str)  # TODO: 'isinstance' should be method
 
 
 class InlineCspCell(CspCell, InlinePythonCell):
@@ -569,8 +569,6 @@ class ParserBot:
 
         fit = (before + " ") if (before and after) else before
         misfit = after
-
-        # TODO: mmm ugly drop of lookahead padding
 
         return (fit, misfit)
 
@@ -660,6 +658,13 @@ class ParserBot:
 
         return items
 
+    def alt_source(self):
+        """Return the Alt Source, being a style of Source that shows the splitting"""
+
+        (fit, misfit) = self._split_misfit_()
+        alt_source = fit + misfit
+        return alt_source
+
     def at_one(self, cls):
         """Form Cls if present, else return None, but don't take it yet"""
 
@@ -679,6 +684,12 @@ class ParserBot:
         if not tail and not chars:
             return True
 
+    def fit(self):
+        """Return an Alt Source copy of the parsed head or whole of the Source"""
+
+        (fit, _) = self._split_misfit_()
+        return fit
+
     def form_plural(self, cls, items):
         """Return the first and only item, else flatten then wrap in plural Cls"""
 
@@ -686,6 +697,12 @@ class ParserBot:
             return items[0]
 
         return cls(*items)
+
+    def misfit(self):
+        """Return an Alt Source copy of the not-parsed tail or whole of the Source"""
+
+        (_, misfit) = self._split_misfit_()
+        return misfit
 
     def peek_one_tail(self):
         """Return the next Tail, else None"""
@@ -823,15 +840,14 @@ class Alphabet(
 
     _csp_style_ = Style(head="{{", first="{}", middle=", {}", tail="}}")
 
-    def _compile_(self):  # TODO: merge suggest dupes
+    def _compile_(self):
         events = self.events
 
-        dupes = duplicates(sorted(_.name for _ in events))
-        if dupes:
-            event_names = "...".split() + dupes + "...".split()
-            str_event_names = ", ".join(event_names)
-            hint = "need distinct event names, not {{{}}}".format(str_event_names)
-            raise SourceRepairHint(hint)
+        csp_source_repair_hint = csp_bot_hint_uniq(
+            "event names", items=list(_.name for _ in events)
+        )
+        if csp_source_repair_hint:
+            raise csp_source_repair_hint
 
     @classmethod
     def _accept_one_(cls, bot):
@@ -873,15 +889,14 @@ class ArgotAliases(
 
     _csp_style_ = Style(first="{}", middle=" = {}")
 
-    def _compile_(self):  # TODO: merge suggest dupes
+    def _compile_(self):
         argots = self.aliases
 
-        dupes = duplicates(sorted(_.proc.name for _ in argots))
-        if dupes:
-            argot_names = "...".split() + dupes + "...".split()
-            str_argot_names = ", ".join(argot_names)
-            hint = "need distinct argot names, not {{{}}}".format(str_argot_names)
-            raise SourceRepairHint(hint)
+        csp_source_repair_hint = csp_bot_hint_uniq(
+            "argot names", items=list(_.proc.name for _ in argots)
+        )
+        if csp_source_repair_hint:
+            raise csp_source_repair_hint
 
     @classmethod
     def _accept_one_(cls, bot):
@@ -1020,15 +1035,14 @@ class Fork(
 
     _csp_style_ = Style(first="{}", middle=" | {}")
 
-    def _compile_(self):  # TODO: merge suggest dupes
+    def _compile_(self):
         menu = self._menu_()
 
-        dupes = duplicates(sorted(_.name for _ in menu))
-        if dupes:
-            choices = "...".split() + dupes + "...".split()
-            str_choices = ", ".join(choices)
-            hint = "need distinct choices, not {{{}}}".format(str_choices)
-            raise SourceRepairHint(hint)
+        csp_source_repair_hint = csp_bot_hint_uniq(
+            "guard names", items=list(_.name for _ in menu)
+        )
+        if csp_source_repair_hint:
+            raise csp_source_repair_hint
 
     def _menu_(self):
         events = list()
@@ -1044,15 +1058,7 @@ class Fork(
         if prongs:
             fork_or_prong = bot.form_plural(Fork, items=prongs)
 
-            if bot.at_one(Prolog) or bot.at_mark("("):
-                hint = "need '| x → P' prong after fork {}".format(fork_or_prong)
-                raise bot.suggest(hint)
-
             return fork_or_prong
-
-        if (prolog := bot.at_one(Prolog)) and not bot.at_mark("→"):
-            hint = "need '→ P' proc after prolog '{}'".format(prolog)
-            raise bot.suggest(hint)
 
     # "→" "\u2192" Rightwards Arrow
 
@@ -1204,27 +1210,29 @@ class Frag(
             return pocketable
 
 
-class Csp(
-    KwArgsCspCell,
-    collections.namedtuple("Csp", list()),
-):
-    """csp = frag ''"""  # match empty '' mark at end-of-source
+#
+# Did You Mean:  Form Source Repair Hints to raise
+#
 
-    @classmethod
-    def _accept_one_(cls, bot):
-        snapshot = bot._snapshot_()
 
-        if frag := bot.accept_one(Frag):
-            if bot.at_mark(""):
-                return frag
+def csp_bot_hint_csp_none(bot):
+    _ = bot
+    raise SourceRepairHint("need hint from some smarter parser")
 
-            if bot.at_mark("→"):
-                hint = "need 'x → P | y → Q' choice, not 'P | Q'"
-                raise bot.suggest(hint)
 
-        bot._restore_(snapshot)
+def csp_bot_hint_csp_more(bot, cell):
+    _ = bot
+    _ = cell
+    raise SourceRepairHint("need hint for less source")
 
-    # "→" "\u2192" Rightwards Arrow
+
+def csp_bot_hint_uniq(kind, items):
+
+    dupes = duplicates(sorted(items))
+    if dupes:
+        str_dupes = " ".join(dupes)  # TODO: '" ".join' goes wrong if " " in any item
+        hint = "need distinct {}, got: {}".format(kind, str_dupes)
+        raise SourceRepairHint(hint)
 
 
 #
@@ -1334,6 +1342,21 @@ def stderr_print_diff(**kwargs):
         stderr_print("\n".join(lines))
 
     return diff_lines
+
+
+# deffed in many files  # partly missing from docs.python.org
+def unique_everseen(items):  # TODO: mmm not tested much here lately
+    """Remove each duplicate, but keep the first occurrence, in order"""
+
+    item_set = set()
+
+    uniques = list()
+    for item in items:
+        if item not in item_set:
+            item_set.add(item)
+            uniques.append(item)
+
+    return uniques
 
 
 #
@@ -1469,7 +1492,7 @@ def collect_tests():
         py = None
 
         # Pick 0 or 1 raised Exception's out of the test source
-        # TODO: keep separate the same test when given more than once
+        # TODO: keep separate the same test when given duplicates
 
         tail_chars = chars[chars.index(csp_line) :]
         tail_line = tail_chars.splitlines()[0]
@@ -1650,8 +1673,8 @@ CHAPTER_1 = """
 
     CTR = (right → up → right → right → STOP)  # 1.1.1 X3
 
-    x → y  # no, need '→ P' proc after prolog 'x → y'
-    P → Q  # no, need 'x → P | y → Q' choice, not 'P | Q'
+    x → y  # no, need hint from some smarter parser
+    P → Q  # no, need hint for less source
 
     x → (y → STOP)
 
@@ -1695,10 +1718,11 @@ CHAPTER_1 = """
 
     (x → P | y → Q | z → R)
 
-    (x → P | x → Q)  # no, need distinct choices, not {..., x, x, ...}
+    (x → P | x → Q)  # no, need distinct guard names, got: x x
+
     (x → P | y)  # no, need hint from some smarter parser
-    (x → P) | (y → Q)  # no, need hint from some smarter parser
-    (x → P) | y → Q  # no, need hint from some smarter parser
+    (x → P) | (y → Q)  # no, need hint for less source
+    (x → P) | y → Q  # no, need hint for less source
     (x → P | (y → Q | z → R))  # no, need hint from some smarter parser
 
     x:αP → STOP
@@ -1765,14 +1789,16 @@ CHAPTER_2 = """
 # To do
 #
 
-# TODO:  solve hinting for parse failures near choice
-
-# TODO:  exit into interactive Repl
 # TODO:  review grammar & grammar class names vs CspBook Pdf
-# TODO:  code more methods, less branches on 'if isinstance('
+
+# TODO:  code up cogent '.format_as_trace' representations of infinities
+# TODO:  write the Csp code for me, when I give you the trace and edit the trace
+# TODO:  exit into interactive Repl
 
 # TODO:  Slackji :: transliteration of Unicode Org names of the Csp Unicode symbols
 # TODO:  Ascii transliteration of Csp Unicode
+
+# TODO:  search the source lines for 'TODO' marks
 
 
 #
