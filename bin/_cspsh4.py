@@ -29,7 +29,6 @@ import __main__
 import argparse
 import collections
 import difflib
-import itertools
 import os
 import pdb
 import re
@@ -57,7 +56,7 @@ def main(argv):
     parser = compile_argdoc(epi="workflow:")
     _ = parser.parse_args(argv[1:])
 
-    try_test_self()
+    try_test_self_some()
 
     stderr_print("cspsh: + exit 0")
 
@@ -67,16 +66,16 @@ def main(argv):
 #
 
 
-def eval_csp_cell(source):
+def eval_csp(csp):
     """Split and structure Cells corresponding to Source Chars of Csp"""
 
-    shards = split_csp(source)
+    shards = split_csp(csp)
 
     (opened, closed) = balance_csp_shards(shards)
-    assert not closed, (closed, opened, source)
-    assert not opened, (closed, opened, source)
+    assert not closed, (closed, opened, csp)
+    assert not opened, (closed, opened, csp)
 
-    cell = parse_csp_cell(source)  # TODO: stop repeating the work of "split_csp"
+    cell = parse_csp(csp)  # TODO: stop repeating the work of "split_csp"
 
     compile_csp_cell(cell)
 
@@ -209,10 +208,10 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
 #
 
 
-def parse_csp_cell(source):
+def parse_csp(csp):
     """Parse the Source to form a Graph rooted by one Cell, & return that root Cell"""
 
-    shards = split_csp(source)
+    shards = split_csp(csp)
     tails = list(_ for _ in shards if _.key != "blanks")
     bot = ParserBot(tails)
 
@@ -353,7 +352,7 @@ class SourceCell(Cell):
 
             str_reply = str(reply)
             if isinstance(down, str):
-                if func == format_as_python:  # TODO: inelegant
+                if func == format_as_py:  # TODO: inelegant
                     str_reply = '"{}"'.format(reply)
 
             if key is None:
@@ -433,12 +432,12 @@ class PythonCell(SourceCell):
 
     def _as_python_(self, replies=None):
         """Format this Cell as Py Source Chars"""
-        func = format_as_python
+        func = format_as_py
         py = self._as_source_(func, replies=replies, style=self._py_style_)
         return py
 
 
-def format_as_python(cell, replies=None):
+def format_as_py(cell, replies=None):
     """Format a Cell as Python Source Chars"""
     py = cell._as_python_(replies)
     return py
@@ -1341,52 +1340,214 @@ def stderr_print_diff(**kwargs):
 # Try Self Test
 #
 
-
-def try_test_self():
-    """Run from the command line"""
-
-    try_py_then_csp()
-    try_csp_then_py()
+TRACES = list()
 
 
-def bootstrap_py_csp_fragments():
+def try_test_self_some():
+    """Try Self Test"""
+
+    tests = collect_tests()
+
+    for (index, test) in enumerate(tests):
+
+        TRACES[::] = list()
+        try:
+            try_test_self_one(test)
+        except AssertionError:
+            for trace in TRACES:
+                stderr_print(trace)
+            raise
+
+
+def try_test_self_one(test):
+    """Pass test, else raise AssertionError"""
+
+    def _trace_(kwargs):
+        space = argparse.Namespace(**kwargs)
+        TRACES.append(space)
+
+    (csp, py, str_exc) = test
+    _trace_(dict(csp=csp, py=py, str_exc=str_exc))
+
+    # Bootstrap on Csp paired with Python, and without raising Exception's
+
+    if py:
+        assert str_exc is None
+
+        cell_of_py = eval(py)
+        _trace_(dict(got_cell_of_py=bool(cell_of_py)))
+
+        py_of_cell = format_as_py(cell_of_py)
+        _trace_(dict(py_of_cell=py_of_cell))
+        assert py_of_cell == py
+
+        csp_of_cell = format_as_csp(cell_of_py)
+        _trace_(dict(csp_of_cell=csp_of_cell))
+        assert csp_of_cell == csp
+
+        cell_of_csp = eval_csp(csp)
+        _trace_(dict(cell_of_csp=cell_of_csp))
+        assert cell_of_csp == cell_of_py
+
+    # Then switch up to test lots of brief Csp in place of a few verbose Python
+    # and include raising Exception's
+
+    else:
+
+        try:
+            cell_of_csp = eval_csp(csp)
+            _trace_(dict(cell_of_csp=bool(cell_of_csp)))
+            assert not str_exc
+        except SourceRepairHint as srh:
+            str_srh = str(srh)
+            _trace_(dict(str_srh=str_srh))
+            assert str_srh == str_exc
+
+            return
+
+        py_of_cell = format_as_py(cell_of_csp)
+        _trace_(dict(py_of_cell=py_of_cell))
+
+        csp_of_cell = format_as_csp(cell_of_csp)
+        _trace_(dict(csp_of_cell=csp_of_cell))
+        assert csp_of_cell == csp
+
+        cell_of_py = eval(py_of_cell)
+        _trace_(dict(got_cell_of_py=bool(cell_of_py)))
+        assert cell_of_py == cell_of_csp
+
+
+def collect_tests():
+    """Collect the tests as Csp alone, or as Csp paired with Python"""
+
+    # Collect tests of Csp paired with Lisp on Python
+
+    (csps, pys) = choose_csps_pys_pairs()
+
+    assert len(csps) == len(pys)
+    str_excs = len(csps) * [None]
+
+    # Collect tests of Csp without git-tracked Lisp on Python
+    # TODO: include comments and blanks in the tests
+
+    chars = CHAPTER_1
+    chars += CHAPTER_2
+    chars = textwrap.dedent(chars).strip()
+
+    csp_chars = "\n".join(_.partition("#")[0] for _ in chars.splitlines())
+    csp_lines = (_.strip() for _ in csp_chars.splitlines() if _.strip())
+
+    # Visit each line of Csp that has no Python
+
+    csp_laters = list()
+    for (index, csp_line) in enumerate(csp_lines):
+
+        # Join Csp lines til all ( [ { ⟨ marks closed by ) ] } ⟩ marks
+
+        csp_laters.append(csp_line)
+        csp_joined = "\n".join(csp_laters)
+
+        shards = split_csp(csp_joined)
+        (opened, closed) = balance_csp_shards(shards)
+        assert not closed, (closed, opened, csp_line)
+
+        if opened:
+            continue
+
+        csp_laters = list()
+
+        # Collapse the Csp Test into a single line
+        # TODO: include the line-break's in test
+
+        csp = csp_joined
+        csp = csp.replace("(\n", "(")  # TODO: grossly inelegant
+        csp = csp.replace("\n", " ")
+        csp = csp.replace("\t", " ")
+
+        # Admit we have no Py
+
+        py = None
+
+        # Pick 0 or 1 raised Exception's out of the test source
+        # TODO: keep separate the same test when given more than once
+
+        tail_chars = chars[chars.index(csp_line) :]
+        tail_line = tail_chars.splitlines()[0]
+        tail_comment = tail_line.partition("#")[-1].strip()
+
+        str_exc = None
+        if tail_comment.startswith("no, "):
+            str_exc = tail_comment[len("no, ") :]
+
+        # Collect the test
+
+        csps.append(csp)
+        pys.append(py)
+        str_excs.append(str_exc)
+
+    # Require no lines of Csp leftover
+
+    assert not csp_laters
+
+    return zip(csps, pys, str_excs)
+
+
+def choose_csps_pys_pairs():
     """Put a few fragments of Py Source, and their Csp Source, under test"""
 
-    # Csp Python of Csp:  coin  # an event exists
+    csps = list()
+    pys = list()
 
-    want0 = textwrap.dedent(
-        """
+    # A Proc exists
+
+    csps.append("X")
+
+    pys.append(
+        textwrap.dedent(
+            """
         Proc("X")
         """
-    ).strip()
+        ).strip()
+    )
 
-    # Csp Python of Csp:  {coin, choc, toffee}  # an alphabet collects events
+    # An Alphabet collects Events
 
-    want1 = textwrap.dedent(
-        """
+    csps.append("{coin, choc, toffee}")
+
+    pys.append(
+        textwrap.dedent(
+            """
         Alphabet(
             Event("coin"),
             Event("choc"),
             Event("toffee"),
         )
         """
-    ).strip()
+        ).strip()
+    )
 
-    # Csp Python of Csp:  choc → X  # event guards proc
+    # An Event Guards a Proc
 
-    want11 = textwrap.dedent(
-        """
+    csps.append("choc → X")
+
+    pys.append(
+        textwrap.dedent(
+            """
         Prong(
             prolog=Event("choc"),
             epilog=Proc("X"),
         )
         """
-    ).strip()
+        ).strip()
+    )
 
-    # Csp Python of Csp:  choc → X | toffee → X  # events guard proc's
+    # Events guard Proc's
 
-    want20 = textwrap.dedent(
-        """
+    csps.append("choc → X | toffee → X")
+
+    pys.append(
+        textwrap.dedent(
+            """
         Fork(
             Prong(
                 prolog=Event("choc"),
@@ -1398,12 +1559,16 @@ def bootstrap_py_csp_fragments():
             ),
         )
         """
-    ).strip()
+        ).strip()
+    )
 
-    # Csp Python of Csp:  coin → (choc → X | toffee → X)  # events guard proc's
+    # An Event guards a Pocket
 
-    want2 = textwrap.dedent(
-        """
+    csps.append("coin → (choc → X | toffee → X)")
+
+    pys.append(
+        textwrap.dedent(
+            """
         Prong(
             prolog=Event("coin"),
             epilog=Pocket(
@@ -1420,12 +1585,16 @@ def bootstrap_py_csp_fragments():
             ),
         )
         """
-    ).strip()
+        ).strip()
+    )
 
-    # Csp Python of Csp:  VMCT = μ X : {...} • (coin → (choc → X | toffee → X))
+    # Stepping through Events of an Alphabet defines a Proc
 
-    want3 = textwrap.dedent(
-        """
+    csps.append("VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))")
+
+    pys.append(
+        textwrap.dedent(
+            """
         ProcDef(
             proc=Proc("VMCT"),
             proc_body=Focused(
@@ -1455,202 +1624,13 @@ def bootstrap_py_csp_fragments():
             ),
         )
         """
-    ).strip()
+        ).strip()
+    )
 
-    # Same lines of Csp as above
+    # Return the chosen fragments
 
-    CSP_WANTS = textwrap.dedent(
-        """
-        X
-        {coin, choc, toffee}
-        choc → X
-        choc → X | toffee → X
-        coin → (choc → X | toffee → X)
-        VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
-        """
-    ).strip()
+    return (csps, pys)
 
-    assert textwrap.dedent(OUR_BOOTSTRAP).strip() == CSP_WANTS
-
-    # Return the fragments chosen
-
-    py_wants = (want0, want1, want11, want20, want2, want3)
-    csp_wants = CSP_WANTS.splitlines()
-    return (py_wants, csp_wants)
-
-
-def try_py_then_csp():
-    """Translate from Py Source to Calls to Py Source, to Csp Source, to Csp Calls"""
-
-    (py_wants, csp_wants) = bootstrap_py_csp_fragments()
-
-    tupled_wants = itertools.zip_longest(py_wants, csp_wants)
-    for (index, tupled_want) in enumerate(tupled_wants):
-        (py_want, csp_want) = tupled_want
-
-        if False:
-            if index < 0:
-                continue
-
-        if False:
-            csp_line = csp_want  # simple, here
-            stderr_print(
-                "cspsh: try_py_then_csp: testing {}:  {}".format(index, csp_line)
-            )
-
-        # test parse as Py
-
-        py_evalled = eval(py_want)
-
-        # test print as Py
-
-        py_got = py_evalled._as_python_()
-
-        assert not stderr_print_diff(input=py_want, output=py_got)
-
-        # test print as Csp
-
-        csp_got = format_as_csp(py_evalled)
-        if csp_got != csp_want:
-            stderr_print("cspsh: want Csp::  {!r}".format(csp_want))
-            stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
-            assert False
-
-        # test parse as Csp
-
-        try:
-            csp_evalled = eval_csp_cell(csp_want)
-        except Exception:
-            stderr_print("cspsh: csp_want", csp_want)
-            raise
-
-        if csp_evalled != py_evalled:
-            stderr_print("cspsh: csp_evalled", csp_evalled)
-            stderr_print("cspsh: py_evalled", py_evalled)
-
-        assert csp_evalled == py_evalled, argparse.Namespace(
-            want_py=py_want,
-            got_py=format_as_python(csp_evalled),
-        )
-
-
-def try_csp_then_py():
-    """Translate from Csp Source to Calls to Py Source, to Py Calls, to Csp Source"""
-
-    # Collect input lines
-
-    chars = OUR_BOOTSTRAP
-    chars += CHAPTER_1
-    chars = textwrap.dedent(chars).strip()
-
-    if False:
-        chars = "x → y"
-
-    csp_chars = "\n".join(_.partition("#")[0] for _ in chars.splitlines())
-    csp_lines = (_.strip() for _ in csp_chars.splitlines() if _.strip())
-    # TODO: teach the comments and blanks to survive the parse
-
-    # Visit each input line
-
-    csp_laters = list()
-    for (index, csp_line) in enumerate(csp_lines):
-
-        if False:  # if index < 0:
-            continue
-
-        # Join input lines til all ( [ { ⟨ marks closed by ) ] } ⟩ marks
-
-        csp_laters.append(csp_line)
-        csp_joined = "\n".join(csp_laters)
-
-        shards = split_csp(csp_joined)
-        (opened, closed) = balance_csp_shards(shards)
-        assert not closed, (closed, opened, csp_line)
-
-        if opened:
-            continue
-
-        csp_laters = list()
-
-        # Pick 0 or 1 raised Exception's out of the test source
-
-        tail_chars = chars[chars.index(csp_line) :]
-        tail_line = tail_chars.splitlines()[0]
-        tail_comment = tail_line.partition("#")[-1]
-
-        want_str_exc = None
-        if tail_comment.startswith(" no, "):
-            want_str_exc = tail_comment[len(" no, ") :].strip()
-
-        # Test a closed fragment of Csp source
-
-        py_got = None
-
-        try:
-
-            csp_want = csp_joined
-            csp_want = csp_want.replace("(\n", "(")  # TODO: grossly inelegant
-            csp_want = csp_want.replace("\n", " ")
-            csp_want = csp_want.replace("\t", " ")
-
-            if False:
-                stderr_print(
-                    "cspsh: try_csp_then_py: testing {}:  {}".format(index, csp_want)
-                )
-                if want_str_exc is not None:
-                    stderr_print("cspsh: try_csp_then_py: wanting:", want_str_exc)
-
-            csp_evalled = eval_csp_cell(csp_joined)
-            assert not want_str_exc, (want_str_exc, None)
-
-            py_got = format_as_python(csp_evalled)
-
-            alt_py_got = csp_evalled._as_python_()
-            assert py_got == alt_py_got, (print(py_got), print(alt_py_got))
-
-            py_evalled = eval(py_got)
-
-            csp_got = format_as_csp(py_evalled)
-            if csp_got != csp_want:
-                stderr_print("cspsh: want Csp::  {!r}".format(csp_want))
-                stderr_print("cspsh: got Csp:::  {!r}".format(csp_got))
-                assert False
-
-        except SourceRepairHint as exc:
-
-            got_str_exc = str(exc)
-
-            assert got_str_exc == want_str_exc, (want_str_exc, got_str_exc)
-
-        except Exception:
-
-            stderr_print("cspsh: failing at test of Csp:  {}".format(csp_want))
-            if want_str_exc:
-                stderr_print("cspsh: failing to raise:  {}".format(want_str_exc))
-            stderr_print("cspsh: failing with Python of:  {}".format(py_got))
-
-            raise
-
-        if False:
-            if "x:αP" in csp_joined:
-                pdb.set_trace()
-                pass
-
-    # Require no input lines leftover
-
-    assert not csp_laters
-
-
-OUR_BOOTSTRAP = """
-
-    X
-    {coin, choc, toffee}
-    choc → X
-    choc → X | toffee → X
-    coin → (choc → X | toffee → X)
-    VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))
-
-"""
 
 CHAPTER_1 = """
 
@@ -1774,6 +1754,10 @@ CHAPTER_1 = """
 
     # 1.6 Operations on traces
 
+"""
+
+CHAPTER_2 = """
+    # TODO:  Tests beyond Csp Chapter 1
 """
 
 
