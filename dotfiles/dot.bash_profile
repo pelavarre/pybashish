@@ -480,6 +480,7 @@ alias -- -gl='--exec-echo-xe git log'
 alias -- -gr='--exec-echo-xe git rebase'
 alias -- -gs='--exec-echo-xe git show'
 
+alias -- -gap='--exec-echo-xe git add --patch'
 alias -- -gba='--exec-echo-xe git branch --all'
 alias -- -gbq='--exec-echo-xe "git branch |grep '\''[*]'\''"'
 alias -- -gca='--exec-echo-xe git commit --amend'
