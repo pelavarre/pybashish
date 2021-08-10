@@ -10,10 +10,11 @@ optional arguments:
 
 workflow:
   while :; do
+    echo ... paused ...
+    read
     cd ~/Public/pybashish/bin && \
       echo| python3 -m pdb _cspsh4.py && \
       --black _cspsh4.py && --flake8 _cspsh4.py && python3 _cspsh4.py
-    read
   done
 
 examples:
@@ -21,6 +22,7 @@ examples:
 """
 
 # code reviewed by people, and by Black and Flake8 bots
+# table of contents in Vim at :/g^#
 
 
 import __main__
@@ -40,13 +42,211 @@ def b():
 
 
 #
-# Cover Python with a layer of Lisp
+# Main:  Run from the command line
 #
 
+
+def main(argv):
+    """Run from the command line"""
+
+    stderr_print("")
+    stderr_print("")
+    stderr_print("cspsh: hello")
+    stderr_print("")
+
+    parser = compile_argdoc(epi="workflow:")
+    _ = parser.parse_args(argv[1:])
+
+    try_test_self()
+
+    stderr_print("cspsh: + exit 0")
+
+
 #
-# Form an Abstract Syntax Tree (AST) graph of Cells of Args and KwArgs, such as:
+# Eval:  Split and parse and compile Csp Source
+#
+
+
+def eval_csp_cell(source):
+    """Split and structure Cells corresponding to Source Chars of Csp"""
+
+    shards = split_csp(source)
+
+    (opened, closed) = balance_csp_shards(shards)
+    assert not closed, (closed, opened, source)
+    assert not opened, (closed, opened, source)
+
+    cell = parse_csp_cell(source)  # TODO: stop repeating the work of "split_csp"
+
+    compile_csp_cell(cell)
+
+    return cell
+
+
+#
+# Split:  Split Csp Source into blank and nonblank, balanced and unbalanced, Shards
+#
+# aka Scanner, Tokenizer, Lexxer
+#
+
+
+NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
+MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"
+COMMENT_REGEX = r"(?P<comment>#[^\n]+)"
+BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
+
+SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, COMMENT_REGEX, BLANKS_REGEX])
+
+OPENING_MARKS = "([{⟨"
+CLOSING_MARKS = ")]}⟩"
+
+
+def split_csp(source):
+    """Split Csp Source into blank and nonblank, balanced and unbalanced, Shards"""
+
+    # Drop the "\r" out of each "\r\n"
+
+    chars = "\n".join(source.splitlines()) + "\n"
+
+    # Split the source into names, marks, comments, and blanks
+
+    matches = re.finditer(SHARDS_REGEX, string=chars)
+    items = list(_to_item_from_groupdict_(_.groupdict()) for _ in matches)
+    shards = list(CspShard(*_) for _ in items)
+
+    # Require no chars dropped
+
+    rejoined = "".join(_.value for _ in shards)  # a la ._split_misfit_
+    assert rejoined == chars  # TODO: cope more gracefully with new chars
+
+    # Succeed
+
+    return shards
+
+
+def _to_item_from_groupdict_(groupdict):
+    """Pick the 1 Item of Value Is Not None out of an Re FindIter GroupDict"""
+
+    items = list(_ for _ in groupdict.items() if _[-1] is not None)
+    assert len(items) == 1, groupdict
+
+    item = items[-1]
+    return item
+
+
+def balance_csp_shards(shards):
+    """Open up paired marks, close them down, & say what's missing or extra"""
+
+    opened = ""
+    closed = ""
+    next_closing_mark = None
+
+    for shard in shards:
+
+        # Open up any opening mark
+
+        for mark in OPENING_MARKS:
+            if shard.is_mark(mark):
+                opened += mark
+                pair_index = OPENING_MARKS.index(mark)
+                next_closing_mark = CLOSING_MARKS[pair_index]
+
+                break
+
+        # Close down an open mark followed by its corresponding close mark
+
+        for mark in CLOSING_MARKS:
+
+            if shard.is_mark(mark):
+                if mark == next_closing_mark:
+                    opened = opened[:-1]
+
+                # List close marks given before a corresponding open mark
+
+                else:
+                    closed += mark
+
+                break
+
+    # Return ("", "") if balanced, else the extra open marks and extra close marks
+
+    return (opened, closed)
+
+
+class CspShard(collections.namedtuple("CspShard", "key value".split())):
+    """Carry a fragment of Csp Source Code"""
+
+    def is_mark(self, chars):
+        if self.key == "mark":
+            if self.value == chars:
+                return True
+
+    def peek_event_name(self):
+        """Return the Chars of the Name if it lexxes as a Csp Proc Name"""
+        if self.key == "name":
+            name = self.value
+
+            if name.upper() != name:  # could be upper
+                if name == name.lower():  # is lower
+                    return name
+
+    def peek_proc_name(self):
+        """Return the Chars of the Name if it lexxes as a Csp Event Name"""
+        if self.key == "name":
+            name = self.value
+
+            if name.lower() != name:  # could be lower
+                if name == name.upper():  # is upper
+                    return name
+
+
+#
+# Parse:  Form an Abstract Syntax Tree (AST) Graph of Cells of Args and KwArgs
+#
+#   Such as:
 #
 #       Add(1, Divide(dividend=2, divisor=3))  # 1 + 2/3
+#
+
+
+def parse_csp_cell(source):
+    """Parse the Source to form a Graph rooted by one Cell, & return that root Cell"""
+
+    shards = split_csp(source)
+    tails = list(_ for _ in shards if _.key != "blanks")
+    bot = ParserBot(tails)
+
+    try:
+
+        csp = bot.accept_one(Csp)
+        if not csp:
+            raise SourceRepairHint("need hint from some smarter parser")
+
+        if not bot.at_mark(""):
+            raise SourceRepairHint("need hint for less source")
+
+    except SourceRepairHint:
+
+        raise
+
+    except Exception:
+
+        (fit, misfit) = bot._split_misfit_()
+        alt_source = fit + misfit
+
+        stderr_print("cspsh: CspSyntaxError in:", alt_source)
+        stderr_print("cspsh: CspSyntaxError fit:", fit)
+        stderr_print("cspsh: CspSyntaxError misfit:", misfit)
+
+        raise
+
+    # Succeed
+
+    return csp
+
+
+#
+# Lisp Cells:  Cover Python with a layer of Lisp Cells of Cells
 #
 
 
@@ -122,52 +322,6 @@ class Bond(collections.namedtuple("Bond", "up, key, down".split(", "))):
     """Point a parent Cell down to a child Cell, & back up again"""
 
 
-STYLE_FIELDS = "head, first, middle, last, tail".split(", ")
-
-
-class Style(
-    collections.namedtuple(
-        "Style", STYLE_FIELDS, defaults=(len(STYLE_FIELDS) * (None,))
-    ),
-):
-    """Say how to format an Abstract Syntax Tree graph (AST) as Source Code"""
-
-
-class KwArgsCell(Cell):
-    """Collect and order the keyed KwArgs children of this Cell"""
-
-    def _bonds_(self):
-        """Yield each Bond to a child Cell, in order"""
-
-        up = self
-        for key in self._keys_():
-            down = getattr(self, key)
-            bond = Bond(up, key=key, down=down)
-            yield bond
-
-    def _keys_(self):
-        keys = self._fields  # from collections.namedtuple
-        return keys
-
-
-class ArgsCell(Cell):
-    """Collect and order the indexed Args children of this Cell"""
-
-    def _bonds_(self):
-        """Yield each child Cell in order"""
-
-        up = self
-        for key in self._keys_():  # rarely more than one key
-            downs_list = getattr(self, key)
-            for down in downs_list:
-                bond = Bond(up, key=None, down=down)
-                yield bond
-
-    def _keys_(self):
-        keys = self._fields  # from collections.namedtuple
-        return keys
-
-
 class SourceCell(Cell):
     """Format the Graph rooted by the Cell, as Source Chars of our Lisp on Python"""
 
@@ -223,8 +377,54 @@ class SourceCell(Cell):
         return spaced_chars
 
 
+STYLE_FIELDS = "head, first, middle, last, tail".split(", ")
+
+
+class Style(
+    collections.namedtuple(
+        "Style", STYLE_FIELDS, defaults=(len(STYLE_FIELDS) * (None,))
+    ),
+):
+    """Say how to format an Abstract Syntax Tree Graph (AST) as Source Code"""
+
+
+class KwArgsCell(Cell):
+    """Collect and order the keyed KwArgs children of this Cell"""
+
+    def _bonds_(self):
+        """Yield each Bond to a child Cell, in order"""
+
+        up = self
+        for key in self._keys_():
+            down = getattr(self, key)
+            bond = Bond(up, key=key, down=down)
+            yield bond
+
+    def _keys_(self):
+        keys = self._fields  # from collections.namedtuple
+        return keys
+
+
+class ArgsCell(Cell):
+    """Collect and order the indexed Args children of this Cell"""
+
+    def _bonds_(self):
+        """Yield each child Cell in order"""
+
+        up = self
+        for key in self._keys_():  # rarely more than one key
+            downs_list = getattr(self, key)
+            for down in downs_list:
+                bond = Bond(up, key=None, down=down)
+                yield bond
+
+    def _keys_(self):
+        keys = self._fields  # from collections.namedtuple
+        return keys
+
+
 #
-# Cover Lisp on Python with a second Layer of Python
+# Python Cells:  Cover Lisp on Python with a layer of Python Cells of Cells
 #
 
 
@@ -263,7 +463,7 @@ class ArgsPythonCell(PythonCell, ArgsCell):
 
 
 #
-# Cover Lisp on Python with a Layer of Csp
+# Csp Cells:  Cover Lisp on Python with a layer of Csp Cells of Cells
 #
 
 
@@ -321,7 +521,7 @@ class ArgsCspCell(CspCell, ArgsPythonCell):
 
 
 #
-# Join Shards of Csp Source into an Abstract Syntax Tree graph
+# ParserBot:  Help knit Split Cells into an Abstract Syntax Tree Graph of Kwargs & Args
 #
 
 
@@ -511,7 +711,7 @@ class ParserBot:
 
 
 #
-# Say how to parse the atoms of Csp:  Event names and Proc names
+# Csp Atoms:  Define the Atoms of the Parse as Event or Proc or Mark
 #
 
 
@@ -556,9 +756,7 @@ class Proc(
 
 
 #
-# Doc our Grammar in a Backus Naur Form (BNF)
-#
-# Speak in terms of Event name, Proc name, and Mark's
+# Csp Grammar Doc:  Code up our Grammar in a Backus Naur Form (BNF) of Event/ Proc/ Mark
 #
 
 
@@ -593,6 +791,11 @@ _grammar_ = """
 
 
 #
+# Csp Grammar Code:  Code up our Grammar on top of ParserBot
+#
+
+
+# aggregate events #
 
 
 class Transcript(
@@ -638,7 +841,7 @@ class Alphabet(
             return Alphabet(*events)
 
 
-#
+# name the alphabet of a process #
 
 
 class Argot(
@@ -729,7 +932,7 @@ class ArgotEvent(
         bot._restore_(snapshot)
 
 
-#
+# sketch a fork of prongs of prolog and epilog of steps #
 
 
 class Step(
@@ -855,6 +1058,9 @@ class Fork(
     # "→" "\u2192" Rightwards Arrow
 
 
+# define a proc of pocket over alphabet #
+
+
 class ProcDef(
     KwArgsCspCell,
     collections.namedtuple("ProcDef", "proc, proc_body".split(", ")),
@@ -939,7 +1145,7 @@ class Blurred(
         bot._restore_(snapshot)
 
 
-#
+# say what process work is pocketable #
 
 
 class Pocketable(
@@ -976,7 +1182,7 @@ class Pocket(
         bot._restore_(snapshot)
 
 
-#
+# accept any of many fragments of Csp source #
 
 
 class Frag(
@@ -1023,206 +1229,7 @@ class Csp(
 
 
 #
-# Split Csp Source into blank and nonblank, balanced and unbalanced, Shards
-#
-
-
-NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
-MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"
-COMMENT_REGEX = r"(?P<comment>#[^\n]+)"
-BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
-
-SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, COMMENT_REGEX, BLANKS_REGEX])
-
-OPENING_MARKS = "([{⟨"
-CLOSING_MARKS = ")]}⟩"
-
-
-def split_csp(source):
-    """Split Csp Source into blank and nonblank, balanced and unbalanced, Shards"""
-
-    # Drop the "\r" out of each "\r\n"
-
-    chars = "\n".join(source.splitlines()) + "\n"
-
-    # Split the source into names, marks, comments, and blanks
-
-    matches = re.finditer(SHARDS_REGEX, string=chars)
-    items = list(_to_item_from_groupdict_(_.groupdict()) for _ in matches)
-    shards = list(CspShard(*_) for _ in items)
-
-    # Require no chars dropped
-
-    rejoined = "".join(_.value for _ in shards)  # a la ._split_misfit_
-    assert rejoined == chars  # TODO: cope more gracefully with new chars
-
-    # Succeed
-
-    return shards
-
-
-def _to_item_from_groupdict_(groupdict):
-    """Pick the 1 Item of Value Is Not None out of an Re FindIter GroupDict"""
-
-    items = list(_ for _ in groupdict.items() if _[-1] is not None)
-    assert len(items) == 1, groupdict
-
-    item = items[-1]
-    return item
-
-
-def balance_csp_shards(shards):
-    """Open up paired marks, close them down, & say what's missing or extra"""
-
-    opened = ""
-    closed = ""
-    next_closing_mark = None
-
-    for shard in shards:
-
-        # Open up any opening mark
-
-        for mark in OPENING_MARKS:
-            if shard.is_mark(mark):
-                opened += mark
-                pair_index = OPENING_MARKS.index(mark)
-                next_closing_mark = CLOSING_MARKS[pair_index]
-
-                break
-
-        # Close down an open mark followed by its corresponding close mark
-
-        for mark in CLOSING_MARKS:
-
-            if shard.is_mark(mark):
-                if mark == next_closing_mark:
-                    opened = opened[:-1]
-
-                # List close marks given before a corresponding open mark
-
-                else:
-                    closed += mark
-
-                break
-
-    # Return ("", "") if balanced, else the extra open marks and extra close marks
-
-    return (opened, closed)
-
-
-class CspShard(collections.namedtuple("CspShard", "key value".split())):
-    """Carry a fragment of Csp Source Code"""
-
-    def is_mark(self, chars):
-        if self.key == "mark":
-            if self.value == chars:
-                return True
-
-    def peek_event_name(self):
-        """Return the Chars of the Name if it lexxes as a Csp Proc Name"""
-        if self.key == "name":
-            name = self.value
-
-            if name.upper() != name:  # could be upper
-                if name == name.lower():  # is lower
-                    return name
-
-    def peek_proc_name(self):
-        """Return the Chars of the Name if it lexxes as a Csp Event Name"""
-        if self.key == "name":
-            name = self.value
-
-            if name.lower() != name:  # could be lower
-                if name == name.upper():  # is upper
-                    return name
-
-
-#
-# Split and parse and compile Csp Source
-#
-
-
-def eval_csp_cell(source):
-    """Split and structure Cells corresponding to Source Chars of Csp"""
-
-    shards = split_csp(source)
-
-    (opened, closed) = balance_csp_shards(shards)
-    assert not closed, (closed, opened, source)
-    assert not opened, (closed, opened, source)
-
-    cell = parse_csp_cell(source)  # TODO: stop repeating the work of "split_csp"
-
-    compile_csp_cell(cell)
-
-    return cell
-
-
-def parse_csp_cell(source):
-    """Parse the Source to form a Graph rooted by one Cell, & return that root Cell"""
-
-    shards = split_csp(source)
-    tails = list(_ for _ in shards if _.key != "blanks")
-    bot = ParserBot(tails)
-
-    try:
-
-        csp = bot.accept_one(Csp)
-        if not csp:
-            raise SourceRepairHint("need hint from some smarter parser")
-
-        if not bot.at_mark(""):
-            raise SourceRepairHint("need hint for less source")
-
-    except SourceRepairHint:
-
-        raise
-
-    except Exception:
-
-        (fit, misfit) = bot._split_misfit_()
-        alt_source = fit + misfit
-
-        stderr_print("cspsh: CspSyntaxError in:", alt_source)
-        stderr_print("cspsh: CspSyntaxError fit:", fit)
-        stderr_print("cspsh: CspSyntaxError misfit:", misfit)
-
-        raise
-
-    # Succeed
-
-    return csp
-
-
-#
-#
-#
-
-
-#
-# Run from the command line
-#
-
-
-def main(argv):
-    """Run from the command line"""
-
-    stderr_print("")
-    stderr_print("")
-    stderr_print("cspsh: hello")
-    stderr_print("")
-
-    parser = compile_argdoc(epi="workflow:")
-    _ = parser.parse_args(argv[1:])
-
-    try_py_then_csp()
-    try_csp_then_py()
-
-    stderr_print("cspsh: + exit 0")
-
-
-#
-# Run on top of a layer of general-purpose Python idioms
+# Extra Pythonic:  Run on top of a layer of general-purpose Python idioms
 #
 
 
@@ -1331,8 +1338,15 @@ def stderr_print_diff(**kwargs):
 
 
 #
-# Self test
+# Try Self Test
 #
+
+
+def try_test_self():
+    """Run from the command line"""
+
+    try_py_then_csp()
+    try_csp_then_py()
 
 
 def bootstrap_py_csp_fragments():
