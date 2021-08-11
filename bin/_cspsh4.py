@@ -12,9 +12,11 @@ workflow:
   while :; do
     echo ... paused ...
     read
-    cd ~/Public/pybashish/bin && \
-      echo| python3 -m pdb _cspsh4.py && \
-      --black _cspsh4.py && --flake8 _cspsh4.py && python3 _cspsh4.py
+    date; time (
+      cd ~/Public/pybashish/bin && \
+        echo| python3 -m pdb _cspsh4.py && \
+        --black _cspsh4.py && --flake8 _cspsh4.py && python3 _cspsh4.py
+    )
   done
 
 examples:
@@ -820,7 +822,7 @@ class Transcript(
 ):
     """transcript = '⟨' { event ',' } [ event ] '⟩'"""
 
-    _csp_style_ = Style(head="⟨", first="{}", middle=",{}", tail="⟩")  # "⟨⟩", not "()"
+    _csp_style_ = Style(head="⟨", first="{}", middle=", {}", tail="⟩")  # "⟨⟩", not "()"
 
     @classmethod
     def _accept_one_(cls, bot):
@@ -1000,13 +1002,16 @@ class Epilog(
             return pocket
 
 
-class Prong(
+class Prong(  # Csp:  prefixes then process
     KwArgsCspCell,
     collections.namedtuple("Prong", "prolog, epilog".split(", ")),
 ):
     """prong = prolog '→' epilog"""
 
     _csp_style_ = Style(first="{}", last=" → {}")
+
+    def _compile_(self):
+        pass  # TODO:  alphabet of prolog must be in alphabet of epilog
 
     def _menu_(self):
         prolog = self.prolog
@@ -1484,6 +1489,7 @@ def collect_tests():
 
         csp = csp_joined
         csp = csp.replace("(\n", "(")  # TODO: grossly inelegant
+        csp = csp.replace("\n)", ")")  # TODO: grossly inelegant
         csp = csp.replace("\n", " ")
         csp = csp.replace("\t", " ")
 
@@ -1664,70 +1670,124 @@ CHAPTER_1 = """
 
     # 1.1 Introduction, p.1
 
+    {coin, choc, in2p, out1p}
+    {a, b, c, d, e}
+
+    VMS
+    VMC
+
+    P   # arbitrary processes in laws
+    Q
+    R
+
+    # A = B = C = {x,y,z}  # sets of events, variables denoting events
+
+    X   # variables denoting processes
+    Y
+
+    αVMS = {coin, choc}
+    αVMC = {in1p, in2p, small, large, out1p}
+
 
     # 1.1.1 Prefix, p.3
 
-    STOP
-    coin → STOP  # 1.1.1 X1
-    coin → choc → coin → choc → STOP  # 1.1.1 X2
+    (x → P)  # 'x then P'
+    # α(x → P) = αP  provided x ∈ αP
 
+    coin → STOP  # 1.1.1 X1  # Pdf speaks STOP↓αVMS as subscript
+    (coin → (choc → (coin → (choc → STOP))))  # 1.1.1 X2
+
+    αCTR = {up, right}
     CTR = (right → up → right → right → STOP)  # 1.1.1 X3
 
-    x → y  # no, need hint from some smarter parser
     P → Q  # no, need hint for less source
+    x → y  # no, need hint from some smarter parser
 
     x → (y → STOP)
 
 
     # 1.1.2 Recursion, p.4
 
+    αCLOCK = {tick}
+
+    (tick → CLOCK)
     CLOCK = (tick → CLOCK)
-    CLOCK = (tick → tick → tick → CLOCK)
+    CLOCK = (tick → (tick → CLOCK))
+    CLOCK = (tick → (tick → (tick → CLOCK)))  # tick → tick → tick → ... unbounded
+
+    # X = X
+    # X = F(X)
+    # μ X : A • F(X)
+    # μ X : A • F(X) = μ Y : A • F(Y)
+
     CLOCK = μ X : {tick} • (tick → X)  # 1.1.2 X1
 
-    VMS = (coin → (choc → VMS))  # 1.1.2 X2
+    VMS = (coin → (choc → VMS))  # 1.1.2a X2
+    VMS = μ X : {coin, choc} • (coin → (choc → X))  # 1.1.2b X2
 
+    αCH5A = {in5p, out2p, out1p}
     CH5A = (in5p → out2p → out1p → out2p → CH5A)  # 1.1.2 X3
+
+    # αCH5B = αCH5A  # TODO
+    αCH5B = {in5p, out2p, out1p}
     CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
 
 
     # 1.1.3 Choice, p.7
 
+    (x → P | y → Q)
+    # α(x → P | y → Q) = αP provided {x, y} ⊆ αP and αP = αQ
+
     (up → STOP | right → right → up → STOP)  # 1.1.3 X1
 
-    CH5C = in5p → (  # 1.1.3 X2
-        out1p → out1p → out1p → out2p → CH5C |
-        out2p → out1p → out2p → CH5C)
-
-    (x → P | y → Q)
+    # 1.1.3 X2     # Pdf doesn't split sourcelines in Black style
+    CH5C = in5p → (
+        out1p → out1p → out1p → out2p → CH5C
+        | out2p → out1p → out2p → CH5A
+    )
 
     VMCT = μ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
 
-    VMC = (in2p → (large → VMC |  # 1.1.3 X4
-                   small → out1p → VMC) |
-           in1p → (small → VMC |
-                   in1p → (large → VMC |
-                           in1p → STOP)))
+    VMC = (     # 1.1.3 X4
+        in2p → (
+            large → VMC
+            | small → out1p → VMC
+        ) | in1p → (
+            small → VMC
+            | in1p → (
+                large → VMC
+                | in1p → STOP
+            )
+        )
+    )
 
     VMCRED = μ X • (coin → choc → X | choc → coin → X)  # 1.1.3 X5
 
     VMS2 = (coin → VMCRED)  # 1.1.3 X6
 
-    COPYBIT = μ X • (in.0 → out.0 → X |  # 1.1.3 X7
-                     in.1 → out.1 → X)
+    COPYBIT = μ X • (  # 1.1.3 X7
+        in.0 → out.0 → X
+        | in.1 → out.1 → X
+    )
+
+    P | Q  # no, need hint for less source
+    (x → P | x → Q)  # no, need distinct guard names, got: x x
+    (x → P | (y → Q | z → R))  # no, need hint from some smarter parser
 
     (x → P | y → Q | z → R)
-
-    (x → P | x → Q)  # no, need distinct guard names, got: x x
 
     (x → P | y)  # no, need hint from some smarter parser
     (x → P) | (y → Q)  # no, need hint for less source
     (x → P) | y → Q  # no, need hint for less source
-    (x → P | (y → Q | z → R))  # no, need hint from some smarter parser
+
+    # (x:B → P(x))
+    # (x:B → P(x)) = (y:B → P(u))
 
     x:αP → STOP
     αRUNNER = {coin, choc, toffee}
     RUNNER = (x:αRUNNER → RUNNER)  # 1.1.3 X8
+
+# FIXME: sync 1.1.3 X8 to Pdf
 
 
     # 1.1.4 Mutual recursion, p.11
@@ -1758,22 +1818,22 @@ CHAPTER_1 = """
 
     # 1.5 Traces
 
-    ⟨coin,choc,coin,choc⟩  # 1.5 X1
+    ⟨coin, choc, coin, choc⟩  # 1.5 X1
 
-    ⟨coin,choc,coin⟩  # 1.5 X2
+    ⟨coin, choc, coin⟩  # 1.5 X2
 
     ⟨⟩  # 1.5 X3
 
     ⟨⟩  # 1.5 X4.1
     ⟨in2p⟩  # 1.5 X4.2.1
     ⟨in1p⟩  # 1.5 X4.2.2
-    ⟨in2p,large⟩  # 1.5 X4.3.1
-    ⟨in2p,small⟩  # 1.5 X4.3.2
-    ⟨in1p,in1p⟩  # 1.5 X4.3.3
-    ⟨in1p,small⟩  # 1.5 X4.3.4
+    ⟨in2p, large⟩  # 1.5 X4.3.1
+    ⟨in2p, small⟩  # 1.5 X4.3.2
+    ⟨in1p, in1p⟩  # 1.5 X4.3.3
+    ⟨in1p, small⟩  # 1.5 X4.3.4
 
-    ⟨in1p,in1p,in1p⟩  # 1.5 X5.1
-    ⟨in1p,in1p,in1p,x⟩  # 1.5 X5.2
+    ⟨in1p, in1p, in1p⟩  # 1.5 X5.1
+    ⟨in1p, in1p, in1p, x⟩  # 1.5 X5.2
 
 
     # 1.6 Operations on traces
@@ -1785,10 +1845,89 @@ CHAPTER_2 = """
 """
 
 
+GLOSSARY_OF_LOGIC = """
+
+Notation
+..............  Meaing
+..............  ..........................  Example
+..............  ..........................  ............
+
+=               equals                      x = x
+
+≠               is distinct from            x ≠ x + 1
+
+∎               end of an example or proof
+
+P ∧ Q           P and Q (both true)         x ≤ x + 1  ∧  x ≠ x + 1
+
+P ∨ Q           P or Q (one or both true)   x ≤ y  ∨  y ≤ x
+
+¬ P             not P (P is not true)       ¬ 3 ≥ 5
+
+P ⇒ Q           if P then Q                 x < y  ⇒  x ≤ y
+
+P ≡             P if and only if Q          x < y  ≡  y > x
+
+∃ x • P         there exists an x           ∃ x • x > y
+                such that P
+
+∀ x • P         for all x, yes P            ∀ x • x < x + 1
+
+∃ x : A • P     there exists an x
+                in set A such that P
+
+∀ x : A • P     for all x in set A, yes P
+
+# Pdf doesn't spec the '#' syntax for comments
+# Pdf doesn't choose the '∎' end-of-example/proof character for us
+# Pdf lacks the two "yes " here
+# Pdf doesn't add blanks to show nesting
+
+"""
+
+
+# TODO:  GLOSSARY_OF_SETS
+# TODO:  GLOSSARY_OF_FUNCTIONS
+# TODO:  GLOSSARY_OF_TRACES
+# TODO:  GLOSSARY_OF_SPECIAL_EVENTS
+
+GLOSSARY_OF_PROCESSES = """
+
+Section
+......  Notation
+..................          Meaning
+
+1.1     αP                  the alphabet of process P
+
+1.1.1   a → P               a then P
+
+1.1.3   (a → P | b → Q)     a then P choice b then Q (provided a ≠ b)
+
+1.1.3   (x:A → P(x))        (choice of) x from A then P(x)
+
+1.1.2   μ X : A • F(X)      the process X with alphabet A
+                            such that X = F(X)
+
+1.8     P / s               P after (engaging in events of trace) s
+
+1.10.1  P sat S             (process) P satisfies (specification) S
+1.10.1  tr                  an arbitrary trace of the specified process
+
+# Pdf doesn't plainly match the spacing here, such as 'αP' and '(x:A'
+
+# TODO: fill out the rest of GLOSSARY_OF_PROCESSES
+
+"""
+
+# TODO:  GLOSSARY_OF_ALGEBRA
+# TODO:  GLOSSARY_OF_GRAPHS
+
+
 #
 # To do
 #
 
+# TODO:  rewrite '_snapshot_'/''/'_restore_' as 'with' '_checkpoint_'/'_commit_'/''
 # TODO:  review grammar & grammar class names vs CspBook Pdf
 
 # TODO:  code up cogent '.format_as_trace' representations of infinities
