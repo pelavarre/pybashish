@@ -532,7 +532,7 @@ alias -- -gpfwl='dirs -p |head -1 && --exec-echo-xe-maybe git push --force-with-
 # TODO: git log -G regex file.ext # grep the changes
 # TODO: git log -S regex file.ext # grep the changes for an odd number (PickAxe)
 # TODO: --pretty=format:'%h %aE %s'  |cat - <(echo) |sed "s,@$DOMAIN,,"
-# TODO: git blame/log --abbrev
+# TODO: git blame/log --abbrev=3
 
 # TODO: help with
 # git push origin HEAD:people/jqdoe/project/1234
