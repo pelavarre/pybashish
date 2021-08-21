@@ -93,8 +93,8 @@ def eval_csp(csp):
 
 BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
 COMMENT_REGEX = r"(?P<comment>#[^\n]+)"
-MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"  # TODO: make a mark of the \ Backslash
-NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Z\\a-z_]*)"
+MARK_REGEX = r"(?P<mark>[()*,:={|}αμ•→⟨⟩])"
+NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
 # NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"  # TODO: test Freak Shards
 FREAK_REGEX = r"(?P<freak>.)"
 
@@ -244,13 +244,14 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
 
     def peek_alphabet_name(self):
         """Return the Chars of the Name if it splits as a Csp Alphabet Name"""
+        return self.peek_proc_name()
+
+    def peek_arg_name(self):
+        """Return the Chars of the Name if it splits as a Csp Arg Name"""
 
         if self.key == "name":
             name = self.value
-
-            if name.lower() != name:  # could be lower
-                if name == name.upper():  # is upper
-                    return name  # same spelling accepted as a 'proc_name'
+            return name
 
     def peek_event_name(self):
         """Return the Chars of the Name if it splits as a Csp Proc Name"""
@@ -270,7 +271,7 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
 
             if name.lower() != name:  # could be lower
                 if name == name.upper():  # is upper
-                    return name  # same spelling accepted as an 'alphabet_name'
+                    return name
 
 
 #
@@ -716,7 +717,7 @@ class KnitterBot:
     def accept_one(self, cls):
         """Form and take Cls if present, else return None"""
 
-        cell = cls._accept_one_(self)
+        cell = cls._accept_one_(self)  # TODO: 'accept_one' overloads '_accept_one_'
         return cell
 
     def accept_some(self, cls, sep):
@@ -836,11 +837,11 @@ class Event(
                 return Event(name)
 
 
-class Proc(
+class ProcName(
     InlineCspCell,
-    collections.namedtuple("Proc", "name".split(", ")),
+    collections.namedtuple("ProcName", "name".split(", ")),
 ):
-    """Accept one Proc name, if present"""  # split same as an Alphabet name
+    """Accept one Proc name, if present"""  # split same as an Alphabet or Arg name
 
     @classmethod
     def _accept_one_(cls, bot):
@@ -851,14 +852,14 @@ class Proc(
             if name is not None:
                 bot.take_one_tail()
 
-                return Proc(name)
+                return ProcName(name)
 
 
 class Alphabet(
     InlineCspCell,
     collections.namedtuple("Alphabet", "name".split(", ")),
 ):
-    """Accept one Alphabet name, if present"""  # split same as a Proc name
+    """Accept one Alphabet name, if present"""  # split same as an Arg or Proc name
 
     @classmethod
     def _accept_one_(cls, bot):
@@ -872,6 +873,24 @@ class Alphabet(
                 return Alphabet(name)
 
 
+class Arg(
+    InlineCspCell,
+    collections.namedtuple("Arg", "name".split(", ")),
+):
+    """Accept one Arg name, if present"""  # split same as an Alphabet or Proc name
+
+    @classmethod
+    def _accept_one_(cls, bot):
+
+        tail = bot.peek_one_tail()
+        if tail:
+            name = tail.peek_arg_name()
+            if name is not None:
+                bot.take_one_tail()
+
+                return Arg(name)
+
+
 #
 # Csp Knitter Doc:  Code up our Grammar in a Backus Naur Form (BNF) of atomic Cells
 #
@@ -883,10 +902,15 @@ class Alphabet(
 #
 
 
-_grammar_ = """
+_grammar_ = r"""
 
     transcript = '⟨' { event ',' } [ event ] '⟩'
     event_set = '{' { event ',' } [ event ] '}'
+
+    proc = proc_with_args | proc_with_one | proc_name
+    proc_with_one = proc '*' arg
+    proc_with_args = proc_name arg_list
+    arg_list = '(' { arg ',' } [ arg ]
 
     argot = 'α' proc_body
     argot_names = argot { '=' argot }
@@ -902,9 +926,10 @@ _grammar_ = """
     fork = prong { '|' prong }
 
     proc_def = proc '=' proc_body
-    proc_body = sharp_body | fuzzy_body | fork | proc | pocket
-    sharp_body = 'μ' proc ':' event_set '•' pocket
-    fuzzy_body = 'μ' proc '•' pocket
+    proc_body = sharp_body | fuzzy_body | fork | basic_body
+    sharp_body = 'μ' proc ':' world '•' basic_body
+    fuzzy_body = 'μ' proc '•' basic_body
+    basic_body = proc | pocket
 
     pocketable = fork | proc_body
     pocket = '(' pocketable ')'
@@ -966,6 +991,82 @@ class EventSet(
         events = bot.accept_between(Event, head="{", sep=",", end=",", tail="}")
         if events is not None:
             return EventSet(*events)
+
+
+# Csp Procs without Args, with explicit 0 Args, with 1 Arg, with more Args #
+
+
+class Proc(ArgsCspCell, collections.namedtuple("Proc", list())):
+    """proc = proc_with_args | proc_with_one | proc_name"""
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        if proc_with_args := bot.accept_one(ProcWithArgs):
+            return proc_with_args
+        elif proc_with_one := bot.accept_one(ProcWithOne):
+            return proc_with_one
+        elif proc_name := bot.accept_one(ProcName):
+            return proc_name
+
+
+class ProcWithOne(
+    ArgsCspCell,
+    collections.namedtuple("ProcWithOne", "atoms".split(", ")),
+):
+    r"""proc_with_one = proc '*' arg"""
+
+    _csp_style_ = Style(first="{}", middle=r"*{}")
+
+    @classmethod
+    def _accept_one_(cls, bot):
+
+        with bot._checkpoint_():
+            if proc_name := bot.accept_one(ProcName):
+                if bot.accept_mark("*"):
+                    if arg := bot.accept_one(Arg):
+
+                        atoms = list()
+                        atoms.append(proc_name)
+                        atoms.append(arg)
+
+                        bot._commit_()
+                        return ProcWithOne(*atoms)
+
+
+class ProcWithArgs(
+    ArgsCspCell,
+    collections.namedtuple("ProcWithOne", "atoms".split(", ")),
+):
+    """proc_with_args = proc_name arg_list"""
+
+    _csp_style_ = Style(first="{}(", middle="{}, ", last="{}", tail=")")
+
+    @classmethod
+    def _accept_one_(cls, bot):
+
+        with bot._checkpoint_():
+            if proc_name := bot.accept_one(ProcName):
+                if arg_list := bot.accept_one(ArgList):
+
+                    atoms = list()
+                    atoms.append(proc_name)
+                    atoms.extend(arg_list.args)
+
+                    bot._commit_()
+                    return ProcWithArgs(*atoms)
+
+
+class ArgList(
+    ArgsCspCell,
+    collections.namedtuple("ArgList", "args".split(", ")),
+):
+    """arg_list = '(' { arg ',' } [ arg ]"""
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        args = bot.accept_between(Arg, head="(", sep=",", end=",", tail=")")
+        if args is not None:
+            return ArgList(*args)
 
 
 # name the event_set of a process #
@@ -1219,11 +1320,8 @@ class ProcDef(
                         return ProcDef(proc, proc_body=proc_body)
 
 
-class ProcBody(
-    KwArgsCspCell,
-    collections.namedtuple("ProcBody", "body".split(", ")),
-):
-    """proc_body = sharp_body | fuzzy_body | fork | proc | pocket"""
+class ProcBody(KwArgsCspCell, collections.namedtuple("ProcBody", list())):
+    """proc_body = sharp_body | fuzzy_body | fork | basic_body"""
 
     @classmethod
     def _accept_one_(cls, bot):
@@ -1233,17 +1331,15 @@ class ProcBody(
             return fuzzy_body
         elif fork := bot.accept_one(Fork):
             return fork
-        elif proc := bot.accept_one(Proc):
-            return proc
-        elif pocket := bot.accept_one(Pocket):
-            return pocket
+        elif basic_body := bot.accept_one(BasicBody):
+            return basic_body
 
 
 class SharpBody(
     KwArgsCspCell,
-    collections.namedtuple("SharpBody", "proc, event_set, pocket".split(", ")),
+    collections.namedtuple("SharpBody", "proc, world, basic_body".split(", ")),
 ):
-    """sharp_body = 'μ' proc ':' event_set '•' pocket"""
+    """sharp_body = 'μ' proc ':' world '•' basic_body"""
 
     _csp_style_ = Style(first="μ {}", middle=" : {}", last=" • {}")
 
@@ -1254,21 +1350,21 @@ class SharpBody(
             if bot.accept_mark("μ"):
                 if proc := bot.accept_one(Proc):
                     if bot.accept_mark(":"):
-                        if event_set := bot.accept_one(EventSet):
+                        if world := bot.accept_one(World):
                             if bot.accept_mark("•"):
-                                if pocket := bot.accept_one(Pocket):
+                                if basic_body := bot.accept_one(BasicBody):
 
                                     bot._commit_()
                                     return SharpBody(
-                                        proc, event_set=event_set, pocket=pocket
+                                        proc, world=world, basic_body=basic_body
                                     )
 
 
 class FuzzyBody(
     KwArgsCspCell,
-    collections.namedtuple("FuzzyBody", "proc, pocket".split(", ")),
+    collections.namedtuple("FuzzyBody", "proc, basic_body".split(", ")),
 ):
-    """fuzzy_body = 'μ' proc '•' pocket"""
+    """fuzzy_body = 'μ' proc '•' basic_body"""
 
     _csp_style_ = Style(first="μ {}", last=" • {}")
 
@@ -1279,10 +1375,24 @@ class FuzzyBody(
             if bot.accept_mark("μ"):
                 if proc := bot.accept_one(Proc):
                     if bot.accept_mark("•"):
-                        if pocket := bot.accept_one(Pocket):
+                        if basic_body := bot.accept_one(BasicBody):
 
                             bot._commit_()
-                            return FuzzyBody(proc, pocket=pocket)
+                            return FuzzyBody(proc, basic_body=basic_body)
+
+
+class BasicBody(
+    KwArgsCspCell,
+    collections.namedtuple("BasicBody", list()),
+):
+    """basic_body = proc | pocket"""
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        if proc := bot.accept_one(Proc):
+            return proc
+        elif pocket := bot.accept_one(Pocket):
+            return pocket
 
 
 # say what process work is pocketable #
@@ -1699,7 +1809,7 @@ def choose_csps_pys_pairs():
     pys.append(
         textwrap.dedent(
             """
-            Proc("X")
+            ProcName("X")
             """
         ).strip()
     )
@@ -1729,7 +1839,7 @@ def choose_csps_pys_pairs():
             """
             Prong(
                 prolog=Event("choc"),
-                epilog=Proc("X"),
+                epilog=ProcName("X"),
             )
             """
         ).strip()
@@ -1745,11 +1855,11 @@ def choose_csps_pys_pairs():
             Fork(
                 Prong(
                     prolog=Event("choc"),
-                    epilog=Proc("X"),
+                    epilog=ProcName("X"),
                 ),
                 Prong(
                     prolog=Event("toffee"),
-                    epilog=Proc("X"),
+                    epilog=ProcName("X"),
                 ),
             )
             """
@@ -1769,11 +1879,11 @@ def choose_csps_pys_pairs():
                     pocketable=Fork(
                         Prong(
                             prolog=Event("choc"),
-                            epilog=Proc("X"),
+                            epilog=ProcName("X"),
                         ),
                         Prong(
                             prolog=Event("toffee"),
-                            epilog=Proc("X"),
+                            epilog=ProcName("X"),
                         ),
                     ),
                 ),
@@ -1790,26 +1900,26 @@ def choose_csps_pys_pairs():
         textwrap.dedent(
             """
             ProcDef(
-                proc=Proc("VMCT"),
+                proc=ProcName("VMCT"),
                 proc_body=SharpBody(
-                    proc=Proc("X"),
-                    event_set=EventSet(
+                    proc=ProcName("X"),
+                    world=EventSet(
                         Event("coin"),
                         Event("choc"),
                         Event("toffee"),
                     ),
-                    pocket=Pocket(
+                    basic_body=Pocket(
                         pocketable=Prong(
                             prolog=Event("coin"),
                             epilog=Pocket(
                                 pocketable=Fork(
                                     Prong(
                                         prolog=Event("choc"),
-                                        epilog=Proc("X"),
+                                        epilog=ProcName("X"),
                                     ),
                                     Prong(
                                         prolog=Event("toffee"),
-                                        epilog=Proc("X"),
+                                        epilog=ProcName("X"),
                                     ),
                                 ),
                             ),
@@ -1858,6 +1968,7 @@ CHAPTER_1 = r"""
 
     (x → P)  # 'x then P'
     α(x → P) = αP  # provided x ∈ αP
+    # x ∈ αP  # not till we knit set ops
 
     coin → STOP  # 1.1.1 X1  # Pdf speaks STOP↓αVMS as subscript
     (coin → (choc → (coin → (choc → STOP))))  # 1.1.1 X2
@@ -1881,9 +1992,10 @@ CHAPTER_1 = r"""
     CLOCK = (tick → (tick → (tick → CLOCK)))  # tick → tick → tick → ... unbounded
 
     X = X
-    # X = F(X)
-    # μ X : A • F(X)
-    # μ X : A • F(X) = μ Y : A • F(Y)
+    F(X)
+    X = F(X)
+    μ X : A • F(X)
+    μ X : A • F(X) = μ Y : A • F(Y)
 
     CLOCK = μ X : {tick} • (tick → X)  # 1.1.2 X1
 
@@ -1902,6 +2014,8 @@ CHAPTER_1 = r"""
 
     (x → P | y → Q)
     α(x → P | y → Q) = αP   # provided {x, y} ⊆ αP and αP = αQ
+    # {x, y} ⊆ αP  # not till we knit set ops
+    αP = αQ
 
     (up → STOP | right → right → up → STOP)  # 1.1.3 X1
 
@@ -1948,23 +2062,23 @@ CHAPTER_1 = r"""
     A
     x:A
 
-    # (x:B → P(x))
-    # (x:B → P(x)) = (y:B → P(u))
+    (x:B → P(x))
+    (x:B → P(x)) = (y:B → P(u))
 
     x:αP
-    x:αRUN\A
+    x:αRUN*A
 
-    αRUN\A
-    αRUN\A = A
-    x:A → RUN\A
-    RUN\A = (x:A → RUN\A)  # 1.1.3 X8
+    αRUN*A
+    αRUN*A = A
+    x:A → RUN*A
+    RUN*A = (x:A → RUN*A)  # 1.1.3 X8
 
-    # (x:{e} → P(x)) = (e → P(e))
+    (x:{e} → P(x)) = (e → P(e))
 
-    # (a → P | b → Q ) = (x : B → R(x))
+    (a → P | b → Q) = (x:B → R(x))
     B = {a, b}
-    # R(x) = if x = a then P else Q
-
+    # (a → P | x:C → Q)  # not till we calc menu of x:C
+    # R(x) = if x = a then P else Q  # not till we knit if-then-else
 
     # 1.1.4 Mutual recursion, p.11
 
@@ -2030,7 +2144,7 @@ Notation
 
 #               separate source & comment
 
-\               subscript                   RUN\A  # RUN sub A
+*               subscript                   RUN*A  # RUN sub A
 
 """
 
