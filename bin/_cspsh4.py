@@ -64,20 +64,20 @@ def main(argv):
 
 
 #
-# Eval:  Split and parse and compile Csp Source
+# Eval:  Split and knit and compile Csp Source
 #
 
 
 def eval_csp(csp):
-    """Split and structure Cells corresponding to Source Chars of Csp"""
+    """Split and knit Cells of Source Chars of Csp"""
 
-    shards = split_csp(csp)
+    shards = split_csp_source(csp)
 
     (opened, closed) = balance_csp_shards(shards)
     assert not closed, (closed, opened, csp)
     assert not opened, (closed, opened, csp)
 
-    cell = parse_csp(csp)  # TODO: stop rerunning 'split_csp' inside 'parse_csp'
+    cell = knit_csp_shards(shards)
 
     compile_csp_cell(cell)
 
@@ -87,42 +87,62 @@ def eval_csp(csp):
 #
 # Split:  Split Csp Source into blank and nonblank, balanced and unbalanced, Shards
 #
-# aka Scanner, Tokenizer, Lexxer
+# aka yet another Lexxer, Scanner, Splitter, Tokenizer
 #
 
 
-NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Z\\a-z_]*)"
-MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"
-COMMENT_REGEX = r"(?P<comment>#[^\n]+)"
 BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
+COMMENT_REGEX = r"(?P<comment>#[^\n]+)"
+MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"  # TODO: make a mark of the \ Backslash
+NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Z\\a-z_]*)"
+# NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"  # TODO: test Freak Shards
+FREAK_REGEX = r"(?P<freak>.)"
 
-SHARDS_REGEX = r"|".join([NAME_REGEX, MARK_REGEX, COMMENT_REGEX, BLANKS_REGEX])
+SHARDS_REGEX = r"|".join(
+    [BLANKS_REGEX, COMMENT_REGEX, MARK_REGEX, NAME_REGEX, FREAK_REGEX]
+)
 
 OPENING_MARKS = "([{⟨"
 CLOSING_MARKS = ")]}⟩"
 
 
-def split_csp(source):
-    """Split Csp Source into blank and nonblank, balanced and unbalanced, Shards"""
+def split_csp_source(source):
+    """Split Csp Source into Csp Shards of kinds of fragments of Source Chars"""
 
     # Drop the "\r" out of each "\r\n"
 
     chars = "\n".join(source.splitlines()) + "\n"
 
-    # Split the source into names, marks, comments, and blanks
+    # Split the Csp Source Chars into Csp Blanks, Comments, Marks, Names, & Freaks
 
     matches = re.finditer(SHARDS_REGEX, string=chars)
     items = list(_to_item_from_groupdict_(_.groupdict()) for _ in matches)
-    shards = list(CspShard(*_) for _ in items)
 
-    # Require no chars dropped
+    shards = list(CspShard(key=k, value=v) for (k, v) in items)
 
-    rejoined = "".join(_.value for _ in shards)  # a la ._split_misfit_
-    assert rejoined == chars  # TODO: welcome new chars not yet found in MARK_REGEX
+    # Require no Source Chars dropped
+
+    rejoined = "".join(str(_) for _ in shards)  # a la ._split_misfit_
+    assert rejoined == chars
+
+    # Announce the Freaks
+
+    for shard in shards:
+        str_freak = shard.format_as_freak_char()
+        if str_freak:
+
+            ch = str(shard)
+            if ch not in split_csp_source.freaks:
+                split_csp_source.freaks.add(ch)
+
+                stderr_print("cspsh: freak char {}".format(str_freak))
 
     # Succeed
 
     return shards
+
+
+split_csp_source.freaks = set()  # TODO: one set per Source, not per Python Process
 
 
 def _to_item_from_groupdict_(groupdict):
@@ -177,13 +197,64 @@ def balance_csp_shards(shards):
 class CspShard(collections.namedtuple("CspShard", "key value".split())):
     """Carry a fragment of Csp Source Code"""
 
+    def __str__(self):
+        """Print as the fragment of source, but stay repr'ed as the whole Self"""
+
+        str_self = str(self.value)
+        return str_self
+
+    def format_as_freak_char(self):
+        """Say if this Shard is a Mark of those Chars, or not"""
+
+        if self.key != "freak":
+            return
+
+        ch = self.value
+        assert len(ch) == 1, (len(ch), repr(ch))
+
+        # Rep chars that print only as \u or \U escapes
+
+        repr_ch = repr(ch)
+
+        ascii_ch = ascii(ch)
+        if ascii_ch == repr_ch:
+            if ascii_ch.lower().startswith(r"'\u"):
+                return ascii_ch
+            if ascii_ch.startswith(r"'\x"):
+                return ascii_ch
+
+            assert 0x20 <= ord(ch) <= 0x7E, hex(ord(ch))
+            uxxxx_ch = r"\x{:02x}".format(ord(ch))
+
+            return "{} {}".format(uxxxx_ch, repr_ch)
+
+        return "{} {}".format(ascii_ch, repr_ch)
+
+        # such as Apostrophe:  \x27 "'"
+        # such as Reverse Solidus:  \x5c '\\'
+        # such as Greek Small Letter Mu:  \u03bc 'μ'
+        # such as Emoji Smiling Face With Smiling Eyes:  '\U0001f60a' '😊'
+
     def is_mark(self, chars):
+        """Say if this Shard is a Mark of those Chars, or not"""
+
         if self.key == "mark":
             if self.value == chars:
                 return True
 
+    def peek_alphabet_name(self):
+        """Return the Chars of the Name if it splits as a Csp Alphabet Name"""
+
+        if self.key == "name":
+            name = self.value
+
+            if name.lower() != name:  # could be lower
+                if name == name.upper():  # is upper
+                    return name  # same spelling accepted as a 'proc_name'
+
     def peek_event_name(self):
-        """Return the Chars of the Name if it lexxes as a Csp Proc Name"""
+        """Return the Chars of the Name if it splits as a Csp Proc Name"""
+
         if self.key == "name":
             name = self.value
 
@@ -192,17 +263,20 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
                     return name
 
     def peek_proc_name(self):
-        """Return the Chars of the Name if it lexxes as a Csp Event Name"""
+        """Return the Chars of the Name if it splits as a Csp Event Name"""
+
         if self.key == "name":
             name = self.value
 
             if name.lower() != name:  # could be lower
                 if name == name.upper():  # is upper
-                    return name
+                    return name  # same spelling accepted as an 'alphabet_name'
 
 
 #
-# Parse:  Form an Abstract Syntax Tree (AST) Graph of Cells of Args and KwArgs
+# Knit:  Form an Abstract Syntax Tree (AST) Graph of Cells of Args and KwArgs
+#
+# aka yet another Parser, Yacc
 #
 #   Such as:
 #
@@ -210,16 +284,15 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
 #
 
 
-def parse_csp(csp):
-    """Parse the Source to form a Graph rooted by one Cell, & return that root Cell"""
+def knit_csp_shards(shards):
+    """Form Cells of the Shards and knit them into a Graph at a Cell"""
 
-    shards = split_csp(csp)
-    tails = list(_ for _ in shards if _.key != "blanks")
-    bot = ParserBot(tails)
+    tails = list(_ for _ in shards if str(_).strip())
+    bot = KnitterBot(tails)
 
     try:
 
-        cell = bot.accept_one(Frag)
+        cell = bot.accept_one(Csp)
 
         if not cell:
             raise csp_bot_hint_csp_none(bot)
@@ -228,9 +301,9 @@ def parse_csp(csp):
 
     except Exception as exc:
 
-        if False:
+        if not main.want_str_exc:
             # TODO: go invent more accurate strong Source Repair Hints
-            # TODO: more logging for unexpected parser failure
+            # TODO: more logging for unexpected failure to knit
 
             (fit, misfit) = bot._split_misfit_()
             alt_source = fit + misfit
@@ -331,24 +404,29 @@ class SourceCell(Cell):
     def _as_source_(cell, func, replies, style):
         """Format this Cell as Source Chars"""
 
-        # Pull the Replies from the whole Graph, if not chosen
+        # Pull the Replies from the Graph, if none supplied
+        # else form Source Chars out of the Replies
 
         if replies is None:
             py = cell._grok_(func=func)
             return py
 
-        # Else knit the replies together
+        # Study this Cell, its children, and the bonds between them
 
-        bonds = cell._bonds_()
+        bonds = list(cell._bonds_())
 
         cell_type_name = type(cell).__name__
         formats = cell._choose_formats_(style, replies=replies)
 
-        assert len(replies) == len(replies)
+        assert len(replies) == len(bonds)
         assert len(formats[1:][:-1]) == len(replies)
+
+        # Begin by adding Source Chars from this Cell
 
         chars = ""
         chars += formats[0].format(cell_type_name)
+
+        # Add Source Chars from each Reply, as styled by this Cell
 
         for (bond, reply, reply_format) in zip(bonds, replies, formats[1:][:-1]):
             key = bond.key
@@ -374,7 +452,11 @@ class SourceCell(Cell):
 
             chars += dented
 
+        # End by adding more Source Chars from this Cell
+
         chars += formats[-1].format()
+
+        # Produce only Spaces and Line Breaks as Blanks, produce no Tabs as Blanks
 
         spaced_chars = chars.expandtabs(tabsize=len(DENT))
         return spaced_chars
@@ -524,17 +606,19 @@ class ArgsCspCell(CspCell, ArgsPythonCell):
 
 
 #
-# ParserBot:  Help knit Split Cells into an Abstract Syntax Tree Graph of Kwargs & Args
+# KnitterBot:  Knit Shards into an Abstract Syntax Tree Graph of Cells of Kwargs & Args
 #
 
 
 class SourceRepairHint(Exception):
-    """Suggest how to repair Source so it more lexxes, parses, & compiles"""
+    """Say how to repair Source Chars, when we cannot split, knit, or compile them"""
 
 
-class ParserBot:
+class KnitterBot:
     """
-    Walk once through Source Chars, as split, working as yet another Yacc
+    Choose one Path to walk through the Shards of Source
+
+    Try one Path, then another, till some Path matches all the Shards
 
     Say "take" to mean require and consume
     Say "accept" to mean take if present, else return None
@@ -542,11 +626,9 @@ class ParserBot:
     Say "at" to mean detect, but do Not consume
 
     Let the caller ask to backtrack indefinitely far,
-    like after each failure to complete a partial match
+    such as back across all of the partial match, for each incomplete match
 
-    Work especially well with Source Chars
-    as split by 'match.groupdict().items()' of 'import re',
-    per reg-ex'es of r"(?P<...>...)+"
+    Trust the 'def __str__' of each Shard is its fragment of Source Chars
     """
 
     def __init__(self, tails):
@@ -578,10 +660,10 @@ class ParserBot:
         self.__enter__()
 
     def _split_misfit_(self):
-        """Split a format of the source taken from a format of what remains"""
+        """Style a couple of Alt Sources to show the splitting and knitting"""
 
-        before = " ".join(_.value for _ in self.heads[: -len(self.tails)])
-        after = " ".join(_.value for _ in self.tails).rstrip()
+        before = " ".join(str(_) for _ in self.heads[: -len(self.tails)])
+        after = " ".join(str(_) for _ in self.tails).rstrip()
 
         fit = (before + " ") if (before and after) else before
         misfit = after
@@ -686,7 +768,7 @@ class ParserBot:
             return True
 
     def fit(self):
-        """Return an Alt Source copy of the parsed head or whole of the Source"""
+        """Return an Alt Source copy of the knitted Shards of the Source"""
 
         (fit, _) = self._split_misfit_()
         return fit
@@ -700,7 +782,7 @@ class ParserBot:
         return cls(*items)
 
     def misfit(self):
-        """Return an Alt Source copy of the not-parsed tail or whole of the Source"""
+        """Return an Alt Source copy of the not-knitted Shards of the Source"""
 
         (_, misfit) = self._split_misfit_()
         return misfit
@@ -715,7 +797,7 @@ class ParserBot:
             return tail
 
     def suggest(self, hint):
-        """Form an Exception to repair Source so it more lexxes, parses, & compiles"""
+        """Form an Exception to say how to repair Source Chars"""
 
         return SourceRepairHint(hint)
 
@@ -728,7 +810,7 @@ class ParserBot:
 
 
 #
-# Csp Atoms:  Define the Atoms of the Parse as Event or Proc or Mark
+# Csp Atoms:  Plan to knit Cells of Cells of atomic single Cells of single Shards
 #
 
 
@@ -758,7 +840,7 @@ class Proc(
     InlineCspCell,
     collections.namedtuple("Proc", "name".split(", ")),
 ):
-    """Accept one Proc name, if present"""
+    """Accept one Proc name, if present"""  # split same as an Alphabet name
 
     @classmethod
     def _accept_one_(cls, bot):
@@ -772,8 +854,26 @@ class Proc(
                 return Proc(name)
 
 
+class Alphabet(
+    InlineCspCell,
+    collections.namedtuple("Alphabet", "name".split(", ")),
+):
+    """Accept one Alphabet name, if present"""  # split same as a Proc name
+
+    @classmethod
+    def _accept_one_(cls, bot):
+
+        tail = bot.peek_one_tail()
+        if tail:
+            name = tail.peek_alphabet_name()
+            if name is not None:
+                bot.take_one_tail()
+
+                return Alphabet(name)
+
+
 #
-# Csp Grammar Doc:  Code up our Grammar in a Backus Naur Form (BNF) of Event/ Proc/ Mark
+# Csp Knitter Doc:  Code up our Grammar in a Backus Naur Form (BNF) of atomic Cells
 #
 # In this BNF,
 #
@@ -786,12 +886,14 @@ class Proc(
 _grammar_ = """
 
     transcript = '⟨' { event ',' } [ event ] '⟩'
-    alphabet = '{' { event ',' } [ event ] '}'
+    event_set = '{' { event ',' } [ event ] '}'
 
-    argot = 'α' proc
+    argot = 'α' proc_body
     argot_names = argot { '=' argot }
-    argot_def = argot_names '=' alphabet
-    argot_event =  event ':' argot
+    argot_def = argot_names '=' event_set
+
+    world = event_set | argot | alphabet
+    argot_event =  event ':' world
 
     step = argot_event | event
     prolog = step { '→' step }
@@ -799,22 +901,25 @@ _grammar_ = """
     prong = prolog '→' epilog
     fork = prong { '|' prong }
 
-    proc_def = proc '=' body
-    body = proc | sharp_body | fuzzy_body | fork | pocket
-    sharp_body = 'μ' proc ':' alphabet '•' pocket
+    proc_def = proc '=' proc_body
+    proc_body = sharp_body | fuzzy_body | fork | proc | pocket
+    sharp_body = 'μ' proc ':' event_set '•' pocket
     fuzzy_body = 'μ' proc '•' pocket
 
-    pocketable = fork | body
+    pocketable = fork | proc_body
     pocket = '(' pocketable ')'
 
-    frag = transcript | alphabet | proc_def | argot_def | pocketable
-    csp = frag ''
+    term = transcript | event_set | proc_def | argot_def | pocketable | step | argot
+
+    sentence = term { '=' term }
+    csp = sentence
 
 """
+# TODO: keep our Csp Knitter Doc synched with the Docstrins of Csp Knitter Code
 
 
 #
-# Csp Grammar Code:  Code up our Grammar on top of ParserBot
+# Csp Knitter Code:  Code up our Grammar on top of KnitterBot
 #
 
 
@@ -839,11 +944,11 @@ class Transcript(
     # "⟩" "\u28E9" Mathematical Right Angle Bracket
 
 
-class Alphabet(
+class EventSet(
     ArgsCspCell,
-    collections.namedtuple("Alphabet", "events".split(", ")),
+    collections.namedtuple("EventSet", "events".split(", ")),
 ):
-    """alphabet = '{' { event ',' } [ event ] '}'"""
+    """event_set = '{' { event ',' } [ event ] '}'"""
 
     _csp_style_ = Style(head="{{", first="{}", middle=", {}", tail="}}")
 
@@ -860,18 +965,18 @@ class Alphabet(
     def _accept_one_(cls, bot):
         events = bot.accept_between(Event, head="{", sep=",", end=",", tail="}")
         if events is not None:
-            return Alphabet(*events)
+            return EventSet(*events)
 
 
-# name the alphabet of a process #
+# name the event_set of a process #
 
 
 class Argot(
     KwArgsCspCell,
-    collections.namedtuple("Argot", "proc".split(", ")),
+    collections.namedtuple("Argot", "proc_body".split(", ")),
 ):
 
-    """argot = 'α' proc"""
+    """argot = 'α' proc_body"""
 
     _csp_style_ = Style(first="α{}")
 
@@ -880,10 +985,10 @@ class Argot(
         with bot._checkpoint_():
 
             if bot.accept_mark("α"):
-                if proc := bot.accept_one(Proc):
+                if proc_body := bot.accept_one(ProcBody):
 
                     bot._commit_()
-                    return Argot(proc)
+                    return Argot(proc_body)
 
     # "α" "\u03B1" Greek Small Letter Alpha
 
@@ -900,8 +1005,9 @@ class ArgotNames(
         argots = self.argots
 
         csp_source_repair_hint = csp_bot_hint_uniq(
-            "argot names", items=list(_.proc.name for _ in argots)
+            "argot names", items=list(_.proc_body.name for _ in argots)
         )
+
         if csp_source_repair_hint:
             raise csp_source_repair_hint
 
@@ -915,9 +1021,9 @@ class ArgotNames(
 
 class ArgotDef(
     KwArgsCspCell,
-    collections.namedtuple("ArgotDef", "argot_names, alphabet".split(", ")),
+    collections.namedtuple("ArgotDef", "argot_names, event_set".split(", ")),
 ):
-    """argot_def = argot_names '=' alphabet"""
+    """argot_def = argot_names '=' event_set"""
 
     _csp_style_ = Style(first="{}", last=" = {}")
 
@@ -927,17 +1033,33 @@ class ArgotDef(
 
             if argot_names := bot.accept_one(ArgotNames):
                 if bot.accept_mark("="):
-                    if alphabet := bot.accept_one(Alphabet):
+                    if event_set := bot.accept_one(EventSet):
 
                         bot._commit_()
-                        return ArgotDef(argot_names, alphabet=alphabet)
+                        return ArgotDef(argot_names, event_set=event_set)
+
+
+class World(
+    KwArgsCspCell,
+    collections.namedtuple("World", list()),
+):
+    """world = event_set | argot | alphabet"""
+
+    @classmethod
+    def _accept_one_(cls, bot):
+        if event_set := bot.accept_one(EventSet):
+            return event_set
+        elif argot := bot.accept_one(Argot):
+            return argot
+        elif alphabet := bot.accept_one(Alphabet):
+            return alphabet
 
 
 class ArgotEvent(
     KwArgsCspCell,
-    collections.namedtuple("ArgotEvent", "event, argot".split(", ")),
+    collections.namedtuple("ArgotEvent", "event, world".split(", ")),
 ):
-    """argot_event =  event ':' argot"""
+    """argot_event =  event ':' world"""
 
     _csp_style_ = Style(first="{}", last=":{}")
 
@@ -947,10 +1069,10 @@ class ArgotEvent(
 
             if event := bot.accept_one(Event):
                 if bot.accept_mark(":"):
-                    if argot := bot.accept_one(Argot):
+                    if world := bot.accept_one(World):
 
                         bot._commit_()
-                        return ArgotEvent(event, argot=argot)
+                        return ArgotEvent(event, world=world)
 
 
 # sketch a fork of prongs of prolog and epilog of steps #
@@ -1016,7 +1138,7 @@ class Prong(  # Csp:  prefixes then process
     _csp_style_ = Style(first="{}", last=" → {}")
 
     def _compile_(self):
-        pass  # TODO:  alphabet of prolog must be in alphabet of epilog
+        pass  # TODO:  event_set of prolog must be in event_set of epilog
 
     def _menu_(self):
         prolog = self.prolog
@@ -1074,14 +1196,14 @@ class Fork(
     # "→" "\u2192" Rightwards Arrow
 
 
-# define a proc of pocket over alphabet #
+# define a proc of pocket over event_set #
 
 
 class ProcDef(
     KwArgsCspCell,
     collections.namedtuple("ProcDef", "proc, proc_body".split(", ")),
 ):
-    """proc_def = proc '=' body"""
+    """proc_def = proc '=' proc_body"""
 
     _csp_style_ = Style(first="{}", last=" = {}")
 
@@ -1101,27 +1223,27 @@ class ProcBody(
     KwArgsCspCell,
     collections.namedtuple("ProcBody", "body".split(", ")),
 ):
-    """proc_body = proc | sharp_body | fuzzy_body | fork | pocket"""
+    """proc_body = sharp_body | fuzzy_body | fork | proc | pocket"""
 
     @classmethod
     def _accept_one_(cls, bot):
-        if proc := bot.accept_one(Proc):
-            return proc
-        elif sharp_body := bot.accept_one(SharpBody):
+        if sharp_body := bot.accept_one(SharpBody):
             return sharp_body
         elif fuzzy_body := bot.accept_one(FuzzyBody):
             return fuzzy_body
         elif fork := bot.accept_one(Fork):
             return fork
+        elif proc := bot.accept_one(Proc):
+            return proc
         elif pocket := bot.accept_one(Pocket):
             return pocket
 
 
 class SharpBody(
     KwArgsCspCell,
-    collections.namedtuple("SharpBody", "proc, alphabet, pocket".split(", ")),
+    collections.namedtuple("SharpBody", "proc, event_set, pocket".split(", ")),
 ):
-    """sharp_body = 'μ' proc ':' alphabet '•' pocket"""
+    """sharp_body = 'μ' proc ':' event_set '•' pocket"""
 
     _csp_style_ = Style(first="μ {}", middle=" : {}", last=" • {}")
 
@@ -1132,13 +1254,13 @@ class SharpBody(
             if bot.accept_mark("μ"):
                 if proc := bot.accept_one(Proc):
                     if bot.accept_mark(":"):
-                        if alphabet := bot.accept_one(Alphabet):
+                        if event_set := bot.accept_one(EventSet):
                             if bot.accept_mark("•"):
                                 if pocket := bot.accept_one(Pocket):
 
                                     bot._commit_()
                                     return SharpBody(
-                                        proc, alphabet=alphabet, pocket=pocket
+                                        proc, event_set=event_set, pocket=pocket
                                     )
 
 
@@ -1170,7 +1292,7 @@ class Pocketable(
     KwArgsCspCell,
     collections.namedtuple("Pocketable", list()),
 ):
-    """pocketable = fork | body"""
+    """pocketable = fork | proc_body"""
 
     @classmethod
     def _accept_one_(cls, bot):
@@ -1203,24 +1325,49 @@ class Pocket(
 # accept any of many fragments of Csp source #
 
 
-class Frag(
+class Term(
     KwArgsCspCell,
-    collections.namedtuple("Frag", list()),
+    collections.namedtuple("Term", list()),
 ):
-    """frag = transcript | alphabet | proc_def | argot_def | pocketable"""
+    """term = transcript | event_set | proc_def | argot_def | pocketable | step | argot"""
 
     @classmethod
     def _accept_one_(cls, bot):
         if transcript := bot.accept_one(Transcript):
             return transcript
-        elif alphabet := bot.accept_one(Alphabet):
-            return alphabet
+        elif event_set := bot.accept_one(EventSet):
+            return event_set
         elif proc_def := bot.accept_one(ProcDef):
             return proc_def
         elif argot_def := bot.accept_one(ArgotDef):
             return argot_def
         elif pocketable := bot.accept_one(Pocketable):
             return pocketable
+        elif step := bot.accept_one(Step):
+            return step
+        elif argot := bot.accept_one(Argot):
+            return argot
+
+
+class Sentence(
+    ArgsCspCell,
+    collections.namedtuple("Sentence", "terms".split(", ")),
+):
+    """sentence = term { '=' term }"""
+
+    _csp_style_ = Style(first="{}", middle=" = {}")
+
+    @classmethod
+    def _accept_one_(cls, bot):
+
+        terms = bot.accept_some(Term, sep="=")
+        if terms:
+            sentence_or_term = bot.form_plural(Sentence, items=terms)
+
+            return sentence_or_term
+
+
+Csp = Sentence  # as if class Csp: ... same as Sentence ...
 
 
 #
@@ -1230,13 +1377,13 @@ class Frag(
 
 def csp_bot_hint_csp_none(bot):
     _ = bot
-    raise SourceRepairHint("need hint from some smarter parser")
+    raise SourceRepairHint("need a better knitter")
 
 
 def csp_bot_hint_csp_more(bot, cell):
     _ = bot
     _ = cell
-    raise SourceRepairHint("need hint for less source")
+    raise SourceRepairHint("need more source")
 
 
 def csp_bot_hint_uniq(kind, items):
@@ -1421,6 +1568,7 @@ def try_test_self_one(test):
         _trace_(dict(csp_of_cell=csp_of_cell))
         assert csp_of_cell == csp
 
+        main.want_str_exc = str_exc
         cell_of_csp = eval_csp(csp)
         _trace_(dict(cell_of_csp=cell_of_csp))
         assert cell_of_csp == cell_of_py
@@ -1431,15 +1579,24 @@ def try_test_self_one(test):
     else:
 
         try:
+
+            main.want_str_exc = str_exc
             cell_of_csp = eval_csp(csp)
             _trace_(dict(cell_of_csp=bool(cell_of_csp)))
             assert not str_exc
+
         except SourceRepairHint as srh:
+
             str_srh = str(srh)
             _trace_(dict(str_srh=str_srh))
             assert str_srh == str_exc, (str_srh, str_exc)
 
             return
+
+        except Exception:
+            stderr_print("cspsh: Exception in Csp: {}".format(csp))
+
+            raise
 
         py_of_cell = format_as_py(cell_of_csp)
         _trace_(dict(py_of_cell=py_of_cell))
@@ -1483,7 +1640,7 @@ def collect_tests():
         csp_laters.append(csp_line)
         csp_joined = "\n".join(csp_laters)
 
-        shards = split_csp(csp_joined)
+        shards = split_csp_source(csp_joined)
         (opened, closed) = balance_csp_shards(shards)
         assert not closed, (closed, opened, csp_line)
 
@@ -1542,24 +1699,24 @@ def choose_csps_pys_pairs():
     pys.append(
         textwrap.dedent(
             """
-        Proc("X")
-        """
+            Proc("X")
+            """
         ).strip()
     )
 
-    # An Alphabet collects Events
+    # An EventSet collects Events
 
     csps.append("{coin, choc, toffee}")
 
     pys.append(
         textwrap.dedent(
             """
-        Alphabet(
-            Event("coin"),
-            Event("choc"),
-            Event("toffee"),
-        )
-        """
+            EventSet(
+                Event("coin"),
+                Event("choc"),
+                Event("toffee"),
+            )
+            """
         ).strip()
     )
 
@@ -1570,11 +1727,11 @@ def choose_csps_pys_pairs():
     pys.append(
         textwrap.dedent(
             """
-        Prong(
-            prolog=Event("choc"),
-            epilog=Proc("X"),
-        )
-        """
+            Prong(
+                prolog=Event("choc"),
+                epilog=Proc("X"),
+            )
+            """
         ).strip()
     )
 
@@ -1585,17 +1742,17 @@ def choose_csps_pys_pairs():
     pys.append(
         textwrap.dedent(
             """
-        Fork(
-            Prong(
-                prolog=Event("choc"),
-                epilog=Proc("X"),
-            ),
-            Prong(
-                prolog=Event("toffee"),
-                epilog=Proc("X"),
-            ),
-        )
-        """
+            Fork(
+                Prong(
+                    prolog=Event("choc"),
+                    epilog=Proc("X"),
+                ),
+                Prong(
+                    prolog=Event("toffee"),
+                    epilog=Proc("X"),
+                ),
+            )
+            """
         ).strip()
     )
 
@@ -1606,61 +1763,61 @@ def choose_csps_pys_pairs():
     pys.append(
         textwrap.dedent(
             """
-        Prong(
-            prolog=Event("coin"),
-            epilog=Pocket(
-                pocketable=Fork(
-                    Prong(
-                        prolog=Event("choc"),
-                        epilog=Proc("X"),
-                    ),
-                    Prong(
-                        prolog=Event("toffee"),
-                        epilog=Proc("X"),
+            Prong(
+                prolog=Event("coin"),
+                epilog=Pocket(
+                    pocketable=Fork(
+                        Prong(
+                            prolog=Event("choc"),
+                            epilog=Proc("X"),
+                        ),
+                        Prong(
+                            prolog=Event("toffee"),
+                            epilog=Proc("X"),
+                        ),
                     ),
                 ),
-            ),
-        )
+            )
         """
         ).strip()
     )
 
-    # Stepping through Events of an Alphabet defines a Proc
+    # Stepping through Events of an EventSet defines a Proc
 
     csps.append("VMCT = μ X : {coin, choc, toffee} • (coin → (choc → X | toffee → X))")
 
     pys.append(
         textwrap.dedent(
             """
-        ProcDef(
-            proc=Proc("VMCT"),
-            proc_body=SharpBody(
-                proc=Proc("X"),
-                alphabet=Alphabet(
-                    Event("coin"),
-                    Event("choc"),
-                    Event("toffee"),
-                ),
-                pocket=Pocket(
-                    pocketable=Prong(
-                        prolog=Event("coin"),
-                        epilog=Pocket(
-                            pocketable=Fork(
-                                Prong(
-                                    prolog=Event("choc"),
-                                    epilog=Proc("X"),
-                                ),
-                                Prong(
-                                    prolog=Event("toffee"),
-                                    epilog=Proc("X"),
+            ProcDef(
+                proc=Proc("VMCT"),
+                proc_body=SharpBody(
+                    proc=Proc("X"),
+                    event_set=EventSet(
+                        Event("coin"),
+                        Event("choc"),
+                        Event("toffee"),
+                    ),
+                    pocket=Pocket(
+                        pocketable=Prong(
+                            prolog=Event("coin"),
+                            epilog=Pocket(
+                                pocketable=Fork(
+                                    Prong(
+                                        prolog=Event("choc"),
+                                        epilog=Proc("X"),
+                                    ),
+                                    Prong(
+                                        prolog=Event("toffee"),
+                                        epilog=Proc("X"),
+                                    ),
                                 ),
                             ),
                         ),
                     ),
                 ),
-            ),
-        )
-        """
+            )
+            """
         ).strip()
     )
 
@@ -1688,7 +1845,7 @@ CHAPTER_1 = r"""
     Q
     R
 
-    # A = B = C = {x,y,z}  # sets of events, variables denoting events
+    A = B = C = {x, y, z}  # sets of events, variables denoting events
 
     X   # variables denoting processes
     Y
@@ -1700,7 +1857,7 @@ CHAPTER_1 = r"""
     # 1.1.1 Prefix, p.3
 
     (x → P)  # 'x then P'
-    # α(x → P) = αP  provided x ∈ αP
+    α(x → P) = αP  # provided x ∈ αP
 
     coin → STOP  # 1.1.1 X1  # Pdf speaks STOP↓αVMS as subscript
     (coin → (choc → (coin → (choc → STOP))))  # 1.1.1 X2
@@ -1708,8 +1865,8 @@ CHAPTER_1 = r"""
     αCTR = {up, right}
     CTR = (right → up → right → right → STOP)  # 1.1.1 X3
 
-    P → Q  # no, need hint for less source
-    x → y  # no, need hint from some smarter parser
+    P → Q  # no, need more source
+    x → y  # no, need more source
 
     x → (y → STOP)
 
@@ -1723,7 +1880,7 @@ CHAPTER_1 = r"""
     CLOCK = (tick → (tick → CLOCK))
     CLOCK = (tick → (tick → (tick → CLOCK)))  # tick → tick → tick → ... unbounded
 
-    # X = X
+    X = X
     # X = F(X)
     # μ X : A • F(X)
     # μ X : A • F(X) = μ Y : A • F(Y)
@@ -1736,7 +1893,7 @@ CHAPTER_1 = r"""
     αCH5A = {in5p, out2p, out1p}
     CH5A = (in5p → out2p → out1p → out2p → CH5A)  # 1.1.2 X3
 
-    # αCH5B = αCH5A  # TODO
+    αCH5B = αCH5A
     αCH5B = {in5p, out2p, out1p}
     CH5B = (in5p → out1p → out1p → out1p → out2p → CH5B)  # 1.1.2 X4
 
@@ -1744,19 +1901,19 @@ CHAPTER_1 = r"""
     # 1.1.3 Choice, p.7
 
     (x → P | y → Q)
-    # α(x → P | y → Q) = αP provided {x, y} ⊆ αP and αP = αQ
+    α(x → P | y → Q) = αP   # provided {x, y} ⊆ αP and αP = αQ
 
     (up → STOP | right → right → up → STOP)  # 1.1.3 X1
 
-    # 1.1.3 X2     # Pdf doesn't split sourcelines in Black style
-    CH5C = in5p → (
+    CH5C = in5p → (  # 1.1.3 X2
         out1p → out1p → out1p → out2p → CH5C
         | out2p → out1p → out2p → CH5A
     )
+    # Pdf doesn't break sourcelines in Black style
 
     VMCT = μ X • (coin → (choc → X | toffee → X))  # 1.1.3 X3
 
-    VMC = (     # 1.1.3 X4
+    VMC = (  # 1.1.3 X4
         in2p → (
             large → VMC
             | small → out1p → VMC
@@ -1778,26 +1935,34 @@ CHAPTER_1 = r"""
         | in.1 → out.1 → X
     )
 
-    P | Q  # no, need hint for less source
+    P | Q  # no, need more source
     (x → P | x → Q)  # no, need distinct guard names, got: x x
-    (x → P | (y → Q | z → R))  # no, need hint from some smarter parser
+    (x → P | (y → Q | z → R))  # no, need a better knitter
 
     (x → P | y → Q | z → R)
 
-    (x → P | y)  # no, need hint from some smarter parser
-    (x → P) | (y → Q)  # no, need hint for less source
-    (x → P) | y → Q  # no, need hint for less source
+    (x → P | y)  # no, need a better knitter
+    (x → P) | (y → Q)  # no, need more source
+    (x → P) | y → Q  # no, need more source
+
+    A
+    x:A
 
     # (x:B → P(x))
     # (x:B → P(x)) = (y:B → P(u))
 
-    # αRUN\A = A
-    # RUN\A = (x:α → RUN\A)       # 1.1.3 X8
+    x:αP
+    x:αRUN\A
+
+    αRUN\A
+    αRUN\A = A
+    x:A → RUN\A
+    RUN\A = (x:A → RUN\A)  # 1.1.3 X8
 
     # (x:{e} → P(x)) = (e → P(e))
 
     # (a → P | b → Q ) = (x : B → R(x))
-    # B = {a,b}
+    B = {a, b}
     # R(x) = if x = a then P else Q
 
 
