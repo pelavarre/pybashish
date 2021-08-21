@@ -91,7 +91,7 @@ def eval_csp(csp):
 #
 
 
-NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
+NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Z\\a-z_]*)"
 MARK_REGEX = r"(?P<mark>[(),:={|}αμ•→⟨⟩])"
 COMMENT_REGEX = r"(?P<comment>#[^\n]+)"
 BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
@@ -776,6 +776,12 @@ class Proc(
 #
 # Csp Grammar Doc:  Code up our Grammar in a Backus Naur Form (BNF) of Event/ Proc/ Mark
 #
+# In this BNF,
+#
+#       ','         is a quotation of source
+#       [ ... ]     is 0 or 1
+#       { ... }     is 0 or more
+#
 
 
 _grammar_ = """
@@ -784,8 +790,8 @@ _grammar_ = """
     alphabet = '{' { event ',' } [ event ] '}'
 
     argot = 'α' proc
-    aliases = argot { '=' argot }
-    argot_def = aliases '=' alphabet
+    argot_names = argot { '=' argot }
+    argot_def = argot_names '=' alphabet
     argot_event =  event ':' argot
 
     step = argot_event | event
@@ -795,9 +801,9 @@ _grammar_ = """
     fork = prong { '|' prong }
 
     proc_def = proc '=' body
-    body = proc | focused | blurred | fork | pocket
-    focused = 'μ' proc ':' alphabet '•' pocket
-    blurred = 'μ' proc '•' pocket
+    body = proc | sharp_body | fuzzy_body | fork | pocket
+    sharp_body = 'μ' proc ':' alphabet '•' pocket
+    fuzzy_body = 'μ' proc '•' pocket
 
     pocketable = fork | body
     pocket = '(' pocketable ')'
@@ -883,16 +889,16 @@ class Argot(
     # "α" "\u03B1" Greek Small Letter Alpha
 
 
-class ArgotAliases(
+class ArgotNames(
     ArgsCspCell,
-    collections.namedtuple("ArgotAliases", "aliases".split(", ")),
+    collections.namedtuple("ArgotNames", "argots".split(", ")),
 ):
-    """argot_aliases = argot { '=' argot }"""
+    """argot_names = argot { '=' argot }"""
 
     _csp_style_ = Style(first="{}", middle=" = {}")
 
     def _compile_(self):
-        argots = self.aliases
+        argots = self.argots
 
         csp_source_repair_hint = csp_bot_hint_uniq(
             "argot names", items=list(_.proc.name for _ in argots)
@@ -902,17 +908,17 @@ class ArgotAliases(
 
     @classmethod
     def _accept_one_(cls, bot):
-        aliases = bot.accept_some(Argot, sep="=")
-        if aliases:
-            cell = bot.form_plural(ArgotAliases, items=aliases)
+        argots = bot.accept_some(Argot, sep="=")
+        if argots:
+            cell = bot.form_plural(ArgotNames, items=argots)
             return cell
 
 
 class ArgotDef(
     KwArgsCspCell,
-    collections.namedtuple("ArgotDef", "argot_aliases, alphabet".split(", ")),
+    collections.namedtuple("ArgotDef", "argot_names, alphabet".split(", ")),
 ):
-    """argot_def = argot_aliases '=' alphabet"""
+    """argot_def = argot_names '=' alphabet"""
 
     _csp_style_ = Style(first="{}", last=" = {}")
 
@@ -920,10 +926,10 @@ class ArgotDef(
     def _accept_one_(cls, bot):
         snapshot = bot._snapshot_()
 
-        if argot_aliases := bot.accept_one(ArgotAliases):
+        if argot_names := bot.accept_one(ArgotNames):
             if bot.accept_mark("="):
                 if alphabet := bot.accept_one(Alphabet):
-                    return ArgotDef(argot_aliases, alphabet=alphabet)
+                    return ArgotDef(argot_names, alphabet=alphabet)
 
         bot._restore_(snapshot)
 
@@ -1095,27 +1101,27 @@ class ProcBody(
     KwArgsCspCell,
     collections.namedtuple("ProcBody", "body".split(", ")),
 ):
-    """proc_body = proc | focused | blurred | fork | pocket"""
+    """proc_body = proc | sharp_body | fuzzy_body | fork | pocket"""
 
     @classmethod
     def _accept_one_(cls, bot):
         if proc := bot.accept_one(Proc):
             return proc
-        elif focused := bot.accept_one(Focused):
-            return focused
-        elif blurred := bot.accept_one(Blurred):
-            return blurred
+        elif sharp_body := bot.accept_one(SharpBody):
+            return sharp_body
+        elif fuzzy_body := bot.accept_one(FuzzyBody):
+            return fuzzy_body
         elif fork := bot.accept_one(Fork):
             return fork
         elif pocket := bot.accept_one(Pocket):
             return pocket
 
 
-class Focused(
+class SharpBody(
     KwArgsCspCell,
-    collections.namedtuple("Focused", "proc, alphabet, pocket".split(", ")),
+    collections.namedtuple("SharpBody", "proc, alphabet, pocket".split(", ")),
 ):
-    """focused = 'μ' proc ':' alphabet '•' pocket"""
+    """sharp_body = 'μ' proc ':' alphabet '•' pocket"""
 
     _csp_style_ = Style(first="μ {}", middle=" : {}", last=" • {}")
 
@@ -1129,16 +1135,16 @@ class Focused(
                     if alphabet := bot.accept_one(Alphabet):
                         if bot.accept_mark("•"):
                             if pocket := bot.accept_one(Pocket):
-                                return Focused(proc, alphabet=alphabet, pocket=pocket)
+                                return SharpBody(proc, alphabet=alphabet, pocket=pocket)
 
         bot._restore_(snapshot)
 
 
-class Blurred(
+class FuzzyBody(
     KwArgsCspCell,
-    collections.namedtuple("Blurred", "proc, pocket".split(", ")),
+    collections.namedtuple("FuzzyBody", "proc, pocket".split(", ")),
 ):
-    """blurred = 'μ' proc '•' pocket"""
+    """fuzzy_body = 'μ' proc '•' pocket"""
 
     _csp_style_ = Style(first="μ {}", last=" • {}")
 
@@ -1150,7 +1156,7 @@ class Blurred(
             if proc := bot.accept_one(Proc):
                 if bot.accept_mark("•"):
                     if pocket := bot.accept_one(Pocket):
-                        return Blurred(proc, pocket=pocket)
+                        return FuzzyBody(proc, pocket=pocket)
 
         bot._restore_(snapshot)
 
@@ -1429,7 +1435,7 @@ def try_test_self_one(test):
         except SourceRepairHint as srh:
             str_srh = str(srh)
             _trace_(dict(str_srh=str_srh))
-            assert str_srh == str_exc
+            assert str_srh == str_exc, (str_srh, str_exc)
 
             return
 
@@ -1626,7 +1632,7 @@ def choose_csps_pys_pairs():
             """
         ProcDef(
             proc=Proc("VMCT"),
-            proc_body=Focused(
+            proc_body=SharpBody(
                 proc=Proc("X"),
                 alphabet=Alphabet(
                     Event("coin"),
@@ -1661,7 +1667,7 @@ def choose_csps_pys_pairs():
     return (csps, pys)
 
 
-CHAPTER_1 = """
+CHAPTER_1 = r"""
 
     #
     # Chapter 1:  Processes
@@ -1783,11 +1789,14 @@ CHAPTER_1 = """
     # (x:B → P(x))
     # (x:B → P(x)) = (y:B → P(u))
 
-    x:αP → STOP
-    αRUNNER = {coin, choc, toffee}
-    RUNNER = (x:αRUNNER → RUNNER)  # 1.1.3 X8
+    # αRUN\A = A
+    # RUN\A = (x:α → RUN\A)       # 1.1.3 X8
 
-# FIXME: sync 1.1.3 X8 to Pdf
+    # (x:{e} → P(x)) = (e → P(e))
+
+    # (a → P | b → Q ) = (x : B → R(x))
+    # B = {a,b}
+    # R(x) = if x = a then P else Q
 
 
     # 1.1.4 Mutual recursion, p.11
@@ -1840,12 +1849,26 @@ CHAPTER_1 = """
 
 """
 
-CHAPTER_2 = """
+CHAPTER_2 = r"""
     # TODO:  Tests beyond Csp Chapter 1
 """
 
 
-GLOSSARY_OF_LOGIC = """
+GLOSSARY_BEYOND_CSP = r"""
+
+Notation
+..............  Meaing
+..............  ..........................  Example
+..............  ..........................  ............
+
+#               separate source & comment
+
+\               subscript                   RUN\A  # RUN sub A
+
+"""
+
+
+GLOSSARY_OF_LOGIC = r"""
 
 Notation
 ..............  Meaing
@@ -1878,10 +1901,9 @@ P ≡             P if and only if Q          x < y  ≡  y > x
 
 ∀ x : A • P     for all x in set A, yes P
 
-# Pdf doesn't spec the '#' syntax for comments
 # Pdf doesn't choose the '∎' end-of-example/proof character for us
 # Pdf lacks the two "yes " here
-# Pdf doesn't add blanks to show nesting
+# Pdf doesn't add spaces to show nesting, such as '∨  y ≤ x' far above
 
 """
 
@@ -1913,7 +1935,7 @@ Section
 1.10.1  P sat S             (process) P satisfies (specification) S
 1.10.1  tr                  an arbitrary trace of the specified process
 
-# Pdf doesn't plainly match the spacing here, such as 'αP' and '(x:A'
+# Pdf doesn't squeeze spaces to show close association, such as 'αP' and '(x:A'
 
 # TODO: fill out the rest of GLOSSARY_OF_PROCESSES
 
