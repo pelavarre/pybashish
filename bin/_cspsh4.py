@@ -228,7 +228,9 @@ def parse_csp(csp):
 
     except Exception as exc:
 
-        if False:  # TODO: go invent more accurate strong Source Repair Hints
+        if False:
+            # TODO: go invent more accurate strong Source Repair Hints
+            # TODO: more logging for unexpected parser failure
 
             (fit, misfit) = bot._split_misfit_()
             alt_source = fit + misfit
@@ -550,18 +552,30 @@ class ParserBot:
     def __init__(self, tails):
         self.tails = list(tails)
         self.heads = list(self.tails)
+        self.contexts = list()
 
-    def _snapshot_(self):
-        """Set up '_restore_' to push back everything taken since '_snapshot_'"""
+    def __enter__(self):
+        """Back up the Tails not yet matched"""
 
-        snapshot = list(self.tails)
+        context = list(self.tails)
+        self.contexts.append(context)
 
-        return snapshot
+    def __exit__(self, *exc_info):
+        """Restore the Tails that were not yet matched at last Enter/ Commit"""
 
-    def _restore_(self, snapshot):
-        """Push back everything taken since set up by '_snapshot_'"""
+        context = self.contexts.pop()
+        self.tails[::] = context
 
-        self.tails[::] = snapshot
+    def _checkpoint_(self):
+        """Say to call Self to choose which Tails to Backup and Restore"""
+
+        return self
+
+    def _commit_(self):
+        """Say these are the Tails that were matched at last Enter/ Commit"""
+
+        _ = self.contexts.pop()
+        self.__enter__()
 
     def _split_misfit_(self):
         """Split a format of the source taken from a format of what remains"""
@@ -575,58 +589,39 @@ class ParserBot:
         return (fit, misfit)
 
     def accept_between(self, cls, head, sep, end, tail):
-        """between = head { item sep } [ item ] [ end ] tail"""
+        """between = head [ item { sep item } ] [ end ] tail"""
+        # becomes 'head { item sep } [ item ] tail' when sep = end
+
+        assert head and sep and end and tail  # nothing else yet tested
+        assert sep == end  # nothing else yet tested
 
         items = list()
+        with self._checkpoint_():
 
-        snapshot = self._snapshot_()
+            # Require Head
 
-        # Require head
+            if head and not self.accept_mark(head):
+                return
 
-        if head and not self.accept_mark(head):
-            self._restore_(snapshot)
-            return
+            # Allow one Item, or multiple items separated by Sep
 
-        # Match item { sep item }
+            no_items = list()
+            some_items = self.accept_some(cls=cls, sep=sep)  # indefinite lookahead
+            items = no_items if (some_items is None) else some_items
 
-        item = self.accept_one(cls)  # indefinite lookahead
-        if item:
-            commit = self._snapshot_()
+            # Allow End
 
-            while item:
-                commit = self._snapshot_()
-                items.append(item)
+            if end:
+                _ = self.accept_mark(end)
 
-                if sep and not self.accept_mark(sep):
-                    break
+            # Require Tail
 
-                item = self.accept_one(cls)  # more indefinite lookahead
-                if not item:
-                    break
+            if tail and self.accept_mark(tail):
 
-            self._restore_(commit)
+                # Succeed with a truthy or falsey list of Items
 
-        # Allow end
-
-        if end:
-            _ = self.accept_mark(end)
-
-        # Require tail
-
-        if tail and not self.accept_mark(tail):
-            self._restore_(snapshot)
-            return
-
-        # Succeed with a truthy or falsey list of items
-
-        return items
-
-    def accept_one(self, cls):
-        """Form and take Cls if present, else return None"""
-
-        cell = cls._accept_one_(self)
-
-        return cell
+                self._commit_()
+                return items
 
     def accept_mark(self, chars):
         """Accept a Mark, if present"""
@@ -636,27 +631,30 @@ class ParserBot:
             self.take_one_tail()
             return True
 
+    def accept_one(self, cls):
+        """Form and take Cls if present, else return None"""
+
+        cell = cls._accept_one_(self)
+        return cell
+
     def accept_some(self, cls, sep):
         """some = item { sep item }"""
 
         items = list()
 
-        item = self.accept_one(cls)
-        if not item:  # require one or more
-            return
-
-        while True:
-            commit = self._snapshot_()
+        if item := self.accept_one(cls):
             items.append(item)
 
-            if sep and not self.accept_mark(sep):  # falsey sep's not much tested
-                break
+        while True:
+            with self._checkpoint_():
+                if sep and self.accept_mark(sep):
+                    if item := self.accept_one(cls):  # indefinite lookahead
 
-            item = self.accept_one(cls)  # indefinite lookahead
-            if not item:
-                break
+                        items.append(item)
+                        self._commit_()
+                        continue
 
-        self._restore_(commit)
+            break
 
         return items
 
@@ -670,11 +668,12 @@ class ParserBot:
     def at_one(self, cls):
         """Form Cls if present, else return None, but don't take it yet"""
 
-        snapshot = self._snapshot_()
-        cell = cls._accept_one_(self)
-        self._restore_(snapshot)
+        with self._checkpoint_():
+            cell = cls._accept_one_(self)  # indefinite lookahead
+            if cell:
 
-        return cell
+                self._commit_()
+                return cell
 
     def at_mark(self, chars):
         """Return truthy if Mark present, but don't take it yet"""
@@ -878,13 +877,13 @@ class Argot(
 
     @classmethod
     def _accept_one_(cls, bot):
-        snapshot = bot._snapshot_()
+        with bot._checkpoint_():
 
-        if bot.accept_mark("α"):
-            if proc := bot.accept_one(Proc):
-                return Argot(proc)
+            if bot.accept_mark("α"):
+                if proc := bot.accept_one(Proc):
 
-        bot._restore_(snapshot)
+                    bot._commit_()
+                    return Argot(proc)
 
     # "α" "\u03B1" Greek Small Letter Alpha
 
@@ -924,14 +923,14 @@ class ArgotDef(
 
     @classmethod
     def _accept_one_(cls, bot):
-        snapshot = bot._snapshot_()
+        with bot._checkpoint_():
 
-        if argot_names := bot.accept_one(ArgotNames):
-            if bot.accept_mark("="):
-                if alphabet := bot.accept_one(Alphabet):
-                    return ArgotDef(argot_names, alphabet=alphabet)
+            if argot_names := bot.accept_one(ArgotNames):
+                if bot.accept_mark("="):
+                    if alphabet := bot.accept_one(Alphabet):
 
-        bot._restore_(snapshot)
+                        bot._commit_()
+                        return ArgotDef(argot_names, alphabet=alphabet)
 
 
 class ArgotEvent(
@@ -944,14 +943,14 @@ class ArgotEvent(
 
     @classmethod
     def _accept_one_(cls, bot):
-        snapshot = bot._snapshot_()
+        with bot._checkpoint_():
 
-        if event := bot.accept_one(Event):
-            if bot.accept_mark(":"):
-                if argot := bot.accept_one(Argot):
-                    return ArgotEvent(event, argot=argot)
+            if event := bot.accept_one(Event):
+                if bot.accept_mark(":"):
+                    if argot := bot.accept_one(Argot):
 
-        bot._restore_(snapshot)
+                        bot._commit_()
+                        return ArgotEvent(event, argot=argot)
 
 
 # sketch a fork of prongs of prolog and epilog of steps #
@@ -1026,14 +1025,15 @@ class Prong(  # Csp:  prefixes then process
 
     @classmethod
     def _accept_one_(cls, bot):
-        snapshot = bot._snapshot_()
 
-        if prolog := bot.accept_one(Prolog):
-            if bot.accept_mark("→"):
-                if epilog := bot.accept_one(Epilog):
-                    return Prong(prolog, epilog=epilog)
+        with bot._checkpoint_():
 
-        bot._restore_(snapshot)
+            if prolog := bot.accept_one(Prolog):
+                if bot.accept_mark("→"):
+                    if epilog := bot.accept_one(Epilog):
+
+                        bot._commit_()
+                        return Prong(prolog, epilog=epilog)
 
     # "→" "\u2192" Rightwards Arrow
 
@@ -1087,14 +1087,14 @@ class ProcDef(
 
     @classmethod
     def _accept_one_(cls, bot):
-        snapshot = bot._snapshot_()
+        with bot._checkpoint_():
 
-        if proc := bot.accept_one(Proc):
-            if bot.accept_mark("="):
-                if proc_body := bot.accept_one(ProcBody):
-                    return ProcDef(proc, proc_body=proc_body)
+            if proc := bot.accept_one(Proc):
+                if bot.accept_mark("="):
+                    if proc_body := bot.accept_one(ProcBody):
 
-        bot._restore_(snapshot)
+                        bot._commit_()
+                        return ProcDef(proc, proc_body=proc_body)
 
 
 class ProcBody(
@@ -1127,17 +1127,19 @@ class SharpBody(
 
     @classmethod
     def _accept_one_(cls, bot):
-        snapshot = bot._snapshot_()
+        with bot._checkpoint_():
 
-        if bot.accept_mark("μ"):
-            if proc := bot.accept_one(Proc):
-                if bot.accept_mark(":"):
-                    if alphabet := bot.accept_one(Alphabet):
-                        if bot.accept_mark("•"):
-                            if pocket := bot.accept_one(Pocket):
-                                return SharpBody(proc, alphabet=alphabet, pocket=pocket)
+            if bot.accept_mark("μ"):
+                if proc := bot.accept_one(Proc):
+                    if bot.accept_mark(":"):
+                        if alphabet := bot.accept_one(Alphabet):
+                            if bot.accept_mark("•"):
+                                if pocket := bot.accept_one(Pocket):
 
-        bot._restore_(snapshot)
+                                    bot._commit_()
+                                    return SharpBody(
+                                        proc, alphabet=alphabet, pocket=pocket
+                                    )
 
 
 class FuzzyBody(
@@ -1150,15 +1152,15 @@ class FuzzyBody(
 
     @classmethod
     def _accept_one_(cls, bot):
-        snapshot = bot._snapshot_()
+        with bot._checkpoint_():
 
-        if bot.accept_mark("μ"):
-            if proc := bot.accept_one(Proc):
-                if bot.accept_mark("•"):
-                    if pocket := bot.accept_one(Pocket):
-                        return FuzzyBody(proc, pocket=pocket)
+            if bot.accept_mark("μ"):
+                if proc := bot.accept_one(Proc):
+                    if bot.accept_mark("•"):
+                        if pocket := bot.accept_one(Pocket):
 
-        bot._restore_(snapshot)
+                            bot._commit_()
+                            return FuzzyBody(proc, pocket=pocket)
 
 
 # say what process work is pocketable #
@@ -1188,14 +1190,14 @@ class Pocket(
 
     @classmethod
     def _accept_one_(cls, bot):
-        snapshot = bot._snapshot_()
+        with bot._checkpoint_():
 
-        if bot.accept_mark("("):
-            if pocketable := bot.accept_one(Pocketable):
-                if bot.accept_mark(")"):
-                    return Pocket(pocketable)
+            if bot.accept_mark("("):
+                if pocketable := bot.accept_one(Pocketable):
+                    if bot.accept_mark(")"):
 
-        bot._restore_(snapshot)
+                        bot._commit_()
+                        return Pocket(pocketable)
 
 
 # accept any of many fragments of Csp source #
@@ -1949,7 +1951,6 @@ Section
 # To do
 #
 
-# TODO:  rewrite '_snapshot_'/''/'_restore_' as 'with' '_checkpoint_'/'_commit_'/''
 # TODO:  review grammar & grammar class names vs CspBook Pdf
 
 # TODO:  code up cogent '.format_as_trace' representations of infinities
