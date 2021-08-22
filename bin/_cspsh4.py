@@ -92,10 +92,11 @@ def eval_csp(csp):
 
 
 BLANKS_REGEX = r"(?P<blanks>[ \t\n]+)"
-COMMENT_REGEX = r"(?P<comment>#[^\n]+)"
+COMMENT_REGEX = r"(?P<comment>#[^\n]*)"
+
 MARK_REGEX = r"(?P<mark>[()*,:={|}αμ•→⟨⟩])"
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
-# NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"  # TODO: test Freak Shards
+# NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"  # TODO: test Freak Shards often
 FREAK_REGEX = r"(?P<freak>.)"
 
 SHARDS_REGEX = r"|".join(
@@ -235,6 +236,14 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
         # such as Greek Small Letter Mu:  \u03bc 'μ'
         # such as Emoji Smiling Face With Smiling Eyes:  '\U0001f60a' '😊'
 
+    def is_yarn(self):
+        """Say to knit this kind of Shard, drop the other kinds"""
+
+        key = self.key
+        if key not in "blanks comment".split():
+            assert key in "mark name freak".split(), key
+            return True
+
     def is_mark(self, chars):
         """Say if this Shard is a Mark of those Chars, or not"""
 
@@ -288,17 +297,24 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
 def knit_csp_shards(shards):
     """Form Cells of the Shards and knit them into a Graph at a Cell"""
 
-    tails = list(_ for _ in shards if str(_).strip())
+    rejoined = "".join(str(_) for _ in shards)  # rejoin to help trigger breakpoints
+    _ = rejoined
+
+    tails = list(_ for _ in shards if _.is_yarn())
     bot = KnitterBot(tails)
 
     try:
 
+        if not tails:
+            raise need_some_source()
+
         cell = bot.accept_one(Csp)
 
         if not cell:
-            raise csp_bot_hint_csp_none(bot)
+            raise need_knitter()
+
         if not bot.at_mark(""):
-            raise csp_bot_hint_csp_more(bot, cell=cell)
+            raise need_more_source()
 
     except Exception as exc:
 
@@ -980,7 +996,7 @@ class EventSet(
     def _compile_(self):
         events = self.events
 
-        csp_source_repair_hint = csp_bot_hint_uniq(
+        csp_source_repair_hint = need_distinct(
             "event names", items=list(_.name for _ in events)
         )
         if csp_source_repair_hint:
@@ -1105,7 +1121,7 @@ class ArgotNames(
     def _compile_(self):
         argots = self.argots
 
-        csp_source_repair_hint = csp_bot_hint_uniq(
+        csp_source_repair_hint = need_distinct(
             "argot names", items=list(_.proc_body.name for _ in argots)
         )
 
@@ -1272,9 +1288,10 @@ class Fork(
     def _compile_(self):
         menu = self._menu_()
 
-        csp_source_repair_hint = csp_bot_hint_uniq(
+        csp_source_repair_hint = need_distinct(
             "guard names", items=list(_.name for _ in menu)
         )
+
         if csp_source_repair_hint:
             raise csp_source_repair_hint
 
@@ -1485,24 +1502,25 @@ Csp = Sentence  # as if class Csp: ... same as Sentence ...
 #
 
 
-def csp_bot_hint_csp_none(bot):
-    _ = bot
-    raise SourceRepairHint("need a better knitter")
-
-
-def csp_bot_hint_csp_more(bot, cell):
-    _ = bot
-    _ = cell
-    raise SourceRepairHint("need more source")
-
-
-def csp_bot_hint_uniq(kind, items):
+def need_distinct(kind, items):
 
     dupes = duplicates(sorted(items))
     if dupes:
         str_dupes = " ".join(dupes)  # TODO: '" ".join' goes wrong if " " in any item
         hint = "need distinct {}, got: {}".format(kind, str_dupes)
-        raise SourceRepairHint(hint)
+        return SourceRepairHint(hint)
+
+
+def need_knitter():
+    return SourceRepairHint("need a stronger knitter")
+
+
+def need_more_source():
+    return SourceRepairHint("need more source to knit")
+
+
+def need_some_source():
+    return SourceRepairHint("need some source")
 
 
 #
@@ -1976,8 +1994,8 @@ CHAPTER_1 = r"""
     αCTR = {up, right}
     CTR = (right → up → right → right → STOP)  # 1.1.1 X3
 
-    P → Q  # no, need more source
-    x → y  # no, need more source
+    P → Q  # no, need more source to knit
+    x → y  # no, need more source to knit
 
     x → (y → STOP)
 
@@ -2049,15 +2067,15 @@ CHAPTER_1 = r"""
         | in.1 → out.1 → X
     )
 
-    P | Q  # no, need more source
+    P | Q  # no, need more source to knit
     (x → P | x → Q)  # no, need distinct guard names, got: x x
-    (x → P | (y → Q | z → R))  # no, need a better knitter
+    (x → P | (y → Q | z → R))  # no, need a stronger knitter
 
     (x → P | y → Q | z → R)
 
-    (x → P | y)  # no, need a better knitter
-    (x → P) | (y → Q)  # no, need more source
-    (x → P) | y → Q  # no, need more source
+    (x → P | y)  # no, need a stronger knitter
+    (x → P) | (y → Q)  # no, need more source to knit
+    (x → P) | y → Q  # no, need more source to knit
 
     A
     x:A
