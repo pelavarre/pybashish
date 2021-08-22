@@ -12,7 +12,7 @@ workflow:
   while :; do
     echo ... paused ...
     read
-    date; time (
+    (
       cd ~/Public/pybashish/bin && \
         echo| python3 -m pdb _cspsh4.py && \
         --black _cspsh4.py && --flake8 _cspsh4.py && python3 _cspsh4.py
@@ -52,8 +52,6 @@ def main(argv):
 
     stderr_print("")
     stderr_print("")
-    stderr_print("cspsh: hello")
-    stderr_print("")
 
     parser = compile_argdoc(epi="workflow:")
     _ = parser.parse_args(argv[1:])
@@ -71,13 +69,13 @@ def main(argv):
 def eval_csp(csp):
     """Split and knit Cells of Source Chars of Csp"""
 
-    shards = split_csp_source(csp)
+    splits = split_csp_source(csp)
 
-    (opened, closed) = balance_csp_shards(shards)
+    (opened, closed) = balance_csp_splits(splits)
     assert not closed, (closed, opened, csp)
     assert not opened, (closed, opened, csp)
 
-    cell = knit_csp_shards(shards)
+    cell = knit_csp_splits(splits)
 
     compile_csp_cell(cell)
 
@@ -85,7 +83,7 @@ def eval_csp(csp):
 
 
 #
-# Split:  Split Csp Source into blank and nonblank, balanced and unbalanced, Shards
+# Split:  Split Csp Source into blank and nonblank, balanced and unbalanced, Splits
 #
 # aka yet another Lexxer, Scanner, Splitter, Tokenizer
 #
@@ -96,10 +94,10 @@ COMMENT_REGEX = r"(?P<comment>#[^\n]*)"
 
 MARK_REGEX = r"(?P<mark>[()*,:={|}αμ•→⟨⟩])"
 NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"
-# NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"  # TODO: test Freak Shards often
+# NAME_REGEX = r"(?P<name>[A-Za-z_][.0-9A-Za-z_]*)"  # TODO: test Freak Splits often
 FREAK_REGEX = r"(?P<freak>.)"
 
-SHARDS_REGEX = r"|".join(
+SPLITS_REGEX = r"|".join(
     [BLANKS_REGEX, COMMENT_REGEX, MARK_REGEX, NAME_REGEX, FREAK_REGEX]
 )
 
@@ -108,7 +106,7 @@ CLOSING_MARKS = ")]}⟩"
 
 
 def split_csp_source(source):
-    """Split Csp Source into Csp Shards of kinds of fragments of Source Chars"""
+    """Split Csp Source into Csp Splits of kinds of fragments of Source Chars"""
 
     # Drop the "\r" out of each "\r\n"
 
@@ -116,23 +114,23 @@ def split_csp_source(source):
 
     # Split the Csp Source Chars into Csp Blanks, Comments, Marks, Names, & Freaks
 
-    matches = re.finditer(SHARDS_REGEX, string=chars)
+    matches = re.finditer(SPLITS_REGEX, string=chars)
     items = list(_to_item_from_groupdict_(_.groupdict()) for _ in matches)
 
-    shards = list(CspShard(key=k, value=v) for (k, v) in items)
+    splits = list(CspSplit(key=k, value=v) for (k, v) in items)
 
     # Require no Source Chars dropped
 
-    rejoined = "".join(str(_) for _ in shards)  # a la ._split_misfit_
+    rejoined = "".join(str(_) for _ in splits)  # a la ._split_misfit_
     assert rejoined == chars
 
     # Announce the Freaks
 
-    for shard in shards:
-        str_freak = shard.format_as_freak_char()
+    for split in splits:
+        str_freak = split.format_as_freak_char()
         if str_freak:
 
-            ch = str(shard)
+            ch = str(split)
             if ch not in split_csp_source.freaks:
                 split_csp_source.freaks.add(ch)
 
@@ -140,7 +138,7 @@ def split_csp_source(source):
 
     # Succeed
 
-    return shards
+    return splits
 
 
 split_csp_source.freaks = set()  # TODO: one set per Source, not per Python Process
@@ -156,19 +154,19 @@ def _to_item_from_groupdict_(groupdict):
     return item
 
 
-def balance_csp_shards(shards):
+def balance_csp_splits(splits):
     """Open up paired marks, close them down, & say what's missing or extra"""
 
     opened = ""
     closed = ""
     next_closing_mark = None
 
-    for shard in shards:
+    for split in splits:
 
         # Open up any opening mark
 
         for mark in OPENING_MARKS:
-            if shard.is_mark(mark):
+            if split.is_mark(mark):
                 opened += mark
                 pair_index = OPENING_MARKS.index(mark)
                 next_closing_mark = CLOSING_MARKS[pair_index]
@@ -179,7 +177,7 @@ def balance_csp_shards(shards):
 
         for mark in CLOSING_MARKS:
 
-            if shard.is_mark(mark):
+            if split.is_mark(mark):
                 if mark == next_closing_mark:
                     opened = opened[:-1]
 
@@ -195,7 +193,7 @@ def balance_csp_shards(shards):
     return (opened, closed)
 
 
-class CspShard(collections.namedtuple("CspShard", "key value".split())):
+class CspSplit(collections.namedtuple("CspSplit", "key value".split())):
     """Carry a fragment of Csp Source Code"""
 
     def __str__(self):
@@ -205,7 +203,7 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
         return str_self
 
     def format_as_freak_char(self):
-        """Say if this Shard is a Mark of those Chars, or not"""
+        """Say if this Split is a Mark of those Chars, or not"""
 
         if self.key != "freak":
             return
@@ -237,7 +235,7 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
         # such as Emoji Smiling Face With Smiling Eyes:  '\U0001f60a' '😊'
 
     def is_yarn(self):
-        """Say to knit this kind of Shard, drop the other kinds"""
+        """Say to knit this kind of Split, drop the other kinds"""
 
         key = self.key
         if key not in "blanks comment".split():
@@ -245,7 +243,7 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
             return True
 
     def is_mark(self, chars):
-        """Say if this Shard is a Mark of those Chars, or not"""
+        """Say if this Split is a Mark of those Chars, or not"""
 
         if self.key == "mark":
             if self.value == chars:
@@ -294,13 +292,13 @@ class CspShard(collections.namedtuple("CspShard", "key value".split())):
 #
 
 
-def knit_csp_shards(shards):
-    """Form Cells of the Shards and knit them into a Graph at a Cell"""
+def knit_csp_splits(splits):
+    """Form Cells of the Splits and knit them into a Graph at a Cell"""
 
-    rejoined = "".join(str(_) for _ in shards)  # rejoin to help trigger breakpoints
+    rejoined = "".join(str(_) for _ in splits)  # rejoin to help trigger breakpoints
     _ = rejoined
 
-    tails = list(_ for _ in shards if _.is_yarn())
+    tails = list(_ for _ in splits if _.is_yarn())
     bot = KnitterBot(tails)
 
     try:
@@ -623,7 +621,7 @@ class ArgsCspCell(CspCell, ArgsPythonCell):
 
 
 #
-# KnitterBot:  Knit Shards into an Abstract Syntax Tree Graph of Cells of Kwargs & Args
+# KnitterBot:  Knit Splits into an Abstract Syntax Tree Graph of Cells of Kwargs & Args
 #
 
 
@@ -633,9 +631,9 @@ class SourceRepairHint(Exception):
 
 class KnitterBot:
     """
-    Choose one Path to walk through the Shards of Source
+    Choose one Path to walk through the Splits of Source
 
-    Try one Path, then another, till some Path matches all the Shards
+    Try one Path, then another, till some Path matches all the Splits
 
     Say "take" to mean require and consume
     Say "accept" to mean take if present, else return None
@@ -645,7 +643,7 @@ class KnitterBot:
     Let the caller ask to backtrack indefinitely far,
     such as back across all of the partial match, for each incomplete match
 
-    Trust the 'def __str__' of each Shard is its fragment of Source Chars
+    Trust the 'def __str__' of each Split is its fragment of Source Chars
     """
 
     def __init__(self, tails):
@@ -785,7 +783,7 @@ class KnitterBot:
             return True
 
     def fit(self):
-        """Return an Alt Source copy of the knitted Shards of the Source"""
+        """Return an Alt Source copy of the knitted Splits of the Source"""
 
         (fit, _) = self._split_misfit_()
         return fit
@@ -799,7 +797,7 @@ class KnitterBot:
         return cls(*items)
 
     def misfit(self):
-        """Return an Alt Source copy of the not-knitted Shards of the Source"""
+        """Return an Alt Source copy of the not-knitted Splits of the Source"""
 
         (_, misfit) = self._split_misfit_()
         return misfit
@@ -827,7 +825,7 @@ class KnitterBot:
 
 
 #
-# Csp Atoms:  Plan to knit Cells of Cells of atomic single Cells of single Shards
+# Csp Atoms:  Plan to knit Cells of Cells of atomic single Cells of single Splits
 #
 
 
@@ -1768,8 +1766,8 @@ def collect_tests():
         csp_laters.append(csp_line)
         csp_joined = "\n".join(csp_laters)
 
-        shards = split_csp_source(csp_joined)
-        (opened, closed) = balance_csp_shards(shards)
+        splits = split_csp_source(csp_joined)
+        (opened, closed) = balance_csp_splits(splits)
         assert not closed, (closed, opened, csp_line)
 
         if opened:
