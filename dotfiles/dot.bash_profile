@@ -100,13 +100,13 @@ alias -- --null="--exec-echo-xe 'cat - >/dev/null'"
 
 
 #
-# Push out and merge back in configuration secrets of Bash, Zsh, etc
+# Push out and merge back in configuration secrets
 #
 
 
 function --dotfiles-dir () {
     : :: 'say where to push out the dotfiles'
-    dotfiles=$(dirname $(dirname $(which bash.py)))/dotfiles
+    dotfiles=$(dirname $(dirname $(which read.py)))/dotfiles
     dotfiles=$(cd $dotfiles && dirs -p|head -1)
     echo $dotfiles
 }
@@ -124,7 +124,7 @@ function --dotfiles-find () {
     echo .zprofile
     echo .zshrc
 
-    : 'do Not echo ".bash_profile_secrets" because local per host'
+    : 'drop from this list the secrets local to this host'
 }
 
 function --dotfiles-backup () {
@@ -237,11 +237,11 @@ function --pwd () {
 
 alias -- '--'='(set -xe; cat - >/dev/null;)'
 
-alias -- ','="--take-pbpipe-from --search-dotluck 'expand.py'"
+alias -- ','="--take-pbpipe-from --search-dotluck 'expand.py | tee /dev/tty'"
 alias -- ',,'="--pbpaste-dotluck 'cat.py -entv'"
 alias -- ',,,'="--take-input-from --search-dotluck 'cd -'"
 alias -- ',,,,'="--search-dotluck 'cd -'"
-alias -- '@'="--pbpipe 'expand.py'"
+alias -- '@'="--pbpipe 'expand.py |tee /dev/tty'"
 alias -- '@@'="--pbpaste 'cat.py -entv'"
 
 function --pbpaste () {
@@ -437,7 +437,7 @@ alias -- '?'="echo -n '? '>/dev/tty && cat -"  # press ⌃D for Yes, ⌃C for No
 function -jqd () {
     : :: 'guess the initials of the person at the keyboard'
     echo 'jqd'  # J Q Doe
-}  # redefined by ~/.bash_profile_secrets
+}  # odds on redefined by secrets local to this host
 
 function -cp () {
     : :: 'back up to date-author-time stamp'
@@ -477,6 +477,7 @@ alias -- -gf='--exec-echo-xe git fetch'
 alias -- -gd='--exec-echo-xe git diff'
 alias -- -gg='--exec-echo-xe git grep'
 alias -- -gl='--exec-echo-xe git log'
+alias -- -gp='--exec-echo-xe git prune'
 alias -- -gr='--exec-echo-xe git rebase'
 alias -- -gs='--exec-echo-xe git show'
 
@@ -490,7 +491,9 @@ alias -- -gcl='pwd && --exec-echo-xe-maybe git clean -ffxdq'
 alias -- -gco='--exec-echo-xe git checkout'  # especially:  gco -
 alias -- -gcp='--exec-echo-xe git cherry-pick'
 alias -- -gdh=--git-diff-head
+alias -- -gfp='--exec-echo-xe git fetch --prune'
 alias -- -gfr='--exec-echo-xe "(set -xe; git fetch && git rebase)"'
+alias -- -ggc='--exec-echo-xe git gc'
 alias -- -ggl='--exec-echo-xe git grep -l'  # --files-with-matches
 alias -- -gl1='--exec-echo-xe git log --decorate -1'
 alias -- -glf=--git-ls-files
@@ -505,6 +508,7 @@ alias -- -gs1='--git-show-conflict :1'
 alias -- -gs2='--git-show-conflict :2'
 alias -- -gs3='--git-show-conflict :3'
 
+alias -- -gbdd='--exec-echo-xe-maybe git branch -D'
 alias -- -gcaa='--exec-echo-xe git commit --all --amend'
 alias -- -gcaf=--git-commit-all-fixup
 alias -- -gcam='--exec-echo-xe git commit --all -m WIP-$(basename $(pwd))'
@@ -512,6 +516,8 @@ alias -- -gcls='pwd && --exec-echo-xe-maybe sudo git clean -ffxdq'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
 alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
 alias -- -glqv='--exec-echo-xe git log --decorate --oneline -19'
+alias -- -gpod='--exec-echo-xe-maybe git push origin --delete'
+alias -- -gpoh=--git-push-origin-head-maybe
 alias -- -grhu='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard @{upstream}'
 alias -- -gsno="--exec-echo-xe git show --name-only --pretty=''"
 alias -- -gssi='--exec-echo-xe git status --short --ignored'
@@ -537,7 +543,7 @@ alias -- -gpfwl='dirs -p |head -1 && --exec-echo-xe-maybe git push --force-with-
 # TODO: help with
 # git push origin HEAD:people/jqdoe/project/1234
 # git checkout -b people/jqdoe/project/1234 origin/people/jqdoe/project/1234
-# git push -d origin people/jqdoe/project/12345
+# git push origin --delete people/jqdoe/project/12345
 # git branch -D people/jqdoe/project/12345
 #
 
@@ -608,6 +614,13 @@ function --git-ls-files () {
     fi
 }
 
+
+function --git-push-origin-head-maybe () {  # for '-gpoh'
+    : :: 'Push Origin to Head Colon'
+    --exec-echo-xe-maybe git push origin HEAD:"$@"
+}
+
+
 function --git-rebase-interactive () {
     : :: 'Rebase Interactive with Auto Squash of the last 9, else of the last N'
     if [ $# = 0 ]; then
@@ -616,6 +629,7 @@ function --git-rebase-interactive () {
         --exec-echo-xe git rebase -i --autosquash "HEAD~$@"
     fi
 }
+
 
 function --git-show-conflict () {
     : :: 'Exit loud & nonzero, else Show Conflict Base, else Show choice of Conflict'
@@ -745,6 +759,11 @@ function --edit-shifted-slash () {
 
 export PATH="${PATH:+$PATH:}$HOME/bin"
 
+# TODO: more trace in how these do what they do
+
+alias -- --futurize='futurize --no-diffs -wW $PWD'
+alias -- --2to3='2to3 --no-diffs -wW $PWD'
+
 alias -- --black='~/.venvs/pips/bin/black'
 
 alias -- --flake8='~/.venvs/pips/bin/flake8 --max-line-length=999 --ignore=E203,W503'
@@ -757,7 +776,7 @@ echo $(dirs -p |head -1)/
 
 
 #
-# Fall through to patches added onto this source file later, and then to " ~/.bashrc"
+# Fall through more configuration script lines, & override some of them, or not
 #
 
 
