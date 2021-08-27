@@ -1593,6 +1593,7 @@ def exit_unless_main_doc_eq(parser):
         stderr_print("\n".join(lines))
 
         stderr_print("error: cspsh: update main argdoc to match help, or vice versa")
+        # different in each copy-edit
 
         sys.exit(1)
 

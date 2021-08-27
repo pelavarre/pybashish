@@ -519,7 +519,7 @@ alias -- -glqv='--exec-echo-xe git log --decorate --oneline -19'
 alias -- -gpod='--exec-echo-xe-maybe git push origin --delete'
 alias -- -gpoh=--git-push-origin-head-maybe
 alias -- -grhu='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard @{upstream}'
-alias -- -gsno="--exec-echo-xe git show --name-only --pretty=''"
+alias -- -gsno='--exec-echo-xe git show --name-only --pretty='
 alias -- -gssi='--exec-echo-xe git status --short --ignored'
 alias -- -gssn='--exec-echo-xe git shortlog --summary --numbered'
 alias -- -gsun='--exec-echo-xe git status --untracked-files=no'
@@ -652,34 +652,53 @@ function --git-show-conflict () {
 alias -- -e='--exec-echo-xe emacs -nw --no-splash'
 alias -- -v='--exec-echo-xe vim'
 
-function -pp () {
-    ( set -xe; python3 -i "$@" ~/.python.py; )
+function -eg () {
+    echo 'emacs -nw --no-splash $(git show --name-only --pretty=)' >&2
+    vim       $(git show --name-only --pretty=)
 }
-function -pp3 () {
+function -vg () {
+    echo 'vim $(git show --name-only --pretty=)' >&2
+    vim       $(git show --name-only --pretty=)
+}
+
+
+function -p () {
+    if [ $# = 0 ]; then
+        ( set -xe; python3 -i "$@" ~/.python.py; )
+    else
+        local F="$1"
+        (
+            set -xe
+
+            echo |python3 -m pdb $F  # explain SyntaxError's better than Black does
+
+            ~/.venvs/pips/bin/black $F
+
+            ~/.venvs/pips/bin/flake8 --max-line-length=999 --ignore=E203,W503 $F
+            # --ignore=E203  # Black '[ : ]' rules over E203 whitespace before ':'
+            # --ignore=W503  # 2017 Pep 8 and Black over W503 line break before bin op
+
+            python3 "$@"
+        )
+    fi
+}
+
+
+function -p3 () {
     ( set -xe; python3 -i "$@" ~/.python.py 'print(sys.version.split()[0])'; )
 }
-function -pp2 () {
+function -p2 () {
     ( set -xe; python2 -i "$@" ~/.python.py 'print(sys.version.split()[0])'; )
 }
 
-function -p () {
+
+function -ps () {
     (
         echo '+ source ~/bin/pips.source' >&2
         source ~/bin/pips.source
         set -xe
         python3 -i "$@" ~/.python.lazy.py
     )
-}
-function -p3 () {
-    (
-        echo '+ source ~/bin/pips.source' >&2
-        source ~/bin/pips.source
-        set -xe
-        python3 -i "$@" ~/.python.lazy.py 'print(sys.version.split()[0])'
-    )
-}
-function -p2 () {
-    -pp2 "$@"
 }
 
 
