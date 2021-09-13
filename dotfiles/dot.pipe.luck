@@ -5,18 +5,18 @@ awk '{print $NF}'  # hexdump
 hexdump -C  # hexdump
 sed 's,^,    ,'  # dent indent
 sed 's,^    ,,'  # dedent undent
-tr '[A-Z]' '[a-z]'  # lower
-sed 's,^  *,,'  # lstrip
-cat <(tr '\n' ' ') <(echo)  # join
+tr '[A-Z]' '[a-z]'  # str.lower
+sed 's,^  *,,'  # str.lstrip
+cat <(tr '\n' ' ') <(echo)  # str.join
 cat -n |sort -nr |cut -f2-  # reverse
-sed 's,  *$,,'  # rstrip
+sed 's,  *$,,'  # str.rstrip
 sort  # sort
-sed 's,  *, ,g' |tr ' ' '\n'  # split
-sed 's,^\(.*\)\([.][^.]*\)$,\1 \2,'  # splitext
-sed 's,^  *,,'  |sed 's,  *$,,'  # strip lrstrip
-tr '[a-z]' '[A-Z]'  # upper
-sed 's,[^ -~],?,g'  # ascii-else-question
-sed 's,[^ -~],,g'  # ascii-else-delete ascii-else-drop ascii-else-ignore
+xargs -n 1  # str.split
+sed 's,^\(.*\)\([.][^.]*\)$,\1 \2,'  # os.path.splitext
+sed 's,^  *,,'  |sed 's,  *$,,'  # str.strip str.lrstrip
+tr '[a-z]' '[A-Z]'  # str.upper
+sed 's,[^ -~],?,g'  # str.ascii-else-question
+sed 's,[^ -~],,g'  # str.ascii-else-delete ascii-else-drop ascii-else-ignore
 
 
 expand.py  # make plain

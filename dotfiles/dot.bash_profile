@@ -2,7 +2,7 @@
 
 _DOT_BASH_PROFILE_=~/.bash_profile  # don't export, to say if this file has been sourced
 
-date
+# date
 
 # TODO: contrast with Ubuntu ~/.bash_aliases
 
@@ -71,6 +71,19 @@ function --authorize () {
 function --exec-echo-xe-maybe () {
     --authorize "did you mean:  $@"
     --exec-echo-xe "$@"
+}
+
+function --do-loudly () {
+    : :: "say what you'll do, do what you do, say what you did, and when"
+    local xs
+
+    echo "$(date) + $@" >&2
+
+    "$@"
+    xs=$?
+
+    echo "$(date) + exit $xs"
+    return $xs
 }
 
 
@@ -157,13 +170,17 @@ function a () {
     eval $shline
 }
 
-function g () {
-    --grep "$@"
-}
-
-function p () {
-    popd
-}
+function b () { --exec-echo-xe pbpaste "$@"; }
+function c () { --exec-echo-xe pbcopy "$@"; }
+function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
+function h () { --more-history; }
+function l () { --exec-echo-xe less -FIXR "$@"; }
+function m () { --exec-echo-xe make "$@"; }
+function n () { --exec-echo-xe cat -n "|expand" "$@"; }
+function p () { --exec-echo-xe popd "$@"; }
+function s () { --exec-echo-xe sort "$@"; }
+function u () { --exec-echo-xe uniq "$@"; }
+function x () { hexdump -C"$@"; }
 
 
 #
@@ -495,10 +512,10 @@ alias -- -gfp='--exec-echo-xe git fetch --prune'
 alias -- -gfr='--exec-echo-xe "(set -xe; git fetch && git rebase)"'
 alias -- -ggc='--exec-echo-xe git gc'
 alias -- -ggl='--exec-echo-xe git grep -l'  # --files-with-matches
-alias -- -gl1='--exec-echo-xe git log --decorate -1'
+alias -- -gl1='--exec-echo-xe git log -1 --decorate'
 alias -- -glf=--git-ls-files
 alias -- -glg='--exec-echo-xe git log --no-decorate --oneline --grep'
-alias -- -glq='--exec-echo-xe git log --no-decorate --oneline -19'
+alias -- -glq='--exec-echo-xe git log -19 --no-decorate --oneline'
 alias -- -gls='--exec-echo-xe git log --stat'
 alias -- -grh='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard'
 alias -- -gri=--git-rebase-interactive
@@ -515,7 +532,8 @@ alias -- -gcam='--exec-echo-xe git commit --all -m WIP-$(basename $(pwd))'
 alias -- -gcls='pwd && --exec-echo-xe-maybe sudo git clean -ffxdq'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
 alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
-alias -- -glqv='--exec-echo-xe git log --decorate --oneline -19'
+alias -- -glq1='--exec-echo-xe git log -1 --no-decorate --oneline'
+alias -- -glqv='--exec-echo-xe git log -19 --decorate --oneline'
 alias -- -gpod='--exec-echo-xe-maybe git push origin --delete'
 alias -- -gpoh=--git-push-origin-head-maybe
 alias -- -grhu='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard @{upstream}'
@@ -529,7 +547,7 @@ alias -- -glqv0='--exec-echo-xe git log --decorate --oneline'
 alias -- -gpfwl='dirs -p |head -1 && --exec-echo-xe-maybe git push --force-with-lease'
 
 
-# TODO: solve dry run of -gco -  => git log --oneline --decorate -1 @{-1}
+# TODO: solve dry run of -gco -  => git log -1 --oneline --decorate @{-1}
 # TODO: version test results by:  git describe --always --dirty
 
 # TODO: solve -gg -ggl etc with quoted args
@@ -622,9 +640,9 @@ function --git-push-origin-head-maybe () {  # for '-gpoh'
 
 
 function --git-rebase-interactive () {
-    : :: 'Rebase Interactive with Auto Squash of the last 9, else of the last N'
+    : :: 'Rebase Interactive with Auto Squash of the last 19, else of the last N'
     if [ $# = 0 ]; then
-        --exec-echo-xe git rebase -i --autosquash HEAD~9
+        --exec-echo-xe git rebase -i --autosquash HEAD~19
     else
         --exec-echo-xe git rebase -i --autosquash "HEAD~$@"
     fi
@@ -674,7 +692,7 @@ function -p () {
 
             ~/.venvs/pips/bin/black $F
 
-            ~/.venvs/pips/bin/flake8 --max-line-length=999 --ignore=E203,W503 $F
+            ~/.venvs/pips/bin/flake8 --max-line-length=999 --max-complexity 10 --ignore=E203,W503 $F
             # --ignore=E203  # Black '[ : ]' rules over E203 whitespace before ':'
             # --ignore=W503  # 2017 Pep 8 and Black over W503 line break before bin op
 
@@ -785,7 +803,7 @@ alias -- --2to3='2to3 --no-diffs -wW $PWD'
 
 alias -- --black='~/.venvs/pips/bin/black'
 
-alias -- --flake8='~/.venvs/pips/bin/flake8 --max-line-length=999 --ignore=E203,W503'
+alias -- --flake8='~/.venvs/pips/bin/flake8 --max-line-length=999 --max-complexity 10 --ignore=E203,W503'
 : --max-line-length=999  # Black max line lengths over Flake8 max line lengths
 : --ignore=E203  # Black '[ : ]' rules over Flake8 E203 whitespace before ':'
 : --ignore=W503  # 2017 Pep 8 and Black over Flake8 W503 line break before binary op

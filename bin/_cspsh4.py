@@ -54,6 +54,7 @@ def main(argv):
     stderr_print("")
 
     parser = compile_argdoc(epi="workflow:")
+    exit_unless_main_doc_eq(parser)
     _ = parser.parse_args(argv[1:])
 
     try_test_self_some()
@@ -1528,7 +1529,7 @@ def need_some_source():
 
 # deffed in many files  # missing from docs.python.org
 def compile_argdoc(epi):
-    """Declare how to parse the command line"""
+    """Construct the 'argparse.ArgumentParser' with Epilog but without Arguments yet"""
 
     doc = __main__.__doc__
     prog = doc.strip().splitlines()[0].split()[1]
@@ -1544,7 +1545,6 @@ def compile_argdoc(epi):
         epilog=epilog,
     )
 
-    exit_unless_main_doc_eq(parser)
     return parser
 
 

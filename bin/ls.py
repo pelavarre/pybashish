@@ -94,7 +94,6 @@ def main():
 
     stdout_isatty = sys.stdout.isatty()
     stdout_columns = sys_stdout_guess_tty_columns()
-    # stderr_print("stdout_columns={}".format(stdout_columns))
 
     args = argdoc.parse_args()
     correct_args(args, stdout_isatty=stdout_isatty, stdout_columns=stdout_columns)

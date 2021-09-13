@@ -7,6 +7,8 @@
 autocmd FileType c,cpp   set softtabstop=8 shiftwidth=8 expandtab
 autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 
+:set background=light
+
 
 " Configure Vim
 
@@ -53,5 +55,17 @@ function! RStripEachLine()
     call cursor(with_line, with_col)
 endfun
 
+" £ => insert # instead, because Shift+3 at UK/US Keyboards
+" :nmap £ #
+" :imap £ #
+" :vmap £ #
+" :xmap £ #
+" :smap £ #
+" :cmap £ #
+" :omap £ #
+
+" :cnoremap £ #
+" :inoremap £ #
+:abbrev £ #
 
 " copied from:  git clone https://github.com/pelavarre/pybashish.git

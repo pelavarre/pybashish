@@ -16,6 +16,7 @@ import lazy_import
 argparse = lazy_import.lazy_module("argparse")
 collections = lazy_import.lazy_module("collections")
 dt = lazy_import.lazy_module("datetime")
+json = lazy_import.lazy_module("json")
 os = lazy_import.lazy_module("os")
 pathlib = lazy_import.lazy_module("pathlib")
 pdb = lazy_import.lazy_module("pdb")
