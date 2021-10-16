@@ -117,6 +117,9 @@ class TerminalEditor:
 
         self.quitting = None
 
+        self.driver = None
+        self.painter = None
+
         self.row = 0
         self.column = 0
         self.status = None
@@ -187,8 +190,10 @@ class TerminalEditor:
     def scroll(self):
         """Scroll to place Cursor on Screen"""
 
-        painter = self.painter
         row = self.row
+
+        painter = self.painter
+        assert painter.rows >= 1
 
         bottom_row = self.find_bottom_row()
 
@@ -381,18 +386,24 @@ class TerminalEditor:
         """Find the Bottom Row on Screen, as if enough Rows to fill Screen"""
 
         painter = self.painter
-        bottom_row = self.top_row + (painter.rows - 1) - 1
+        assert painter.rows >= 1
+
+        rows = len(self.lines)
+
+        if not rows:
+            bottom_row = 0
+        else:
+            bottom_row = self.top_row + (painter.rows - 1) - 1
+            bottom_row = min(bottom_row, rows - 1)
 
         return bottom_row
 
     def find_middle_row(self):
         """Find the Middle Row on Screen, of the Rows that carry Lines of File"""
 
-        rows = self.count_rows_in_file()
-
         top_row = self.top_row
         bottom_row = self.find_bottom_row()
-        rows_on_screen = min(bottom_row, rows) - top_row + 1
+        rows_on_screen = bottom_row - top_row + 1
 
         middle = (rows_on_screen + 1) // 2
         middle_row = top_row + middle
@@ -737,6 +748,207 @@ class TerminalEditor:
         self.column = clipped_column
 
     #
+    # Scroll to show more than one Screen of File
+    #
+
+    def do_half_screen_down(self):
+        """FIXME"""
+
+        assert False
+
+        if self.arg:
+            self.do_screen_row_down()
+        else:
+            self.half_screen_down_once()
+
+    def do_half_screen_up(self):
+        """FIXME"""
+
+        assert False
+
+        arg = self.arg
+        reps = 1 if (arg is None) else arg
+
+        for _ in range(reps):
+            self.half_screen_up_once()
+
+    def half_screen_down_once(self):
+        """FIXME"""
+
+        row = self.row
+        top_row = self.top_row
+        old_cursor_row = row - top_row
+
+        painter = self.painter
+        assert painter.rows
+
+        rows = self.count_rows_in_file()
+
+        rows_per_half_screen = (painter.rows - 1) // 2
+
+        # Choose new Top Row
+
+        top_row += rows_per_half_screen
+        top_row = min(top_row, rows - 1)
+
+        self.top_row = top_row
+
+        # Choose new Row and Column
+
+        row = top_row + old_cursor_row
+        if row > (rows - 1):
+            row = rows - 1
+
+        self.row = row
+
+        self.do_slip_dent_plus()
+
+    #
+
+    def do_screen_down(self):
+        """Show some later Screen of Rows"""
+
+        arg = self.arg
+        reps = 1 if (arg is None) else arg
+
+        for _ in range(reps):
+            self.screen_down_once()
+
+    def do_screen_up(self):
+        """Show some earlier Screen of Rows"""
+
+        arg = self.arg
+        reps = 1 if (arg is None) else arg
+
+        for _ in range(reps):
+            self.screen_up_once()
+
+    def screen_down_once(self):
+        """Show the next Screen of Rows"""
+
+        row = self.row
+        top_row = self.top_row
+
+        painter = self.painter
+        assert painter.rows >= 3
+        rows_per_screen = painter.rows - 3
+
+        rows = self.count_rows_in_file()
+        bottom_row = self.find_bottom_row()
+
+        # Step one Up if in Bottom Row already
+
+        if row == bottom_row:
+            if bottom_row:
+                row -= 1
+
+        # Choose new Top Row
+
+        top_row += rows_per_screen
+        top_row = min(top_row, rows - 1)
+
+        self.top_row = top_row
+
+        # Choose new Row and Column
+
+        if row < top_row:
+            row = top_row
+
+        self.row = row
+
+        self.do_slip_dent_plus()
+
+    def screen_up_once(self):
+        """Show the previous Screen of Rows"""
+
+        row = self.row
+        top_row = self.top_row
+
+        painter = self.painter
+        assert painter.rows >= 3
+
+        rows = self.count_rows_in_file()
+
+        rows_per_screen = painter.rows - 3
+
+        # Step one Down if in Top Row already
+
+        if row == top_row:
+            if top_row < (rows - 1):
+                row += 1
+
+        # Choose new Top Row
+
+        if rows_per_screen >= top_row:
+            top_row = 0
+        else:
+            top_row -= rows_per_screen
+
+        self.top_row = top_row
+
+        # Choose new Row and Column
+
+        bottom_row = self.find_bottom_row()
+        if row > bottom_row:
+            self.row = bottom_row
+
+        self.do_slip_dent_plus()
+
+    #
+
+    def do_screen_row_down(self):
+        """Show some later Rows of Screen"""
+
+        arg = self.arg
+        reps = 1 if (arg is None) else arg
+
+        for _ in range(reps):
+            self.screen_row_down_one()
+
+    def do_screen_row_up(self):
+        """Show some earlier Rows of Screen"""
+
+        arg = self.arg
+        reps = 1 if (arg is None) else arg
+
+        for _ in range(reps):
+            self.screen_row_up_one()
+
+    def screen_row_down_one(self):
+        """Show the next Row of Screen"""
+
+        row = self.row
+        top_row = self.top_row
+
+        rows = self.count_rows_in_file()
+
+        if top_row < (rows - 1):
+            top_row += 1
+            if row < top_row:
+                row = top_row
+
+        self.top_row = top_row
+        self.row = row
+
+    def screen_row_up_one(self):
+        """Show the previous Row of Screen"""
+
+        row = self.row
+        top_row = self.top_row
+
+        if top_row:
+            top_row -= 1
+
+            self.top_row = top_row  # TODO: ugly
+            bottom_row = self.find_bottom_row()
+
+            if row > bottom_row:
+                row = bottom_row
+
+        self.top_row = top_row
+        self.row = row
+
+    #
     # Bind sequences of keyboard input Chords to Code
     #
 
@@ -745,8 +957,14 @@ class TerminalEditor:
 
         bots_by_stdin = dict()
 
+        bots_by_stdin[b"\x02"] = self.do_screen_up  # STX, aka ⌃B, aka 2
         bots_by_stdin[b"\x03"] = self.do_help_quit  # ETX, aka ⌃C, aka 3
+        bots_by_stdin[b"\x04"] = self.do_half_screen_down  # EOT, aka ⌃D, aka 4
+        bots_by_stdin[b"\x05"] = self.do_screen_row_down  # ENQ, aka ⌃E, aka 5
+        bots_by_stdin[b"\x06"] = self.do_screen_down  # ACK, aka ⌃F, aka 6
         # bots_by_stdin[b"\x0C"] = self.repaint_every_char  # FF, aka ⌃L, aka 12
+        bots_by_stdin[b"\x15"] = self.do_half_screen_up  # NAK, aka ⌃U, aka 15
+        bots_by_stdin[b"\x19"] = self.do_screen_row_up  # EM, aka ⌃Y, aka 25
 
         bots_by_stdin[b"\x1B[A"] = self.do_step_up  # ↑ Up Arrow
         bots_by_stdin[b"\x1B[B"] = self.do_step_down  # ↓ Down Arrow
