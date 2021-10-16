@@ -92,27 +92,40 @@ def main(argv):
 
         while not editor.quitting:
 
-            # Prompt for first input
-
             shadow.redraw(lines, first=0)
-            editor.getch()
+            ch = editor.getch()
 
-            # React
+            if ch == b'G':
+                shadow.cursor_row = len(lines[:-1])
 
-            y = len(lines[:-1])
-            x = len("  1 ") + len(lines[y][:-1])
+                continue
 
-            shadow.cursor_row = y
-            shadow.cursor_column = x
+            if ch == b'0':
+                y = shadow.cursor_row
+                x = len("  1 ")
+                shadow.cursor_column = x
 
-            # Prompt for second input
+                continue
 
-            shadow.redraw(lines, first=0)
-            editor.getch()
+            if ch == b'$':
+                y = shadow.cursor_row
+                x = len("  1 ") + len(lines[y][:-1])
+                shadow.cursor_column = x
 
-            # Quit
+                continue
 
-            editor.quitting = True
+            if ch == b'Z':
+
+                shadow.redraw(lines, first=0)
+                ch = editor.getch()
+
+                if ch == b'Q':
+                    editor.quitting = True
+
+                    continue
+
+            editor.tty.write("\a")
+            editor.tty.flush()
 
     # Flush output
 
@@ -139,74 +152,56 @@ class TerminalShadow:
 
     def __init__(self, tty):
 
-        self.cursor_row = 0
-        self.cursor_column = len("  1 ")
-
-        self.rows = None
-        self.columns = None
-        self.texts = list()
-
         self.tty = tty
 
         fd = tty.fileno()
         self.fdtty = fd
 
         tty_size = os.get_terminal_size(fd)
-        self.resize(rows=tty_size.lines, columns=tty_size.columns)
+        self.rows = tty_size.lines
+        self.columns = tty_size.columns
 
-    def resize(self, rows, columns):
-        """Change the Terminal Size"""
+        self.status = ""
 
-        texts = self.texts
-
-        self.rows = rows
-        self.columns = columns
-
-        # Adjust height up, or down, or not at all
-
-        texts[::] = texts[:rows]
-        if len(texts) < rows:
-            empty_texts = (rows - len(texts)) * [""]
-            texts.extend(empty_texts)
-
-        # Reduce with, or don't
-
-        for (index, text) in enumerate(texts):
-            texts[index] = text[:columns]
+        self.cursor_row = 0
+        self.cursor_column = len("  1 ")
 
     def redraw(self, lines, first):
         """Write over the Rows of Chars"""
 
+        tty = self.tty
         rows = self.rows
         columns = self.columns
+        str_status = str(self.status)
 
         # Choose chars to display
 
-        texts = lines[first:][:rows]
+        visibles = lines[first:][:(rows - 1)]
+        texts = list(visibles)
+
         for (index, text) in enumerate(texts):
             texts[index] = text[:columns]
-        while len(texts) < rows:
+        while len(texts) < (rows - 1):
             texts.append("~")
         if texts and (len(texts[-1]) >= columns):
             texts[-1] = texts[-1][:-1]  # TODO: test writes of Lower Right Corner
 
-        for (index, text) in enumerate(texts):
+        for (index, text) in enumerate(texts[:len(visibles)]):
             texts[index] = "{:3} ".format(1 + index) + text
 
         # Display the chosen chars
 
-        self.tty.write(CUP_1_1)
+        tty.write(CUP_1_1)
         for (index, text) in enumerate(texts):
-            if index < (rows - 1):
-                self.tty.write(text + "\n\r")
-            else:
-                self.tty.write(text)
+            tty.write(text + "\n\r")
+
+        tty.write(str_status.ljust(columns - 1))
 
         y = 1 + self.cursor_row
         x = 1 + self.cursor_column
-        self.tty.write(CUP_Y_X.format(y, x))
+        tty.write(CUP_Y_X.format(y, x))
 
-        self.tty.flush()
+        tty.flush()
 
 
 class TerminalEditor:
