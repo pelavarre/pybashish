@@ -84,50 +84,9 @@ def main(argv):
     # Edit the input
 
     iobytearray = bytearray(inbytes)
-    chars = iobytearray.decode(errors="surrogateescape")
-    lines = chars.splitlines()
 
-    tty = sys.stderr
-    with TerminalDriver(tty) as driver:
-        painter = TerminalPainter(tty)
-
-        editor = TerminalEditor()
-        while not editor.quitting:
-
-            painter.redraw(lines, first=0)
-            ch = driver.getch()
-
-            if ch == b"G":
-                painter.cursor_row = len(lines[:-1])
-
-                continue
-
-            if ch == b"0":
-                y = painter.cursor_row
-                x = len("  1 ")
-                painter.cursor_column = x
-
-                continue
-
-            if ch == b"$":
-                y = painter.cursor_row
-                x = len("  1 ") + len(lines[y][:-1])
-                painter.cursor_column = x
-
-                continue
-
-            if ch == b"Z":
-
-                painter.redraw(lines, first=0)
-                ch = driver.getch()
-
-                if ch == b"Q":
-                    editor.quitting = True
-
-                    continue
-
-            tty.write("\a")
-            tty.flush()
+    editor = TerminalEditor(iobytearray)
+    editor.run_awhile()
 
     # Flush output
 
@@ -151,9 +110,94 @@ def parse_vi_argv(argv):
 class TerminalEditor:
     """Write through to the Terminal, but keep a copy"""
 
-    def __init__(self):
+    def __init__(self, iobytearray):
 
+        self.iobytearray = iobytearray
         self.quitting = None
+
+    def run_awhile(self):
+
+        iobytearray = self.iobytearray
+
+        chars = iobytearray.decode(errors="surrogateescape")
+        lines = chars.splitlines()
+
+        tty = sys.stderr
+        with TerminalDriver(tty) as driver:
+            painter = TerminalPainter(tty)
+
+            while not self.quitting:
+
+                painter.redraw(lines, first=0)
+                ch = driver.getch()
+
+                if ch == b"G":
+                    painter.cursor_row = len(lines[:-1])
+
+                    continue
+
+                if ch == b"0":
+                    y = painter.cursor_row
+                    x = len("  1 ")
+                    painter.cursor_column = x
+
+                    continue
+
+                if ch == b"$":
+                    y = painter.cursor_row
+                    x = len("  1 ") + len(lines[y][:-1])
+                    painter.cursor_column = x
+
+                    continue
+
+                if ch == b"Z":
+
+                    painter.redraw(lines, first=0)
+                    ch = driver.getch()
+
+                    if ch == b"Q":
+                        self.quitting = True
+
+                        continue
+
+                tty.write("\a")
+                tty.flush()
+
+    def _calc_bots_by_stdin(self):
+        """Enlist some bots to serve many kinds of keystrokes"""
+
+        bots_by_stdin = dict()
+
+        bots_by_stdin[None] = self._insert_stdin
+
+        bots_by_stdin[b""] = self._end_input
+
+        bots_by_stdin[b"\x03"] = self._raise_keyboard_interrupt  # ETX, aka ⌃C, aka 3
+        bots_by_stdin[b"\x04"] = self._drop_next_char  # EOT, aka ⌃D, aka 4
+        bots_by_stdin[b"\x07"] = self._ring_bell  # BEL, aka ⌃G, aka 7
+        bots_by_stdin[b"\x08"] = self._drop_char  # BS, aka ⌃H, aka 8
+        bots_by_stdin[b"\x0A"] = self._end_line  # LF, aka ⌃J, aka 10
+        # FF, aka ⌃L, aka 12
+        bots_by_stdin[b"\x0D"] = self._end_line  # CR, aka ⌃M, aka 13
+        bots_by_stdin[b"\x0E"] = self._next_history  # SO, aka ⌃N, aka 14
+        bots_by_stdin[b"\x10"] = self._previous_history  # DLE, aka ⌃P, aka 16
+        # XON, aka ⌃Q, aka 17
+        bots_by_stdin[b"\x12"] = self._reprint  # DC2, aka ⌃R, aka 18
+        # XOFF, aka ⌃S, aka 19
+        bots_by_stdin[b"\x15"] = self._drop_line  # NAK, aka ⌃U, aka 21
+        bots_by_stdin[b"\x16"] = self._quoted_insert  # ACK, aka ⌃V, aka 22
+        bots_by_stdin[b"\x17"] = self._drop_word  # ETB, aka ⌃W, aka 23
+
+        bots_by_stdin[b"\x7F"] = self._drop_char  # DEL, classically aka ⌃?, aka 127
+        # SUB, aka ⌃Z, aka 26
+        # FS, aka ⌃\, aka 28
+
+        bots_by_stdin[b"\x1B[A"] = self._previous_history  # ↑ Up Arrow
+        bots_by_stdin[b"\x1B[B"] = self._next_history  # ↓ Down Arrow
+        # bots_by_stdin[b"\x1B[C"] = self._forward_char  # ↑ Left Arrow
+        # bots_by_stdin[b"\x1B[D"] = self._backward_char  # ↑ Right Arrow
+
+        return bots_by_stdin
 
 
 class TerminalPainter:
@@ -345,42 +389,6 @@ class TerminalDriver:
 
         if rlist_ == rlist:
             return True
-
-    def _calc_bots_by_stdin(self):
-        """Enlist some bots to serve many kinds of keystrokes"""
-
-        bots_by_stdin = dict()
-
-        bots_by_stdin[None] = self._insert_stdin
-
-        bots_by_stdin[b""] = self._end_input
-
-        bots_by_stdin[b"\x03"] = self._raise_keyboard_interrupt  # ETX, aka ⌃C, aka 3
-        bots_by_stdin[b"\x04"] = self._drop_next_char  # EOT, aka ⌃D, aka 4
-        bots_by_stdin[b"\x07"] = self._ring_bell  # BEL, aka ⌃G, aka 7
-        bots_by_stdin[b"\x08"] = self._drop_char  # BS, aka ⌃H, aka 8
-        bots_by_stdin[b"\x0A"] = self._end_line  # LF, aka ⌃J, aka 10
-        # FF, aka ⌃L, aka 12
-        bots_by_stdin[b"\x0D"] = self._end_line  # CR, aka ⌃M, aka 13
-        bots_by_stdin[b"\x0E"] = self._next_history  # SO, aka ⌃N, aka 14
-        bots_by_stdin[b"\x10"] = self._previous_history  # DLE, aka ⌃P, aka 16
-        # XON, aka ⌃Q, aka 17
-        bots_by_stdin[b"\x12"] = self._reprint  # DC2, aka ⌃R, aka 18
-        # XOFF, aka ⌃S, aka 19
-        bots_by_stdin[b"\x15"] = self._drop_line  # NAK, aka ⌃U, aka 21
-        bots_by_stdin[b"\x16"] = self._quoted_insert  # ACK, aka ⌃V, aka 22
-        bots_by_stdin[b"\x17"] = self._drop_word  # ETB, aka ⌃W, aka 23
-
-        bots_by_stdin[b"\x7F"] = self._drop_char  # DEL, classically aka ⌃?, aka 127
-        # SUB, aka ⌃Z, aka 26
-        # FS, aka ⌃\, aka 28
-
-        bots_by_stdin[b"\x1B[A"] = self._previous_history  # ↑ Up Arrow
-        bots_by_stdin[b"\x1B[B"] = self._next_history  # ↓ Down Arrow
-        # bots_by_stdin[b"\x1B[C"] = self._forward_char  # ↑ Left Arrow
-        # bots_by_stdin[b"\x1B[D"] = self._backward_char  # ↑ Right Arrow
-
-        return bots_by_stdin
 
 
 #
