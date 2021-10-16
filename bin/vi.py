@@ -125,6 +125,8 @@ class TerminalEditor:
         chars = iobytearray.decode(errors="surrogateescape")
         lines = chars.splitlines(keepends=True)
         self.lines = lines
+        self.top_row = 0
+        self.set_number = None
 
         self.bots_by_stdin = self._calc_bots_by_stdin()
         self.digits = b""
@@ -152,17 +154,22 @@ class TerminalEditor:
 
             while not self.quitting:
 
-                # Prompt, take input, react
+                # Scroll, prompt, take input, react
 
+                self.scroll()
                 self.prompt()
 
                 try:
+
                     chord = self.pull_chord()
+
                 except KeyboardInterrupt:
+
                     chord = b"\x03"  # ETX, aka ⌃C, aka 3
+
                     if self.digits or self.chords:
                         self.chords += chord
-                        self.status = self.format_echo()  # just echo, no bell
+                        self.status = self.format_echo(tag="cancelled")
 
                         self.digits = b""
                         self.chords = b""
@@ -171,21 +178,45 @@ class TerminalEditor:
 
                 self.react(chord)
 
+    def scroll(self):
+        """Scroll to place Cursor on Screen"""
+
+        painter = self.painter
+        row = self.row
+
+        bottom_row = self.find_bottom_row()
+
+        # Scroll to place Cursor on Screen
+
+        if row < self.top_row:
+            self.top_row = row
+        else:
+            if row > bottom_row:
+                self.top_row = row - (painter.rows - 1) + 1
+
     def prompt(self):
         """Write over the Rows of Chars on Screen"""
 
         painter = self.painter
+
+        # Tell Painter to repaint
+
         lines = self.lines
+        top_lines = lines[self.top_row :]
+
         status = self.shout if self.shout else self.status
 
         self.status = None
         self.shout = None
 
-        painter.cursor_row = self.row
-        painter.cursor_column = len("  1 ") + self.column
+        painter.top_line_number = 1 + self.top_row
+        painter.bottom_line_number = 1 + len(lines)
+        painter.set_number = self.set_number
 
-        first = 0
-        painter.repaint(lines[first:], status=status)
+        painter.cursor_row = self.row - self.top_row
+        painter.cursor_column = self.column
+
+        painter.repaint(lines=top_lines, status=status)
 
     def react(self, chord):
         """Interpret sequences of keyboard input chords"""
@@ -208,7 +239,7 @@ class TerminalEditor:
         self.chords += chord
 
         chords = self.chords
-        self.status = self.format_echo()
+        self.status = self.format_echo(tag=None)
 
         # Else find, call, and consume the Chord
 
@@ -218,31 +249,31 @@ class TerminalEditor:
         if chords in bots_by_stdin.keys():
             bot = bots_by_stdin[chords]
         else:
+            self.status = self.format_echo("meaningless")
             bot = self.ring_bell
 
         try:
             bot()
         except KeyboardInterrupt:
-            self.digits = b""
-            self.chords = b"\x03"  # ETX, aka ⌃C, aka 3
-            self.status = self.format_echo()  # just echo, no bell
-        except Exception:
-            self.status = self.format_echo()
+            self.chords += b"\x03"  # ETX, aka ⌃C, aka 3
+            self.status = self.format_echo("cancelled as")
+        except Exception as exc:
+            self.status = self.format_echo(type(exc).__name__ + " in")
             self.ring_bell()
 
         self.digits = b""
         if not self.chording_more:
             self.chords = b""
 
-    def format_echo(self):
+    def format_echo(self, tag):
         """Echo keyboard input Digits and Chords"""
 
         digits = self.digits
         chords = self.chords
-        chars = (digits + chords).decode()
 
-        rep = repr(chars)
-        status = chars if (rep == "'{}'".format(chars)) else rep
+        status = repr(digits + chords)
+        if tag:
+            status = "{} {}".format(tag, status)
 
         return status
 
@@ -260,10 +291,12 @@ class TerminalEditor:
     def chord_more_now(self):
         """Repaint now and add another keyboard input chord now"""
 
+        self.scroll()
         self.prompt()
+
         chord = self.pull_chord()
         self.chords += chord
-        self.status = self.format_echo()
+        self.status = self.format_echo(tag=None)
 
         choice = chord.decode(errors="surrogateescape")
 
@@ -297,6 +330,16 @@ class TerminalEditor:
         self.quitting = True
 
     #
+    # Flip switches
+    #
+
+    def set_invnumber(self):
+        """Toggle Line-in-File numbers in or out"""
+
+        self.set_number = not self.set_number
+        self.status = ":set number" if self.set_number else ":set nonumber"
+
+    #
     # Focus on one Line of a File of Lines
     #
 
@@ -316,7 +359,15 @@ class TerminalEditor:
 
         return rows
 
-    def get_row_text(self):
+    def find_bottom_row(self):
+        """Find the Bottom Row on Screen"""
+
+        painter = self.painter
+        bottom_row = self.top_row + (painter.rows - 1) - 1
+
+        return bottom_row
+
+    def copy_row(self):
         """Get chars of columns in row"""
 
         line = self.lines[self.row]
@@ -405,7 +456,7 @@ class TerminalEditor:
         """Go to the column after the indent"""
         # silently ignore Arg
 
-        text = self.get_row_text()
+        text = self.copy_row()
         lstripped = text.lstrip()
         column = len(text) - len(lstripped)
 
@@ -446,7 +497,7 @@ class TerminalEditor:
 
         arg = self.arg
         columns = self.count_columns_in_row()
-        text = self.get_row_text()
+        text = self.copy_row()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -554,7 +605,7 @@ class TerminalEditor:
 
         arg = self.arg
         columns = self.count_columns_in_row()
-        text = self.get_row_text()
+        text = self.copy_row()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -641,6 +692,7 @@ class TerminalEditor:
         bots_by_stdin = dict()
 
         bots_by_stdin[b"\x03"] = self.help_quit  # ETX, aka ⌃C, aka 3
+        # bots_by_stdin[b"\x0C"] = self.repaint_every_char  # FF, aka ⌃L, aka 12
 
         bots_by_stdin[b"\x1B[A"] = self.step_up  # ↑ Up Arrow
         bots_by_stdin[b"\x1B[B"] = self.step_down  # ↓ Down Arrow
@@ -658,7 +710,6 @@ class TerminalEditor:
         bots_by_stdin[b"F"] = self.slip_rindex_chord
         bots_by_stdin[b"G"] = self.step
         bots_by_stdin[b"T"] = self.slip_rindex_chord_plus
-        bots_by_stdin[b"Z"] = self.chord_more_soon
 
         bots_by_stdin[b"^"] = self.slip_dent_plus
 
@@ -671,8 +722,14 @@ class TerminalEditor:
 
         bots_by_stdin[b"|"] = self.slip
 
+        bots_by_stdin[b"Z"] = self.chord_more_soon
         bots_by_stdin[b"ZQ"] = self.quit
         bots_by_stdin[b"ZZ"] = self.save_and_quit
+
+        # TODO: stop occupying the \ Chord Sequences
+
+        bots_by_stdin[b"\\"] = self.chord_more_soon
+        bots_by_stdin[b"\\n"] = self.set_invnumber
 
         return bots_by_stdin
 
@@ -716,10 +773,29 @@ class TerminalPainter:
         self.rows = tty_size.lines
         self.columns = tty_size.columns
 
+        self.top_line_number = 1
+        self.bottom_line_number = 1
+        self.set_number = None
+
         self.cursor_row = 0
-        self.cursor_column = len("  1 ")
+        self.cursor_column = 0
 
         self.soon = None
+
+    def format_as_line_number(self, index):
+        """Format a Row Index on Screen as a Line Number of File"""
+
+        if not self.set_number:
+
+            return ""
+
+        last_line_number = "{:3} ".format(self.bottom_line_number)
+        width = len(last_line_number)
+
+        line_number = self.top_line_number + index
+        formatted = "{:3} ".format(line_number).rjust(width)
+
+        return formatted
 
     def ring_bell_soon(self):
         """Ring the bell at end of next Repaint"""
@@ -749,10 +825,12 @@ class TerminalPainter:
             texts[-1] = texts[-1][:-1]  # TODO: test writes of Lower Right Corner
 
         for (index, text) in enumerate(texts[: len(visibles)]):
-            texts[index] = "{:3} ".format(1 + index) + text
+            str_line_number = self.format_as_line_number(index)
+            texts[index] = str_line_number + text
 
         # Write the formatted chars
 
+        tty.write(ED_2)
         tty.write(CUP_1_1)
         for (index, text) in enumerate(texts):
             tty.write(text + "\n\r")
@@ -765,7 +843,7 @@ class TerminalPainter:
         # Place the cursor
 
         y = 1 + self.cursor_row
-        x = 1 + self.cursor_column
+        x = 1 + len(str_line_number) + self.cursor_column
         tty.write(CUP_Y_X.format(y, x))
 
         # Ring the bell on demand
