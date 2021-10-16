@@ -129,14 +129,20 @@ class TerminalEditor:
         self.set_number = None
 
         self.bots_by_stdin = self._calc_bots_by_stdin()
+
         self.digits = b""
         self.arg = None
+
         self.chords = b""
+        self.chording_more = None
 
         self.slip_choice = None
         self.slip_after = None
         self.slip_redo = None
         self.slip_undo = None
+
+        self.stepping_column = None
+        self.stepping_more = None
 
     #
     # Work closely with one TerminalDriver and one TerminalPainter
@@ -244,13 +250,15 @@ class TerminalEditor:
         # Else find, call, and consume the Chord
 
         self.arg = int(digits) if digits else None
-        self.chording_more = None
 
         if chords in bots_by_stdin.keys():
             bot = bots_by_stdin[chords]
         else:
             self.status = self.format_echo("meaningless")
-            bot = self.ring_bell
+            bot = self.do_ring_bell
+
+        self.chording_more = None
+        self.stepping_more = None
 
         try:
             bot()
@@ -259,11 +267,13 @@ class TerminalEditor:
             self.status = self.format_echo("cancelled as")
         except Exception as exc:
             self.status = self.format_echo(type(exc).__name__ + " in")
-            self.ring_bell()
+            self.do_ring_bell()
 
         self.digits = b""
         if not self.chording_more:
             self.chords = b""
+        if not self.stepping_more:
+            self.stepping_column = None
 
     def format_echo(self, tag):
         """Echo keyboard input Digits and Chords"""
@@ -302,29 +312,29 @@ class TerminalEditor:
 
         return choice
 
-    def chord_more_soon(self):
+    def do_chord_more_soon(self):
         """Add another keyboard input chord, after next Repaint"""
 
         self.chording_more = True
 
-    def ring_bell(self):
+    def do_ring_bell(self):
         """Reject unwanted input"""
 
         painter = self.painter
         painter.ring_bell_soon()
 
-    def help_quit(self):
+    def do_help_quit(self):
         """Say how to exit Vi Py"""
 
         self.status = "Press ZQ to quit Vi Py without saving last changes" ""
 
-    def quit(self):  # emacs kill-emacs
+    def do_quit(self):  # emacs kill-emacs
         """Lose last changes and quit"""
 
         self.iobytearray[::] = b""
         self.quitting = True
 
-    def save_and_quit(self):  # emacs save-buffers-kill-terminal
+    def do_save_and_quit(self):  # emacs save-buffers-kill-terminal
         """Save last changes and quit"""
 
         self.quitting = True
@@ -333,7 +343,7 @@ class TerminalEditor:
     # Flip switches
     #
 
-    def set_invnumber(self):
+    def do_set_invnumber(self):
         """Toggle Line-in-File numbers in or out"""
 
         self.set_number = not self.set_number
@@ -359,14 +369,6 @@ class TerminalEditor:
 
         return rows
 
-    def find_bottom_row(self):
-        """Find the Bottom Row on Screen"""
-
-        painter = self.painter
-        bottom_row = self.top_row + (painter.rows - 1) - 1
-
-        return bottom_row
-
     def copy_row(self):
         """Get chars of columns in row"""
 
@@ -375,12 +377,34 @@ class TerminalEditor:
 
         return text
 
+    def find_bottom_row(self):
+        """Find the Bottom Row on Screen, as if enough Rows to fill Screen"""
+
+        painter = self.painter
+        bottom_row = self.top_row + (painter.rows - 1) - 1
+
+        return bottom_row
+
+    def find_middle_row(self):
+        """Find the Middle Row on Screen, of the Rows that carry Lines of File"""
+
+        rows = self.count_rows_in_file()
+
+        top_row = self.top_row
+        bottom_row = self.find_bottom_row()
+        rows_on_screen = min(bottom_row, rows) - top_row + 1
+
+        middle = (rows_on_screen + 1) // 2
+        middle_row = top_row + middle
+
+        return middle_row
+
     #
     # Say to "slip" is to place the Cursor in a Column of the Row
     #
 
-    def slip(self):  # emacs goto-char
-        """Go to first column, else to a chosen column"""
+    def do_slip(self):  # emacs goto-char
+        """Leap to first Column, else to a chosen Column"""
 
         arg = self.arg
         columns = self.count_columns_in_row()
@@ -390,7 +414,7 @@ class TerminalEditor:
 
         self.column = column
 
-    def slip_choice_redo(self):
+    def do_slip_choice_redo(self):
         """Repeat the last 'slip_index' or 'slip_rindex' once or more"""
 
         after = self.slip_after
@@ -421,7 +445,7 @@ class TerminalEditor:
 
                 raise
 
-    def slip_choice_undo(self):
+    def do_slip_choice_undo(self):
         """Undo the last 'slip_index' or 'slip_rindex' once or more"""
 
         after = self.slip_after
@@ -452,8 +476,8 @@ class TerminalEditor:
 
                 raise
 
-    def slip_dent_plus(self):
-        """Go to the column after the indent"""
+    def do_slip_dent_plus(self):
+        """Leap to the Column after the Indent"""
         # silently ignore Arg
 
         text = self.copy_row()
@@ -462,15 +486,15 @@ class TerminalEditor:
 
         self.column = column
 
-    def slip_first(self):  # emacs move-beginning-of-line
-        """Leap to the first column in row"""
+    def do_slip_first(self):  # emacs move-beginning-of-line
+        """Leap to the first Column in Row"""
 
         assert not self.arg
 
         self.column = 0
 
-    def slip_index_chord(self):
-        """Find char to right in row, once or more"""
+    def do_slip_index_chord(self):
+        """Find Char to right in Row, once or more"""
 
         choice = self.chord_more_now()
 
@@ -481,8 +505,8 @@ class TerminalEditor:
 
         self.slip_redo()
 
-    def slip_index_chord_minus(self):
-        """Find char to right in row, once or more, but then slip back one column"""
+    def do_slip_index_chord_minus(self):
+        """Find Char to Right in row, once or more, but then slip left one Column"""
 
         choice = self.chord_more_now()
 
@@ -494,6 +518,7 @@ class TerminalEditor:
         self.slip_redo()
 
     def slip_index(self):
+        """Find Char to Right in row, once or more"""
 
         arg = self.arg
         columns = self.count_columns_in_row()
@@ -524,15 +549,15 @@ class TerminalEditor:
 
         self.column = column
 
-    def slip_last(self):  # emacs move-end-of-line, but to last, not beyond end
-        """Leap to the last column in row"""
+    def do_slip_last(self):  # emacs move-end-of-line, but to last, not beyond end
+        """Leap to the last Column in Row"""
         # Vim says N'$' should mean (N-1)'j' '$'
 
         columns = self.count_columns_in_row()
         self.column = (columns - 1) if columns else 0  # goes beyond when line is empty
 
-    def slip_left(self):  # emacs left-char, backward-char
-        """Go left a column or more"""
+    def do_slip_left(self):  # emacs left-char, backward-char
+        """Slip left one Column or more"""
 
         arg = self.arg
 
@@ -543,8 +568,8 @@ class TerminalEditor:
 
         self.column -= left
 
-    def slip_more(self):
-        """Go right, then down"""
+    def do_slip_more(self):
+        """Slip right, then down"""
 
         arg = self.arg
 
@@ -563,8 +588,8 @@ class TerminalEditor:
             else:
                 break
 
-    def slip_right(self):  # emacs right-char, forward-char
-        """Go right a column or more"""
+    def do_slip_right(self):  # emacs right-char, forward-char
+        """Slip Right one Column or more"""
 
         arg = self.arg
         columns = self.count_columns_in_row()
@@ -576,8 +601,8 @@ class TerminalEditor:
 
         self.column += right
 
-    def slip_rindex_chord(self):
-        """Find char to left in row, once or more"""
+    def do_slip_rindex_chord(self):
+        """Find Char to left in Row, once or more"""
 
         choice = self.chord_more_now()
 
@@ -588,8 +613,8 @@ class TerminalEditor:
 
         self.slip_redo()
 
-    def slip_rindex_chord_plus(self):
-        """Find char to left in row, once or more, but then slip right one column"""
+    def do_slip_rindex_chord_plus(self):
+        """Find Char to left in Row, once or more, but then slip right one Column"""
 
         choice = self.chord_more_now()
 
@@ -601,7 +626,7 @@ class TerminalEditor:
         self.slip_redo()
 
     def slip_rindex(self):
-        """Find char to left in row, once or more"""
+        """Find Char to left in Row, once or more"""
 
         arg = self.arg
         columns = self.count_columns_in_row()
@@ -632,22 +657,12 @@ class TerminalEditor:
 
         self.column = column
 
-    def slip_rindex_plus(self):
-        """Find char to left in row, once or more, but then also go column right once"""
-
-        columns = self.count_columns_in_row()
-
-        self.slip_rindex()
-
-        assert self.column < (columns - 1)
-        self.column += 1
-
     #
     # Say to "step" is to place the Cursor in a Line of the File
     #
 
-    def step(self):  # emacs goto-line
-        """Go to last row, else to a chosen row"""
+    def do_step(self):  # emacs goto-line
+        """Leap to last Row, else to a chosen Row"""
 
         arg = self.arg
         rows = self.count_rows_in_file()
@@ -656,9 +671,10 @@ class TerminalEditor:
         row = min(row, rows - 1)
 
         self.row = row
+        self.clip_step_column()
 
-    def step_down(self):  # emacs next-line
-        """Go down a row or more"""
+    def do_step_down(self):  # emacs next-line
+        """Step down a Row or more"""
 
         arg = self.arg
         rows = self.count_rows_in_file()
@@ -669,9 +685,28 @@ class TerminalEditor:
         down = min(down, rows - 1 - self.row)
 
         self.row += down
+        self.clip_step_column()
 
-    def step_up(self):  # emacs previous-line
-        """Go up a row or more"""
+    def do_step_max_low(self):
+        """Leap to first Word of Bottom Row on Screen"""
+
+        self.row = self.find_bottom_row()
+        self.do_slip_dent_plus()
+
+    def do_step_max_high(self):
+        """Leap to first Word of Top Row on Screen"""
+
+        self.row = self.top_row
+        self.do_slip_dent_plus()
+
+    def do_step_to_middle(self):
+        """Leap to first Word of Middle Row on Screen"""
+
+        self.row = self.find_middle_row()
+        self.do_slip_dent_plus()
+
+    def do_step_up(self):  # emacs previous-line
+        """Step up a Row or more"""
 
         arg = self.arg
 
@@ -681,6 +716,25 @@ class TerminalEditor:
         up = min(up, self.row)
 
         self.row -= up
+        self.clip_step_column()
+
+    def clip_step_column(self):
+        """Restore Column when lost only by Stepping from Row to Row"""
+
+        column = self.column
+        columns = self.count_columns_in_row()
+
+        self.stepping_more = True
+        if not self.stepping_column:
+            self.stepping_column = column
+
+        stepping_column = self.stepping_column
+        if stepping_column is not None:
+            clipped_column = min(self.stepping_column, columns - 1)
+        else:
+            clipped_column = min(column, columns - 1)
+
+        self.column = clipped_column
 
     #
     # Bind sequences of keyboard input Chords to Code
@@ -691,45 +745,51 @@ class TerminalEditor:
 
         bots_by_stdin = dict()
 
-        bots_by_stdin[b"\x03"] = self.help_quit  # ETX, aka ⌃C, aka 3
+        bots_by_stdin[b"\x03"] = self.do_help_quit  # ETX, aka ⌃C, aka 3
         # bots_by_stdin[b"\x0C"] = self.repaint_every_char  # FF, aka ⌃L, aka 12
 
-        bots_by_stdin[b"\x1B[A"] = self.step_up  # ↑ Up Arrow
-        bots_by_stdin[b"\x1B[B"] = self.step_down  # ↓ Down Arrow
-        bots_by_stdin[b"\x1B[C"] = self.slip_right  # → Right Arrow
-        bots_by_stdin[b"\x1B[D"] = self.slip_left  # ← Left Arrow
+        bots_by_stdin[b"\x1B[A"] = self.do_step_up  # ↑ Up Arrow
+        bots_by_stdin[b"\x1B[B"] = self.do_step_down  # ↓ Down Arrow
+        bots_by_stdin[b"\x1B[C"] = self.do_slip_right  # → Right Arrow
+        bots_by_stdin[b"\x1B[D"] = self.do_slip_left  # ← Left Arrow
 
-        bots_by_stdin[b" "] = self.slip_more
-        bots_by_stdin[b"$"] = self.slip_last
-        bots_by_stdin[b","] = self.slip_choice_undo
+        bots_by_stdin[b" "] = self.do_slip_more
+        bots_by_stdin[b"$"] = self.do_slip_last
+        bots_by_stdin[b","] = self.do_slip_choice_undo
 
-        bots_by_stdin[b"0"] = self.slip_first
+        bots_by_stdin[b"0"] = self.do_slip_first
 
-        bots_by_stdin[b";"] = self.slip_choice_redo
+        bots_by_stdin[b";"] = self.do_slip_choice_redo
 
-        bots_by_stdin[b"F"] = self.slip_rindex_chord
-        bots_by_stdin[b"G"] = self.step
-        bots_by_stdin[b"T"] = self.slip_rindex_chord_plus
+        bots_by_stdin[b"F"] = self.do_slip_rindex_chord
+        bots_by_stdin[b"G"] = self.do_step
+        bots_by_stdin[b"H"] = self.do_step_max_high
+        bots_by_stdin[b"M"] = self.do_step_to_middle
+        bots_by_stdin[b"L"] = self.do_step_max_low
+        bots_by_stdin[b"T"] = self.do_slip_rindex_chord_plus
 
-        bots_by_stdin[b"^"] = self.slip_dent_plus
+        bots_by_stdin[b"Z"] = self.do_chord_more_soon
+        bots_by_stdin[b"ZQ"] = self.do_quit
+        bots_by_stdin[b"ZZ"] = self.do_save_and_quit
 
-        bots_by_stdin[b"f"] = self.slip_index_chord
-        bots_by_stdin[b"j"] = self.step_down
-        bots_by_stdin[b"k"] = self.step_up
-        bots_by_stdin[b"h"] = self.slip_left
-        bots_by_stdin[b"l"] = self.slip_right
-        bots_by_stdin[b"t"] = self.slip_index_chord_minus
+        bots_by_stdin[b"^"] = self.do_slip_dent_plus
 
-        bots_by_stdin[b"|"] = self.slip
+        bots_by_stdin[b"f"] = self.do_slip_index_chord
+        bots_by_stdin[b"j"] = self.do_step_down
+        bots_by_stdin[b"k"] = self.do_step_up
+        bots_by_stdin[b"h"] = self.do_slip_left
+        bots_by_stdin[b"l"] = self.do_slip_right
+        bots_by_stdin[b"t"] = self.do_slip_index_chord_minus
 
-        bots_by_stdin[b"Z"] = self.chord_more_soon
-        bots_by_stdin[b"ZQ"] = self.quit
-        bots_by_stdin[b"ZZ"] = self.save_and_quit
+        # bots_by_stdin[b"z"] = self.do_chord_more_soon
+        # bots_by_stdin[b"zz"] = self.do_scroll_to_center
+
+        bots_by_stdin[b"|"] = self.do_slip
 
         # TODO: stop occupying the \ Chord Sequences
 
-        bots_by_stdin[b"\\"] = self.chord_more_soon
-        bots_by_stdin[b"\\n"] = self.set_invnumber
+        bots_by_stdin[b"\\"] = self.do_chord_more_soon
+        bots_by_stdin[b"\\n"] = self.do_set_invnumber
 
         return bots_by_stdin
 
