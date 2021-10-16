@@ -88,10 +88,30 @@ def main(argv):
     lines = chars.splitlines()
 
     with TerminalEditor() as editor:
-        editor.shadow.redraw(lines, first=0)
+        shadow = editor.shadow
+
         while not editor.quitting:
+
+            # Prompt for first input
+
+            shadow.redraw(lines, first=0)
             editor.getch()
-            editor.getch()  # twice
+
+            # React
+
+            y = len(lines[:-1])
+            x = len("  1 ") + len(lines[y][:-1])
+
+            shadow.cursor_row = y
+            shadow.cursor_column = x
+
+            # Prompt for second input
+
+            shadow.redraw(lines, first=0)
+            editor.getch()
+
+            # Quit
+
             editor.quitting = True
 
     # Flush output
@@ -119,11 +139,11 @@ class TerminalShadow:
 
     def __init__(self, tty):
 
-        self.cursor_column = 0
         self.cursor_row = 0
+        self.cursor_column = len("  1 ")
 
-        self.columns = None
         self.rows = None
+        self.columns = None
         self.texts = list()
 
         self.tty = tty
@@ -132,15 +152,15 @@ class TerminalShadow:
         self.fdtty = fd
 
         tty_size = os.get_terminal_size(fd)
-        self.resize(tty_size.columns, rows=tty_size.lines)
+        self.resize(rows=tty_size.lines, columns=tty_size.columns)
 
-    def resize(self, columns, rows):
+    def resize(self, rows, columns):
         """Change the Terminal Size"""
 
         texts = self.texts
 
-        self.columns = columns
         self.rows = rows
+        self.columns = columns
 
         # Adjust height up, or down, or not at all
 
@@ -157,8 +177,8 @@ class TerminalShadow:
     def redraw(self, lines, first):
         """Write over the Rows of Chars"""
 
-        columns = self.columns
         rows = self.rows
+        columns = self.columns
 
         # Choose chars to display
 
@@ -170,11 +190,17 @@ class TerminalShadow:
         if texts and (len(texts[-1]) >= columns):
             texts[-1] = texts[-1][:-1]  # TODO: test writes of Lower Right Corner
 
+        for (index, text) in enumerate(texts):
+            texts[index] = "{:3} ".format(1 + index) + text
+
         # Display the chosen chars
 
         self.tty.write(CUP_1_1)
-        for text in texts:
-            self.tty.write(text + "\n\r")
+        for (index, text) in enumerate(texts):
+            if index < (rows - 1):
+                self.tty.write(text + "\n\r")
+            else:
+                self.tty.write(text)
 
         y = 1 + self.cursor_row
         x = 1 + self.cursor_column
