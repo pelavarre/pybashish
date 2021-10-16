@@ -12,7 +12,7 @@ emacs -nw ~/.emacs
 #
 # emacs  ⌃A ⌃B ⌃E ⌃F ⌥M  => move column
 # emacs  ⌥B ⌥F ⌥A ⌥E  => move small word, sentence
-# emacs  ⌃P ⌃N ⌥< ⌥> ⌥G  => move row, goto line
+# emacs  ⌃P ⌃N ⌥< ⌥> ⌥GG  => move row, goto line
 # emacs  fixme  => move match balance pair
 #
 # emacs  ⌃D ⌥D ⌥Z  => delete char, word, to char
@@ -34,7 +34,7 @@ emacs -nw ~/.emacs
 #
 # emacs  ⌃X⌃C ⌥~⌃X⌃C  => quit emacs, without saving
 #
-# emacs  ⌃Hk... ⌃Hkb ⌃Ha...   => help for key chord sequence, for all keys, for word
+# emacs  ⌃Hk... ⌃Hb ⌃Ha...   => help for key chord sequence, for all keys, for word
 # emacs  ⌥X ⌥:  => execute-extended-command, eval-expression  => dry run ~/.emacs
 #
 # emacs  ⌃Z  => as per terminal or no-op

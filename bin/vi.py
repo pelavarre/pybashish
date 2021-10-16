@@ -16,7 +16,8 @@ quirks:
   defaults to read Stdin and write Stdout
 
 examples:
-  ls |bin/vi.py -  # to quit, strike the two keyboard chords Z Q
+  ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
+  cat bin/vi.py |bin/vi.py
 """
 
 import argparse
@@ -113,66 +114,551 @@ class TerminalEditor:
     def __init__(self, iobytearray):
 
         self.iobytearray = iobytearray
+
         self.quitting = None
 
-    def run_awhile(self):
-
-        iobytearray = self.iobytearray
+        self.row = 0
+        self.column = 0
+        self.status = None
+        self.shout = None
 
         chars = iobytearray.decode(errors="surrogateescape")
-        lines = chars.splitlines()
+        lines = chars.splitlines(keepends=True)
+        self.lines = lines
+
+        self.bots_by_stdin = self._calc_bots_by_stdin()
+        self.digits = b""
+        self.arg = None
+        self.chords = b""
+
+        self.slip_choice = None
+        self.slip_after = None
+        self.slip_redo = None
+        self.slip_undo = None
+
+    #
+    # Work closely with one TerminalDriver and one TerminalPainter
+    #
+
+    def run_awhile(self):
+        """Prompt, take input, react, repeat till quit"""
+
+        # Repeat till quit
 
         tty = sys.stderr
         with TerminalDriver(tty) as driver:
-            painter = TerminalPainter(tty)
+            self.driver = driver
+            self.painter = TerminalPainter(tty)
 
             while not self.quitting:
 
-                painter.redraw(lines, first=0)
-                ch = driver.getch()
+                # Prompt, take input, react
 
-                if ch == b"G":
-                    painter.cursor_row = len(lines[:-1])
+                self.prompt()
 
-                    continue
+                try:
+                    chord = self.pull_chord()
+                except KeyboardInterrupt:
+                    chord = b"\x03"  # ETX, aka ⌃C, aka 3
+                    if self.digits or self.chords:
+                        self.chords += chord
+                        self.status = self.format_echo()  # just echo, no bell
 
-                if ch == b"0":
-                    y = painter.cursor_row
-                    x = len("  1 ")
-                    painter.cursor_column = x
-
-                    continue
-
-                if ch == b"$":
-                    y = painter.cursor_row
-                    x = len("  1 ") + len(lines[y][:-1])
-                    painter.cursor_column = x
-
-                    continue
-
-                if ch == b"Z":
-
-                    painter.redraw(lines, first=0)
-                    ch = driver.getch()
-
-                    if ch == b"Q":
-                        self.quitting = True
+                        self.digits = b""
+                        self.chords = b""
 
                         continue
 
-                tty.write("\a")
-                tty.flush()
+                self.react(chord)
+
+    def prompt(self):
+        """Write over the Rows of Chars on Screen"""
+
+        painter = self.painter
+        lines = self.lines
+        status = self.shout if self.shout else self.status
+
+        self.status = None
+        self.shout = None
+
+        painter.cursor_row = self.row
+        painter.cursor_column = len("  1 ") + self.column
+
+        first = 0
+        painter.repaint(lines[first:], status=status)
+
+    def react(self, chord):
+        """Interpret sequences of keyboard input chords"""
+
+        bots_by_stdin = self.bots_by_stdin
+
+        # Accept decimal digits as a prefix before any Chords
+
+        if not self.chords:
+            if (chord in b"123456789") or (self.digits and (chord == b"0")):
+                self.digits += chord
+                self.status = self.digits.decode()
+
+                return
+
+        digits = self.digits
+
+        # Append the keyboard input Chord
+
+        self.chords += chord
+
+        chords = self.chords
+        self.status = self.format_echo()
+
+        # Else find, call, and consume the Chord
+
+        self.arg = int(digits) if digits else None
+        self.chording_more = None
+
+        if chords in bots_by_stdin.keys():
+            bot = bots_by_stdin[chords]
+        else:
+            bot = self.ring_bell
+
+        try:
+            bot()
+        except KeyboardInterrupt:
+            self.digits = b""
+            self.chords = b"\x03"  # ETX, aka ⌃C, aka 3
+            self.status = self.format_echo()  # just echo, no bell
+        except Exception:
+            self.status = self.format_echo()
+            self.ring_bell()
+
+        self.digits = b""
+        if not self.chording_more:
+            self.chords = b""
+
+    def format_echo(self):
+        """Echo keyboard input Digits and Chords"""
+
+        digits = self.digits
+        chords = self.chords
+        chars = (digits + chords).decode()
+
+        rep = repr(chars)
+        status = chars if (rep == "'{}'".format(chars)) else rep
+
+        return status
+
+    def pull_chord(self):
+        """Block till the keyboard input Digit or Chord, else raise KeyboardInterrupt"""
+
+        driver = self.driver
+
+        chord = driver.getch()
+        if chord == b"\x03":
+            raise KeyboardInterrupt()
+
+        return chord
+
+    def chord_more_now(self):
+        """Repaint now and add another keyboard input chord now"""
+
+        self.prompt()
+        chord = self.pull_chord()
+        self.chords += chord
+        self.status = self.format_echo()
+
+        choice = chord.decode(errors="surrogateescape")
+
+        return choice
+
+    def chord_more_soon(self):
+        """Add another keyboard input chord, after next Repaint"""
+
+        self.chording_more = True
+
+    def ring_bell(self):
+        """Reject unwanted input"""
+
+        painter = self.painter
+        painter.ring_bell_soon()
+
+    def help_quit(self):
+        """Say how to exit Vi Py"""
+
+        self.status = "Press ZQ to quit Vi Py without saving last changes" ""
+
+    def quit(self):  # emacs kill-emacs
+        """Lose last changes and quit"""
+
+        self.iobytearray[::] = b""
+        self.quitting = True
+
+    def save_and_quit(self):  # emacs save-buffers-kill-terminal
+        """Save last changes and quit"""
+
+        self.quitting = True
+
+    #
+    # Focus on one Line of a File of Lines
+    #
+
+    def count_columns(self):
+        """Count columns in row"""
+
+        line = self.lines[self.row]
+        text = line.splitlines()[0]
+        columns = len(text)
+
+        return columns
+
+    def count_rows(self):
+        """Count rows in file"""
+
+        rows = len(self.lines)
+
+        return rows
+
+    def get_row_text(self):
+        """Count columns in row"""
+
+        line = self.lines[self.row]
+        text = line.splitlines()[0]
+
+        return text
+
+    #
+    # Say to "slip" is to place the Cursor in a Column of the Row
+    #
+
+    def slip(self):  # emacs goto-char
+        """Go to first column, else to a chosen column"""
+
+        arg = self.arg
+        columns = self.count_columns()
+
+        column = 0 if (arg is None) else (arg - 1)
+        column = min(column, columns - 1)
+
+        self.column = column
+
+    def slip_choice_redo(self):
+        """Repeat the last 'slip_index' or 'slip_rindex' once or more"""
+
+        after = self.slip_after
+        if not after:
+
+            self.slip_redo()
+
+        else:
+
+            columns = self.count_columns()
+
+            with_column = self.column
+            try:
+
+                if after < 0:
+                    assert self.column < (columns - 1)
+                    self.column += 1
+                elif after > 0:
+                    assert self.column
+                    self.column -= 1
+
+                self.slip_redo()
+
+                assert self.column != with_column
+
+            except Exception:
+                self.column = with_column
+
+                raise
+
+    def slip_choice_undo(self):
+        """Undo the last 'slip_index' or 'slip_rindex' once or more"""
+
+        after = self.slip_after
+        if not after:
+
+            self.slip_undo()
+
+        else:
+
+            columns = self.count_columns()
+
+            with_column = self.column
+            try:
+
+                if after < 0:
+                    assert self.column
+                    self.column -= 1
+                elif after > 0:
+                    assert self.column < (columns - 1)
+                    self.column += 1
+
+                self.slip_undo()
+
+                assert self.column != with_column
+
+            except Exception:
+                self.column = with_column
+
+                raise
+
+    def slip_dent_plus(self):
+        """Go to the column after the indent"""
+        # silently ignore Arg
+
+        text = self.get_row_text()
+        lstripped = text.lstrip()
+        column = len(text) - len(lstripped)
+
+        self.column = column
+
+    def slip_first(self):  # emacs move-beginning-of-line
+        """Leap to the first column in row"""
+
+        assert not self.arg
+
+        self.column = 0
+
+    def slip_index_chord(self):
+        """Find char to right in row, once or more"""
+
+        choice = self.chord_more_now()
+
+        self.slip_choice = choice
+        self.slip_after = 0
+        self.slip_redo = self.slip_index
+        self.slip_undo = self.slip_rindex
+
+        self.slip_redo()
+
+    def slip_index_chord_minus(self):
+        """Find char to right in row, once or more, but then slip back one column"""
+
+        choice = self.chord_more_now()
+
+        self.slip_choice = choice
+        self.slip_after = -1
+        self.slip_redo = self.slip_index
+        self.slip_undo = self.slip_rindex
+
+        self.slip_redo()
+
+    def slip_index(self):
+
+        arg = self.arg
+        columns = self.count_columns()
+        text = self.get_row_text()
+
+        choice = self.slip_choice
+        after = self.slip_after
+
+        count = 1 if (arg is None) else arg
+
+        # Index each
+
+        column = self.column
+
+        for _ in range(count):
+
+            assert column < (columns - 1)
+            column += 1
+
+            right = text[column:].index(choice)
+            column += right
+
+        # Option to slip back one column
+
+        if after:
+            assert column
+            column -= 1
+
+        self.column = column
+
+    def slip_last(self):  # emacs move-end-of-line, but to last, not beyond end
+        """Leap to the last column in row"""
+        # Vim says N'$' should mean (N-1)'j' '$'
+
+        columns = self.count_columns()
+        self.column = (columns - 1) if columns else 0  # goes beyond when line is empty
+
+    def slip_left(self):  # emacs left-char, backward-char
+        """Go left a column or more"""
+
+        arg = self.arg
+
+        assert self.column
+
+        left = 1 if (arg is None) else arg
+        left = min(left, self.column)
+
+        self.column -= left
+
+    def slip_right(self):  # emacs right-char, forward-char
+        """Go right a column or more"""
+
+        arg = self.arg
+        columns = self.count_columns()
+
+        assert self.column < (columns - 1)
+
+        right = 1 if (arg is None) else arg
+        right = min(right, columns - 1 - self.column)
+
+        self.column += right
+
+    def slip_rindex_chord(self):
+        """Find char to left in row, once or more"""
+
+        choice = self.chord_more_now()
+
+        self.slip_choice = choice
+        self.slip_after = 0
+        self.slip_redo = self.slip_rindex
+        self.slip_undo = self.slip_index
+
+        self.slip_redo()
+
+    def slip_rindex_chord_plus(self):
+        """Find char to left in row, once or more, but then slip right one column"""
+
+        choice = self.chord_more_now()
+
+        self.slip_choice = choice
+        self.slip_after = +1
+        self.slip_redo = self.slip_rindex
+        self.slip_undo = self.slip_index
+
+        self.slip_redo()
+
+    def slip_rindex(self):
+        """Find char to left in row, once or more"""
+
+        arg = self.arg
+        columns = self.count_columns()
+        text = self.get_row_text()
+
+        choice = self.slip_choice
+        after = self.slip_after
+
+        count = 1 if (arg is None) else arg
+
+        # R-Index each
+
+        column = self.column
+
+        for _ in range(count):
+
+            assert column
+            column -= 1
+
+            column = text[: (column + 1)].rindex(choice)
+
+        # Option to slip right one column
+
+        if after:
+
+            assert column < (columns - 1)
+            column += 1
+
+        self.column = column
+
+    def slip_rindex_plus(self):
+        """Find char to left in row, once or more, but then also go column right once"""
+
+        columns = self.count_columns()
+
+        self.slip_rindex()
+
+        assert self.column < (columns - 1)
+        self.column += 1
+
+    #
+    # Say to "step" is to place the Cursor in a Line of the File
+    #
+
+    def step(self):  # emacs goto-line
+        """Go to last row, else to a chosen row"""
+
+        arg = self.arg
+        rows = self.count_rows()
+
+        row = (rows - 1) if (arg is None) else (arg - 1)
+        row = min(row, rows - 1)
+
+        self.row = row
+
+    def step_down(self):  # emacs next-line
+        """Go down a row or more"""
+
+        arg = self.arg
+        rows = self.count_rows()
+
+        assert self.row < (rows - 1)
+
+        down = 1 if (arg is None) else arg
+        down = min(down, rows - 1 - self.row)
+
+        self.row += down
+
+    def step_up(self):  # emacs previous-line
+        """Go up a row or more"""
+
+        arg = self.arg
+
+        assert self.row
+
+        up = 1 if (arg is None) else arg
+        up = min(up, self.row)
+
+        self.row -= up
+
+    #
+    # Bind sequences of keyboard input Chords to Code
+    #
 
     def _calc_bots_by_stdin(self):
         """Enlist some bots to serve many kinds of keystrokes"""
 
         bots_by_stdin = dict()
 
-        bots_by_stdin[None] = self._insert_stdin
+        bots_by_stdin[b"\x03"] = self.help_quit  # ETX, aka ⌃C, aka 3
 
-        bots_by_stdin[b""] = self._end_input
+        bots_by_stdin[b"\x1B[A"] = self.step_up  # ↑ Up Arrow
+        bots_by_stdin[b"\x1B[B"] = self.step_down  # ↓ Down Arrow
+        bots_by_stdin[b"\x1B[C"] = self.slip_right  # → Right Arrow
+        bots_by_stdin[b"\x1B[D"] = self.slip_left  # ← Left Arrow
 
-        bots_by_stdin[b"\x03"] = self._raise_keyboard_interrupt  # ETX, aka ⌃C, aka 3
+        bots_by_stdin[b"$"] = self.slip_last
+        bots_by_stdin[b","] = self.slip_choice_undo
+
+        bots_by_stdin[b"0"] = self.slip_first
+
+        bots_by_stdin[b";"] = self.slip_choice_redo
+
+        bots_by_stdin[b"F"] = self.slip_rindex_chord
+        bots_by_stdin[b"G"] = self.step
+        bots_by_stdin[b"T"] = self.slip_rindex_chord_plus
+        bots_by_stdin[b"Z"] = self.chord_more_soon
+
+        bots_by_stdin[b"^"] = self.slip_dent_plus
+
+        bots_by_stdin[b"f"] = self.slip_index_chord
+        bots_by_stdin[b"j"] = self.step_down
+        bots_by_stdin[b"k"] = self.step_up
+        bots_by_stdin[b"h"] = self.slip_left
+        bots_by_stdin[b"l"] = self.slip_right
+        bots_by_stdin[b"t"] = self.slip_index_chord_minus
+
+        bots_by_stdin[b"|"] = self.slip
+
+        bots_by_stdin[b"ZQ"] = self.quit
+        bots_by_stdin[b"ZZ"] = self.save_and_quit
+
+        return bots_by_stdin
+
+    def _scratch_space_for_sourcelines_coming_back_soon(self):
+
+        _ = r"""
+
         bots_by_stdin[b"\x04"] = self._drop_next_char  # EOT, aka ⌃D, aka 4
         bots_by_stdin[b"\x07"] = self._ring_bell  # BEL, aka ⌃G, aka 7
         bots_by_stdin[b"\x08"] = self._drop_char  # BS, aka ⌃H, aka 8
@@ -192,16 +678,11 @@ class TerminalEditor:
         # SUB, aka ⌃Z, aka 26
         # FS, aka ⌃\, aka 28
 
-        bots_by_stdin[b"\x1B[A"] = self._previous_history  # ↑ Up Arrow
-        bots_by_stdin[b"\x1B[B"] = self._next_history  # ↓ Down Arrow
-        # bots_by_stdin[b"\x1B[C"] = self._forward_char  # ↑ Left Arrow
-        # bots_by_stdin[b"\x1B[D"] = self._backward_char  # ↑ Right Arrow
-
-        return bots_by_stdin
+        """
 
 
 class TerminalPainter:
-    """Write through to the Terminal, but keep a copy"""
+    """Paint a Screen of Rows of Chars"""
 
     def __init__(self, tty):
 
@@ -214,23 +695,30 @@ class TerminalPainter:
         self.rows = tty_size.lines
         self.columns = tty_size.columns
 
-        self.status = ""
-
         self.cursor_row = 0
         self.cursor_column = len("  1 ")
 
-    def redraw(self, lines, first):
-        """Write over the Rows of Chars"""
+        self.soon = None
+
+    def ring_bell_soon(self):
+        """Ring the bell at end of next Repaint"""
+
+        self.soon = "\a"
+
+    def repaint(self, lines, status):
+        """Write over the Rows of Chars on Screen"""
 
         tty = self.tty
         rows = self.rows
         columns = self.columns
-        str_status = str(self.status)
 
-        # Choose chars to display
+        visibles = lines[: (rows - 1)]
+        texts = list(_.splitlines()[0] for _ in visibles)
 
-        visibles = lines[first:][: (rows - 1)]
-        texts = list(visibles)
+        soon = self.soon
+        self.soon = None
+
+        # Format chars to display
 
         for (index, text) in enumerate(texts):
             texts[index] = text[:columns]
@@ -242,17 +730,29 @@ class TerminalPainter:
         for (index, text) in enumerate(texts[: len(visibles)]):
             texts[index] = "{:3} ".format(1 + index) + text
 
-        # Display the chosen chars
+        # Write the formatted chars
 
         tty.write(CUP_1_1)
         for (index, text) in enumerate(texts):
             tty.write(text + "\n\r")
 
+        # Show status
+
+        str_status = "" if (status is None) else str(status)
         tty.write(str_status.ljust(columns - 1))
+
+        # Place the cursor
 
         y = 1 + self.cursor_row
         x = 1 + self.cursor_column
         tty.write(CUP_Y_X.format(y, x))
+
+        # Ring the bell on demand
+
+        if soon:
+            tty.write(soon)
+
+        # Flush it all now
 
         tty.flush()
 
