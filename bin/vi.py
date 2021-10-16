@@ -29,7 +29,7 @@ import termios
 import tty
 
 
-# Name Terminal Output magic
+# Name some Terminal Output magic
 
 ESC = "\x1B"  # Escape
 CSI = ESC + "["  # Control Sequence Introducer (CSI)
@@ -50,7 +50,7 @@ _CURSES_INITSCR_ = SMCUP + ED_2 + CUP_1_1
 _CURSES_ENDWIN_ = RMCUP
 
 
-# Name Terminal Input magic
+# Name some Terminal Input magic
 
 C0_CONTROL_STDINS = set(chr(codepoint).encode() for codepoint in range(0x00, 0x20))
 C0_CONTROL_STDINS.add(chr(0x7F).encode())
@@ -87,45 +87,47 @@ def main(argv):
     chars = iobytearray.decode(errors="surrogateescape")
     lines = chars.splitlines()
 
-    with TerminalEditor() as editor:
-        shadow = editor.shadow
+    tty = sys.stderr
+    with TerminalDriver(tty) as driver:
+        painter = TerminalPainter(tty)
 
+        editor = TerminalEditor()
         while not editor.quitting:
 
-            shadow.redraw(lines, first=0)
-            ch = editor.getch()
+            painter.redraw(lines, first=0)
+            ch = driver.getch()
 
-            if ch == b'G':
-                shadow.cursor_row = len(lines[:-1])
+            if ch == b"G":
+                painter.cursor_row = len(lines[:-1])
 
                 continue
 
-            if ch == b'0':
-                y = shadow.cursor_row
+            if ch == b"0":
+                y = painter.cursor_row
                 x = len("  1 ")
-                shadow.cursor_column = x
+                painter.cursor_column = x
 
                 continue
 
-            if ch == b'$':
-                y = shadow.cursor_row
+            if ch == b"$":
+                y = painter.cursor_row
                 x = len("  1 ") + len(lines[y][:-1])
-                shadow.cursor_column = x
+                painter.cursor_column = x
 
                 continue
 
-            if ch == b'Z':
+            if ch == b"Z":
 
-                shadow.redraw(lines, first=0)
-                ch = editor.getch()
+                painter.redraw(lines, first=0)
+                ch = driver.getch()
 
-                if ch == b'Q':
+                if ch == b"Q":
                     editor.quitting = True
 
                     continue
 
-            editor.tty.write("\a")
-            editor.tty.flush()
+            tty.write("\a")
+            tty.flush()
 
     # Flush output
 
@@ -137,7 +139,6 @@ def parse_vi_argv(argv):
     """Convert a Vi Sys ArgV to an Args Namespace, or print some Help and quit"""
 
     parser = compile_argdoc(epi="quirks")
-
     parser.add_argument("FILE", nargs="?", help="a file to edit")
 
     exit_unless_doc_eq(parser)
@@ -147,7 +148,15 @@ def parse_vi_argv(argv):
     return args
 
 
-class TerminalShadow:
+class TerminalEditor:
+    """Write through to the Terminal, but keep a copy"""
+
+    def __init__(self):
+
+        self.quitting = None
+
+
+class TerminalPainter:
     """Write through to the Terminal, but keep a copy"""
 
     def __init__(self, tty):
@@ -176,7 +185,7 @@ class TerminalShadow:
 
         # Choose chars to display
 
-        visibles = lines[first:][:(rows - 1)]
+        visibles = lines[first:][: (rows - 1)]
         texts = list(visibles)
 
         for (index, text) in enumerate(texts):
@@ -186,7 +195,7 @@ class TerminalShadow:
         if texts and (len(texts[-1]) >= columns):
             texts[-1] = texts[-1][:-1]  # TODO: test writes of Lower Right Corner
 
-        for (index, text) in enumerate(texts[:len(visibles)]):
+        for (index, text) in enumerate(texts[: len(visibles)]):
             texts[index] = "{:3} ".format(1 + index) + text
 
         # Display the chosen chars
@@ -204,30 +213,31 @@ class TerminalShadow:
         tty.flush()
 
 
-class TerminalEditor:
+class TerminalDriver:
     r"""
     Emulate a glass teletype at Stdio, such as the 1978 DEC VT100 Video Terminal
 
-    Wrap "tty.setraw" to read ⌃@ ⌃C ⌃D ⌃J ⌃M ⌃T ⌃Z ⌃\ etc as themselves,
+    Apply Terminal Input Magic to read ⌃@ ⌃C ⌃D ⌃J ⌃M ⌃T ⌃Z ⌃\ etc as themselves,
     not as SIGINT SIGINFO SIGQUIT etc
 
-    Compare Bash "bind -p", Zsh "bindkey", Bash "stty -a", and Unicode-Org U0000.pdf
+    Apply Terminal Output Magic to write the XTerm Alt Screen without Scrollback,
+    in place of the XTerm Main Screen with Scrollback
+
+    Compare Bash 'bind -p', Zsh 'bindkey', Bash 'stty -a', and Unicode-Org U0000.pdf
+
+    Compare Bash 'vim' and 'less -FIXR'
     """
 
-    def __init__(self):
+    def __init__(self, tty):
 
-        self.tty = None
+        self.tty = tty
+
         self.fdtty = None
         self.with_termios = None
-
-        self.shadow = None
         self.inputs = None
 
-        self.quitting = None
-
     def __enter__(self):
-
-        self.tty = sys.stderr
+        """Connect Keyboard and switch Screen to XTerm Alt Screen"""
 
         self.tty.flush()
 
@@ -240,11 +250,10 @@ class TerminalEditor:
             self.tty.write(_CURSES_INITSCR_)
             self.tty.flush()
 
-            self.shadow = TerminalShadow(tty=self.tty)
-
         return self
 
     def __exit__(self, *exc_info):
+        """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
         (_, exc, _) = exc_info
 
@@ -260,9 +269,9 @@ class TerminalEditor:
             termios.tcsetattr(self.fdtty, when, attributes)
 
     def getch(self):
-        """Block to fetch next char of paste, next keystroke, or empty end-of-input"""
+        """Block to fetch next Char of Paste, next Keystroke, or empty Eof"""
 
-        # Block to fetch next keystroke, if no paste already queued
+        # Block to fetch next Keystroke, if no Paste already queued
 
         inputs = "" if (self.inputs is None) else self.inputs
         if not inputs:
@@ -275,7 +284,7 @@ class TerminalEditor:
 
             inputs = stdin.decode()
 
-        # Pick an Esc [ X sequence apart from more paste
+        # Pick a CSI Esc [ sequence apart from more Paste
 
         if len(inputs) >= 3:
             if inputs[:2] == (ESC_CHAR + "["):
@@ -285,8 +294,8 @@ class TerminalEditor:
 
                 return stdin
 
-        # Fetch next char of paste
-        # such as ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑  # Control Option Alt Shift Command, Left Right Down Up Arrows
+        # Fetch next whole Char of Paste, such as
+        # ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑  # Control Option Alt Shift Command, Left Right Down Up Arrows
 
         stdin = inputs[:1].encode()
         self.inputs = inputs[1:]
@@ -294,16 +303,16 @@ class TerminalEditor:
         return stdin
 
     def _pull_stdin(self):
-        """Pull a burst of paste, else one slow single keystroke, else empty at Eof"""
+        """Pull a burst of Paste, else one slow single Keystroke, else empty at Eof"""
 
-        # Block to fetch one more byte (or fetch no bytes at end of input when Stdin is not Tty)
+        # Block to fetch one more byte
+        # (or fetch no bytes at end of input when Stdin is not Tty)
 
         stdin = os.read(self.tty.fileno(), 1)
         assert stdin or not self.with_termios
 
-        # Call for more, while available, while line not closed, if Stdin is or is not Tty
-        # Trust no multibyte character encoding contains b"\r" or b"\n", as is true for UTF-8
-        # (Solving the case of this trust violated will never be worthwhile?)
+        # Call for more, while available, while line not closed
+        # Trust no multibyte char encoding contains b"\r" or b"\n" (as per UTF-8)
 
         calls = 1
         while stdin and (b"\r" not in stdin) and (b"\n" not in stdin):
@@ -322,14 +331,10 @@ class TerminalEditor:
 
         assert calls <= len(stdin) if self.with_termios else (len(stdin) + 1)
 
-        if False:  # FIXME: configure logging
-            with open("trace.txt", mode="a") as appending:
-                appending.write("read._pull_stdin: {} {}\n".format(calls, repr(stdin)))
-
         return stdin
 
     def kbhit(self):
-        """Wait till next key struck, or a burst of paste pasted"""
+        """Wait till next Keystroke, or next burst of Paste pasted"""
 
         rlist = [self.tty]
         wlist = list()
@@ -340,30 +345,6 @@ class TerminalEditor:
 
         if rlist_ == rlist:
             return True
-
-    def putch(self, chars):
-        """Print one or more decoded Basic Latin character or decode C0 Control code"""
-
-        for ch in chars:
-            self.shadow.putch(ch)
-            if self.with_termios:
-                self.tty.write(ch)
-
-        self.tty.flush()
-
-    def _insert_chars(self, chars):
-        """Add chars to the shline"""
-
-        for ch in chars:
-
-            stdin = ch.encode()
-            caret_echo = "^{}".format(chr(stdin[0] ^ X40_CONTROL_MASK))
-            echo = caret_echo if (stdin in C0_CONTROL_STDINS) else ch
-
-            self.chars.append(ch)
-            self.echoes.append(echo)
-
-            self.putch(echo)
 
     def _calc_bots_by_stdin(self):
         """Enlist some bots to serve many kinds of keystrokes"""
@@ -400,136 +381,6 @@ class TerminalEditor:
         # bots_by_stdin[b"\x1B[D"] = self._backward_char  # ↑ Right Arrow
 
         return bots_by_stdin
-
-    def _join_shline(self):
-        """Catenate the chars of the shline, on demand"""
-
-        shline = "".join(self.chars)
-
-        return shline
-
-    def _drop_char(self, stdin):  # aka Stty "erase", aka Bind "backward-delete-char"
-        """Undo just the last insert of one char, no matter how it echoed out"""
-
-        if not self.echoes:
-            return
-
-        echo = self.echoes[-1]
-
-        width = len(echo)
-        backing = width * "\b"
-        blanking = width * " "
-
-        self.echoes = self.echoes[:-1]
-        self.chars = self.chars[:-1]
-        self.putch(f"{backing}{blanking}{backing}")
-
-    def _drop_line(self, stdin):  # aka Stty "kill" many, aka Bind "unix-line-discard"
-        """Undo all the inserts of chars since the start of line"""
-
-        if not self.echoes:
-            self._ring_bell(stdin)
-            return
-
-        while self.echoes:
-            self._drop_char(stdin)
-
-    def _drop_next_char(self, stdin):
-        """End the input if line empty, else drop the next char, else ring bell"""
-
-        if not self.chars:
-            return self._end_input(stdin)
-
-        pass  # FIXME: code up the ← Left Arrow, to make drop-next-char possible
-
-        self._ring_bell(stdin)
-
-    def _drop_word(self, stdin):  # aka Stty "werase" many, aka Bind "unix-word-rubout"
-        """Undo all the inserts of chars since the start of the last word"""
-
-        if not self.echoes:
-            self._ring_bell(stdin)
-            return
-
-        while self.echoes and self.echoes[-1] == " ":
-            self._drop_char(stdin)
-
-        while self.echoes and self.echoes[-1] != " ":
-            self._drop_char(stdin)
-
-    def _end_input(self, stdin):
-        """End the input and the shline"""
-
-        if not self.echoes:
-            self.putch("^D")  # FIXME: second of two "^D"
-
-        self.putch("\r\n")
-
-        quitting = ""  # not "\n" there
-        return quitting
-
-    def _end_line(self, stdin):
-        """End the shline"""
-
-        self.putch("\r\n")  # echo ending the shline
-
-        quitting = "\n"
-        return quitting
-
-    def _insert_stdin(self, stdin):  # aka Bash "bind -p | grep self-insert"
-        """Add the codepoint of the keystroke"""
-
-        ch = stdin.decode()
-        self._insert_chars(ch)
-
-    def _log_stdin(self, stdin):
-        """Disclose the encoding of a meaningless keystroke"""
-
-        echoable = "".join("<{}>".format(codepoint) for codepoint in stdin)
-        self.echoes.append(echoable)
-        self.putch(echoable)
-
-    def _next_history(self, stdin):
-        """Step forward in time, but skip over blank lines, except at ends of history"""
-
-        stepped = False
-        while self.lines:
-
-            new_shline = self.lines[-1]
-            self.lines = self.lines[:-1]
-
-            self._drop_line(stdin)
-            self._insert_chars(new_shline)  # FIXME: insert only last next choice
-            stepped = True
-
-            if new_shline.strip():
-                return
-
-        if not stepped:
-            self._ring_bell(stdin)
-
-    def _quoted_insert(self, stdin):
-        """Add any one keystroke to the shline"""
-
-        next_stdin = self.getch()  # such as the b"\x1B[A" ↑ Up Arrow
-        next_char = next_stdin.decode()
-        self._insert_chars(next_char)
-
-    def _raise_keyboard_interrupt(self, stdin):  # aka Stty "intr" SIGINT
-        """Raise KeyboardInterrupt"""
-
-        raise KeyboardInterrupt()  # FIXME: also SIGINFO, SIGUSR1, SIGSUSP, SIGQUIT
-
-    def _reprint(self, stdin):
-        """Restart the edit of this line"""
-
-        self.putch("^R\r\n")  # strike this one out, open up another
-        self.putch("".join(self.echoes))  # echo as if inserting each char of this line
-
-    def _ring_bell(self, stdin):
-        """Ring the Terminal bell"""
-
-        self.putch("\a")
 
 
 #
