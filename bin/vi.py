@@ -300,7 +300,7 @@ class TerminalEditor:
     # Focus on one Line of a File of Lines
     #
 
-    def count_columns(self):
+    def count_columns_in_row(self):
         """Count columns in row"""
 
         line = self.lines[self.row]
@@ -309,7 +309,7 @@ class TerminalEditor:
 
         return columns
 
-    def count_rows(self):
+    def count_rows_in_file(self):
         """Count rows in file"""
 
         rows = len(self.lines)
@@ -317,7 +317,7 @@ class TerminalEditor:
         return rows
 
     def get_row_text(self):
-        """Count columns in row"""
+        """Get chars of columns in row"""
 
         line = self.lines[self.row]
         text = line.splitlines()[0]
@@ -332,7 +332,7 @@ class TerminalEditor:
         """Go to first column, else to a chosen column"""
 
         arg = self.arg
-        columns = self.count_columns()
+        columns = self.count_columns_in_row()
 
         column = 0 if (arg is None) else (arg - 1)
         column = min(column, columns - 1)
@@ -349,7 +349,7 @@ class TerminalEditor:
 
         else:
 
-            columns = self.count_columns()
+            columns = self.count_columns_in_row()
 
             with_column = self.column
             try:
@@ -380,7 +380,7 @@ class TerminalEditor:
 
         else:
 
-            columns = self.count_columns()
+            columns = self.count_columns_in_row()
 
             with_column = self.column
             try:
@@ -445,7 +445,7 @@ class TerminalEditor:
     def slip_index(self):
 
         arg = self.arg
-        columns = self.count_columns()
+        columns = self.count_columns_in_row()
         text = self.get_row_text()
 
         choice = self.slip_choice
@@ -477,7 +477,7 @@ class TerminalEditor:
         """Leap to the last column in row"""
         # Vim says N'$' should mean (N-1)'j' '$'
 
-        columns = self.count_columns()
+        columns = self.count_columns_in_row()
         self.column = (columns - 1) if columns else 0  # goes beyond when line is empty
 
     def slip_left(self):  # emacs left-char, backward-char
@@ -492,11 +492,31 @@ class TerminalEditor:
 
         self.column -= left
 
+    def slip_more(self):
+        """Go right, then down"""
+
+        arg = self.arg
+
+        columns = self.count_columns_in_row()
+        rows = self.count_rows_in_file()
+        assert (self.column < (columns - 1)) or (self.row < (rows - 1))
+
+        ahead = 1 if (arg is None) else arg
+        for _ in range(ahead):
+
+            if self.column < (self.count_columns_in_row() - 1):
+                self.column += 1
+            elif self.row < (self.count_rows_in_file() - 1):
+                self.column = 0
+                self.row += 1
+            else:
+                break
+
     def slip_right(self):  # emacs right-char, forward-char
         """Go right a column or more"""
 
         arg = self.arg
-        columns = self.count_columns()
+        columns = self.count_columns_in_row()
 
         assert self.column < (columns - 1)
 
@@ -533,7 +553,7 @@ class TerminalEditor:
         """Find char to left in row, once or more"""
 
         arg = self.arg
-        columns = self.count_columns()
+        columns = self.count_columns_in_row()
         text = self.get_row_text()
 
         choice = self.slip_choice
@@ -564,7 +584,7 @@ class TerminalEditor:
     def slip_rindex_plus(self):
         """Find char to left in row, once or more, but then also go column right once"""
 
-        columns = self.count_columns()
+        columns = self.count_columns_in_row()
 
         self.slip_rindex()
 
@@ -579,7 +599,7 @@ class TerminalEditor:
         """Go to last row, else to a chosen row"""
 
         arg = self.arg
-        rows = self.count_rows()
+        rows = self.count_rows_in_file()
 
         row = (rows - 1) if (arg is None) else (arg - 1)
         row = min(row, rows - 1)
@@ -590,7 +610,7 @@ class TerminalEditor:
         """Go down a row or more"""
 
         arg = self.arg
-        rows = self.count_rows()
+        rows = self.count_rows_in_file()
 
         assert self.row < (rows - 1)
 
@@ -627,6 +647,7 @@ class TerminalEditor:
         bots_by_stdin[b"\x1B[C"] = self.slip_right  # → Right Arrow
         bots_by_stdin[b"\x1B[D"] = self.slip_left  # ← Left Arrow
 
+        bots_by_stdin[b" "] = self.slip_more
         bots_by_stdin[b"$"] = self.slip_last
         bots_by_stdin[b","] = self.slip_choice_undo
 
