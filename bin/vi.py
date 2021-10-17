@@ -12,13 +12,22 @@ optional arguments:
   -h, --help  show this help message and exit
 
 quirks:
-  doesn't implement most of Vim
   defaults to read Stdin and write Stdout
+  defines only the most basic keyboard input chords of Bash Less/ Vim
+    ZQ ZZ  => how to exit Vi Py
+    ⌃C ↑ ↓ → ← Space  => natural enough
+    0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
+    j k G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => leap to row, leap to line
+    1234567890  => repeat
+    ⌃B ⌃E ⌃F ⌃Y  => scroll rows
+    \n  => toggle line numbers on and off
 
 examples:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
   cat bin/vi.py |bin/vi.py
 """
+# we define ⌃L to redraw, yes, and don't mention it above, on purpose
+
 
 import argparse
 import difflib
@@ -70,8 +79,13 @@ X20_LOWER_MASK = 0x20
 X20_UPPER_MASK = 0x20
 
 
+#
+# Run from the Command Line
+#
+
+
 def main(argv):
-    """Run from the command line"""
+    """Run from the Command Line"""
 
     parse_vi_argv(argv)
 
@@ -99,11 +113,18 @@ def parse_vi_argv(argv):
     """Convert a Vi Sys ArgV to an Args Namespace, or print some Help and quit"""
 
     parser = compile_argdoc(epi="quirks")
-    parser.add_argument("FILE", nargs="?", help="a file to edit")
+    parser.add_argument("file", metavar="FILE", nargs="?", help="a file to edit")
 
     exit_unless_doc_eq(parser)
 
     args = parser.parse_args(argv[1:])
+
+    if args.file is not None:
+        if args.file != "-":
+            stderr_print(
+                "vi.py: error: file '-' meaning '/dev/stdin' implemented, nothing else yet"
+            )
+            sys.exit(2)
 
     return args
 
@@ -210,8 +231,6 @@ class TerminalEditor:
 
         painter = self.painter
 
-        # Tell Painter to repaint
-
         lines = self.lines
         top_lines = lines[self.top_row :]
 
@@ -227,7 +246,7 @@ class TerminalEditor:
         painter.cursor_row = self.row - self.top_row
         painter.cursor_column = self.column
 
-        painter.repaint(lines=top_lines, status=status)
+        painter.paint_diffs(lines=top_lines, status=status)
 
     def react(self, chord):
         """Interpret sequences of keyboard input chords"""
@@ -250,7 +269,7 @@ class TerminalEditor:
         self.chords += chord
 
         chords = self.chords
-        self.status = self.format_echo(tag=None)
+        self.status = self.format_echo(tag=None)  # a la Vim :set showcmd
 
         # Else find, call, and consume the Chord
 
@@ -286,7 +305,7 @@ class TerminalEditor:
         digits = self.digits
         chords = self.chords
 
-        status = repr(digits + chords)
+        status = repr(digits + chords)  # TODO: Black Repr of b"\x0A" etc (not b"\x0a")
         if tag:
             status = "{} {}".format(tag, status)
 
@@ -304,7 +323,7 @@ class TerminalEditor:
         return chord
 
     def chord_more_now(self):
-        """Repaint now and add another keyboard input chord now"""
+        """Add another keyboard input chord, but now, not soon"""
 
         self.scroll()
         self.prompt()
@@ -318,9 +337,15 @@ class TerminalEditor:
         return choice
 
     def do_chord_more_soon(self):
-        """Add another keyboard input chord, after next Repaint"""
+        """Add another keyboard input Chord after the next Prompt"""
 
         self.chording_more = True
+
+    def do_repaint_soon(self):
+        """Clear the screen and repaint every char"""
+
+        painter = self.painter
+        painter.repaint_soon()
 
     def do_ring_bell(self):
         """Reject unwanted input"""
@@ -698,6 +723,20 @@ class TerminalEditor:
         self.row += down
         self.clip_step_column()
 
+    def do_step_down_dent_plus(self):
+        """Step down a Row or more, but land just past the Indent"""
+
+        self.do_step_down()
+        self.do_slip_dent_plus()
+
+    def do_step_down_minus_dent_plus(self):
+
+        if self.arg and (self.arg > 1):
+            self.arg -= 1  # mutate
+            self.do_step_down()
+
+        self.do_slip_dent_plus()
+
     def do_step_max_low(self):
         """Leap to first Word of Bottom Row on Screen"""
 
@@ -728,6 +767,12 @@ class TerminalEditor:
 
         self.row -= up
         self.clip_step_column()
+
+    def do_step_up_dent_plus(self):
+        """Step up a Row or more, but land just past the Indent"""
+
+        self.do_step_up()
+        self.do_slip_dent_plus()
 
     def clip_step_column(self):
         """Restore Column when lost only by Stepping from Row to Row"""
@@ -962,7 +1007,11 @@ class TerminalEditor:
         bots_by_stdin[b"\x04"] = self.do_half_screen_down  # EOT, aka ⌃D, aka 4
         bots_by_stdin[b"\x05"] = self.do_screen_row_down  # ENQ, aka ⌃E, aka 5
         bots_by_stdin[b"\x06"] = self.do_screen_down  # ACK, aka ⌃F, aka 6
-        # bots_by_stdin[b"\x0C"] = self.repaint_every_char  # FF, aka ⌃L, aka 12
+        bots_by_stdin[b"\x0A"] = self.do_step_down  # LF, aka ⌃J, aka 10
+        bots_by_stdin[b"\x0C"] = self.do_repaint_soon  # FF, aka ⌃L, aka 12
+        bots_by_stdin[b"\x0D"] = self.do_step_down_dent_plus  # CR, aka ⌃M, aka 13
+        bots_by_stdin[b"\x0E"] = self.do_step_down  # SO, aka ⌃N, aka 14
+        bots_by_stdin[b"\x10"] = self.do_step_up  # DLE, aka ⌃P, aka 16
         bots_by_stdin[b"\x15"] = self.do_half_screen_up  # NAK, aka ⌃U, aka 15
         bots_by_stdin[b"\x19"] = self.do_screen_row_up  # EM, aka ⌃Y, aka 25
 
@@ -973,7 +1022,9 @@ class TerminalEditor:
 
         bots_by_stdin[b" "] = self.do_slip_more
         bots_by_stdin[b"$"] = self.do_slip_last
+        bots_by_stdin[b"+"] = self.do_step_down_dent_plus
         bots_by_stdin[b","] = self.do_slip_choice_undo
+        bots_by_stdin[b"-"] = self.do_step_up_dent_plus
 
         bots_by_stdin[b"0"] = self.do_slip_first
 
@@ -991,6 +1042,7 @@ class TerminalEditor:
         bots_by_stdin[b"ZZ"] = self.do_save_and_quit
 
         bots_by_stdin[b"^"] = self.do_slip_dent_plus
+        bots_by_stdin[b"_"] = self.do_step_down_minus_dent_plus
 
         bots_by_stdin[b"f"] = self.do_slip_index_chord
         bots_by_stdin[b"j"] = self.do_step_down
@@ -1010,31 +1062,6 @@ class TerminalEditor:
         bots_by_stdin[b"\\n"] = self.do_set_invnumber
 
         return bots_by_stdin
-
-    def _scratch_space_for_sourcelines_coming_back_soon(self):
-
-        _ = r"""
-
-        bots_by_stdin[b"\x04"] = self._drop_next_char  # EOT, aka ⌃D, aka 4
-        bots_by_stdin[b"\x07"] = self._ring_bell  # BEL, aka ⌃G, aka 7
-        bots_by_stdin[b"\x08"] = self._drop_char  # BS, aka ⌃H, aka 8
-        bots_by_stdin[b"\x0A"] = self._end_line  # LF, aka ⌃J, aka 10
-        # FF, aka ⌃L, aka 12
-        bots_by_stdin[b"\x0D"] = self._end_line  # CR, aka ⌃M, aka 13
-        bots_by_stdin[b"\x0E"] = self._next_history  # SO, aka ⌃N, aka 14
-        bots_by_stdin[b"\x10"] = self._previous_history  # DLE, aka ⌃P, aka 16
-        # XON, aka ⌃Q, aka 17
-        bots_by_stdin[b"\x12"] = self._reprint  # DC2, aka ⌃R, aka 18
-        # XOFF, aka ⌃S, aka 19
-        bots_by_stdin[b"\x15"] = self._drop_line  # NAK, aka ⌃U, aka 21
-        bots_by_stdin[b"\x16"] = self._quoted_insert  # ACK, aka ⌃V, aka 22
-        bots_by_stdin[b"\x17"] = self._drop_word  # ETB, aka ⌃W, aka 23
-
-        bots_by_stdin[b"\x7F"] = self._drop_char  # DEL, classically aka ⌃?, aka 127
-        # SUB, aka ⌃Z, aka 26
-        # FS, aka ⌃\, aka 28
-
-        """
 
 
 class TerminalPainter:
@@ -1075,12 +1102,17 @@ class TerminalPainter:
 
         return formatted
 
+    def repaint_soon(self):
+        """Slowly paint over every Char, to show bugs in just painting Diff's"""
+
+        pass  # no work to do here, till we change 'def repaint' to
+
     def ring_bell_soon(self):
         """Ring the bell at end of next Repaint"""
 
         self.soon = "\a"
 
-    def repaint(self, lines, status):
+    def paint_diffs(self, lines, status):
         """Write over the Rows of Chars on Screen"""
 
         tty = self.tty
@@ -1102,6 +1134,7 @@ class TerminalPainter:
         if texts and (len(texts[-1]) >= columns):
             texts[-1] = texts[-1][:-1]  # TODO: test writes of Lower Right Corner
 
+        str_line_number = self.format_as_line_number(1)
         for (index, text) in enumerate(texts[: len(visibles)]):
             str_line_number = self.format_as_line_number(index)
             texts[index] = str_line_number + text
@@ -1203,7 +1236,7 @@ class TerminalDriver:
 
                 return stdin
 
-            inputs = stdin.decode()
+            inputs = stdin.decode(errors="surrogateescape")
 
         # Pick a CSI Esc [ sequence apart from more Paste
 
