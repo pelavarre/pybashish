@@ -41,7 +41,7 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 # vim  >x <x  => dent/dedent
 # vim  !x  => pipe bash, such as {}!G or 1G!G
 #
-# vim  zb zt zz ⌃B ⌃D ⌃E ⌃F ⌃U ⌃Y  => scroll rows
+# vim  zb zt zz ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
 # vim  ⌃Wo ⌃WW ⌃Ww ⌃]  => close others, previous, next, goto link
 # vim  ⌃^  => replace panel with previous buffer
 #

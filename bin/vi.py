@@ -15,18 +15,19 @@ quirks:
   defaults to read Stdin and write Stdout
   defines only the most basic keyboard input chords of Bash Less/ Vim
     ZQ ZZ  => how to exit Vi Py
-    ⌃C ↑ ↓ → ← Space  => natural enough
+    ⌃C Up Down Right Left Space Delete Return  => natural enough
     0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
     j k G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => leap to row, leap to line
     1234567890  => repeat
-    ⌃B ⌃E ⌃F ⌃Y  => scroll rows
+    ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
     \n  => toggle line numbers on and off
 
 examples:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
   cat bin/vi.py |bin/vi.py
 """
-# we define ⌃L to redraw, yes, and don't mention it above, on purpose
+# we do define the arcane ⌃L to redraw, but we don't mention it in the help
+# we also don't mention ⌃D ⌃U till they stop raising NotImplementedError
 
 
 import argparse
@@ -431,7 +432,7 @@ class TerminalEditor:
         # After fixing it, assert we never got it wrong
 
         after = (row, column)
-        assert before == after, (before, after)
+        self.require(before == after, before=before, after=after)
 
     def copy_row(self):
         """Get chars of columns in row"""
@@ -501,6 +502,15 @@ class TerminalEditor:
         middle_row = top_row + middle
 
         return middle_row
+
+    def require(self, truthy, **kwargs):
+        """Fail fast, perhaps with details, else proceed"""
+
+        if not truthy:
+            if kwargs:
+                raise KwArgsException(**kwargs)
+            else:
+                raise IndexError()
 
     #
     # Define keys for entering, pausing, exiting Vi Py
@@ -670,6 +680,10 @@ class TerminalEditor:
 
         self.slip_redo()
 
+        # TODO: Vi says f⎋ means f⌃C interrupted, not go find the ⎋ Escape Char
+        # TODO: Vi says f⌃V means go find the ⌃V char, not prefix of f⌃V⎋
+        # TODO: Vi says f⌃? means fail
+
     def do_slip_index_chord_minus(self):
         """Find Char to Right in row, once or more, but then slip left one Column"""
 
@@ -700,7 +714,7 @@ class TerminalEditor:
 
         for _ in range(count):
 
-            assert column < last_column
+            self.require(column < last_column)
             column += 1
 
             right = text[column:].index(choice)
@@ -709,7 +723,7 @@ class TerminalEditor:
         # Option to slip back one column
 
         if after:
-            assert column
+            self.require(column)
             column -= 1
 
         self.column = column
@@ -723,7 +737,7 @@ class TerminalEditor:
 
         last_column = self.find_last_column()
         last_row = self.find_last_row()
-        assert (self.column < last_column) or (self.row < last_row)
+        self.require((self.column < last_column) or (self.row < last_row))
 
         ahead = 1 if (arg is None) else arg
         for _ in range(ahead):
@@ -741,7 +755,7 @@ class TerminalEditor:
 
         arg = self.arg
 
-        assert self.row or self.column
+        self.require(self.row or self.column)
 
         behind = 1 if (arg is None) else arg
         for _ in range(behind):
@@ -768,7 +782,7 @@ class TerminalEditor:
 
         arg = self.arg
 
-        assert self.column  # FIXME FIXME: raise IndexError for such constraints
+        self.require(self.column)
 
         left = 1 if (arg is None) else arg
         left = min(left, self.column)
@@ -781,7 +795,7 @@ class TerminalEditor:
         arg = self.arg
         last_column = self.find_last_column()
 
-        assert self.column < last_column
+        self.require(self.column < last_column)
 
         right = 1 if (arg is None) else arg
         right = min(right, last_column - self.column)
@@ -832,7 +846,7 @@ class TerminalEditor:
 
         for _ in range(count):
 
-            assert column
+            self.require(column)
             column -= 1
 
             column = text[: (column + 1)].rindex(choice)
@@ -841,7 +855,7 @@ class TerminalEditor:
 
         if after:
 
-            assert column < last_column
+            self.require(column < last_column)
             column += 1
 
         self.column = column
@@ -868,7 +882,7 @@ class TerminalEditor:
         arg = self.arg
         last_row = self.find_last_row()
 
-        assert self.row < last_row
+        self.require(self.row < last_row)
 
         down = 1 if (arg is None) else arg
         down = min(down, last_row - self.row)
@@ -913,7 +927,7 @@ class TerminalEditor:
 
         arg = self.arg
 
-        assert self.row
+        self.require(self.row)
 
         up = 1 if (arg is None) else arg
         up = min(up, self.row)
@@ -1482,28 +1496,35 @@ def repr_vi_bytes(xxs):
         chr_xx = chr(xx)
 
         if xx == 9:
+            # rep += " ⇥"  # ⇥ \u21E5 Rightward Arrows to Bar
             rep += " Tab"
         elif xx == 13:
+            # rep += " ⏎"  # ⏎ \u23CE Return Symbol
             rep += " Return"
         elif xx == 27:
+            # rep += " ⎋"  # ⎋ \u238B Broken Circle With Northwest Arrow
             rep += " Escape"
         elif xx == 127:
+            # rep += " ⌫"  # ⌫ \u232B Erase To The Left
             rep += " Delete"
         elif chr_xx == " ":
+            # rep += " ␢"  # ␢ \u2422 Blank Symbol
+            # rep += " ␣"  # ␣ \u2423 Open Box
             rep += " Space"
+
         elif chr_xx.encode() in C0_CONTROL_STDINS:  # xx in 0x00..0x1F,0x7F
             rep += " ⌃" + chr(xx ^ 0x40)
+
         elif (chr_xx in "0123456789") and rep and (rep[-1] in "0123456789"):
-            rep += chr_xx
+            rep += chr_xx  # no Space between Digits
+
         else:
             rep += " " + chr_xx
 
-    _ = 0x0C  # Black Python style enforces Uppercase Hex in this sourceline
-
-    rep = rep.replace("Escape [ A", "Up")
-    rep = rep.replace("Escape [ B", "Down")
-    rep = rep.replace("Escape [ C", "Right")
-    rep = rep.replace("Escape [ D", "Left")
+    rep = rep.replace("Escape [ A", "Up")  # aka ↑ \u2191 Upwards Arrow
+    rep = rep.replace("Escape [ B", "Down")  # aka ↓ \u2193 Downwards Arrow
+    rep = rep.replace("Escape [ C", "Right")  # aka → \u2192 Rightwards Arrow
+    rep = rep.replace("Escape [ D", "Left")  # aka ← \u2190 Leftwards Arrows
 
     rep = rep.strip()
 
@@ -1585,6 +1606,19 @@ endfun
 #
 # Define some Python idioms
 #
+
+
+# deffed in many files  # missing from docs.python.org
+class KwArgsException(Exception):
+    """Raise a string of Key-Value Pairs"""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def __str__(self):
+        kwargs = self.kwargs
+        str_exc = ", ".join("{}={!r}".format(k, v) for (k, v) in kwargs.items())
+        return str_exc
 
 
 # deffed in many files  # missing from docs.python.org
