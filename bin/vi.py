@@ -30,6 +30,7 @@ examples:
 
 
 import argparse
+import collections
 import difflib
 import inspect
 import os
@@ -135,6 +136,13 @@ def parse_vi_argv(argv):
     return args
 
 
+TerminalStatus = collections.namedtuple(
+    "TerminalStatus",
+    "digits, chords, whisper, mention, shout".split(", "),
+    defaults=(None, None, None, None, None),
+)
+
+
 class TerminalEditor:
     """Write through to the Terminal, but keep a copy"""
 
@@ -149,12 +157,7 @@ class TerminalEditor:
         self.row = 0
         self.column = 0
 
-        self.status_tag = None
-        self.status_chords = None
-        self.status_digits = None
-        self.status_whisper = None
-        self.status_shout = None
-        # FIXME: self.status = instance of collections.namedtuple
+        self.status = TerminalStatus()
 
         chars = iobytearray.decode(errors="surrogateescape")
         lines = chars.splitlines(keepends=True)
@@ -211,7 +214,7 @@ class TerminalEditor:
 
                     if self.digits or self.chords:
                         self.chords += chord
-                        self.send_status_soon(tag="cancelled")
+                        self.send_status_soon(whisper="cancelled")
 
                         self.digits = b""
                         self.chords = b""
@@ -241,7 +244,7 @@ class TerminalEditor:
         lines = self.lines
         top_lines = lines[self.top_row :]
 
-        status = self.consume_status()
+        str_status = self.consume_status()
 
         painter.top_line_number = 1 + self.top_row
         painter.bottom_line_number = 1 + len(lines)
@@ -250,7 +253,7 @@ class TerminalEditor:
         painter.cursor_row = self.row - self.top_row
         painter.cursor_column = self.column
 
-        painter.paint_diffs(lines=top_lines, status=status)
+        painter.paint_diffs(lines=top_lines, status=str_status)
 
     def react(self, chord):
         """Interpret sequences of keyboard input chords"""
@@ -263,7 +266,7 @@ class TerminalEditor:
         if not self.chords:
             if (chord in b"123456789") or (self.digits and (chord == b"0")):
                 self.digits += chord
-                self.send_status_soon(tag=None)
+                self.send_status_soon(whisper=None)
 
                 return
 
@@ -274,7 +277,7 @@ class TerminalEditor:
         self.chords += chord
 
         chords = self.chords
-        self.send_status_soon(tag=None)  # a la Vim :set showcmd
+        self.send_status_soon(whisper=None)  # a la Vim :set showcmd
 
         # Else find, call, and consume the Chord
 
@@ -320,22 +323,19 @@ class TerminalEditor:
         if not self.stepping_more:
             self.stepping_column = None
 
-    def send_status_soon(self, tag):
+    def send_status_soon(self, whisper):
         """Capture some Status now, to show with next Prompt"""
 
-        self.status_tag = tag
+        digits = self.digits
+        chords = self.chords
 
-        self.status_digits = self.digits
-        self.status_chords = self.chords
+        status = TerminalStatus(digits=digits, chords=chords, whisper=whisper)
+        self.status = status
 
     def consume_status(self):
-        """Mention Row, Column, Tag, Digits, and Chords"""
+        """Send Shout else Mention else Row, Column, Digits, Chords, & Whisper"""
 
-        tag = self.status_tag
-        digits = self.status_digits
-        chords = self.status_chords
-        whisper = self.status_whisper
-        shout = self.status_shout
+        status = self.status
 
         #
 
@@ -343,32 +343,30 @@ class TerminalEditor:
         column_number = 1 + self.column
 
         digits_chords = b""
-        if digits:
-            digits_chords += digits
-        if chords:
-            digits_chords += chords
+        if status.digits:
+            digits_chords += status.digits
+        if status.chords:
+            digits_chords += status.chords
 
         echo = repr_vi_bytes(digits_chords) if digits_chords else ""
 
-        str_tag = str(tag) if tag else ""
+        str_whisper = str(status.whisper) if status.whisper else ""
 
         #
 
-        status = "{},{} {} {}".format(row_number, column_number, echo, str_tag).rstrip()
-        if whisper:
-            status = str(whisper)
-        if shout:
-            status = str(shout)
+        str_status = "{},{} {} {}".format(
+            row_number, column_number, echo, str_whisper
+        ).rstrip()
+        if status.mention:
+            str_status = str(status.mention)
+        if status.shout:
+            str_status = str(status.shout)
 
-        #
+        # Consume the Status, before returning a formatted copy of it
 
-        self.status_tag = None
-        self.status_chords = None
-        self.status_digits = None
-        self.status_whisper = None
-        self.status_shout = None
+        self.status = TerminalStatus()
 
-        return status
+        return str_status
 
     def pull_chord(self):
         """Block till the keyboard input Digit or Chord, else raise KeyboardInterrupt"""
@@ -389,7 +387,7 @@ class TerminalEditor:
 
         chord = self.pull_chord()
         self.chords += chord
-        self.status = self.send_status_soon(tag=None)
+        self.send_status_soon(whisper=None)
 
         choice = chord.decode(errors="surrogateescape")
 
