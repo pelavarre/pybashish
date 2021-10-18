@@ -177,11 +177,11 @@ class TerminalEditor:
         self.slip_after = None
         self.slip_redo = None
         self.slip_undo = None
-        # FIXME: self.last_slip = instance of collections.namedtuple
+        # TODO: self.last_slip = instance of collections.namedtuple
 
         self.stepping_column = None
         self.stepping_more = None
-        # FIXME: self.last_step = instance of collections.namedtuple
+        # TODO: self.last_step = instance of collections.namedtuple
 
     #
     # Work closely with one TerminalDriver and one TerminalPainter
@@ -401,65 +401,7 @@ class TerminalEditor:
     def break_do_loop(self):
         """Silently deny the keyboardist's demand for more repetition"""
 
-        self.arg = None  # mutate  # FIXME: loop if Not break'ened
-
-    #
-    # Define keys for entering, pausing, exiting Vi Py
-    #
-
-    # TODO: shuffle these into place far below
-
-    def do_help_quit(self):
-        """Say how to exit Vi Py"""
-
-        self.send_status_soon("Press ZQ to quit Vi Py without saving last changes")
-
-        self.break_do_loop()
-
-    def do_repaint_soon(self):
-        """Clear the screen and repaint every char, just before next Prompt"""
-
-        painter = self.painter
-        painter.repaint_soon()
-
-        self.break_do_loop()
-
-    def do_ring_bell(self):
-        """Reject unwanted input"""
-
-        painter = self.painter
-        painter.ring_bell_soon()
-
-        self.break_do_loop()
-
-    def do_sig_stop(self):
-
-        raise NotImplementedError()
-
-    def do_quit(self):  # emacs kill-emacs
-        """Lose last changes and quit"""
-
-        returncode = 1 if self.iobytearray else 0
-        self.iobytearray[::] = b""
-
-        sys.exit(returncode)
-
-    def do_save_and_quit(self):  # emacs save-buffers-kill-terminal
-        """Save last changes and quit"""
-
-        sys.exit()
-
-    #
-    # Flip switches
-    #
-
-    def do_set_invnumber(self):
-        """Toggle Line-in-File numbers in or out"""
-
-        self.set_number = not self.set_number
-        self.status_shout = ":set number" if self.set_number else ":set nonumber"
-
-        self.break_do_loop()
+        self.arg = None  # mutate  # FIXME FIXME: loop if Not break'ened
 
     #
     # Focus on one Line of a File of Lines
@@ -564,7 +506,57 @@ class TerminalEditor:
     # Define keys for entering, pausing, exiting Vi Py
     #
 
-    # TODO: move do_help_quit, do_repaint_soon, do_ring_bell, etc here
+    def do_help_quit(self):
+        """Say how to exit Vi Py"""
+
+        self.send_status_soon("Press ZQ to quit Vi Py without saving last changes")
+
+        self.break_do_loop()
+
+    def do_repaint_soon(self):
+        """Clear the screen and repaint every char, just before next Prompt"""
+
+        painter = self.painter
+        painter.repaint_soon()
+
+        self.break_do_loop()
+
+    def do_ring_bell(self):
+        """Reject unwanted input"""
+
+        painter = self.painter
+        painter.ring_bell_soon()
+
+        self.break_do_loop()
+
+    def do_sig_stop(self):
+
+        raise NotImplementedError()
+
+    def do_quit(self):  # emacs kill-emacs
+        """Lose last changes and quit"""
+
+        returncode = 1 if self.iobytearray else 0
+        self.iobytearray[::] = b""
+
+        sys.exit(returncode)
+
+    def do_save_and_quit(self):  # emacs save-buffers-kill-terminal
+        """Save last changes and quit"""
+
+        sys.exit()
+
+    #
+    # Flip switches
+    #
+
+    def do_set_invnumber(self):
+        """Toggle Line-in-File numbers in or out"""
+
+        self.set_number = not self.set_number
+        self.status_shout = ":set number" if self.set_number else ":set nonumber"
+
+        self.break_do_loop()
 
     #
     # Slip the Cursor into place, in some other Column of the same Row
@@ -776,7 +768,7 @@ class TerminalEditor:
 
         arg = self.arg
 
-        assert self.column  # FIXME: raise IndexError for such constraints
+        assert self.column  # FIXME FIXME: raise IndexError for such constraints
 
         left = 1 if (arg is None) else arg
         left = min(left, self.column)
@@ -957,18 +949,18 @@ class TerminalEditor:
     # Scroll to show more than one Screen of File
     #
 
-    def do_half_screen_down(self):
-        """FIXME"""
+    def do_scroll_ahead_some(self):
+        """TODO: Scroll ahead some, just once or more"""
 
         raise NotImplementedError()
 
         if self.arg:
             self.do_screen_row_down()
         else:
-            self.half_screen_down_once()
+            self.scroll_ahead_some_once()
 
-    def do_half_screen_up(self):
-        """FIXME"""
+    def do_scroll_behind_some(self):
+        """TODO: Scroll behind some, just once or more"""
 
         raise NotImplementedError()
 
@@ -978,8 +970,10 @@ class TerminalEditor:
         for _ in range(reps):
             self.half_screen_up_once()
 
-    def half_screen_down_once(self):
-        """FIXME"""
+    def scroll_ahead_some_once(self):
+        """TODO: Scroll ahead some"""
+
+        raise NotImplementedError()
 
         row = self.row
         top_row = self.top_row
@@ -1009,29 +1003,27 @@ class TerminalEditor:
 
     #
 
-    # FIXME: def do scroll_ahead_lots, scroll_ahead_one, scroll_ahead_some
-    # FIXME: def do scroll_behind_lots, scroll_behind_one, scroll_behind_some
-    def do_screen_down(self):
-        """Show some later Screen of Rows"""
+    def do_scroll_ahead_much(self):
+        """Scroll ahead much, just once or more"""
 
         arg = self.arg
         reps = 1 if (arg is None) else arg
 
         for _ in range(reps):
-            self.screen_down_once()
+            self.scroll_ahead_much_once()
 
-    def do_screen_up(self):
-        """Show some earlier Screen of Rows"""
+    def do_scroll_behind_much(self):
+        """Scroll behind much, just once or more"""
         # FIXME: diffs from Vim in case of G ⌃F ⌃B
 
         arg = self.arg
         reps = 1 if (arg is None) else arg
 
         for _ in range(reps):
-            self.screen_up_once()
+            self.scroll_behind_much_once()
 
-    def screen_down_once(self):
-        """Show the next Screen of Rows"""
+    def scroll_ahead_much_once(self):
+        """Scroll ahead much"""
 
         row = self.row
         top_row = self.top_row
@@ -1068,7 +1060,7 @@ class TerminalEditor:
 
         self.do_slip_dent()
 
-    def screen_up_once(self):
+    def scroll_behind_much_once(self):
         """Show the previous Screen of Rows"""
 
         row = self.row
@@ -1105,7 +1097,7 @@ class TerminalEditor:
 
     #
 
-    def do_screen_row_down(self):
+    def do_scroll_ahead_one(self):
         """Show some later Rows of Screen"""
 
         last_row = self.find_last_row()
@@ -1116,9 +1108,9 @@ class TerminalEditor:
         reps = 1 if (arg is None) else arg
 
         for _ in range(reps):
-            self.screen_row_down_one()
+            self.scroll_ahead_one_once()
 
-    def do_screen_row_up(self):
+    def do_scroll_behind_one(self):
         """Show some earlier Rows of Screen"""
 
         if not self.top_row:
@@ -1128,9 +1120,9 @@ class TerminalEditor:
         reps = 1 if (arg is None) else arg
 
         for _ in range(reps):
-            self.screen_row_up_one()
+            self.scroll_behind_one_once()
 
-    def screen_row_down_one(self):
+    def scroll_ahead_one_once(self):
         """Show the next Row of Screen"""
 
         row = self.row
@@ -1146,7 +1138,7 @@ class TerminalEditor:
         self.top_row = top_row
         self.row = row
 
-    def screen_row_up_one(self):
+    def scroll_behind_one_once(self):
         """Show the previous Row of Screen"""
 
         row = self.row
@@ -1155,7 +1147,7 @@ class TerminalEditor:
         if top_row:
             top_row -= 1
 
-            self.top_row = top_row  # TODO: ugly
+            self.top_row = top_row  # TODO: ugly mutate
             bottom_row = self.find_bottom_row()
 
             if row > bottom_row:
@@ -1173,11 +1165,11 @@ class TerminalEditor:
 
         bots_by_stdin = dict()
 
-        bots_by_stdin[b"\x02"] = self.do_screen_up  # STX, aka ⌃B, aka 2
+        bots_by_stdin[b"\x02"] = self.do_scroll_behind_much  # STX, aka ⌃B, aka 2
         bots_by_stdin[b"\x03"] = self.do_help_quit  # ETX, aka ⌃C, aka 3
-        bots_by_stdin[b"\x04"] = self.do_half_screen_down  # EOT, aka ⌃D, aka 4
-        bots_by_stdin[b"\x05"] = self.do_screen_row_down  # ENQ, aka ⌃E, aka 5
-        bots_by_stdin[b"\x06"] = self.do_screen_down  # ACK, aka ⌃F, aka 6
+        bots_by_stdin[b"\x04"] = self.do_scroll_ahead_some  # EOT, aka ⌃D, aka 4
+        bots_by_stdin[b"\x05"] = self.do_scroll_ahead_one  # ENQ, aka ⌃E, aka 5
+        bots_by_stdin[b"\x06"] = self.do_scroll_ahead_much  # ACK, aka ⌃F, aka 6
         # BEL, aka ⌃F, aka 7 \a
         bots_by_stdin[b"\x0A"] = self.do_step_down  # LF, aka ⌃J, aka 10 \n
         # VT, aka ⌃K, aka 11 \v
@@ -1185,8 +1177,8 @@ class TerminalEditor:
         bots_by_stdin[b"\x0D"] = self.do_step_down_dent  # CR, aka ⌃M, aka 13 \r
         bots_by_stdin[b"\x0E"] = self.do_step_down  # SO, aka ⌃N, aka 14
         bots_by_stdin[b"\x10"] = self.do_step_up  # DLE, aka ⌃P, aka 16
-        bots_by_stdin[b"\x15"] = self.do_half_screen_up  # NAK, aka ⌃U, aka 15
-        bots_by_stdin[b"\x19"] = self.do_screen_row_up  # EM, aka ⌃Y, aka 25
+        bots_by_stdin[b"\x15"] = self.do_scroll_behind_some  # NAK, aka ⌃U, aka 15
+        bots_by_stdin[b"\x19"] = self.do_scroll_behind_one  # EM, aka ⌃Y, aka 25
 
         bots_by_stdin[b"\x1B[A"] = self.do_step_up  # ↑ Up Arrow
         bots_by_stdin[b"\x1B[B"] = self.do_step_down  # ↓ Down Arrow
@@ -1231,7 +1223,7 @@ class TerminalEditor:
 
         bots_by_stdin[b"\\"] = self.chord_more_soon
         bots_by_stdin[b"\\n"] = self.do_set_invnumber
-        # TODO: stop occupying the \ Chord Sequences
+        # TODO: stop occupying the personal \ Chord Sequences
 
         bots_by_stdin[b"\x7F"] = self.do_slip_behind  # DEL, aka ⌃?, aka 127
 
