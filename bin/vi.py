@@ -14,7 +14,7 @@ optional arguments:
 quirks:
   defaults to read Stdin and write Stdout
   defines only the most basic keyboard input chords of Bash Less/ Vim
-    ZQ ZZ  => how to exit Vi Py
+    ZQ ZZ ⌃Zfg  => how to exit Vi Py
     ⌃C Up Down Right Left Space Delete Return  => natural enough
     0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
     j k G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => leap to row, leap to line
@@ -36,6 +36,7 @@ import difflib
 import inspect
 import os
 import select
+import signal
 import sys
 import termios
 import traceback
@@ -539,9 +540,14 @@ class TerminalEditor:
 
         self.break_do_loop()
 
-    def do_sig_stop(self):
+    def do_sig_tstp(self):
+        """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
-        raise NotImplementedError()
+        driver = self.driver
+
+        driver.__exit__(*ExcInfo())
+        os.kill(os.getpid(), signal.SIGTSTP)
+        driver.__enter__()
 
     def do_quit(self):  # emacs kill-emacs
         """Lose last changes and quit"""
@@ -1193,6 +1199,7 @@ class TerminalEditor:
         bots_by_stdin[b"\x10"] = self.do_step_up  # DLE, aka ⌃P, aka 16
         bots_by_stdin[b"\x15"] = self.do_scroll_behind_some  # NAK, aka ⌃U, aka 15
         bots_by_stdin[b"\x19"] = self.do_scroll_behind_one  # EM, aka ⌃Y, aka 25
+        bots_by_stdin[b"\x1A"] = self.do_sig_tstp  # SUB, aka ⌃Z, aka 26
 
         bots_by_stdin[b"\x1B[A"] = self.do_step_up  # ↑ Up Arrow
         bots_by_stdin[b"\x1B[B"] = self.do_step_down  # ↓ Down Arrow
@@ -1396,7 +1403,7 @@ class TerminalDriver:
     def __exit__(self, *exc_info):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
-        (_, exc, _) = exc_info
+        _ = exc_info
 
         self.tty.flush()
 
@@ -1606,6 +1613,10 @@ endfun
 #
 # Define some Python idioms
 #
+
+ExcInfo = collections.namedtuple(
+    "ExcInfo", "type, value, traceback".split(", "), defaults=(None, None, None)
+)
 
 
 # deffed in many files  # missing from docs.python.org
