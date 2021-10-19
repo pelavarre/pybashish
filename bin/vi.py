@@ -17,7 +17,7 @@ quirks:
     ZQ ZZ ⌃Zfg  => how to exit Vi Py
     ⌃C Up Down Right Left Space Delete Return  => natural enough
     0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
-    j k G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => leap to row, leap to line
+    j k G 1G H L M - + _ ⌃J ⌃N ⌃P  => leap to row, leap to line
     1234567890  => repeat
     ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
     \n  => toggle line numbers on and off
@@ -181,6 +181,7 @@ class TerminalEditor:
 
         self.chords = b""
         self.doing_more = None
+        self.done = None
 
         self.slip_choice = None
         self.slip_after = None
@@ -232,7 +233,6 @@ class TerminalEditor:
 
                 bot = self.choose_bot(chord)
                 if bot is not None:
-
                     self.call_bot(bot)
 
                     self.digits = b""
@@ -287,8 +287,7 @@ class TerminalEditor:
                 return bot  # is None, to ask for more Digits or Chords
 
         self.arg = int(self.digits) if self.digits else None
-
-        assert (self.arg is None) or (self.arg >= 1), self.arg
+        assert self.get_arg() >= 1
 
         # Accept one more keyboard input Chord
 
@@ -300,7 +299,7 @@ class TerminalEditor:
         bots_by_stdin = self.bots_by_stdin
         chords = self.chords
 
-        bot = self.do_name_error
+        bot = self.do_raise_name_error
         if chords in bots_by_stdin.keys():
             bot = bots_by_stdin[chords]
 
@@ -316,8 +315,7 @@ class TerminalEditor:
         # Start calling
 
         self.done = 0
-        self.doing_more = True
-        while self.doing_more:
+        while True:
             self.doing_more = None
 
             try:
@@ -356,9 +354,11 @@ class TerminalEditor:
 
             if self.doing_more:
                 self.done += 1
-                if self.arg and (self.done < self.arg):
+                if self.done < self.get_arg():
 
                     continue
+
+            break
 
         # Help many Steps between Rows leave the choice of Column unmoved
 
@@ -495,6 +495,14 @@ class TerminalEditor:
 
         return rows
 
+    def get_arg(self, default=1):
+        """Get the Int of the Digits before the Chords, else the Default"""
+
+        arg = self.arg
+        arg = default if (arg is None) else arg
+
+        return arg
+
     def find_bottom_row(self):
         """Find the Bottom Row on Screen, as if enough Rows to fill Screen"""
 
@@ -552,32 +560,30 @@ class TerminalEditor:
     # Define keys for entering, pausing, exiting Vi Py
     #
 
-    def do_help_quit(self):
+    def do_help_quit(self):  # Vim ⌃C
         """Say how to exit Vi Py"""
 
         self.send_status_soon("Press ZQ to quit Vi Py without saving last changes")
 
-    def do_name_error(self):
+    def do_raise_name_error(self):  # such as Esc, such as 'ZB'
         """Reply to a meaningless keyboard input Chord Sequence"""
 
-        painter = self.painter
-        painter.ring_bell_soon()
+        raise NameError()
 
-        self.send_status_soon("meaningless")
-
-    def do_repaint_soon(self):
+    def do_repaint_soon(self):  # Vim ⌃L
         """Clear the screen and repaint every char, just before next Prompt"""
 
         painter = self.painter
         painter.repaint_soon()
 
-    def do_ring_bell(self):
+    def do_ring_bell(self):  # Vim 'chords not in bots_by_stdin.keys()', such as Tab
+
         """Reject unwanted input"""
 
         painter = self.painter
         painter.ring_bell_soon()
 
-    def do_sig_tstp(self):
+    def do_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
         driver = self.driver
@@ -586,20 +592,20 @@ class TerminalEditor:
         os.kill(os.getpid(), signal.SIGTSTP)
         driver.__enter__()
 
-    def do_quit(self):  # emacs kill-emacs
+    def do_quit(self):  # Vim ZQ  # emacs kill-emacs
         """Lose last changes and quit"""
 
         returncode = 1 if self.iobytearray else None
-        returncode = returncode if (self.arg is None) else self.arg
+        returncode = self.get_arg(default=returncode)
 
         self.iobytearray[::] = b""
 
         sys.exit(returncode)
 
-    def do_save_and_quit(self):  # emacs save-buffers-kill-terminal
+    def do_save_and_quit(self):  # Vim ZZ  # emacs save-buffers-kill-terminal
         """Save last changes and quit"""
 
-        returncode = None if (self.arg is None) else self.arg
+        returncode = self.get_arg(default=None)
 
         sys.exit(returncode)
 
@@ -607,7 +613,7 @@ class TerminalEditor:
     # Flip switches
     #
 
-    def do_set_invnumber(self):
+    def do_set_invnumber(self):  # Vi Py \n
         """Toggle Line-in-File numbers in or out"""
 
         self.set_number = not self.set_number
@@ -617,20 +623,17 @@ class TerminalEditor:
     # Slip the Cursor into place, in some other Column of the same Row
     #
 
-    def do_slip(self):  # emacs goto-char
+    def do_slip(self):  # Vim |  # emacs goto-char
         """Leap to first Column, else to a chosen Column"""
 
-        arg = self.arg
         last_column = self.find_last_column()
-
-        column = 0 if (arg is None) else (arg - 1)
-        column = min(column, last_column)
+        column = min(last_column, self.get_arg() - 1)
 
         self.column = column
 
     #
 
-    def do_slip_choice_redo(self):
+    def do_slip_choice_redo(self):  # Vim ;
         """Repeat the last 'slip_index' or 'slip_rindex' once or more"""
 
         after = self.slip_after
@@ -661,7 +664,7 @@ class TerminalEditor:
 
                 raise
 
-    def do_slip_choice_undo(self):
+    def do_slip_choice_undo(self):  # Vim ,
         """Undo the last 'slip_index' or 'slip_rindex' once or more"""
 
         after = self.slip_after
@@ -694,9 +697,9 @@ class TerminalEditor:
 
     #
 
-    def do_slip_dent(self):
+    def do_slip_dent(self):  # Vim _
         """Leap to the Column after the Indent"""
-        # silently ignore Arg
+        # silently ignore Arg  # TODO: Vim doesn't
 
         text = self.copy_row()
         lstripped = text.lstrip()
@@ -704,16 +707,16 @@ class TerminalEditor:
 
         self.column = column
 
-    def do_slip_first(self):  # emacs move-beginning-of-line
+    def do_slip_first(self):  # Vim 0  # emacs move-beginning-of-line
         """Leap to the first Column in Row"""
 
-        assert not self.arg
+        assert self.arg is None  # Vi Py takes no Digits before Chord 0
 
         self.column = 0
 
     #
 
-    def do_slip_index_chord(self):
+    def do_slip_index_chord(self):  # Vim fx
         """Find Char to right in Row, once or more"""
 
         choice = self.chord_more_now()
@@ -729,7 +732,7 @@ class TerminalEditor:
         # TODO: Vi says f⌃V means go find the ⌃V char, not prefix of f⌃V⎋
         # TODO: Vi says f⌃? means fail
 
-    def do_slip_index_chord_minus(self):
+    def do_slip_index_chord_minus(self):  # Vim tx
         """Find Char to Right in row, once or more, but then slip left one Column"""
 
         choice = self.chord_more_now()
@@ -744,14 +747,13 @@ class TerminalEditor:
     def slip_index(self):
         """Find Char to Right in row, once or more"""
 
-        arg = self.arg
         last_column = self.find_last_column()
         text = self.copy_row()
 
         choice = self.slip_choice
         after = self.slip_after
 
-        count = 1 if (arg is None) else arg
+        count = self.get_arg()
 
         # Index each
 
@@ -775,81 +777,70 @@ class TerminalEditor:
 
     #
 
-    def do_slip_ahead(self):
+    def do_slip_ahead(self):  # Vim Space
         """Slip right, then down"""
-
-        arg = self.arg
 
         last_column = self.find_last_column()
         last_row = self.find_last_row()
-        self.require((self.column < last_column) or (self.row < last_row))
 
-        ahead = 1 if (arg is None) else arg
-        for _ in range(ahead):
+        if not self.done:
+            self.require((self.column < last_column) or (self.row < last_row))
 
-            if self.column < self.find_last_column():
-                self.column += 1
-            elif self.row < self.find_last_row():
-                self.column = 0
-                self.row += 1
-            else:
-                break
+        if self.column < last_column:
+            self.column += 1
 
-    def do_slip_behind(self):
+            self.continue_do_loop()
+
+        elif self.row < last_row:
+            self.column = 0
+            self.row += 1
+
+            self.continue_do_loop()
+
+    def do_slip_behind(self):  # Vim Delete
         """Slip left, then up"""
 
-        arg = self.arg
+        if not self.done:
+            self.require(self.row or self.column)
 
-        self.require(self.row or self.column)
+        if self.column:
+            self.column -= 1
 
-        behind = 1 if (arg is None) else arg
-        for _ in range(behind):
+            self.continue_do_loop()
 
-            if self.column:
-                self.column -= 1
-            elif self.row:
-                self.row -= 1
-                self.column = self.find_last_column()
-            else:
-                break
+        elif self.row:
+            self.row -= 1
+            self.column = self.find_last_column()
 
-    def do_slip_last(self):  # emacs move-end-of-line, but to last, not beyond end
+            self.continue_do_loop()
+
+    def do_slip_last(self):  # Vim $  # emacs move-end-of-line
         """Leap to the last Column in Row"""
         # FIXME: Vim says '$' should mean choose last col again in next row
         # FIXME: Vim says N'$' should mean (N-1)'j' '$'
 
-        last_column = self.find_last_column()
+        self.column = self.find_last_column()
 
-        self.column = last_column
-
-    def do_slip_left(self):  # emacs left-char, backward-char
+    def do_slip_left(self):  # Vim h, Left  # emacs left-char, backward-char
         """Slip left one Column or more"""
-
-        arg = self.arg
 
         self.require(self.column)
 
-        left = 1 if (arg is None) else arg
-        left = min(left, self.column)
-
+        left = min(self.column, self.get_arg())
         self.column -= left
 
-    def do_slip_right(self):  # emacs right-char, forward-char
+    def do_slip_right(self):  # Vim l, Right  #  emacs right-char, forward-char
         """Slip Right one Column or more"""
 
-        arg = self.arg
         last_column = self.find_last_column()
-
         self.require(self.column < last_column)
 
-        right = 1 if (arg is None) else arg
-        right = min(right, last_column - self.column)
-
+        right = min(last_column - self.column, self.get_arg())
         self.column += right
 
     #
 
-    def do_slip_rindex_chord(self):
+    def do_slip_rindex_chord(self):  # Vim Fx
         """Find Char to left in Row, once or more"""
 
         choice = self.chord_more_now()
@@ -861,7 +852,7 @@ class TerminalEditor:
 
         self.slip_redo()
 
-    def do_slip_rindex_chord_plus(self):
+    def do_slip_rindex_chord_plus(self):  # Vim Tx
         """Find Char to left in Row, once or more, but then slip right one Column"""
 
         choice = self.chord_more_now()
@@ -876,14 +867,13 @@ class TerminalEditor:
     def slip_rindex(self):
         """Find Char to left in Row, once or more"""
 
-        arg = self.arg
         last_column = self.find_last_column()
         text = self.copy_row()
 
         choice = self.slip_choice
         after = self.slip_after
 
-        count = 1 if (arg is None) else arg
+        count = self.get_arg()
 
         # R-Index each
 
@@ -909,78 +899,73 @@ class TerminalEditor:
     # Step the Cursor across zero, one, or more Lines of the same File
     #
 
-    def do_step(self):  # emacs goto-line
+    def do_step(self):  # Vim G, 1G  # emacs goto-line
         """Leap to last Row, else to a chosen Row"""
 
-        arg = self.arg
         last_row = self.find_last_row()
 
-        row = last_row if (arg is None) else (arg - 1)
-        row = min(row, last_row)
+        row = min(last_row, self.get_arg() - 1)
+        row = last_row if (self.arg is None) else row
 
         self.row = row
         self.step_clip_column()
 
-    def do_step_down(self):  # emacs next-line
+    def do_step_down(self):  # Vim j, ⌃J, ⌃N, Down  # emacs next-line
         """Step down a Row or more"""
 
-        arg = self.arg
         last_row = self.find_last_row()
-
         self.require(self.row < last_row)
 
-        down = 1 if (arg is None) else arg
-        down = min(down, last_row - self.row)
+        down = min(last_row - self.row, self.get_arg())
 
         self.row += down
         self.step_clip_column()
 
-    def do_step_down_dent(self):
+    def do_step_down_dent(self):  # Vim +, Return
         """Step down a Row or more, but land just past the Indent"""
 
         self.do_step_down()
         self.do_slip_dent()
 
-    def do_step_down_minus_dent(self):
+    def do_step_down_minus_dent(self):  # Vim _
+        """Leap to just past the Indent, but first Step Down if Arg"""
 
-        if self.arg and (self.arg > 1):
+        down = self.get_arg() - 1
+        if down:
             self.arg -= 1  # mutate
             self.do_step_down()
 
         self.do_slip_dent()
 
-    def do_step_max_low(self):
+    def do_step_max_low(self):  # Vim L
         """Leap to first Word of Bottom Row on Screen"""
 
         self.row = self.find_bottom_row()
         self.do_slip_dent()
 
-    def do_step_max_high(self):
+    def do_step_max_high(self):  # Vim H
         """Leap to first Word of Top Row on Screen"""
 
         self.row = self.top_row
         self.do_slip_dent()
 
-    def do_step_to_middle(self):
+    def do_step_to_middle(self):  # Vim M
         """Leap to first Word of Middle Row on Screen"""
 
         self.row = self.find_middle_row()
         self.do_slip_dent()
 
-    def do_step_up(self):  # emacs previous-line
+    def do_step_up(self):  # Vim k, ⌃P, Up  # emacs previous-line
         """Step up a Row or more"""
-
-        arg = self.arg
 
         self.require(self.row)
 
-        up = 1 if (arg is None) else arg
-        up = min(up, self.row)
+        up = min(self.row, self.get_arg())
 
         self.row -= up
         self.step_clip_column()
 
-    def do_step_up_dent(self):
+    def do_step_up_dent(self):  # Vim -
         """Step up a Row or more, but land just past the Indent"""
 
         self.do_step_up()
@@ -1008,7 +993,7 @@ class TerminalEditor:
     # Scroll to show more than one Screen of File
     #
 
-    def do_scroll_ahead_some(self):
+    def do_scroll_ahead_some(self):  # Vim ⌃D
         """TODO: Scroll ahead some, just once or more"""
 
         raise NotImplementedError()
@@ -1018,7 +1003,7 @@ class TerminalEditor:
         else:
             self.scroll_ahead_some_once()
 
-    def do_scroll_behind_some(self):
+    def do_scroll_behind_some(self):  # Vim ⌃U
         """TODO: Scroll behind some, just once or more"""
 
         raise NotImplementedError()
@@ -1062,7 +1047,7 @@ class TerminalEditor:
 
     #
 
-    def do_scroll_ahead_much(self):
+    def do_scroll_ahead_much(self):  # Vim ⌃F
         """Scroll ahead much"""
 
         row = self.row
@@ -1079,7 +1064,7 @@ class TerminalEditor:
 
         if top_row == last_row:
             if not self.done:
-                self.send_status_soon("scrolled to end of file")  # Vim squelches this
+                self.send_status_soon("at end of file")  # Vim squelches this
 
             return
 
@@ -1110,7 +1095,7 @@ class TerminalEditor:
 
         self.continue_do_loop()
 
-    def do_scroll_behind_much(self):
+    def do_scroll_behind_much(self):  # Vim ⌃B
         """Show the previous Screen of Rows"""
 
         row = self.row
@@ -1155,7 +1140,7 @@ class TerminalEditor:
 
     #
 
-    def do_scroll_ahead_one(self):
+    def do_scroll_ahead_one(self):  # Vim ⌃E
         """Show the next Row of Screen"""
 
         row = self.row
@@ -1167,7 +1152,7 @@ class TerminalEditor:
 
         if self.top_row == last_row:
             if not self.done:
-                self.send_status_soon("scrolled to end of file")  # Vim squelches this
+                self.send_status_soon("at end of file")  # Vim squelches this
 
             return
 
@@ -1185,7 +1170,7 @@ class TerminalEditor:
 
         self.continue_do_loop()
 
-    def do_scroll_behind_one(self):
+    def do_scroll_behind_one(self):  # Vim ⌃Y
         """Show the previous Row of Screen"""
 
         row = self.row
@@ -1196,7 +1181,7 @@ class TerminalEditor:
         if not top_row:
 
             if not self.done:
-                self.send_status_soon("scrolled to start of file")  # Vim squelches this
+                self.send_status_soon("at start of file")  # Vim squelches this
 
             return
 
