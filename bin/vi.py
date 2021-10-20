@@ -676,74 +676,6 @@ class TerminalEditor:
 
         self.column = column
 
-    #
-    # Repeat search inside the Row for a single Char
-    #
-
-    def do_slip_choice_redo(self):  # Vim ;
-        """Repeat the last 'slip_index' or 'slip_rindex' once or more"""
-
-        after = self.slip_after
-        if not after:
-
-            self.slip_redo()
-
-        else:
-
-            last_column = self.find_last_column()
-
-            with_column = self.column
-            try:
-
-                if after < 0:
-                    assert self.column < last_column
-                    self.column += 1
-                elif after > 0:
-                    assert self.column
-                    self.column -= 1
-
-                self.slip_redo()
-
-                assert self.column != with_column
-
-            except Exception:
-                self.column = with_column
-
-                raise
-
-    def do_slip_choice_undo(self):  # Vim ,
-        """Undo the last 'slip_index' or 'slip_rindex' once or more"""
-
-        after = self.slip_after
-        if not after:
-
-            self.slip_undo()
-
-        else:
-
-            last_column = self.find_last_column()
-
-            with_column = self.column
-            try:
-
-                if after < 0:
-                    assert self.column
-                    self.column -= 1
-                elif after > 0:
-                    assert self.column < last_column
-                    self.column += 1
-
-                self.slip_undo()
-
-                assert self.column != with_column
-
-            except Exception:
-                self.column = with_column
-
-                raise
-
-    # TODO: shuffle the index/ rindex/ redo past the rest
-
     def do_slip_dent(self):  # Vim ^
         """Leap to just past the Indent, but first Step Down if Arg"""
 
@@ -768,69 +700,25 @@ class TerminalEditor:
 
         self.column = 0
 
-    #
-    # Search ahead inside the Row for a single Char
-    #
+    def do_slip_left(self):  # Vim h, Left  # emacs left-char, backward-char
+        """Slip left one Column or more"""
 
-    def do_slip_index(self):  # Vim fx
-        """Find Char to right in Row, once or more"""
+        self.require(self.column)
 
-        choice = self.get_arg2()
+        left = min(self.column, self.get_arg1())
+        self.column -= left
 
-        self.slip_choice = choice
-        self.slip_after = 0
-        self.slip_redo = self.slip_index
-        self.slip_undo = self.slip_rindex
-
-        self.slip_redo()
-
-        # TODO: Vi says f⎋ means f⌃C interrupted, not go find the ⎋ Esc Char
-        # TODO: Vi says f⌃V means go find the ⌃V char, not prefix of f⌃V⎋
-        # TODO: Vi says f⌃? means fail
-
-    def do_slip_index_minus(self):  # Vim tx
-        """Find Char to Right in row, once or more, but then slip left one Column"""
-
-        choice = self.get_arg2()
-
-        self.slip_choice = choice
-        self.slip_after = -1
-        self.slip_redo = self.slip_index
-        self.slip_undo = self.slip_rindex
-
-        self.slip_redo()
-
-    def slip_index(self):
-        """Find Char to Right in row, once or more"""
+    def do_slip_right(self):  # Vim l, Right  #  emacs right-char, forward-char
+        """Slip Right one Column or more"""
 
         last_column = self.find_last_column()
-        text = self.copy_row()
+        self.require(self.column < last_column)
 
-        choice = self.slip_choice
-        after = self.slip_after
+        right = min(last_column - self.column, self.get_arg1())
+        self.column += right
 
-        count = self.get_arg1()
-
-        # Index each
-
-        column = self.column
-
-        for _ in range(count):
-
-            self.require(column < last_column)
-            column += 1
-
-            right = text[column:].index(choice)
-            column += right
-
-        # Option to slip back one column
-
-        if after:
-            self.require(column)
-            column -= 1
-
-        self.column = column
-
+    #
+    #
     #
 
     def do_slip_ahead(self):  # Vim Space
@@ -870,92 +758,6 @@ class TerminalEditor:
 
             self.continue_do_loop()
 
-    # TODO move this to join the other 'self.continue_column_seek' callers
-    def do_slip_last(self):  # Vim $  # emacs move-end-of-line
-        """Leap to the last Column in Row, and keep seeking last Columns"""
-
-        self.seeking_column = True
-        self.step_down_minus()
-        self.column = self.find_last_column()
-
-        self.continue_column_seek()
-
-    def do_slip_left(self):  # Vim h, Left  # emacs left-char, backward-char
-        """Slip left one Column or more"""
-
-        self.require(self.column)
-
-        left = min(self.column, self.get_arg1())
-        self.column -= left
-
-    def do_slip_right(self):  # Vim l, Right  #  emacs right-char, forward-char
-        """Slip Right one Column or more"""
-
-        last_column = self.find_last_column()
-        self.require(self.column < last_column)
-
-        right = min(last_column - self.column, self.get_arg1())
-        self.column += right
-
-    #
-    # Search behind inside the Row for a single Char
-    #
-
-    def do_slip_rindex(self):  # Vim Fx
-        """Find Char to left in Row, once or more"""
-
-        choice = self.get_arg2()
-
-        self.slip_choice = choice
-        self.slip_after = 0
-        self.slip_redo = self.slip_rindex
-        self.slip_undo = self.slip_index
-
-        self.slip_redo()
-
-    def do_slip_rindex_plus(self):  # Vim Tx
-        """Find Char to left in Row, once or more, but then slip right one Column"""
-
-        choice = self.get_arg2()
-
-        self.slip_choice = choice
-        self.slip_after = +1
-        self.slip_redo = self.slip_rindex
-        self.slip_undo = self.slip_index
-
-        self.slip_redo()
-
-    def slip_rindex(self):
-        """Find Char to left in Row, once or more"""
-
-        last_column = self.find_last_column()
-        text = self.copy_row()
-
-        choice = self.slip_choice
-        after = self.slip_after
-
-        count = self.get_arg1()
-
-        # R-Index each
-
-        column = self.column
-
-        for _ in range(count):
-
-            self.require(column)
-            column -= 1
-
-            column = text[: (column + 1)].rindex(choice)
-
-        # Option to slip right one column
-
-        if after:
-
-            self.require(column < last_column)
-            column += 1
-
-        self.column = column
-
     #
     # Step the Cursor across zero, one, or more Lines of the same File
     #
@@ -971,29 +773,35 @@ class TerminalEditor:
         self.row = row
         self.slip_dent()
 
-    # TODO move this to join the other 'self.continue_column_seek' callers
-    def do_step_down(self):  # Vim j, ⌃J, ⌃N, Down  # emacs next-line
-        """Step down one Row or more, but seek the current Column"""
-
-        if self.seeking_column is None:
-            self.seeking_column = self.column
-
-        self.step_down()
-
-        self.column = self.seek_column()
-        self.continue_column_seek()
-
     def do_step_down_dent(self):  # Vim +, Return
         """Step down a Row or more, but land just past the Indent"""
 
         self.step_down()
         self.slip_dent()
 
+    def step_down(self):
+        """Step down one Row or more"""
+
+        last_row = self.find_last_row()
+
+        self.require(self.row < last_row)
+        down = min(last_row - self.row, self.get_arg1())
+
+        self.row += down
+
     def do_step_down_minus_dent(self):  # Vim _
         """Leap to just past the Indent, but first Step Down if Arg"""
 
         self.step_down_minus()
         self.slip_dent()
+
+    def step_down_minus(self):
+        """Step down zero or more Rows, not one or more Rows"""
+
+        down = self.get_arg1() - 1
+        if down:
+            self.arg1 -= 1  # mutate
+            self.step_down()
 
     def do_step_max_low(self):  # Vim L
         """Leap to first Word of Bottom Row on Screen"""
@@ -1013,38 +821,11 @@ class TerminalEditor:
         self.row = self.find_middle_row()
         self.slip_dent()
 
-    #
-    # Step the Cursor up and down between Rows, while holding on to the Column
-    #
-
-    def step_down_minus(self):
-        """Step down zero or more Rows, not one or more Rows"""
-
-        down = self.get_arg1() - 1
-        if down:
-            self.arg1 -= 1  # mutate
-            self.step_down()
-
-    def step_down(self):
-        """Step down one Row or more"""
-
-        last_row = self.find_last_row()
-
-        self.require(self.row < last_row)
-        down = min(last_row - self.row, self.get_arg1())
-
-        self.row += down
-
-    def do_step_up(self):  # Vim k, ⌃P, Up  # emacs previous-line
-        """Step up a Row or more, but seek the current Column"""
-
-        if self.seeking_column is None:
-            self.seeking_column = self.column
+    def do_step_up_dent(self):  # Vim -
+        """Step up a Row or more, but land just past the Indent"""
 
         self.step_up()
-
-        self.column = self.seek_column()
-        self.continue_column_seek()
+        self.slip_dent()
 
     def step_up(self):
         """Step up one Row or more"""
@@ -1054,12 +835,40 @@ class TerminalEditor:
 
         self.row -= up
 
-    # TODO : move this out of the 'self.continue_column_seek' crowd
-    def do_step_up_dent(self):  # Vim -
-        """Step up a Row or more, but land just past the Indent"""
+    #
+    # Step the Cursor up and down between Rows, while holding on to the Column
+    #
+
+    def do_slip_last_seek(self):  # Vim $  # emacs move-end-of-line
+        """Leap to the last Column in Row, and keep seeking last Columns"""
+
+        self.seeking_column = True
+        self.step_down_minus()
+        self.column = self.find_last_column()
+
+        self.continue_column_seek()
+
+    def do_step_down_seek(self):  # Vim j, ⌃J, ⌃N, Down  # emacs next-line
+        """Step down one Row or more, but seek the current Column"""
+
+        if self.seeking_column is None:
+            self.seeking_column = self.column
+
+        self.step_down()
+
+        self.column = self.seek_column()
+        self.continue_column_seek()
+
+    def do_step_up_seek(self):  # Vim k, ⌃P, Up  # emacs previous-line
+        """Step up a Row or more, but seek the current Column"""
+
+        if self.seeking_column is None:
+            self.seeking_column = self.column
 
         self.step_up()
-        self.slip_dent()
+
+        self.column = self.seek_column()
+        self.continue_column_seek()
 
     def seek_column(self, column=True):
         """Begin seeking a Column, if not begun already"""
@@ -1255,6 +1064,194 @@ class TerminalEditor:
         self.continue_do_loop()
 
     #
+    # Search ahead inside the Row for a single Char
+    #
+
+    def do_slip_index(self):  # Vim fx
+        """Find Char to right in Row, once or more"""
+
+        choice = self.get_arg2()
+
+        self.slip_choice = choice
+        self.slip_after = 0
+        self.slip_redo = self.slip_index
+        self.slip_undo = self.slip_rindex
+
+        self.slip_redo()
+
+        # TODO: Vi says f⎋ means f⌃C interrupted, not go find the ⎋ Esc Char
+        # TODO: Vi says f⌃V means go find the ⌃V char, not prefix of f⌃V⎋
+        # TODO: Vi says f⌃? means fail
+
+    def do_slip_index_minus(self):  # Vim tx
+        """Find Char to Right in row, once or more, but then slip left one Column"""
+
+        choice = self.get_arg2()
+
+        self.slip_choice = choice
+        self.slip_after = -1
+        self.slip_redo = self.slip_index
+        self.slip_undo = self.slip_rindex
+
+        self.slip_redo()
+
+    def slip_index(self):
+        """Find Char to Right in row, once or more"""
+
+        last_column = self.find_last_column()
+        text = self.copy_row()
+
+        choice = self.slip_choice
+        after = self.slip_after
+
+        count = self.get_arg1()
+
+        # Index each
+
+        column = self.column
+
+        for _ in range(count):
+
+            self.require(column < last_column)
+            column += 1
+
+            right = text[column:].index(choice)
+            column += right
+
+        # Option to slip back one column
+
+        if after:
+            self.require(column)
+            column -= 1
+
+        self.column = column
+
+    #
+    # Search behind inside the Row for a single Char
+    #
+
+    def do_slip_rindex(self):  # Vim Fx
+        """Find Char to left in Row, once or more"""
+
+        choice = self.get_arg2()
+
+        self.slip_choice = choice
+        self.slip_after = 0
+        self.slip_redo = self.slip_rindex
+        self.slip_undo = self.slip_index
+
+        self.slip_redo()
+
+    def do_slip_rindex_plus(self):  # Vim Tx
+        """Find Char to left in Row, once or more, but then slip right one Column"""
+
+        choice = self.get_arg2()
+
+        self.slip_choice = choice
+        self.slip_after = +1
+        self.slip_redo = self.slip_rindex
+        self.slip_undo = self.slip_index
+
+        self.slip_redo()
+
+    def slip_rindex(self):
+        """Find Char to left in Row, once or more"""
+
+        last_column = self.find_last_column()
+        text = self.copy_row()
+
+        choice = self.slip_choice
+        after = self.slip_after
+
+        count = self.get_arg1()
+
+        # R-Index each
+
+        column = self.column
+
+        for _ in range(count):
+
+            self.require(column)
+            column -= 1
+
+            column = text[: (column + 1)].rindex(choice)
+
+        # Option to slip right one column
+
+        if after:
+
+            self.require(column < last_column)
+            column += 1
+
+        self.column = column
+
+    #
+    # Repeat search inside the Row for a single Char
+    #
+
+    def do_slip_choice_redo(self):  # Vim ;
+        """Repeat the last 'slip_index' or 'slip_rindex' once or more"""
+
+        after = self.slip_after
+        if not after:
+
+            self.slip_redo()
+
+        else:
+
+            last_column = self.find_last_column()
+
+            with_column = self.column
+            try:
+
+                if after < 0:
+                    assert self.column < last_column
+                    self.column += 1
+                elif after > 0:
+                    assert self.column
+                    self.column -= 1
+
+                self.slip_redo()
+
+                assert self.column != with_column
+
+            except Exception:
+                self.column = with_column
+
+                raise
+
+    def do_slip_choice_undo(self):  # Vim ,
+        """Undo the last 'slip_index' or 'slip_rindex' once or more"""
+
+        after = self.slip_after
+        if not after:
+
+            self.slip_undo()
+
+        else:
+
+            last_column = self.find_last_column()
+
+            with_column = self.column
+            try:
+
+                if after < 0:
+                    assert self.column
+                    self.column -= 1
+                elif after > 0:
+                    assert self.column < last_column
+                    self.column += 1
+
+                self.slip_undo()
+
+                assert self.column != with_column
+
+            except Exception:
+                self.column = with_column
+
+                raise
+
+    #
     # Bind sequences of keyboard input Chords to Code
     #
 
@@ -1271,23 +1268,23 @@ class TerminalEditor:
         bot_by_chords[b"\x05"] = self.do_scroll_ahead_one  # ENQ, aka ⌃E, aka 5
         bot_by_chords[b"\x06"] = self.do_scroll_ahead_much  # ACK, aka ⌃F, aka 6
         # BEL, aka ⌃F, aka 7 \a
-        bot_by_chords[b"\x0A"] = self.do_step_down  # LF, aka ⌃J, aka 10 \n
+        bot_by_chords[b"\x0A"] = self.do_step_down_seek  # LF, aka ⌃J, aka 10 \n
         # VT, aka ⌃K, aka 11 \v
         bot_by_chords[b"\x0C"] = self.do_repaint_soon  # FF, aka ⌃L, aka 12 \f
         bot_by_chords[b"\x0D"] = self.do_step_down_dent  # CR, aka ⌃M, aka 13 \r
-        bot_by_chords[b"\x0E"] = self.do_step_down  # SO, aka ⌃N, aka 14
-        bot_by_chords[b"\x10"] = self.do_step_up  # DLE, aka ⌃P, aka 16
+        bot_by_chords[b"\x0E"] = self.do_step_down_seek  # SO, aka ⌃N, aka 14
+        bot_by_chords[b"\x10"] = self.do_step_up_seek  # DLE, aka ⌃P, aka 16
         bot_by_chords[b"\x15"] = self.do_scroll_behind_some  # NAK, aka ⌃U, aka 15
         bot_by_chords[b"\x19"] = self.do_scroll_behind_one  # EM, aka ⌃Y, aka 25
         bot_by_chords[b"\x1A"] = self.do_sig_tstp  # SUB, aka ⌃Z, aka 26
 
-        bot_by_chords[b"\x1B[A"] = self.do_step_up  # ↑ Up Arrow
-        bot_by_chords[b"\x1B[B"] = self.do_step_down  # ↓ Down Arrow
+        bot_by_chords[b"\x1B[A"] = self.do_step_up_seek  # ↑ Up Arrow
+        bot_by_chords[b"\x1B[B"] = self.do_step_down_seek  # ↓ Down Arrow
         bot_by_chords[b"\x1B[C"] = self.do_slip_right  # → Right Arrow
         bot_by_chords[b"\x1B[D"] = self.do_slip_left  # ← Left Arrow
 
         bot_by_chords[b" "] = self.do_slip_ahead
-        bot_by_chords[b"$"] = self.do_slip_last
+        bot_by_chords[b"$"] = self.do_slip_last_seek
         bot_by_chords[b"+"] = self.do_step_down_dent
         bot_by_chords[b","] = self.do_slip_choice_undo
         bot_by_chords[b"-"] = self.do_step_up_dent
@@ -1311,8 +1308,8 @@ class TerminalEditor:
         bot_by_chords[b"_"] = self.do_step_down_minus_dent
 
         bot_by_chords[b"f"] = self.do_slip_index
-        bot_by_chords[b"j"] = self.do_step_down
-        bot_by_chords[b"k"] = self.do_step_up
+        bot_by_chords[b"j"] = self.do_step_down_seek
+        bot_by_chords[b"k"] = self.do_step_up_seek
         bot_by_chords[b"h"] = self.do_slip_left
         bot_by_chords[b"l"] = self.do_slip_right
         bot_by_chords[b"t"] = self.do_slip_index_minus
