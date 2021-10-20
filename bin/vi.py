@@ -218,9 +218,8 @@ class TerminalEditor:
         self.slip_undo = None
         # TODO: self.last_slip = instance of collections.namedtuple
 
-        self.stepping_column = None
-        self.stepping_more = None
-        # TODO: self.last_step = instance of collections.namedtuple
+        self.seeking_more = None
+        self.seeking_column = None
 
     #
     # Work closely with one TerminalDriver and one TerminalPainter
@@ -350,7 +349,7 @@ class TerminalEditor:
 
             # Raise a NameError when no Bot found
 
-            bot = self.do_raise_name_error
+            bot = bot_by_chords[None]  # commonly 'self.do_raise_name_error'
 
             return bot
 
@@ -374,7 +373,7 @@ class TerminalEditor:
 
         # Default to stop remembering the last Stepping Column
 
-        self.stepping_more = None
+        self.seeking_more = None
 
         # Start calling
 
@@ -425,8 +424,8 @@ class TerminalEditor:
 
         # Help many Steps between Rows leave the choice of Column unmoved
 
-        if not self.stepping_more:
-            self.stepping_column = None
+        if not self.seeking_more:
+            self.seeking_column = None
 
     def send_reply_soon(self, message=None):
         """Capture some Status now, to show with next Prompt"""
@@ -478,6 +477,11 @@ class TerminalEditor:
         """Ask to run again, like to run for a total of 'self.arg1' times"""
 
         self.doing_more = True
+
+    def continue_column_seek(self):
+        """Ask to seek again, like to keep on choosing the last Column in each Row"""
+
+        self.seeking_more = True
 
     #
     # Focus on one Line of a File of Lines
@@ -673,6 +677,8 @@ class TerminalEditor:
         self.column = column
 
     #
+    # Repeat search inside the Row for a single Char
+    #
 
     def do_slip_choice_redo(self):  # Vim ;
         """Repeat the last 'slip_index' or 'slip_rindex' once or more"""
@@ -736,11 +742,18 @@ class TerminalEditor:
 
                 raise
 
-    #
+    # TODO: shuffle the index/ rindex/ redo past the rest
 
-    def do_slip_dent(self):  # Vim _
+    def do_slip_dent(self):  # Vim ^
+        """Leap to just past the Indent, but first Step Down if Arg"""
+
+        if self.arg1:  # Vim squelches this
+            self.send_reply_soon("Press {}_ to step down".format(self.arg1))
+
+        self.slip_dent()
+
+    def slip_dent(self):
         """Leap to the Column after the Indent"""
-        # silently ignore Arg  # TODO: Vim doesn't
 
         text = self.copy_row()
         lstripped = text.lstrip()
@@ -755,6 +768,8 @@ class TerminalEditor:
 
         self.column = 0
 
+    #
+    # Search ahead inside the Row for a single Char
     #
 
     def do_slip_index(self):  # Vim fx
@@ -855,12 +870,15 @@ class TerminalEditor:
 
             self.continue_do_loop()
 
+    # TODO move this to join the other 'self.continue_column_seek' callers
     def do_slip_last(self):  # Vim $  # emacs move-end-of-line
-        """Leap to the last Column in Row"""
-        # FIXME: Vim says '$' should mean choose last col again in next row
-        # FIXME: Vim says N'$' should mean (N-1)'j' '$'
+        """Leap to the last Column in Row, and keep seeking last Columns"""
 
+        self.seeking_column = True
+        self.step_down_minus()
         self.column = self.find_last_column()
+
+        self.continue_column_seek()
 
     def do_slip_left(self):  # Vim h, Left  # emacs left-char, backward-char
         """Slip left one Column or more"""
@@ -879,6 +897,8 @@ class TerminalEditor:
         right = min(last_column - self.column, self.get_arg1())
         self.column += right
 
+    #
+    # Search behind inside the Row for a single Char
     #
 
     def do_slip_rindex(self):  # Vim Fx
@@ -949,86 +969,109 @@ class TerminalEditor:
         row = last_row if (self.arg1 is None) else row
 
         self.row = row
-        self.step_clip_column()
+        self.slip_dent()
 
+    # TODO move this to join the other 'self.continue_column_seek' callers
     def do_step_down(self):  # Vim j, ⌃J, ⌃N, Down  # emacs next-line
-        """Step down a Row or more"""
+        """Step down one Row or more, but seek the current Column"""
 
-        last_row = self.find_last_row()
-        self.require(self.row < last_row)
+        if self.seeking_column is None:
+            self.seeking_column = self.column
 
-        down = min(last_row - self.row, self.get_arg1())
+        self.step_down()
 
-        self.row += down
-        self.step_clip_column()
+        self.column = self.seek_column()
+        self.continue_column_seek()
 
     def do_step_down_dent(self):  # Vim +, Return
         """Step down a Row or more, but land just past the Indent"""
 
-        self.do_step_down()
-        self.do_slip_dent()
+        self.step_down()
+        self.slip_dent()
 
     def do_step_down_minus_dent(self):  # Vim _
         """Leap to just past the Indent, but first Step Down if Arg"""
 
-        down = self.get_arg1() - 1
-        if down:
-            self.arg1 -= 1  # mutate
-            self.do_step_down()
-
-        self.do_slip_dent()
+        self.step_down_minus()
+        self.slip_dent()
 
     def do_step_max_low(self):  # Vim L
         """Leap to first Word of Bottom Row on Screen"""
 
         self.row = self.find_bottom_row()
-        self.do_slip_dent()
+        self.slip_dent()
 
     def do_step_max_high(self):  # Vim H
         """Leap to first Word of Top Row on Screen"""
 
         self.row = self.top_row
-        self.do_slip_dent()
+        self.slip_dent()
 
     def do_step_to_middle(self):  # Vim M
         """Leap to first Word of Middle Row on Screen"""
 
         self.row = self.find_middle_row()
-        self.do_slip_dent()
+        self.slip_dent()
+
+    #
+    # Step the Cursor up and down between Rows, while holding on to the Column
+    #
+
+    def step_down_minus(self):
+        """Step down zero or more Rows, not one or more Rows"""
+
+        down = self.get_arg1() - 1
+        if down:
+            self.arg1 -= 1  # mutate
+            self.step_down()
+
+    def step_down(self):
+        """Step down one Row or more"""
+
+        last_row = self.find_last_row()
+
+        self.require(self.row < last_row)
+        down = min(last_row - self.row, self.get_arg1())
+
+        self.row += down
 
     def do_step_up(self):  # Vim k, ⌃P, Up  # emacs previous-line
-        """Step up a Row or more"""
+        """Step up a Row or more, but seek the current Column"""
+
+        if self.seeking_column is None:
+            self.seeking_column = self.column
+
+        self.step_up()
+
+        self.column = self.seek_column()
+        self.continue_column_seek()
+
+    def step_up(self):
+        """Step up one Row or more"""
 
         self.require(self.row)
-
         up = min(self.row, self.get_arg1())
 
         self.row -= up
-        self.step_clip_column()
 
+    # TODO : move this out of the 'self.continue_column_seek' crowd
     def do_step_up_dent(self):  # Vim -
         """Step up a Row or more, but land just past the Indent"""
 
-        self.do_step_up()
-        self.do_slip_dent()
+        self.step_up()
+        self.slip_dent()
 
-    def step_clip_column(self):
-        """Restore Column when lost only by Stepping from Row to Row"""
+    def seek_column(self, column=True):
+        """Begin seeking a Column, if not begun already"""
 
-        column = self.column
         last_column = self.find_last_column()
 
-        self.stepping_more = True
-        if not self.stepping_column:
-            self.stepping_column = column
-
-        stepping_column = self.stepping_column
-        if stepping_column is not None:
-            clipped_column = min(self.stepping_column, last_column)
+        if self.seeking_column is True:
+            chosen_column = last_column
         else:
-            clipped_column = min(column, last_column)
+            chosen_column = min(last_column, self.seeking_column)
 
-        self.column = clipped_column
+        return chosen_column
 
     #
     # Scroll to show more than one Screen of File
@@ -1039,53 +1082,18 @@ class TerminalEditor:
 
         raise NotImplementedError()
 
-        if self.arg1:
-            self.do_screen_row_down()
-        else:
-            self.scroll_ahead_some_once()
-
     def do_scroll_behind_some(self):  # Vim ⌃U
         """TODO: Scroll behind some, just once or more"""
 
         raise NotImplementedError()
-
-        arg = self.arg1
-        reps = 1 if (arg is None) else arg
-
-        for _ in range(reps):
-            self.half_screen_up_once()
 
     def scroll_ahead_some_once(self):
         """TODO: Scroll ahead some"""
 
         raise NotImplementedError()
 
-        row = self.row
-        top_row = self.top_row
-        painter = self.painter
-
-        last_row = self.find_last_row()
-
-        old_cursor_row = row - top_row
-        rows_per_half_screen = painter.scrolling_rows // 2
-
-        # Choose new Top Row
-
-        top_row += rows_per_half_screen
-        top_row = min(top_row, last_row)
-
-        self.top_row = top_row
-
-        # Choose new Row and Column
-
-        row = top_row + old_cursor_row
-        if row > last_row:
-            row = last_row
-
-        self.row = row
-
-        self.do_slip_dent()
-
+    #
+    # Scroll ahead or behind almost one Whole Screen of Rows
     #
 
     def do_scroll_ahead_much(self):  # Vim ⌃F
@@ -1132,7 +1140,7 @@ class TerminalEditor:
 
         self.row = row
 
-        self.do_slip_dent()
+        self.slip_dent()
 
         self.continue_do_loop()
 
@@ -1175,10 +1183,12 @@ class TerminalEditor:
         if row > bottom_row:
             self.row = bottom_row
 
-        self.do_slip_dent()
+        self.slip_dent()
 
         self.continue_do_loop()
 
+    #
+    # Scroll ahead or behind one Row of Screen
     #
 
     def do_scroll_ahead_one(self):  # Vim ⌃E
@@ -1207,7 +1217,7 @@ class TerminalEditor:
         self.top_row = top_row
         self.row = row
 
-        self.do_slip_dent()
+        self.slip_dent()
 
         self.continue_do_loop()
 
@@ -1240,7 +1250,7 @@ class TerminalEditor:
         self.top_row = top_row
         self.row = row
 
-        self.do_slip_dent()
+        self.slip_dent()
 
         self.continue_do_loop()
 
@@ -1252,6 +1262,8 @@ class TerminalEditor:
         """Define lots of keyboard input Chord Sequences"""
 
         bot_by_chords = dict()
+
+        bot_by_chords[None] = self.do_raise_name_error
 
         bot_by_chords[b"\x02"] = self.do_scroll_behind_much  # STX, aka ⌃B, aka 2
         bot_by_chords[b"\x03"] = self.do_help_quit  # ETX, aka ⌃C, aka 3
