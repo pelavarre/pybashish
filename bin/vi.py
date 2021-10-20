@@ -45,7 +45,7 @@ import tty
 
 # Name some Terminal Output magic
 
-ESC = "\x1B"  # Escape
+ESC = "\x1B"  # Esc
 CSI = ESC + "["  # Control Sequence Introducer (CSI)
 CUP_Y_X = CSI + "{};{}H"  # Cursor Position (CUP)
 CUP_1_1 = CUP_Y_X.format(1, 1)  # Cursor Position (CUP)  # (1, 1) = Upper Left
@@ -145,10 +145,38 @@ def parse_vi_argv(argv):
     return args
 
 
-TerminalStatus = collections.namedtuple(
-    "TerminalStatus",
-    "digits, chords, whisper, mention, shout".split(", "),
-    defaults=(None, None, None, None, None),
+#
+# Edit a Buffer of Chars Fetched from a File
+#
+
+
+class TerminalNudgeIn(argparse.Namespace):
+    """Collect keyboard input Chords"""
+
+    def __init__(self, prefix=None, chords=None, suffix=None):
+
+        self.prefix = prefix
+        self.chords = chords
+        self.suffix = suffix
+
+    def format_echo_bytes(self):
+
+        echo = b""
+
+        if self.prefix is not None:
+            echo += self.prefix
+        if self.chords is not None:
+            echo += self.chords
+        if self.suffix is not None:
+            echo += self.suffix
+
+        return echo
+
+
+TerminalReplyOut = collections.namedtuple(
+    "TerminalReplyOut",
+    "nudge, message".split(", "),
+    defaults=(None, None),
 )
 
 
@@ -166,7 +194,7 @@ class TerminalEditor:
         self.row = 0
         self.column = 0
 
-        self.status = TerminalStatus()
+        self.reply = TerminalReplyOut()
 
         chars = iobytearray.decode(errors="surrogateescape")
         lines = chars.splitlines(keepends=True)
@@ -174,12 +202,13 @@ class TerminalEditor:
         self.top_row = 0
         self.set_number = None
 
-        self.bots_by_stdin = self._calc_bots_by_stdin()
+        self.bot_by_chords = self._calc_bot_by_chords()
+        self.more_by_chords = self._calc_more_by_chords()
 
-        self.digits = b""
-        self.arg = None
+        self.nudge = TerminalNudgeIn()
+        self.arg1 = None
+        self.arg2 = None
 
-        self.chords = b""
         self.doing_more = None
         self.done = None
 
@@ -220,23 +249,21 @@ class TerminalEditor:
 
                 except KeyboardInterrupt:
 
-                    chord = b"\x03"  # ETX, aka ⌃C, aka 3
+                    if self.nudge != TerminalNudgeIn():
+                        self.nudge.suffix += b"\x03"  # ETX, aka ⌃C, aka 3
+                        self.send_reply_soon("cancelled")
 
-                    if self.digits or self.chords:
-                        self.chords += chord
-                        self.send_status_soon(whisper="cancelled")
-
-                        self.digits = b""
-                        self.chords = b""
+                        self.nudge = TerminalNudgeIn()
 
                         continue
+
+                    chord = b"\x03"  # ETX, aka ⌃C, aka 3
 
                 bot = self.choose_bot(chord)
                 if bot is not None:
                     self.call_bot(bot)
 
-                    self.digits = b""
-                    self.chords = b""
+                    self.nudge = TerminalNudgeIn()
 
     def scroll(self):
         """Scroll to place Cursor on Screen"""
@@ -254,12 +281,16 @@ class TerminalEditor:
     def prompt(self):
         """Write over the Rows of Chars on Screen"""
 
+        # Pull from Self
+
         painter = self.painter
 
         lines = self.lines
         top_lines = lines[self.top_row :]
 
-        str_status = self.consume_status()
+        str_reply = self.consume_reply()
+
+        # Push into the Painter
 
         painter.top_line_number = 1 + self.top_row
         painter.bottom_line_number = 1 + len(lines)
@@ -268,42 +299,75 @@ class TerminalEditor:
         painter.cursor_row = self.row - self.top_row
         painter.cursor_column = self.column
 
-        painter.paint_diffs(lines=top_lines, status=str_status)
+        painter.paint_diffs(lines=top_lines, status=str_reply)
 
     def choose_bot(self, chord):
         """Join together zero or more Digits and then one or more other Chords"""
 
-        bot = None
+        prefix = self.nudge.prefix
+        chords = self.nudge.chords
+        suffix = self.nudge.suffix
 
-        # Accept the digits of a Non-Negative Int,
-        # as a prefix Int Arg before any other Chords
+        bot_by_chords = self.bot_by_chords
+        more_by_chords = self.more_by_chords
 
-        if not self.chords:
+        # Collect the Prefix
 
-            if (chord in b"123456789") or (self.digits and (chord == b"0")):
-                self.digits += chord
-                self.send_status_soon(whisper=None)
+        if not chords:
 
-                return bot  # is None, to ask for more Digits or Chords
+            if (chord in b"123456789") or (prefix and (chord == b"0")):
 
-        self.arg = int(self.digits) if self.digits else None
-        assert self.get_arg() >= 1
+                prefix_plus = chord if (prefix is None) else (prefix + chord)
+                self.nudge.prefix = prefix_plus
+                self.send_reply_soon()
 
-        # Accept one more keyboard input Chord
+                return None  # ask for Chords
 
-        self.chords += chord
-        self.send_status_soon(whisper=None)  # a la Vim :set showcmd
+        self.arg1 = int(prefix) if prefix else None
+        assert self.get_arg1() >= 1
 
-        # Find the Bot named by the accepted Chords, if any
+        # Collect the Chords
 
-        bots_by_stdin = self.bots_by_stdin
-        chords = self.chords
+        if chords not in more_by_chords.keys():
 
-        bot = self.do_raise_name_error
-        if chords in bots_by_stdin.keys():
-            bot = bots_by_stdin[chords]
+            chords_plus = chord if (chords is None) else (chords + chord)
+            self.nudge.chords = chords_plus
+            self.send_reply_soon()
 
-        return bot  # may be None, to ask for more Chords
+            if chords_plus in more_by_chords.keys():
+
+                return None  # ask for Suffix
+
+            self.arg2 = None
+
+            # Call a Bot with 0 or 1 Args
+
+            if chords_plus in bot_by_chords.keys():
+
+                bot = bot_by_chords[chords_plus]
+
+                return bot  # may be None, to ask for more Chords
+
+            # Raise a NameError when no Bot found
+
+            bot = self.do_raise_name_error
+
+            return bot
+
+        # Collect the Suffix
+
+        assert suffix is None, (chords, chord, suffix)  # one Chord only
+        self.nudge.suffix = chord
+        self.send_reply_soon()
+
+        self.arg2 = chord.decode(errors="surrogateescape")
+
+        # Call a Bot with 2 Args
+
+        bot = bot_by_chords[chords]
+        assert bot is not None, (chords, chord)
+
+        return bot
 
     def call_bot(self, bot):
         """Call the Bot once or more"""
@@ -328,8 +392,8 @@ class TerminalEditor:
 
             except KeyboardInterrupt:
 
-                self.chords += b"\x03"  # ETX, aka ⌃C, aka 3
-                self.send_status_soon("interrupted")
+                self.nudge.suffix += b"\x03"  # ETX, aka ⌃C, aka 3
+                self.send_reply_soon("interrupted")
                 self.log = None
 
                 break
@@ -338,14 +402,13 @@ class TerminalEditor:
 
             except Exception as exc:
 
-                type_exc_name = type(exc).__name__
+                name = type(exc).__name__
                 str_exc = str(exc)
+                message = "{}: {}".format(name, str_exc) if str_exc else name
+
                 self.log = traceback.format_exc()
 
-                detailed_status = "{}: {}".format(type_exc_name, str_exc)
-                status = detailed_status if str_exc else type_exc_name
-                self.send_status_soon(status)
-
+                self.send_reply_soon(message)
                 self.painter.ring_bell_soon()
 
                 break
@@ -354,7 +417,7 @@ class TerminalEditor:
 
             if self.doing_more:
                 self.done += 1
-                if self.done < self.get_arg():
+                if self.done < self.get_arg1():
 
                     continue
 
@@ -365,50 +428,40 @@ class TerminalEditor:
         if not self.stepping_more:
             self.stepping_column = None
 
-    def send_status_soon(self, whisper):
+    def send_reply_soon(self, message=None):
         """Capture some Status now, to show with next Prompt"""
 
-        digits = self.digits
-        chords = self.chords
+        nudge = self.nudge
 
-        status = TerminalStatus(digits=digits, chords=chords, whisper=whisper)
-        self.status = status
+        self.reply = TerminalReplyOut(nudge=nudge, message=message)
 
-    def consume_status(self):
-        """Send Shout else Mention else Row, Column, Digits, Chords, & Whisper"""
+    def consume_reply(self):
+        """Send Shout else Mention else Row, Column, Input, & Whisper"""
 
-        status = self.status
+        reply = self.reply
+        nudge = reply.nudge
 
         #
 
         row_number = 1 + self.row
         column_number = 1 + self.column
 
-        digits_chords = b""
-        if status.digits:
-            digits_chords += status.digits
-        if status.chords:
-            digits_chords += status.chords
+        echo_bytes = b"" if (nudge is None) else nudge.format_echo_bytes()
+        str_echo = repr_vi_bytes(echo_bytes) if echo_bytes else ""
 
-        echo = repr_vi_bytes(digits_chords) if digits_chords else ""
-
-        str_whisper = str(status.whisper) if status.whisper else ""
+        str_message = str(reply.message) if reply.message else ""
 
         #
 
-        str_status = "{},{} {} {}".format(
-            row_number, column_number, echo, str_whisper
+        str_reply = "{},{} {} {}".format(
+            row_number, column_number, str_echo, str_message
         ).rstrip()
-        if status.mention:
-            str_status = str(status.mention)
-        if status.shout:
-            str_status = str(status.shout)
 
         # Consume the Status, before returning a formatted copy of it
 
-        self.status = TerminalStatus()
+        self.reply = TerminalReplyOut()
 
-        return str_status
+        return str_reply
 
     def pull_chord(self):
         """Block till the keyboard input Digit or Chord, else raise KeyboardInterrupt"""
@@ -421,22 +474,8 @@ class TerminalEditor:
 
         return chord
 
-    def chord_more_now(self):
-        """Add another keyboard input chord, but now, not soon"""
-
-        self.scroll()
-        self.prompt()
-
-        chord = self.pull_chord()
-        self.chords += chord
-        self.send_status_soon(whisper=None)
-
-        choice = chord.decode(errors="surrogateescape")
-
-        return choice
-
     def continue_do_loop(self):
-        """Ask to run again, like to run for a total of 'self.arg' times"""
+        """Ask to run again, like to run for a total of 'self.arg1' times"""
 
         self.doing_more = True
 
@@ -495,13 +534,21 @@ class TerminalEditor:
 
         return rows
 
-    def get_arg(self, default=1):
-        """Get the Int of the Digits before the Chords, else the Default"""
+    def get_arg1(self, default=1):
+        """Get the Int of the Prefix Digits before the Chords, else the Default Int"""
 
-        arg = self.arg
-        arg = default if (arg is None) else arg
+        arg1 = self.arg1
+        arg1 = default if (arg1 is None) else arg1
 
-        return arg
+        return arg1
+
+    def get_arg2(self, default=1):
+        """Get the Bytes of the input Suffix past the input Chords"""
+
+        arg2 = self.arg2
+        assert arg2 is not None
+
+        return arg2
 
     def find_bottom_row(self):
         """Find the Bottom Row on Screen, as if enough Rows to fill Screen"""
@@ -563,7 +610,7 @@ class TerminalEditor:
     def do_help_quit(self):  # Vim ⌃C
         """Say how to exit Vi Py"""
 
-        self.send_status_soon("Press ZQ to quit Vi Py without saving last changes")
+        self.send_reply_soon("Press ZQ to quit Vi Py without saving last changes")
 
     def do_raise_name_error(self):  # such as Esc, such as 'ZB'
         """Reply to a meaningless keyboard input Chord Sequence"""
@@ -575,13 +622,6 @@ class TerminalEditor:
 
         painter = self.painter
         painter.repaint_soon()
-
-    def do_ring_bell(self):  # Vim 'chords not in bots_by_stdin.keys()', such as Tab
-
-        """Reject unwanted input"""
-
-        painter = self.painter
-        painter.ring_bell_soon()
 
     def do_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
@@ -596,7 +636,7 @@ class TerminalEditor:
         """Lose last changes and quit"""
 
         returncode = 1 if self.iobytearray else None
-        returncode = self.get_arg(default=returncode)
+        returncode = self.get_arg1(default=returncode)
 
         self.iobytearray[::] = b""
 
@@ -605,7 +645,7 @@ class TerminalEditor:
     def do_save_and_quit(self):  # Vim ZZ  # emacs save-buffers-kill-terminal
         """Save last changes and quit"""
 
-        returncode = self.get_arg(default=None)
+        returncode = self.get_arg1(default=None)
 
         sys.exit(returncode)
 
@@ -617,7 +657,8 @@ class TerminalEditor:
         """Toggle Line-in-File numbers in or out"""
 
         self.set_number = not self.set_number
-        self.status_shout = ":set number" if self.set_number else ":set nonumber"
+        message = ":set number" if self.set_number else ":set nonumber"
+        self.send_reply_soon(message)
 
     #
     # Slip the Cursor into place, in some other Column of the same Row
@@ -627,7 +668,7 @@ class TerminalEditor:
         """Leap to first Column, else to a chosen Column"""
 
         last_column = self.find_last_column()
-        column = min(last_column, self.get_arg() - 1)
+        column = min(last_column, self.get_arg1() - 1)
 
         self.column = column
 
@@ -710,16 +751,16 @@ class TerminalEditor:
     def do_slip_first(self):  # Vim 0  # emacs move-beginning-of-line
         """Leap to the first Column in Row"""
 
-        assert self.arg is None  # Vi Py takes no Digits before Chord 0
+        assert self.arg1 is None  # Vi Py takes no Digits before the Chord 0
 
         self.column = 0
 
     #
 
-    def do_slip_index_chord(self):  # Vim fx
+    def do_slip_index(self):  # Vim fx
         """Find Char to right in Row, once or more"""
 
-        choice = self.chord_more_now()
+        choice = self.get_arg2()
 
         self.slip_choice = choice
         self.slip_after = 0
@@ -728,14 +769,14 @@ class TerminalEditor:
 
         self.slip_redo()
 
-        # TODO: Vi says f⎋ means f⌃C interrupted, not go find the ⎋ Escape Char
+        # TODO: Vi says f⎋ means f⌃C interrupted, not go find the ⎋ Esc Char
         # TODO: Vi says f⌃V means go find the ⌃V char, not prefix of f⌃V⎋
         # TODO: Vi says f⌃? means fail
 
-    def do_slip_index_chord_minus(self):  # Vim tx
+    def do_slip_index_minus(self):  # Vim tx
         """Find Char to Right in row, once or more, but then slip left one Column"""
 
-        choice = self.chord_more_now()
+        choice = self.get_arg2()
 
         self.slip_choice = choice
         self.slip_after = -1
@@ -753,7 +794,7 @@ class TerminalEditor:
         choice = self.slip_choice
         after = self.slip_after
 
-        count = self.get_arg()
+        count = self.get_arg1()
 
         # Index each
 
@@ -826,7 +867,7 @@ class TerminalEditor:
 
         self.require(self.column)
 
-        left = min(self.column, self.get_arg())
+        left = min(self.column, self.get_arg1())
         self.column -= left
 
     def do_slip_right(self):  # Vim l, Right  #  emacs right-char, forward-char
@@ -835,15 +876,15 @@ class TerminalEditor:
         last_column = self.find_last_column()
         self.require(self.column < last_column)
 
-        right = min(last_column - self.column, self.get_arg())
+        right = min(last_column - self.column, self.get_arg1())
         self.column += right
 
     #
 
-    def do_slip_rindex_chord(self):  # Vim Fx
+    def do_slip_rindex(self):  # Vim Fx
         """Find Char to left in Row, once or more"""
 
-        choice = self.chord_more_now()
+        choice = self.get_arg2()
 
         self.slip_choice = choice
         self.slip_after = 0
@@ -852,10 +893,10 @@ class TerminalEditor:
 
         self.slip_redo()
 
-    def do_slip_rindex_chord_plus(self):  # Vim Tx
+    def do_slip_rindex_plus(self):  # Vim Tx
         """Find Char to left in Row, once or more, but then slip right one Column"""
 
-        choice = self.chord_more_now()
+        choice = self.get_arg2()
 
         self.slip_choice = choice
         self.slip_after = +1
@@ -873,7 +914,7 @@ class TerminalEditor:
         choice = self.slip_choice
         after = self.slip_after
 
-        count = self.get_arg()
+        count = self.get_arg1()
 
         # R-Index each
 
@@ -904,8 +945,8 @@ class TerminalEditor:
 
         last_row = self.find_last_row()
 
-        row = min(last_row, self.get_arg() - 1)
-        row = last_row if (self.arg is None) else row
+        row = min(last_row, self.get_arg1() - 1)
+        row = last_row if (self.arg1 is None) else row
 
         self.row = row
         self.step_clip_column()
@@ -916,7 +957,7 @@ class TerminalEditor:
         last_row = self.find_last_row()
         self.require(self.row < last_row)
 
-        down = min(last_row - self.row, self.get_arg())
+        down = min(last_row - self.row, self.get_arg1())
 
         self.row += down
         self.step_clip_column()
@@ -930,9 +971,9 @@ class TerminalEditor:
     def do_step_down_minus_dent(self):  # Vim _
         """Leap to just past the Indent, but first Step Down if Arg"""
 
-        down = self.get_arg() - 1
+        down = self.get_arg1() - 1
         if down:
-            self.arg -= 1  # mutate
+            self.arg1 -= 1  # mutate
             self.do_step_down()
 
         self.do_slip_dent()
@@ -960,7 +1001,7 @@ class TerminalEditor:
 
         self.require(self.row)
 
-        up = min(self.row, self.get_arg())
+        up = min(self.row, self.get_arg1())
 
         self.row -= up
         self.step_clip_column()
@@ -998,7 +1039,7 @@ class TerminalEditor:
 
         raise NotImplementedError()
 
-        if self.arg:
+        if self.arg1:
             self.do_screen_row_down()
         else:
             self.scroll_ahead_some_once()
@@ -1008,7 +1049,7 @@ class TerminalEditor:
 
         raise NotImplementedError()
 
-        arg = self.arg
+        arg = self.arg1
         reps = 1 if (arg is None) else arg
 
         for _ in range(reps):
@@ -1064,7 +1105,7 @@ class TerminalEditor:
 
         if top_row == last_row:
             if not self.done:
-                self.send_status_soon("at end of file")  # Vim squelches this
+                self.send_reply_soon("at end of file")  # Vim squelches this
 
             return
 
@@ -1152,7 +1193,7 @@ class TerminalEditor:
 
         if self.top_row == last_row:
             if not self.done:
-                self.send_status_soon("at end of file")  # Vim squelches this
+                self.send_reply_soon("at end of file")  # Vim squelches this
 
             return
 
@@ -1181,7 +1222,7 @@ class TerminalEditor:
         if not top_row:
 
             if not self.done:
-                self.send_status_soon("at start of file")  # Vim squelches this
+                self.send_reply_soon("at start of file")  # Vim squelches this
 
             return
 
@@ -1207,75 +1248,87 @@ class TerminalEditor:
     # Bind sequences of keyboard input Chords to Code
     #
 
-    def _calc_bots_by_stdin(self):
-        """Enlist some bots to serve many kinds of keystrokes"""
+    def _calc_bot_by_chords(self):
+        """Define lots of keyboard input Chord Sequences"""
 
-        bots_by_stdin = dict()
+        bot_by_chords = dict()
 
-        bots_by_stdin[b"\x02"] = self.do_scroll_behind_much  # STX, aka ⌃B, aka 2
-        bots_by_stdin[b"\x03"] = self.do_help_quit  # ETX, aka ⌃C, aka 3
-        bots_by_stdin[b"\x04"] = self.do_scroll_ahead_some  # EOT, aka ⌃D, aka 4
-        bots_by_stdin[b"\x05"] = self.do_scroll_ahead_one  # ENQ, aka ⌃E, aka 5
-        bots_by_stdin[b"\x06"] = self.do_scroll_ahead_much  # ACK, aka ⌃F, aka 6
+        bot_by_chords[b"\x02"] = self.do_scroll_behind_much  # STX, aka ⌃B, aka 2
+        bot_by_chords[b"\x03"] = self.do_help_quit  # ETX, aka ⌃C, aka 3
+        bot_by_chords[b"\x04"] = self.do_scroll_ahead_some  # EOT, aka ⌃D, aka 4
+        bot_by_chords[b"\x05"] = self.do_scroll_ahead_one  # ENQ, aka ⌃E, aka 5
+        bot_by_chords[b"\x06"] = self.do_scroll_ahead_much  # ACK, aka ⌃F, aka 6
         # BEL, aka ⌃F, aka 7 \a
-        bots_by_stdin[b"\x0A"] = self.do_step_down  # LF, aka ⌃J, aka 10 \n
+        bot_by_chords[b"\x0A"] = self.do_step_down  # LF, aka ⌃J, aka 10 \n
         # VT, aka ⌃K, aka 11 \v
-        bots_by_stdin[b"\x0C"] = self.do_repaint_soon  # FF, aka ⌃L, aka 12 \f
-        bots_by_stdin[b"\x0D"] = self.do_step_down_dent  # CR, aka ⌃M, aka 13 \r
-        bots_by_stdin[b"\x0E"] = self.do_step_down  # SO, aka ⌃N, aka 14
-        bots_by_stdin[b"\x10"] = self.do_step_up  # DLE, aka ⌃P, aka 16
-        bots_by_stdin[b"\x15"] = self.do_scroll_behind_some  # NAK, aka ⌃U, aka 15
-        bots_by_stdin[b"\x19"] = self.do_scroll_behind_one  # EM, aka ⌃Y, aka 25
-        bots_by_stdin[b"\x1A"] = self.do_sig_tstp  # SUB, aka ⌃Z, aka 26
+        bot_by_chords[b"\x0C"] = self.do_repaint_soon  # FF, aka ⌃L, aka 12 \f
+        bot_by_chords[b"\x0D"] = self.do_step_down_dent  # CR, aka ⌃M, aka 13 \r
+        bot_by_chords[b"\x0E"] = self.do_step_down  # SO, aka ⌃N, aka 14
+        bot_by_chords[b"\x10"] = self.do_step_up  # DLE, aka ⌃P, aka 16
+        bot_by_chords[b"\x15"] = self.do_scroll_behind_some  # NAK, aka ⌃U, aka 15
+        bot_by_chords[b"\x19"] = self.do_scroll_behind_one  # EM, aka ⌃Y, aka 25
+        bot_by_chords[b"\x1A"] = self.do_sig_tstp  # SUB, aka ⌃Z, aka 26
 
-        bots_by_stdin[b"\x1B[A"] = self.do_step_up  # ↑ Up Arrow
-        bots_by_stdin[b"\x1B[B"] = self.do_step_down  # ↓ Down Arrow
-        bots_by_stdin[b"\x1B[C"] = self.do_slip_right  # → Right Arrow
-        bots_by_stdin[b"\x1B[D"] = self.do_slip_left  # ← Left Arrow
+        bot_by_chords[b"\x1B[A"] = self.do_step_up  # ↑ Up Arrow
+        bot_by_chords[b"\x1B[B"] = self.do_step_down  # ↓ Down Arrow
+        bot_by_chords[b"\x1B[C"] = self.do_slip_right  # → Right Arrow
+        bot_by_chords[b"\x1B[D"] = self.do_slip_left  # ← Left Arrow
 
-        bots_by_stdin[b" "] = self.do_slip_ahead
-        bots_by_stdin[b"$"] = self.do_slip_last
-        bots_by_stdin[b"+"] = self.do_step_down_dent
-        bots_by_stdin[b","] = self.do_slip_choice_undo
-        bots_by_stdin[b"-"] = self.do_step_up_dent
+        bot_by_chords[b" "] = self.do_slip_ahead
+        bot_by_chords[b"$"] = self.do_slip_last
+        bot_by_chords[b"+"] = self.do_step_down_dent
+        bot_by_chords[b","] = self.do_slip_choice_undo
+        bot_by_chords[b"-"] = self.do_step_up_dent
 
-        bots_by_stdin[b"0"] = self.do_slip_first
+        bot_by_chords[b"0"] = self.do_slip_first
 
-        bots_by_stdin[b";"] = self.do_slip_choice_redo
+        bot_by_chords[b";"] = self.do_slip_choice_redo
 
-        bots_by_stdin[b"F"] = self.do_slip_rindex_chord
-        bots_by_stdin[b"G"] = self.do_step
-        bots_by_stdin[b"H"] = self.do_step_max_high
-        bots_by_stdin[b"M"] = self.do_step_to_middle
-        bots_by_stdin[b"L"] = self.do_step_max_low
-        bots_by_stdin[b"T"] = self.do_slip_rindex_chord_plus
+        bot_by_chords[b"F"] = self.do_slip_rindex
+        bot_by_chords[b"G"] = self.do_step
+        bot_by_chords[b"H"] = self.do_step_max_high
+        bot_by_chords[b"M"] = self.do_step_to_middle
+        bot_by_chords[b"L"] = self.do_step_max_low
+        bot_by_chords[b"T"] = self.do_slip_rindex_plus
 
-        bots_by_stdin[b"Z"] = None
-        bots_by_stdin[b"ZQ"] = self.do_quit
-        bots_by_stdin[b"ZZ"] = self.do_save_and_quit
+        bot_by_chords[b"Z"] = None
+        bot_by_chords[b"ZQ"] = self.do_quit
+        bot_by_chords[b"ZZ"] = self.do_save_and_quit
 
-        bots_by_stdin[b"^"] = self.do_slip_dent
-        bots_by_stdin[b"_"] = self.do_step_down_minus_dent
+        bot_by_chords[b"^"] = self.do_slip_dent
+        bot_by_chords[b"_"] = self.do_step_down_minus_dent
 
-        bots_by_stdin[b"f"] = self.do_slip_index_chord
-        bots_by_stdin[b"j"] = self.do_step_down
-        bots_by_stdin[b"k"] = self.do_step_up
-        bots_by_stdin[b"h"] = self.do_slip_left
-        bots_by_stdin[b"l"] = self.do_slip_right
-        bots_by_stdin[b"t"] = self.do_slip_index_chord_minus
+        bot_by_chords[b"f"] = self.do_slip_index
+        bot_by_chords[b"j"] = self.do_step_down
+        bot_by_chords[b"k"] = self.do_step_up
+        bot_by_chords[b"h"] = self.do_slip_left
+        bot_by_chords[b"l"] = self.do_slip_right
+        bot_by_chords[b"t"] = self.do_slip_index_minus
 
-        bots_by_stdin[b"z"] = None
-        # bots_by_stdin[b"zz"] = self.do_scroll_to_center
+        bot_by_chords[b"z"] = None
+        # bot_by_chords[b"zz"] = self.do_scroll_to_center
 
-        bots_by_stdin[b"|"] = self.do_slip
+        bot_by_chords[b"|"] = self.do_slip
 
-        bots_by_stdin[b"\\"] = None
-        bots_by_stdin[b"\\n"] = self.do_set_invnumber
+        bot_by_chords[b"\\"] = None
+        bot_by_chords[b"\\n"] = self.do_set_invnumber
         # TODO: stop occupying the personal \ Chord Sequences
 
-        bots_by_stdin[b"\x7F"] = self.do_slip_behind  # DEL, aka ⌃?, aka 127
+        bot_by_chords[b"\x7F"] = self.do_slip_behind  # DEL, aka ⌃?, aka 127
 
-        return bots_by_stdin
+        return bot_by_chords
+
+    def _calc_more_by_chords(self):
+        """Ask for more keyboard input Chord Sequences after choosing Code to run"""
+
+        more_by_chords = dict()
+
+        more_by_chords[b"F"] = 1
+        more_by_chords[b"T"] = 1
+        more_by_chords[b"f"] = 1
+        more_by_chords[b"t"] = 1
+
+        return more_by_chords
 
 
 class TerminalPainter:
@@ -1303,7 +1356,7 @@ class TerminalPainter:
         self.cursor_row = 0
         self.cursor_column = 0
 
-        self.soon = None
+        self.write_soon = None
 
     def format_as_line_number(self, index):
         """Format a Row Index on Screen as a Line Number of File"""
@@ -1328,7 +1381,7 @@ class TerminalPainter:
     def ring_bell_soon(self):
         """Ring the bell after next painting Diffs"""
 
-        self.soon = "\a"
+        self.write_soon = "\a"
 
     def paint_diffs(self, lines, status):
         """Write over the Rows of Chars on Screen"""
@@ -1340,8 +1393,8 @@ class TerminalPainter:
         visibles = lines[: (rows - 1)]
         texts = list(_.splitlines()[0] for _ in visibles)
 
-        soon = self.soon
-        self.soon = None
+        write_soon = self.write_soon
+        self.write_soon = None
 
         # Format chars to display
 
@@ -1380,8 +1433,8 @@ class TerminalPainter:
 
         # Ring the bell on demand
 
-        if soon:
-            tty.write(soon)
+        if write_soon:
+            tty.write(write_soon)
 
         # Flush it all now
 
@@ -1537,7 +1590,7 @@ def repr_vi_bytes(xxs):
             rep += " Return"
         elif xx == 27:
             # rep += " ⎋"  # ⎋ \u238B Broken Circle With Northwest Arrow
-            rep += " Escape"
+            rep += " Esc"
         elif xx == 127:
             # rep += " ⌫"  # ⌫ \u232B Erase To The Left
             rep += " Delete"
@@ -1550,15 +1603,15 @@ def repr_vi_bytes(xxs):
             rep += " ⌃" + chr(xx ^ 0x40)
 
         elif (chr_xx in "0123456789") and rep and (rep[-1] in "0123456789"):
-            rep += chr_xx  # no Space between Digits
+            rep += chr_xx  # no Space between Digits in Prefix or Chords or Suffix
 
         else:
             rep += " " + chr_xx
 
-    rep = rep.replace("Escape [ A", "Up")  # aka ↑ \u2191 Upwards Arrow
-    rep = rep.replace("Escape [ B", "Down")  # aka ↓ \u2193 Downwards Arrow
-    rep = rep.replace("Escape [ C", "Right")  # aka → \u2192 Rightwards Arrow
-    rep = rep.replace("Escape [ D", "Left")  # aka ← \u2190 Leftwards Arrows
+    rep = rep.replace("Esc [ A", "Up")  # aka ↑ \u2191 Upwards Arrow
+    rep = rep.replace("Esc [ B", "Down")  # aka ↓ \u2193 Downwards Arrow
+    rep = rep.replace("Esc [ C", "Right")  # aka → \u2192 Rightwards Arrow
+    rep = rep.replace("Esc [ D", "Left")  # aka ← \u2190 Leftwards Arrows
 
     rep = rep.strip()
 
