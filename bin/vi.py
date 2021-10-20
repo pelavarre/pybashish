@@ -17,8 +17,9 @@ quirks:
     ZQ ZZ ⌃Zfg  => how to exit Vi Py
     ⌃C Up Down Right Left Space Delete Return  => natural enough
     0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
+    { }  => leap to paragraph
     j k G 1G H L M - + _ ⌃J ⌃N ⌃P  => leap to row, leap to line
-    1234567890  => repeat
+    1234567890 Esc  => repeat, or don't
     ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
     \n  => toggle line numbers on and off
 
@@ -28,6 +29,9 @@ examples:
 """
 # we do define the arcane ⌃L to redraw, but we don't mention it in the help
 # we also don't mention ⌃D ⌃U till they stop raising NotImplementedError
+
+# TODO:  b e w B E W { }  => leap to small word, large word, paragraph
+# TODO:  splits words at r"[^ \t]+" and at r"[0-9A-Za-z_]+"
 
 
 import argparse
@@ -611,6 +615,16 @@ class TerminalEditor:
     # Define keys for entering, pausing, exiting Vi Py
     #
 
+    def do_c0_control_esc(self):  # Vim Esc
+        """Cancel Digits Prefix"""
+
+        arg1 = self.arg1
+        painter = self.painter
+
+        if arg1 is None:
+            self.send_reply_soon("Esc pressed without Digits before it")
+            painter.ring_bell_soon()
+
     def do_help_quit(self):  # Vim ⌃C
         """Say how to exit Vi Py"""
 
@@ -1064,6 +1078,43 @@ class TerminalEditor:
         self.continue_do_loop()
 
     #
+    # Search ahead for an empty line
+    #
+
+    def do_paragraph_ahead(self):
+        """Step down over Empty Lines, then over Non-Empty Lines"""
+
+        last_row = self.find_last_row()
+
+        if self.done:
+            if (self.row, self.column) == (last_row, self.find_last_column()):
+                raise IndexError()
+
+        while (self.row < last_row) and not self.find_last_column():
+            self.row += 1
+        while (self.row < last_row) and self.find_last_column():
+            self.row += 1
+
+        self.column = self.find_last_column()
+
+        self.continue_do_loop()
+
+    def do_paragraph_behind(self):
+
+        if self.done:
+            if (self.row, self.column) == (0, 0):
+                raise IndexError()
+
+        while self.row and not self.find_last_column():
+            self.row -= 1
+        while self.row and self.find_last_column():
+            self.row -= 1
+
+        self.column = 0
+
+        self.continue_do_loop()
+
+    #
     # Search ahead inside the Row for a single Char
     #
 
@@ -1277,6 +1328,7 @@ class TerminalEditor:
         bot_by_chords[b"\x15"] = self.do_scroll_behind_some  # NAK, aka ⌃U, aka 15
         bot_by_chords[b"\x19"] = self.do_scroll_behind_one  # EM, aka ⌃Y, aka 25
         bot_by_chords[b"\x1A"] = self.do_sig_tstp  # SUB, aka ⌃Z, aka 26
+        bot_by_chords[b"\x1B"] = self.do_c0_control_esc  # ESC, aka ⌃[, aka 27
 
         bot_by_chords[b"\x1B[A"] = self.do_step_up_seek  # ↑ Up Arrow
         bot_by_chords[b"\x1B[B"] = self.do_step_down_seek  # ↓ Down Arrow
@@ -1317,7 +1369,9 @@ class TerminalEditor:
         bot_by_chords[b"z"] = None
         # bot_by_chords[b"zz"] = self.do_scroll_to_center
 
+        bot_by_chords[b"{"] = self.do_paragraph_behind
         bot_by_chords[b"|"] = self.do_slip
+        bot_by_chords[b"}"] = self.do_paragraph_ahead
 
         bot_by_chords[b"\\"] = None
         bot_by_chords[b"\\n"] = self.do_set_invnumber
