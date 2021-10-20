@@ -24,6 +24,7 @@ quirks:
   does show all but printable ascii as nonprinting, unlike Mac "cat" at \u00A0 &nbsp; etc
   does stop copying at first ⌃D of stdin, even when last line not completed by "\n"
   does print hard b"\x09" tab after each line number, via "{:6}\t", same as bash "cat"
+  doesn't yet accept 'cat.py -n=0' to mean count up from zero
 
 unsurprising quirks:
   prompts for stdin, like mac bash "grep -R .", unlike bash "cat -" and "cat"
