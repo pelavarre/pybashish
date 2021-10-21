@@ -139,7 +139,6 @@ if [[ $? != 0 ]]; then
     function precmd () { eval "$PROMPT_COMMAND"; }
 fi
 
-alias -- -h=--history
 function --history () {
     --exec-echo-xe "history -t '%b %d %H:%M:%S' 0"  # a la Bash HISTTIMEFORMAT
 }
@@ -208,10 +207,10 @@ function a () {
 function b () { --exec-echo-xe pbpaste "$@"; }
 function c () { --exec-echo-xe pbcopy "$@"; }
 function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
-function h () { --more-history; }
+alias h='(--more-history; --history) | g'
 function l () { --exec-echo-xe less -FIXR "$@"; }
 function m () { --exec-echo-xe make "$@"; }
-function n () { --exec-echo-xe cat -n "|expand" "$@"; }
+function n () { --exec-echo-xe cat -tvn "|expand" "$@"; }
 function p () { --exec-echo-xe popd "$@"; }
 function s () { --exec-echo-xe sort "$@"; }
 function u () { --exec-echo-xe uniq "$@"; }
@@ -532,6 +531,7 @@ alias -- -gl='--exec-echo-xe git log'
 alias -- -gp='--exec-echo-xe git prune'
 alias -- -gr='--exec-echo-xe git rebase'
 alias -- -gs='--exec-echo-xe git show'
+alias -- -gsp='--exec-echo-xe git show --pretty='
 
 alias -- -gap='--exec-echo-xe git add --patch'
 alias -- -gba='--exec-echo-xe git branch --all'
@@ -555,7 +555,7 @@ alias -- -gls='--exec-echo-xe git log --stat'
 alias -- -grh='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard'
 alias -- -gri=--git-rebase-interactive
 alias -- -grl='--exec-echo-xe git reflog'
-alias -- -grv='--exec-echo-xe git remote -vvv'
+alias -- -grv='--exec-echo-xe git remote -v'
 alias -- -gs1='--git-show-conflict :1'
 alias -- -gs2='--git-show-conflict :2'
 alias -- -gs3='--git-show-conflict :3'
