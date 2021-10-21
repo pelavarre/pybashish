@@ -13,26 +13,28 @@ optional arguments:
 
 quirks:
   defaults to read Stdin and write Stdout
-  defines only the most basic keyboard input chords of Bash Less/ Vim
-    ZQ ZZ ⌃Zfg  => how to exit Vi Py
-    ⌃C Up Down Right Left Space Delete Return  => natural enough
-    0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
-    b e w B E W { }  => leap across small word, large word, paragraph
-    j k G 1G H L M - + _ ⌃J ⌃N ⌃P  => leap to row, leap to line
-    1234567890 Esc  => repeat, or don't
-    ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
-    \n  => toggle line numbers on and off
+  hides eggs at:  Esc ⌃C \n Qvi 123Esc 123⌃C f⌃C 9^ G⌃F⌃F G⌃F⌃E 1G⌃Y ; ,
+
+demos:
+  ZQ ZZ ⌃Zfg  => how to exit Vi Py
+  ⌃C Up Down Right Left Space Delete Return  => natural enough
+  0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
+  b e w B E W { }  => leap across small word, large word, paragraph
+  j k G 1G H L M - + _ ⌃J ⌃N ⌃P  => leap to row, leap to line
+  1234567890 Esc  => repeat, or don't
+  ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
+  \n  => toggle line numbers on and off
 
 examples:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
-  cat bin/vi.py |bin/vi.py
+  cat bin/vi.py |bin/vi.py -  # demo ZQ, etc
+  cat bin/vi.py |bin/vi.py - |grep import  # demo ZQ vs ZZ
 """
 # we do define the arcane ⌃L to redraw, but we don't mention it in the help
 # we also don't mention ⌃D ⌃U till they stop raising NotImplementedError
 
 
 import argparse
-import collections
 import difflib
 import inspect
 import os
@@ -161,7 +163,16 @@ class TerminalNudgeIn(argparse.Namespace):
         self.chords = chords
         self.suffix = suffix
 
+    def append(self, chords):
+        """Collect next Chord into Suffix, like after collecting Prefix and Chords"""
+
+        suffix = b"" if (self.suffix is None) else self.suffix
+        suffix += chords
+
+        self.suffix = suffix
+
     def format_echo_bytes(self):
+        """Echo input, in order"""
 
         echo = b""
 
@@ -175,11 +186,16 @@ class TerminalNudgeIn(argparse.Namespace):
         return echo
 
 
-TerminalReplyOut = collections.namedtuple(
-    "TerminalReplyOut",
-    "nudge, message".split(", "),
-    defaults=(None, None),
-)
+class TerminalReplyOut(argparse.Namespace):
+    """Collect things to say on the side, apart from main Output, in reply to Input"""
+
+    def __init__(self, nudge=None, message=None):
+
+        self.nudge = nudge
+        self.message = message
+
+    # 'class TerminalReplyOut' could become an immutable 'collections.namedtuple'
+    # because Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
 
 class TerminalEditor:
@@ -251,8 +267,8 @@ class TerminalEditor:
                 except KeyboardInterrupt:
 
                     if self.nudge != TerminalNudgeIn():
-                        self.nudge.suffix += b"\x03"  # ETX, aka ⌃C, aka 3
-                        self.send_reply_soon("cancelled")
+                        self.nudge.append(b"\x03")  # ETX, aka ⌃C, aka 3
+                        self.send_reply_soon("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
 
                         self.nudge = TerminalNudgeIn()
 
@@ -320,7 +336,7 @@ class TerminalEditor:
 
                 prefix_plus = chord if (prefix is None) else (prefix + chord)
                 self.nudge.prefix = prefix_plus
-                self.send_reply_soon()
+                self.send_reply_soon()  # Digits of Vim ':set showcmd'
 
                 return None  # ask for Chords
 
@@ -333,7 +349,7 @@ class TerminalEditor:
 
             chords_plus = chord if (chords is None) else (chords + chord)
             self.nudge.chords = chords_plus
-            self.send_reply_soon()
+            self.send_reply_soon()  # Chords of Vim ':set showcmd'
 
             if chords_plus in more_by_chords.keys():
 
@@ -359,7 +375,7 @@ class TerminalEditor:
 
         assert suffix is None, (chords, chord, suffix)  # one Chord only
         self.nudge.suffix = chord
-        self.send_reply_soon()
+        self.send_reply_soon()  # more than Vim ':set showcmd'
 
         self.arg2 = chord.decode(errors="surrogateescape")
 
@@ -393,8 +409,8 @@ class TerminalEditor:
 
             except KeyboardInterrupt:
 
-                self.nudge.suffix += b"\x03"  # ETX, aka ⌃C, aka 3
-                self.send_reply_soon("interrupted")
+                self.nudge.append(b"\x03")  # ETX, aka ⌃C, aka 3
+                self.send_reply_soon("Interrupted")  # TODO: find this Egg
                 self.log = None
 
                 break
@@ -409,8 +425,8 @@ class TerminalEditor:
 
                 self.log = traceback.format_exc()
 
-                self.send_reply_soon(message)
-                self.painter.ring_bell_soon()
+                self.send_reply_soon(message)  # Egg of NotImplementedError
+                self.send_bell_soon()
 
                 break
 
@@ -454,7 +470,7 @@ class TerminalEditor:
 
         #
 
-        str_reply = "{},{} {} {}".format(
+        str_reply = "{},{}  {}  {}".format(
             row_number, column_number, str_echo, str_message
         ).rstrip()
 
@@ -463,6 +479,11 @@ class TerminalEditor:
         self.reply = TerminalReplyOut()
 
         return str_reply
+
+    def send_bell_soon(self):
+        """Capture some Status now, to show with next Prompt"""
+
+        self.painter.ring_bell_soon()
 
     def pull_chord(self):
         """Block till the keyboard input Digit or Chord, else raise KeyboardInterrupt"""
@@ -635,25 +656,21 @@ class TerminalEditor:
     # Define keys for entering, pausing, exiting Vi Py
     #
 
+    def do_help_quit(self):  # Vim ⌃C
+        """Suggest ZQ to quit Vi Py"""
+
+        self.send_reply_soon("Press ZQ to lose changes and quit Vi Py")  # ⌃C Egg
+
     def do_c0_control_esc(self):  # Vim Esc
-        """Cancel Digits Prefix"""
+        """Cancel Digits Prefix, else suggest ZZ to quit Vi Py"""
 
         arg1 = self.arg1
-        painter = self.painter
 
-        if arg1 is None:
-            self.send_reply_soon("Esc pressed without Digits before it")
-            painter.ring_bell_soon()
-
-    def do_help_quit(self):  # Vim ⌃C
-        """Say how to exit Vi Py"""
-
-        self.send_reply_soon("Press ZQ to quit Vi Py without saving last changes")
-
-    def do_raise_name_error(self):  # such as Esc, such as 'ZB'
-        """Reply to a meaningless keyboard input Chord Sequence"""
-
-        raise NameError()
+        if arg1 is not None:
+            self.send_reply_soon("Escaped")  # 123 Esc Egg, etc
+        else:
+            self.send_reply_soon("Press ZZ to save changes and quit Vi Py")  # Esc Egg
+            self.send_bell_soon()
 
     def do_repaint_soon(self):  # Vim ⌃L
         """Clear the screen and repaint every char, just before next Prompt"""
@@ -661,16 +678,27 @@ class TerminalEditor:
         painter = self.painter
         painter.repaint_soon()
 
+    def do_close_vi(self):  # Vim Q v i Return
+        """Raise NotImplementedError, till we port Ex Mode in from last century"""
+
+        raise NotImplementedError()
+
+    def do_raise_name_error(self):  # such as Esc, such as 'ZB'
+        """Reply to a meaningless keyboard input Chord Sequence"""
+
+        raise NameError()
+
     def do_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
         driver = self.driver
 
-        driver.__exit__(*ExcInfo())
+        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
+        driver.__exit__(*exc_info)
         os.kill(os.getpid(), signal.SIGTSTP)
         driver.__enter__()
 
-    def do_quit(self):  # Vim ZQ  # emacs kill-emacs
+    def do_quit(self):  # Vim ZQ  # Emacs kill-emacs
         """Lose last changes and quit"""
 
         returncode = 1 if self.iobytearray else None
@@ -680,7 +708,7 @@ class TerminalEditor:
 
         sys.exit(returncode)
 
-    def do_save_and_quit(self):  # Vim ZZ  # emacs save-buffers-kill-terminal
+    def do_save_and_quit(self):  # Vim ZZ  # Emacs save-buffers-kill-terminal
         """Save last changes and quit"""
 
         returncode = self.get_arg1(default=None)
@@ -696,13 +724,15 @@ class TerminalEditor:
 
         self.set_number = not self.set_number
         message = ":set number" if self.set_number else ":set nonumber"
-        self.send_reply_soon(message)
+        self.send_reply_soon(message)  # \n Egg
+
+        # TODO: stop occupying the personal \ Chord Sequences
 
     #
     # Slip the Cursor into place, in some other Column of the same Row
     #
 
-    def do_slip(self):  # Vim |  # emacs goto-char
+    def do_slip(self):  # Vim |  # Emacs goto-char
         """Leap to first Column, else to a chosen Column"""
 
         last_column = self.find_last_column()
@@ -713,8 +743,9 @@ class TerminalEditor:
     def do_slip_dent(self):  # Vim ^
         """Leap to just past the Indent, but first Step Down if Arg"""
 
-        if self.arg1:  # Vim squelches this
-            self.send_reply_soon("Press {}_ to step down".format(self.arg1))
+        if self.arg1:
+            arg1 = self.get_arg1()
+            self.send_reply_soon("Did you mean:  {} _".format(arg1))  # 9^ Egg, etc
 
         self.slip_dent()
 
@@ -727,14 +758,14 @@ class TerminalEditor:
 
         self.column = column
 
-    def do_slip_first(self):  # Vim 0  # emacs move-beginning-of-line
+    def do_slip_first(self):  # Vim 0  # Emacs move-beginning-of-line
         """Leap to the first Column in Row"""
 
         assert self.arg1 is None  # Vi Py takes no Digits before the Chord 0
 
         self.column = 0
 
-    def do_slip_left(self):  # Vim h, Left  # emacs left-char, backward-char
+    def do_slip_left(self):  # Vim h, Left  # Emacs left-char, backward-char
         """Slip left one Column or more"""
 
         self.check(self.column)
@@ -828,7 +859,7 @@ class TerminalEditor:
     # Step the Cursor across zero, one, or more Lines of the same File
     #
 
-    def do_step(self):  # Vim G, 1G  # emacs goto-line
+    def do_step(self):  # Vim G, 1G  # Emacs goto-line
         """Leap to last Row, else to a chosen Row"""
 
         last_row = self.find_last_row()
@@ -905,7 +936,7 @@ class TerminalEditor:
     # Step the Cursor up and down between Rows, while holding on to the Column
     #
 
-    def do_slip_last_seek(self):  # Vim $  # emacs move-end-of-line
+    def do_slip_last_seek(self):  # Vim $  # Emacs move-end-of-line
         """Leap to the last Column in Row, and keep seeking last Columns"""
 
         self.seeking_column = True
@@ -914,7 +945,7 @@ class TerminalEditor:
 
         self.continue_column_seek()
 
-    def do_step_down_seek(self):  # Vim j, ⌃J, ⌃N, Down  # emacs next-line
+    def do_step_down_seek(self):  # Vim j, ⌃J, ⌃N, Down  # Emacs next-line
         """Step down one Row or more, but seek the current Column"""
 
         if self.seeking_column is None:
@@ -925,7 +956,7 @@ class TerminalEditor:
         self.column = self.seek_column()
         self.continue_column_seek()
 
-    def do_step_up_seek(self):  # Vim k, ⌃P, Up  # emacs previous-line
+    def do_step_up_seek(self):  # Vim k, ⌃P, Up  # Emacs previous-line
         """Step up a Row or more, but seek the current Column"""
 
         if self.seeking_column is None:
@@ -988,7 +1019,7 @@ class TerminalEditor:
 
         if top_row == last_row:
             if not self.done:
-                self.send_reply_soon("at end of file")  # Vim squelches this
+                self.send_reply_soon("Did you mean ⌃B")  # G⌃F⌃F Egg
 
             return
 
@@ -1078,7 +1109,7 @@ class TerminalEditor:
 
         if self.top_row == last_row:
             if not self.done:
-                self.send_reply_soon("at end of file")  # Vim squelches this
+                self.send_reply_soon("Did you mean ⌃Y")  # G⌃F⌃E Egg
 
             return
 
@@ -1107,7 +1138,7 @@ class TerminalEditor:
         if not top_row:
 
             if not self.done:
-                self.send_reply_soon("at start of file")  # Vim squelches this
+                self.send_reply_soon("Did you mean ⌃E")  # 1G⌃Y Egg
 
             return
 
@@ -1182,9 +1213,11 @@ class TerminalEditor:
 
         self.slip_redo()
 
-        # TODO: Vi says f⎋ means f⌃C interrupted, not go find the ⎋ Esc Char
-        # TODO: Vi says f⌃V means go find the ⌃V char, not prefix of f⌃V⎋
-        # TODO: Vi says f⌃? means fail
+        # TODO: Vim f⎋ means escaped without Bell
+        # TODO: Vim f⌃C means cancelled with Bell
+        # TODO: Vim f⌃? means cancelled with Bell
+
+        # TODO: Vim f⌃Vx means go find a ⌃V char, not go find X
 
     def do_slip_index_minus(self):  # Vim tx
         """Find Char to Right in row, once or more, but then slip left one Column"""
@@ -1323,6 +1356,8 @@ class TerminalEditor:
         self.word_start_behind(charsets)
         self.continue_do_loop()
 
+        # TODO: add option for 'b e w' and 'B E W' to swap places
+
     def do_lil_word_start_behind(self):  # Vim b
 
         charsets = list()
@@ -1428,6 +1463,12 @@ class TerminalEditor:
     def do_slip_choice_redo(self):  # Vim ;
         """Repeat the last 'slip_index' or 'slip_rindex' once or more"""
 
+        if self.slip_choice is None:
+            self.send_reply_soon("Did you mean:  fx;")  # ; Egg
+            self.send_bell_soon()
+
+            return
+
         after = self.slip_after
         if not after:
 
@@ -1458,6 +1499,12 @@ class TerminalEditor:
 
     def do_slip_choice_undo(self):  # Vim ,
         """Undo the last 'slip_index' or 'slip_rindex' once or more"""
+
+        if self.slip_choice is None:
+            self.send_reply_soon("Did you mean:  Fx,")  # , Egg
+            self.send_bell_soon()
+
+            return
 
         after = self.slip_after
         if not after:
@@ -1579,7 +1626,7 @@ class TerminalEditor:
         # bot_by_chords[b"N"] = self.find_behind
         # bot_by_chords[b"O"] = self.do_slip_first_open
         # bot_by_chords[b"P"] = self.do_paste_behind
-        # bot_by_chords[b"Q"] = self.do_close_vi
+        bot_by_chords[b"Q"] = self.do_close_vi
         # bot_by_chords[b"R"] = self.do_open_overwrite
         # bot_by_chords[b"S"] = self.do_slip_first_chop_open
         bot_by_chords[b"T"] = self.do_slip_rindex_plus
@@ -1597,7 +1644,6 @@ class TerminalEditor:
 
         bot_by_chords[b"\\"] = None
         bot_by_chords[b"\\n"] = self.do_set_invnumber
-        # TODO: stop occupying the personal \ Chord Sequences
 
         # bot_by_chords[b"]"]  # TODO
         bot_by_chords[b"^"] = self.do_slip_dent
@@ -1809,10 +1855,10 @@ class TerminalDriver:
 
         return self
 
-    def __exit__(self, *exc_info):
+    def __exit__(self, exc_type, exc_value, traceback):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
-        _ = exc_info
+        _ = (exc_type, exc_value, traceback)
 
         self.tty.flush()
 
@@ -2022,10 +2068,6 @@ endfun
 #
 # Define some Python idioms
 #
-
-ExcInfo = collections.namedtuple(
-    "ExcInfo", "type, value, traceback".split(", "), defaults=(None, None, None)
-)
 
 
 # deffed in many files  # missing from docs.python.org
