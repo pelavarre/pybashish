@@ -20,7 +20,7 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 
 #
 # vim  0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
-# vim  b e w B E W ( ) { }  => leap to small word, large word, sentence, paragraph
+# vim  b e w B E W ( ) { }  => leap across small word, large word, sentence, paragraph
 # vim  j k G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => leap to row, leap to line
 # vim  %  => leap to match balance pair
 #

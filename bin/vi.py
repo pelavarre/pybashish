@@ -17,7 +17,7 @@ quirks:
     ZQ ZZ ⌃Zfg  => how to exit Vi Py
     ⌃C Up Down Right Left Space Delete Return  => natural enough
     0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
-    { }  => leap to paragraph
+    b e w B E W { }  => leap across small word, large word, paragraph
     j k G 1G H L M - + _ ⌃J ⌃N ⌃P  => leap to row, leap to line
     1234567890 Esc  => repeat, or don't
     ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
@@ -30,9 +30,6 @@ examples:
 # we do define the arcane ⌃L to redraw, but we don't mention it in the help
 # we also don't mention ⌃D ⌃U till they stop raising NotImplementedError
 
-# TODO:  b e w B E W { }  => leap to small word, large word, paragraph
-# TODO:  splits words at r"[^ \t]+" and at r"[0-9A-Za-z_]+"
-
 
 import argparse
 import collections
@@ -41,6 +38,7 @@ import inspect
 import os
 import select
 import signal
+import string
 import sys
 import termios
 import traceback
@@ -388,7 +386,7 @@ class TerminalEditor:
             try:
 
                 bot()
-                self.clip_cursor_on_screen()
+                self.keep_cursor_on_file()
                 self.log = None
 
             # Cancel calls on KeyboardInterrupt
@@ -491,34 +489,30 @@ class TerminalEditor:
     # Focus on one Line of a File of Lines
     #
 
-    def clip_cursor_on_screen(self):
-        """Fail faster, like when a bug moves the Cursor out of the File"""
+    def find_column_in_charsets(self, charsets):
+        """Return the Index of the first CharSet containing Column Char, else -1"""
 
-        row = self.row
-        column = self.column
+        chars = self.get_column_char()  # may be empty
+        chars = chars if chars else " "
 
-        rows = self.count_rows_in_file()
-        columns = self.count_columns_in_row()
+        for (index, charset) in enumerate(charsets):
+            if chars in charset:
 
-        # Keep the choice of Row and Column non-negative and in File
+                return index
 
-        before = (row, column)
+        return -1
 
-        if not ((0 <= row < rows) or (row == rows == 0)):
-            row = 0
-        if not ((0 <= column < columns) or (column == columns == 0)):
-            column = 0
+    def get_column_char(self):
+        """Get the one Char at the Column in the Row beneath the Cursor"""
 
-        self.row = row
-        self.column = column
+        row_line = self.lines[self.row]
+        row_text = row_line.splitlines()[0]  # "flat is better than nested"
+        chars = row_text[self.column :][:1]
 
-        # After fixing it, assert we never got it wrong
+        return chars  # 0 or 1 chars
 
-        after = (row, column)
-        self.require(before == after, before=before, after=after)
-
-    def copy_row(self):
-        """Get chars of columns in row"""
+    def get_row_text(self):
+        """Get Chars of Columns in Row beneath Cursor"""
 
         row_line = self.lines[self.row]
         row_text = row_line.splitlines()[0]
@@ -526,7 +520,7 @@ class TerminalEditor:
         return row_text
 
     def count_columns_in_row(self):
-        """Count columns in row"""
+        """Count Columns in Row beneath Cursor"""
 
         row_line = self.lines[self.row]
         row_text = row_line.splitlines()[0]  # "flat is better than nested"
@@ -536,7 +530,7 @@ class TerminalEditor:
         return columns
 
     def count_rows_in_file(self):
-        """Count rows in file"""
+        """Count Rows in Buffer of File"""
 
         rows = len(self.lines)
 
@@ -571,7 +565,7 @@ class TerminalEditor:
         return bottom_row
 
     def find_last_row(self):
-        """Find the Last Row in File, else Row Zero when no Rows in File"""
+        """Find the last Row in File, else Row Zero when no Rows in File"""
 
         rows = len(self.lines)  # "flat is better than nested"
 
@@ -580,7 +574,7 @@ class TerminalEditor:
         return last_row
 
     def find_last_column(self):
-        """Find the Last Column in Row, else Column Zero when no Columns in Row"""
+        """Find the last Column in Row, else Column Zero when no Columns in Row"""
 
         row_line = self.lines[self.row]
         row_text = row_line.splitlines()[0]  # "flat is better than nested"
@@ -602,7 +596,33 @@ class TerminalEditor:
 
         return middle_row
 
-    def require(self, truthy, **kwargs):
+    def keep_cursor_on_file(self):
+        """Fail faster, like when some Bug shoves the Cursor off of Buffer of File"""
+
+        row = self.row
+        column = self.column
+
+        rows = self.count_rows_in_file()
+        columns = self.count_columns_in_row()
+
+        # Keep the choice of Row and Column non-negative and in File
+
+        before = (row, column)
+
+        if not ((0 <= row < rows) or (row == rows == 0)):
+            row = 0
+        if not ((0 <= column < columns) or (column == columns == 0)):
+            column = 0
+
+        self.row = row
+        self.column = column
+
+        # After fixing it, assert we never got it wrong
+
+        after = (row, column)
+        self.check(before == after, before=before, after=after)
+
+    def check(self, truthy, **kwargs):
         """Fail fast, perhaps with details, else proceed"""
 
         if not truthy:
@@ -701,7 +721,7 @@ class TerminalEditor:
     def slip_dent(self):
         """Leap to the Column after the Indent"""
 
-        text = self.copy_row()
+        text = self.get_row_text()
         lstripped = text.lstrip()
         column = len(text) - len(lstripped)
 
@@ -717,7 +737,7 @@ class TerminalEditor:
     def do_slip_left(self):  # Vim h, Left  # emacs left-char, backward-char
         """Slip left one Column or more"""
 
-        self.require(self.column)
+        self.check(self.column)
 
         left = min(self.column, self.get_arg1())
         self.column -= left
@@ -726,7 +746,7 @@ class TerminalEditor:
         """Slip Right one Column or more"""
 
         last_column = self.find_last_column()
-        self.require(self.column < last_column)
+        self.check(self.column < last_column)
 
         right = min(last_column - self.column, self.get_arg1())
         self.column += right
@@ -742,7 +762,7 @@ class TerminalEditor:
         last_row = self.find_last_row()
 
         if not self.done:
-            self.require((self.column < last_column) or (self.row < last_row))
+            self.check((self.column < last_column) or (self.row < last_row))
 
         if self.column < last_column:
             self.column += 1
@@ -755,11 +775,27 @@ class TerminalEditor:
 
             self.continue_do_loop()
 
+    def slip_ahead(self):
+
+        last_column = self.find_last_column()
+        last_row = self.find_last_row()
+
+        if self.column < last_column:
+            self.column += 1
+
+            return 1
+
+        elif self.row < last_row:
+            self.column = 0
+            self.row += 1
+
+            return 1
+
     def do_slip_behind(self):  # Vim Delete
         """Slip left, then up"""
 
         if not self.done:
-            self.require(self.row or self.column)
+            self.check(self.row or self.column)
 
         if self.column:
             self.column -= 1
@@ -771,6 +807,22 @@ class TerminalEditor:
             self.column = self.find_last_column()
 
             self.continue_do_loop()
+
+    def slip_behind(self):  # Vim Delete
+        """Slip left, then up"""
+
+        if self.column:
+            self.column -= 1
+
+            self.continue_do_loop()
+
+            return -1
+
+        elif self.row:
+            self.row -= 1
+            self.column = self.find_last_column()
+
+            return -1
 
     #
     # Step the Cursor across zero, one, or more Lines of the same File
@@ -798,7 +850,7 @@ class TerminalEditor:
 
         last_row = self.find_last_row()
 
-        self.require(self.row < last_row)
+        self.check(self.row < last_row)
         down = min(last_row - self.row, self.get_arg1())
 
         self.row += down
@@ -844,7 +896,7 @@ class TerminalEditor:
     def step_up(self):
         """Step up one Row or more"""
 
-        self.require(self.row)
+        self.check(self.row)
         up = min(self.row, self.get_arg1())
 
         self.row -= up
@@ -1081,7 +1133,7 @@ class TerminalEditor:
     # Search ahead for an empty line
     #
 
-    def do_paragraph_ahead(self):
+    def do_paragraph_ahead(self):  # Vim {
         """Step down over Empty Lines, then over Non-Empty Lines"""
 
         last_row = self.find_last_row()
@@ -1099,7 +1151,7 @@ class TerminalEditor:
 
         self.continue_do_loop()
 
-    def do_paragraph_behind(self):
+    def do_paragraph_behind(self):  # Vim }
 
         if self.done:
             if (self.row, self.column) == (0, 0):
@@ -1150,7 +1202,7 @@ class TerminalEditor:
         """Find Char to Right in row, once or more"""
 
         last_column = self.find_last_column()
-        text = self.copy_row()
+        text = self.get_row_text()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -1163,7 +1215,7 @@ class TerminalEditor:
 
         for _ in range(count):
 
-            self.require(column < last_column)
+            self.check(column < last_column)
             column += 1
 
             right = text[column:].index(choice)
@@ -1172,10 +1224,143 @@ class TerminalEditor:
         # Option to slip back one column
 
         if after:
-            self.require(column)
+            self.check(column)
             column -= 1
 
         self.column = column
+
+    #
+    # Step across Chars of CharSets
+    #
+
+    def do_big_word_end_ahead(self):  # Vim E
+
+        charsets = list()
+        charsets.append(set(" \t"))
+        self.word_end_ahead(charsets)
+        self.continue_do_loop()
+
+    def do_lil_word_end_ahead(self):  # Vim e
+
+        charsets = list()
+        charsets.append(set(" \t"))
+        charsets.append(set(string.ascii_letters + string.digits + "_"))
+
+        self.word_end_ahead(charsets)
+        self.continue_do_loop()
+
+    def word_end_ahead(self, charsets):
+
+        self.slip_ahead()
+
+        while not self.find_column_in_charsets(charsets):
+            if not self.slip_ahead():
+
+                break
+
+        here = self.find_column_in_charsets(charsets)
+        if here:
+
+            beyond = None
+            while self.find_column_in_charsets(charsets) == here:
+                on_last_column = self.column == self.find_last_column()
+                if not self.slip_ahead():
+                    beyond = False
+
+                    break
+
+                beyond = True
+                if on_last_column:
+
+                    break
+
+            if beyond:
+                self.slip_behind()
+
+    def do_big_word_start_ahead(self):  # Vim W
+
+        charsets = list()
+        charsets.append(set(" \t"))
+        self.word_start_ahead(charsets)
+        self.continue_do_loop()
+
+    def do_lil_word_start_ahead(self):  # Vim w
+
+        charsets = list()
+        charsets.append(set(" \t"))
+        charsets.append(set(string.ascii_letters + string.digits + "_"))
+        self.word_start_ahead(charsets)
+        self.continue_do_loop()
+
+    def word_start_ahead(self, charsets):
+
+        here = self.find_column_in_charsets(charsets)
+        if here:
+
+            while self.find_column_in_charsets(charsets) == here:
+                on_last_column = self.column == self.find_last_column()
+                if not self.slip_ahead():
+
+                    break
+
+                if on_last_column:
+
+                    break
+
+            if not self.column:
+
+                return
+
+        while not self.find_column_in_charsets(charsets):
+            if not self.slip_ahead():
+
+                break
+
+    def do_big_word_start_behind(self):  # Vim B
+
+        charsets = list()
+        charsets.append(set(" \t"))
+        self.word_start_behind(charsets)
+        self.continue_do_loop()
+
+    def do_lil_word_start_behind(self):  # Vim b
+
+        charsets = list()
+        charsets.append(set(" \t"))
+        charsets.append(set(string.ascii_letters + string.digits + "_"))
+        self.word_start_behind(charsets)
+        self.continue_do_loop()
+
+    def word_start_behind(self, charsets):
+
+        self.slip_behind()
+
+        on_first_column = self.column == 0
+        if not on_first_column:
+
+            while not self.find_column_in_charsets(charsets):
+                if not self.slip_behind():
+
+                    break
+
+            here = self.find_column_in_charsets(charsets)
+            if here:
+
+                beyond = None
+                while self.find_column_in_charsets(charsets) == here:
+                    on_first_column = self.column == 0
+                    if not self.slip_behind():
+                        beyond = False
+
+                        break
+
+                    beyond = True
+                    if on_first_column:
+
+                        break
+
+                if beyond:
+                    self.slip_ahead()
 
     #
     # Search behind inside the Row for a single Char
@@ -1209,7 +1394,7 @@ class TerminalEditor:
         """Find Char to left in Row, once or more"""
 
         last_column = self.find_last_column()
-        text = self.copy_row()
+        text = self.get_row_text()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -1222,7 +1407,7 @@ class TerminalEditor:
 
         for _ in range(count):
 
-            self.require(column)
+            self.check(column)
             column -= 1
 
             column = text[: (column + 1)].rindex(choice)
@@ -1231,7 +1416,7 @@ class TerminalEditor:
 
         if after:
 
-            self.require(column < last_column)
+            self.check(column < last_column)
             column += 1
 
         self.column = column
@@ -1313,58 +1498,137 @@ class TerminalEditor:
 
         bot_by_chords[None] = self.do_raise_name_error
 
+        # bot_by_chords[b"\x00"]  # NUL, aka ⌃@, aka 0
+        # bot_by_chords[b"\x01"]  # SOH, aka ⌃A, aka 1
         bot_by_chords[b"\x02"] = self.do_scroll_behind_much  # STX, aka ⌃B, aka 2
         bot_by_chords[b"\x03"] = self.do_help_quit  # ETX, aka ⌃C, aka 3
         bot_by_chords[b"\x04"] = self.do_scroll_ahead_some  # EOT, aka ⌃D, aka 4
         bot_by_chords[b"\x05"] = self.do_scroll_ahead_one  # ENQ, aka ⌃E, aka 5
         bot_by_chords[b"\x06"] = self.do_scroll_ahead_much  # ACK, aka ⌃F, aka 6
-        # BEL, aka ⌃F, aka 7 \a
+        # bot_by_chords[b"\x07"}  # BEL, aka ⌃G, aka 7 \a
+        # bot_by_chords[b"\x08"]  # BS, aka ⌃H, aka 8 \b
+        # bot_by_chords[b"\x09"]  # TAB, aka ⌃I, aka 9 \t
         bot_by_chords[b"\x0A"] = self.do_step_down_seek  # LF, aka ⌃J, aka 10 \n
-        # VT, aka ⌃K, aka 11 \v
+        # bot_by_chords[b"\x0B"]  # VT, aka ⌃K, aka 11 \v
         bot_by_chords[b"\x0C"] = self.do_repaint_soon  # FF, aka ⌃L, aka 12 \f
         bot_by_chords[b"\x0D"] = self.do_step_down_dent  # CR, aka ⌃M, aka 13 \r
         bot_by_chords[b"\x0E"] = self.do_step_down_seek  # SO, aka ⌃N, aka 14
+        # bot_by_chords[b"\x0F"]  # SI, aka ⌃O, aka 15
         bot_by_chords[b"\x10"] = self.do_step_up_seek  # DLE, aka ⌃P, aka 16
-        bot_by_chords[b"\x15"] = self.do_scroll_behind_some  # NAK, aka ⌃U, aka 15
+        # bot_by_chords[b"\x11"]  # DC1, aka XON, aka ⌃Q, aka 17
+        # bot_by_chords[b"\x12"]  # DC2, aka ⌃R, aka 18
+        # bot_by_chords[b"\x13"]  # DC3, aka XOFF, aka ⌃S, aka 19
+        # bot_by_chords[b"\x14"]  # DC4, aka ⌃T, aka 20
+        bot_by_chords[b"\x15"] = self.do_scroll_behind_some  # NAK, aka ⌃U, aka 21
+        # bot_by_chords[b"\x16"]  # SYN, aka ⌃V, aka 22
+        # bot_by_chords[b"\x17"]  # ETB, aka ⌃W, aka 23
+        # bot_by_chords[b"\x18"]  # CAN, aka ⌃X , aka 24
         bot_by_chords[b"\x19"] = self.do_scroll_behind_one  # EM, aka ⌃Y, aka 25
         bot_by_chords[b"\x1A"] = self.do_sig_tstp  # SUB, aka ⌃Z, aka 26
-        bot_by_chords[b"\x1B"] = self.do_c0_control_esc  # ESC, aka ⌃[, aka 27
 
+        bot_by_chords[b"\x1B"] = self.do_c0_control_esc  # ESC, aka ⌃[, aka 27
         bot_by_chords[b"\x1B[A"] = self.do_step_up_seek  # ↑ Up Arrow
         bot_by_chords[b"\x1B[B"] = self.do_step_down_seek  # ↓ Down Arrow
         bot_by_chords[b"\x1B[C"] = self.do_slip_right  # → Right Arrow
         bot_by_chords[b"\x1B[D"] = self.do_slip_left  # ← Left Arrow
 
+        # bot_by_chords[b"\x1C"] = self.eval_readline   # FS, aka ⌃\, aka 28
+        # bot_by_chords[b"\x1D"]  # GS, aka ⌃], aka 29
+        # bot_by_chords[b"\x1E"]  # RS, aka ⌃^, aka 30  # try this after edit in: |vi -
+        # bot_by_chords[b"\x1F"]  # US, aka ⌃_, aka 31
+
         bot_by_chords[b" "] = self.do_slip_ahead
+        # bot_by_chords[b"!"] = self.do_pipe
+        # bot_by_chords[b'"'] = self.do_arg
+        # bot_by_chords[b'#'] = self.do_lil_word_find_behind
         bot_by_chords[b"$"] = self.do_slip_last_seek
+        # bot_by_chords[b"%"]  # TODO: leap to match
+        # bot_by_chords[b"&"]  # TODO: & and && for repeating substitution
+        # bot_by_chords[b"'"]  # TODO: leap to pin
+        # bot_by_chords[b"("]  # TODO: sentence behind
+        # bot_by_chords[b")"]  # TODO: sentence ahead
+        # bot_by_chords[b'*'] = self.do_lil_word_find_ahead
         bot_by_chords[b"+"] = self.do_step_down_dent
         bot_by_chords[b","] = self.do_slip_choice_undo
         bot_by_chords[b"-"] = self.do_step_up_dent
+        # bot_by_chords[b"/"] = self.find_ahead_readline
 
         bot_by_chords[b"0"] = self.do_slip_first
 
+        # bot_by_chords[b":"]  # TODO: escape vi
         bot_by_chords[b";"] = self.do_slip_choice_redo
+        # bot_by_chords[b"<"]  # TODO: dedent
+        # bot_by_chords[b"="]  # TODO: dent after
+        # bot_by_chords[b">"]  # TODO: indent
+        # bot_by_chords[b"?"] = self.find_behind_readline
+        # bot_by_chords[b"@"]  # TODO: play
 
+        # bot_by_chords[b"A"] = self.do_slip_last_right_open
+        bot_by_chords[b"B"] = self.do_big_word_start_behind
+        # bot_by_chords[b"C"] = self.do_chop_open
+        # bot_by_chords[b"D"] = self.do_chop
+        bot_by_chords[b"E"] = self.do_big_word_end_ahead
         bot_by_chords[b"F"] = self.do_slip_rindex
         bot_by_chords[b"G"] = self.do_step
         bot_by_chords[b"H"] = self.do_step_max_high
-        bot_by_chords[b"M"] = self.do_step_to_middle
+        # bot_by_chords[b"I"] = self.do_slip_dent_open
+        # bot_by_chords[b"J"] = self.do_slip_last_join_right
+        # bot_by_chords[b"K"] = self.do_lookup
         bot_by_chords[b"L"] = self.do_step_max_low
+        bot_by_chords[b"M"] = self.do_step_to_middle
+        # bot_by_chords[b"N"] = self.find_behind
+        # bot_by_chords[b"O"] = self.do_slip_first_open
+        # bot_by_chords[b"P"] = self.do_paste_behind
+        # bot_by_chords[b"Q"] = self.do_close_vi
+        # bot_by_chords[b"R"] = self.do_open_overwrite
+        # bot_by_chords[b"S"] = self.do_slip_first_chop_open
         bot_by_chords[b"T"] = self.do_slip_rindex_plus
+        # bot_by_chords[b"U"] = self.do_row_undo
+        # bot_by_chords[b"V"] = self.do_mark_rows
+        bot_by_chords[b"W"] = self.do_big_word_start_ahead
+        # bot_by_chords[b"X"] = self.do_cut_behind
+        # bot_by_chords[b"Y"] = self.do_copy_row
 
         bot_by_chords[b"Z"] = None
         bot_by_chords[b"ZQ"] = self.do_quit
         bot_by_chords[b"ZZ"] = self.do_save_and_quit
 
+        # bot_by_chords[b"["]  # TODO
+
+        bot_by_chords[b"\\"] = None
+        bot_by_chords[b"\\n"] = self.do_set_invnumber
+        # TODO: stop occupying the personal \ Chord Sequences
+
+        # bot_by_chords[b"]"]  # TODO
         bot_by_chords[b"^"] = self.do_slip_dent
         bot_by_chords[b"_"] = self.do_step_down_minus_dent
+        # bot_by_chords[b"`"]  # TODO: same as '
 
+        # bot_by_chords[b"a"] = self.do_slip_right_open
+        bot_by_chords[b"b"] = self.do_lil_word_start_behind
+        # bot_by_chords[b"c"] = self.do_chop_after_open
+        # bot_by_chords[b"d"] = self.do_chop_after
+        bot_by_chords[b"e"] = self.do_lil_word_end_ahead
         bot_by_chords[b"f"] = self.do_slip_index
+        # bot_by_chords[b"g"]
+        bot_by_chords[b"h"] = self.do_slip_left
+        # bot_by_chords[b"i"] = self.do_open
         bot_by_chords[b"j"] = self.do_step_down_seek
         bot_by_chords[b"k"] = self.do_step_up_seek
-        bot_by_chords[b"h"] = self.do_slip_left
         bot_by_chords[b"l"] = self.do_slip_right
+        # bot_by_chords[b"m"] = self.do_drop_pin
+        # bot_by_chords[b"n"] = self.find_ahead
+        # bot_by_chords[b"o"] = self.do_slip_last_right_open
+        # bot_by_chords[b"p"] = self.do_paste_ahead
+        # bot_by_chords[b"q"] = self.do_record
+        # bot_by_chords[b"r"] = self.do_overwrite
+        # bot_by_chords[b"s"] = self.do_cut_behind_open
         bot_by_chords[b"t"] = self.do_slip_index_minus
+        # bot_by_chords[b"u"] = self.do_undo
+        # bot_by_chords[b"v"] = self.do_mark_chars
+        bot_by_chords[b"w"] = self.do_lil_word_start_ahead
+        # bot_by_chords[b"x"] = self.do_cut_ahead
+        # bot_by_chords[b"y"] = self.do_copy_after
 
         bot_by_chords[b"z"] = None
         # bot_by_chords[b"zz"] = self.do_scroll_to_center
@@ -1372,15 +1636,14 @@ class TerminalEditor:
         bot_by_chords[b"{"] = self.do_paragraph_behind
         bot_by_chords[b"|"] = self.do_slip
         bot_by_chords[b"}"] = self.do_paragraph_ahead
-
-        bot_by_chords[b"\\"] = None
-        bot_by_chords[b"\\n"] = self.do_set_invnumber
-        # TODO: stop occupying the personal \ Chord Sequences
+        # bot_by_chords[b"~"] = self.do_flip_case_overwrite
 
         bot_by_chords[b"\x7F"] = self.do_slip_behind  # DEL, aka ⌃?, aka 127
 
         return bot_by_chords
 
+    # FIXME: more_by_chords[b"f"] = (None, self.do_slip_index)
+    # FIXME: and then same across:  F T f m r t
     def _calc_more_by_chords(self):
         """Ask for more keyboard input Chord Sequences after choosing Code to run"""
 
@@ -1388,7 +1651,10 @@ class TerminalEditor:
 
         more_by_chords[b"F"] = 1
         more_by_chords[b"T"] = 1
+
         more_by_chords[b"f"] = 1
+        # more_by_chords[b"m"] = 1
+        # more_by_chords[b"r"] = 1
         more_by_chords[b"t"] = 1
 
         return more_by_chords
