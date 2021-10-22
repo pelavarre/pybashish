@@ -221,7 +221,6 @@ class TerminalEditor:
         self.set_number = None
 
         self.bots_by_chords = self._calc_bots_by_chords()
-        self.more_by_chords = self._calc_more_by_chords()
 
         self.nudge = TerminalNudgeIn()
         self.arg1 = None
@@ -319,72 +318,69 @@ class TerminalEditor:
         painter.paint_diffs(lines=top_lines, status=str_reply)
 
     def choose_bot(self, chord):
-        """Join together zero or more Digits and then one or more other Chords"""
+        """Accept the Prefix of Digits, the main Chords, and a Suffix, or less"""
 
         prefix = self.nudge.prefix
         chords = self.nudge.chords
-        suffix = self.nudge.suffix
 
         bots_by_chords = self.bots_by_chords
-        more_by_chords = self.more_by_chords
 
-        # Collect the Prefix
+        assert self.nudge.suffix is None, (chords, chord)  # one Chord only
+
+        # Accept a Prefix of Digits
 
         if not chords:
-
             if (chord in b"123456789") or (prefix and (chord == b"0")):
 
                 prefix_plus = chord if (prefix is None) else (prefix + chord)
                 self.nudge.prefix = prefix_plus
-                self.send_reply_soon()  # Digits of Vim ':set showcmd'
+                self.send_reply_soon()  # show Prefix a la Vim ':set showcmd'
 
-                return None  # ask for Chords
+                return None  # ask for more Prefix, else for main Chords
 
         self.arg1 = int(prefix) if prefix else None
         assert self.get_arg1() >= 1
 
-        # Collect the Chords
+        # Accept one or more Chords
 
-        if chords not in more_by_chords.keys():
+        bots = bots_by_chords.get(chords)
+        if not (bots and (len(bots) != 1)):
 
             chords_plus = chord if (chords is None) else (chords + chord)
             self.nudge.chords = chords_plus
             self.send_reply_soon()  # Chords of Vim ':set showcmd'
 
-            if chords_plus in more_by_chords.keys():
+            default_bots = bots_by_chords[None]  # such as 'self.do_raise_name_error'
+
+            bots_plus = bots_by_chords.get(chords_plus, default_bots)
+            if bots_plus is None:
+
+                return None  # ask for more Chords
+
+            if bots_plus and (len(bots_plus) != 1):
 
                 return None  # ask for Suffix
 
             self.arg2 = None
 
-            # Call a Bot with 0 or 1 Args
+            # Call a Bot with or without Prefix, and without Suffix
 
-            if chords_plus in bots_by_chords.keys():
-
-                bots = bots_by_chords[chords_plus]
-                bot = None if (bots is None) else bots[-1]
-
-                return bot  # may be None, to ask for more Chords
-
-            # Raise a NameError when no Bot found
-
-            bots = bots_by_chords[None]  # commonly 'self.do_raise_name_error'
-            bot = None if (bots is None) else bots[-1]
+            bot = bots_plus[-1]
+            assert bot is not None, (chords, chord)
 
             return bot
 
-        # Collect the Suffix
+        # Accept one last Chord as the Suffix
 
-        assert suffix is None, (chords, chord, suffix)  # one Chord only
-        self.nudge.suffix = chord
+        suffix = chord
+        self.nudge.suffix = suffix
         self.send_reply_soon()  # more than Vim ':set showcmd'
 
-        self.arg2 = chord.decode(errors="surrogateescape")
+        self.arg2 = suffix.decode(errors="surrogateescape")
 
-        # Call a Bot with 2 Args
+        # Call a Bot with Suffix, but with or without Prefix
 
-        bots = bots_by_chords[chords]
-        bot = None if (bots is None) else bots[-1]
+        bot = bots[-1]
         assert bot is not None, (chords, chord)
 
         return bot
@@ -1690,21 +1686,6 @@ class TerminalEditor:
         bots_by_chords[b"\x7F"] = (self.do_slip_behind,)  # DEL, aka ⌃?, aka 127
 
         return bots_by_chords
-
-    def _calc_more_by_chords(self):
-        """Ask for more keyboard input Chord Sequences after choosing Code to run"""
-
-        more_by_chords = dict()
-
-        more_by_chords[b"F"] = 1
-        more_by_chords[b"T"] = 1
-
-        more_by_chords[b"f"] = 1
-        # more_by_chords[b"m"] = 1
-        # more_by_chords[b"r"] = 1
-        more_by_chords[b"t"] = 1
-
-        return more_by_chords
 
 
 class TerminalPainter:
