@@ -33,7 +33,7 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 # vim  * / ? n N / .  => this, ahead, behind, next, previous, do again
 #
 # vim  :g/regex/  => preview what will be found
-# vim  :s/regex/repl/gc  => find and replace, .../g for no confirmations
+# vim  :1,$s/regex/repl/gc  => find and replace, .../g for no confirmations
 #
 # vim  mm 'm '' `` `m  => mark, goto, bounce, bounce, bounce and mark
 # vim  qqq @q  => record, replay

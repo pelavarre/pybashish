@@ -220,7 +220,7 @@ class TerminalEditor:
         self.top_row = 0
         self.set_number = None
 
-        self.bot_by_chords = self._calc_bot_by_chords()
+        self.bots_by_chords = self._calc_bots_by_chords()
         self.more_by_chords = self._calc_more_by_chords()
 
         self.nudge = TerminalNudgeIn()
@@ -325,7 +325,7 @@ class TerminalEditor:
         chords = self.nudge.chords
         suffix = self.nudge.suffix
 
-        bot_by_chords = self.bot_by_chords
+        bots_by_chords = self.bots_by_chords
         more_by_chords = self.more_by_chords
 
         # Collect the Prefix
@@ -359,15 +359,17 @@ class TerminalEditor:
 
             # Call a Bot with 0 or 1 Args
 
-            if chords_plus in bot_by_chords.keys():
+            if chords_plus in bots_by_chords.keys():
 
-                bot = bot_by_chords[chords_plus]
+                bots = bots_by_chords[chords_plus]
+                bot = None if (bots is None) else bots[-1]
 
                 return bot  # may be None, to ask for more Chords
 
             # Raise a NameError when no Bot found
 
-            bot = bot_by_chords[None]  # commonly 'self.do_raise_name_error'
+            bots = bots_by_chords[None]  # commonly 'self.do_raise_name_error'
+            bot = None if (bots is None) else bots[-1]
 
             return bot
 
@@ -381,7 +383,8 @@ class TerminalEditor:
 
         # Call a Bot with 2 Args
 
-        bot = bot_by_chords[chords]
+        bots = bots_by_chords[chords]
+        bot = None if (bots is None) else bots[-1]
         assert bot is not None, (chords, chord)
 
         return bot
@@ -1538,158 +1541,156 @@ class TerminalEditor:
     # Bind sequences of keyboard input Chords to Code
     #
 
-    def _calc_bot_by_chords(self):
+    def _calc_bots_by_chords(self):
         """Define lots of keyboard input Chord Sequences"""
 
-        bot_by_chords = dict()
+        bots_by_chords = dict()
 
-        bot_by_chords[None] = self.do_raise_name_error
+        bots_by_chords[None] = (self.do_raise_name_error,)
 
-        # bot_by_chords[b"\x00"]  # NUL, aka ⌃@, aka 0
-        # bot_by_chords[b"\x01"]  # SOH, aka ⌃A, aka 1
-        bot_by_chords[b"\x02"] = self.do_scroll_behind_much  # STX, aka ⌃B, aka 2
-        bot_by_chords[b"\x03"] = self.do_help_quit  # ETX, aka ⌃C, aka 3
-        bot_by_chords[b"\x04"] = self.do_scroll_ahead_some  # EOT, aka ⌃D, aka 4
-        bot_by_chords[b"\x05"] = self.do_scroll_ahead_one  # ENQ, aka ⌃E, aka 5
-        bot_by_chords[b"\x06"] = self.do_scroll_ahead_much  # ACK, aka ⌃F, aka 6
-        # bot_by_chords[b"\x07"}  # BEL, aka ⌃G, aka 7 \a
-        # bot_by_chords[b"\x08"]  # BS, aka ⌃H, aka 8 \b
-        # bot_by_chords[b"\x09"]  # TAB, aka ⌃I, aka 9 \t
-        bot_by_chords[b"\x0A"] = self.do_step_down_seek  # LF, aka ⌃J, aka 10 \n
-        # bot_by_chords[b"\x0B"]  # VT, aka ⌃K, aka 11 \v
-        bot_by_chords[b"\x0C"] = self.do_repaint_soon  # FF, aka ⌃L, aka 12 \f
-        bot_by_chords[b"\x0D"] = self.do_step_down_dent  # CR, aka ⌃M, aka 13 \r
-        bot_by_chords[b"\x0E"] = self.do_step_down_seek  # SO, aka ⌃N, aka 14
-        # bot_by_chords[b"\x0F"]  # SI, aka ⌃O, aka 15
-        bot_by_chords[b"\x10"] = self.do_step_up_seek  # DLE, aka ⌃P, aka 16
-        # bot_by_chords[b"\x11"]  # DC1, aka XON, aka ⌃Q, aka 17
-        # bot_by_chords[b"\x12"]  # DC2, aka ⌃R, aka 18
-        # bot_by_chords[b"\x13"]  # DC3, aka XOFF, aka ⌃S, aka 19
-        # bot_by_chords[b"\x14"]  # DC4, aka ⌃T, aka 20
-        bot_by_chords[b"\x15"] = self.do_scroll_behind_some  # NAK, aka ⌃U, aka 21
-        # bot_by_chords[b"\x16"]  # SYN, aka ⌃V, aka 22
-        # bot_by_chords[b"\x17"]  # ETB, aka ⌃W, aka 23
-        # bot_by_chords[b"\x18"]  # CAN, aka ⌃X , aka 24
-        bot_by_chords[b"\x19"] = self.do_scroll_behind_one  # EM, aka ⌃Y, aka 25
-        bot_by_chords[b"\x1A"] = self.do_sig_tstp  # SUB, aka ⌃Z, aka 26
+        # bots_by_chords[b"\x00"]  # NUL, aka ⌃@, aka 0
+        # bots_by_chords[b"\x01"]  # SOH, aka ⌃A, aka 1
+        bots_by_chords[b"\x02"] = (self.do_scroll_behind_much,)  # STX, aka ⌃B, aka 2
+        bots_by_chords[b"\x03"] = (self.do_help_quit,)  # ETX, aka ⌃C, aka 3
+        bots_by_chords[b"\x04"] = (self.do_scroll_ahead_some,)  # EOT, aka ⌃D, aka 4
+        bots_by_chords[b"\x05"] = (self.do_scroll_ahead_one,)  # ENQ, aka ⌃E, aka 5
+        bots_by_chords[b"\x06"] = (self.do_scroll_ahead_much,)  # ACK, aka ⌃F, aka 6
+        # bots_by_chords[b"\x07"}  # BEL, aka ⌃G, aka 7 \a
+        # bots_by_chords[b"\x08"]  # BS, aka ⌃H, aka 8 \b
+        # bots_by_chords[b"\x09"]  # TAB, aka ⌃I, aka 9 \t
+        bots_by_chords[b"\x0A"] = (self.do_step_down_seek,)  # LF, aka ⌃J, aka 10 \n
+        # bots_by_chords[b"\x0B"]  # VT, aka ⌃K, aka 11 \v
+        bots_by_chords[b"\x0C"] = (self.do_repaint_soon,)  # FF, aka ⌃L, aka 12 \f
+        bots_by_chords[b"\x0D"] = (self.do_step_down_dent,)  # CR, aka ⌃M, aka 13 \r
+        bots_by_chords[b"\x0E"] = (self.do_step_down_seek,)  # SO, aka ⌃N, aka 14
+        # bots_by_chords[b"\x0F"]  # SI, aka ⌃O, aka 15
+        bots_by_chords[b"\x10"] = (self.do_step_up_seek,)  # DLE, aka ⌃P, aka 16
+        # bots_by_chords[b"\x11"]  # DC1, aka XON, aka ⌃Q, aka 17
+        # bots_by_chords[b"\x12"]  # DC2, aka ⌃R, aka 18
+        # bots_by_chords[b"\x13"]  # DC3, aka XOFF, aka ⌃S, aka 19
+        # bots_by_chords[b"\x14"]  # DC4, aka ⌃T, aka 20
+        bots_by_chords[b"\x15"] = (self.do_scroll_behind_some,)  # NAK, aka ⌃U, aka 21
+        # bots_by_chords[b"\x16"]  # SYN, aka ⌃V, aka 22
+        # bots_by_chords[b"\x17"]  # ETB, aka ⌃W, aka 23
+        # bots_by_chords[b"\x18"]  # CAN, aka ⌃X , aka 24
+        bots_by_chords[b"\x19"] = (self.do_scroll_behind_one,)  # EM, aka ⌃Y, aka 25
+        bots_by_chords[b"\x1A"] = (self.do_sig_tstp,)  # SUB, aka ⌃Z, aka 26
 
-        bot_by_chords[b"\x1B"] = self.do_c0_control_esc  # ESC, aka ⌃[, aka 27
-        bot_by_chords[b"\x1B[A"] = self.do_step_up_seek  # ↑ Up Arrow
-        bot_by_chords[b"\x1B[B"] = self.do_step_down_seek  # ↓ Down Arrow
-        bot_by_chords[b"\x1B[C"] = self.do_slip_right  # → Right Arrow
-        bot_by_chords[b"\x1B[D"] = self.do_slip_left  # ← Left Arrow
+        bots_by_chords[b"\x1B"] = (self.do_c0_control_esc,)  # ESC, aka ⌃[, aka 27
+        bots_by_chords[b"\x1B[A"] = (self.do_step_up_seek,)  # ↑ Up Arrow
+        bots_by_chords[b"\x1B[B"] = (self.do_step_down_seek,)  # ↓ Down Arrow
+        bots_by_chords[b"\x1B[C"] = (self.do_slip_right,)  # → Right Arrow
+        bots_by_chords[b"\x1B[D"] = (self.do_slip_left,)  # ← Left Arrow
 
-        # bot_by_chords[b"\x1C"] = self.eval_readline   # FS, aka ⌃\, aka 28
-        # bot_by_chords[b"\x1D"]  # GS, aka ⌃], aka 29
-        # bot_by_chords[b"\x1E"]  # RS, aka ⌃^, aka 30  # try this after edit in: |vi -
-        # bot_by_chords[b"\x1F"]  # US, aka ⌃_, aka 31
+        # bots_by_chords[b"\x1C"] = (self.eval_readline,)   # FS, aka ⌃\, aka 28
+        # bots_by_chords[b"\x1D"]  # GS, aka ⌃], aka 29
+        # bots_by_chords[b"\x1E"]  # RS, aka ⌃^, aka 30  # try this after edit in: |vi -
+        # bots_by_chords[b"\x1F"]  # US, aka ⌃_, aka 31
 
-        bot_by_chords[b" "] = self.do_slip_ahead
-        # bot_by_chords[b"!"] = self.do_pipe
-        # bot_by_chords[b'"'] = self.do_arg
-        # bot_by_chords[b'#'] = self.do_lil_word_find_behind
-        bot_by_chords[b"$"] = self.do_slip_last_seek
-        # bot_by_chords[b"%"]  # TODO: leap to match
-        # bot_by_chords[b"&"]  # TODO: & and && for repeating substitution
-        # bot_by_chords[b"'"]  # TODO: leap to pin
-        # bot_by_chords[b"("]  # TODO: sentence behind
-        # bot_by_chords[b")"]  # TODO: sentence ahead
-        # bot_by_chords[b'*'] = self.do_lil_word_find_ahead
-        bot_by_chords[b"+"] = self.do_step_down_dent
-        bot_by_chords[b","] = self.do_slip_choice_undo
-        bot_by_chords[b"-"] = self.do_step_up_dent
-        # bot_by_chords[b"/"] = self.find_ahead_readline
+        bots_by_chords[b" "] = (self.do_slip_ahead,)
+        # bots_by_chords[b"!"] = (self.do_pipe,)
+        # bots_by_chords[b'"'] = (self.do_arg,)
+        # bots_by_chords[b'#'] = (self.do_lil_word_find_behind,)
+        bots_by_chords[b"$"] = (self.do_slip_last_seek,)
+        # bots_by_chords[b"%"]  # TODO: leap to match
+        # bots_by_chords[b"&"]  # TODO: & and && for repeating substitution
+        # bots_by_chords[b"'"]  # TODO: leap to pin
+        # bots_by_chords[b"("]  # TODO: sentence behind
+        # bots_by_chords[b")"]  # TODO: sentence ahead
+        # bots_by_chords[b'*'] = (self.do_lil_word_find_ahead,)
+        bots_by_chords[b"+"] = (self.do_step_down_dent,)
+        bots_by_chords[b","] = (self.do_slip_choice_undo,)
+        bots_by_chords[b"-"] = (self.do_step_up_dent,)
+        # bots_by_chords[b"/"] = (self.find_ahead_readline,)
 
-        bot_by_chords[b"0"] = self.do_slip_first
+        bots_by_chords[b"0"] = (self.do_slip_first,)
 
-        # bot_by_chords[b":"]  # TODO: escape vi
-        bot_by_chords[b";"] = self.do_slip_choice_redo
-        # bot_by_chords[b"<"]  # TODO: dedent
-        # bot_by_chords[b"="]  # TODO: dent after
-        # bot_by_chords[b">"]  # TODO: indent
-        # bot_by_chords[b"?"] = self.find_behind_readline
-        # bot_by_chords[b"@"]  # TODO: play
+        # bots_by_chords[b":"]  # TODO: escape vi
+        bots_by_chords[b";"] = (self.do_slip_choice_redo,)
+        # bots_by_chords[b"<"]  # TODO: dedent
+        # bots_by_chords[b"="]  # TODO: dent after
+        # bots_by_chords[b">"]  # TODO: indent
+        # bots_by_chords[b"?"] = (self.find_behind_readline,)
+        # bots_by_chords[b"@"]  # TODO: play
 
-        # bot_by_chords[b"A"] = self.do_slip_last_right_open
-        bot_by_chords[b"B"] = self.do_big_word_start_behind
-        # bot_by_chords[b"C"] = self.do_chop_open
-        # bot_by_chords[b"D"] = self.do_chop
-        bot_by_chords[b"E"] = self.do_big_word_end_ahead
-        bot_by_chords[b"F"] = self.do_slip_rindex
-        bot_by_chords[b"G"] = self.do_step
-        bot_by_chords[b"H"] = self.do_step_max_high
-        # bot_by_chords[b"I"] = self.do_slip_dent_open
-        # bot_by_chords[b"J"] = self.do_slip_last_join_right
-        # bot_by_chords[b"K"] = self.do_lookup
-        bot_by_chords[b"L"] = self.do_step_max_low
-        bot_by_chords[b"M"] = self.do_step_to_middle
-        # bot_by_chords[b"N"] = self.find_behind
-        # bot_by_chords[b"O"] = self.do_slip_first_open
-        # bot_by_chords[b"P"] = self.do_paste_behind
-        bot_by_chords[b"Q"] = self.do_close_vi
-        # bot_by_chords[b"R"] = self.do_open_overwrite
-        # bot_by_chords[b"S"] = self.do_slip_first_chop_open
-        bot_by_chords[b"T"] = self.do_slip_rindex_plus
-        # bot_by_chords[b"U"] = self.do_row_undo
-        # bot_by_chords[b"V"] = self.do_mark_rows
-        bot_by_chords[b"W"] = self.do_big_word_start_ahead
-        # bot_by_chords[b"X"] = self.do_cut_behind
-        # bot_by_chords[b"Y"] = self.do_copy_row
+        # bots_by_chords[b"A"] = (self.do_slip_last_right_open,)
+        bots_by_chords[b"B"] = (self.do_big_word_start_behind,)
+        # bots_by_chords[b"C"] = (self.do_chop_open,)
+        # bots_by_chords[b"D"] = (self.do_chop,)
+        bots_by_chords[b"E"] = (self.do_big_word_end_ahead,)
+        bots_by_chords[b"F"] = (None, self.do_slip_rindex)
+        bots_by_chords[b"G"] = (self.do_step,)
+        bots_by_chords[b"H"] = (self.do_step_max_high,)
+        # bots_by_chords[b"I"] = (self.do_slip_dent_open,)
+        # bots_by_chords[b"J"] = (self.do_slip_last_join_right,)
+        # bots_by_chords[b"K"] = (self.do_lookup,)
+        bots_by_chords[b"L"] = (self.do_step_max_low,)
+        bots_by_chords[b"M"] = (self.do_step_to_middle,)
+        # bots_by_chords[b"N"] = (self.find_behind,)
+        # bots_by_chords[b"O"] = (self.do_slip_first_open,)
+        # bots_by_chords[b"P"] = (self.do_paste_behind,)
+        bots_by_chords[b"Q"] = (self.do_close_vi,)
+        # bots_by_chords[b"R"] = (self.do_open_overwrite,)
+        # bots_by_chords[b"S"] = (self.do_slip_first_chop_open,)
+        bots_by_chords[b"T"] = (None, self.do_slip_rindex_plus)
+        # bots_by_chords[b"U"] = (self.do_row_undo,)
+        # bots_by_chords[b"V"] = (self.do_mark_rows,)
+        bots_by_chords[b"W"] = (self.do_big_word_start_ahead,)
+        # bots_by_chords[b"X"] = (self.do_cut_behind,)
+        # bots_by_chords[b"Y"] = (self.do_copy_row,)
 
-        bot_by_chords[b"Z"] = None
-        bot_by_chords[b"ZQ"] = self.do_quit
-        bot_by_chords[b"ZZ"] = self.do_save_and_quit
+        bots_by_chords[b"Z"] = None
+        bots_by_chords[b"ZQ"] = (self.do_quit,)
+        bots_by_chords[b"ZZ"] = (self.do_save_and_quit,)
 
-        # bot_by_chords[b"["]  # TODO
+        # bots_by_chords[b"["]  # TODO
 
-        bot_by_chords[b"\\"] = None
-        bot_by_chords[b"\\n"] = self.do_set_invnumber
+        bots_by_chords[b"\\"] = None
+        bots_by_chords[b"\\n"] = (self.do_set_invnumber,)
 
-        # bot_by_chords[b"]"]  # TODO
-        bot_by_chords[b"^"] = self.do_slip_dent
-        bot_by_chords[b"_"] = self.do_step_down_minus_dent
-        # bot_by_chords[b"`"]  # TODO: same as '
+        # bots_by_chords[b"]"]  # TODO
+        bots_by_chords[b"^"] = (self.do_slip_dent,)
+        bots_by_chords[b"_"] = (self.do_step_down_minus_dent,)
+        # bots_by_chords[b"`"]  # TODO: same as '
 
-        # bot_by_chords[b"a"] = self.do_slip_right_open
-        bot_by_chords[b"b"] = self.do_lil_word_start_behind
-        # bot_by_chords[b"c"] = self.do_chop_after_open
-        # bot_by_chords[b"d"] = self.do_chop_after
-        bot_by_chords[b"e"] = self.do_lil_word_end_ahead
-        bot_by_chords[b"f"] = self.do_slip_index
-        # bot_by_chords[b"g"]
-        bot_by_chords[b"h"] = self.do_slip_left
-        # bot_by_chords[b"i"] = self.do_open
-        bot_by_chords[b"j"] = self.do_step_down_seek
-        bot_by_chords[b"k"] = self.do_step_up_seek
-        bot_by_chords[b"l"] = self.do_slip_right
-        # bot_by_chords[b"m"] = self.do_drop_pin
-        # bot_by_chords[b"n"] = self.find_ahead
-        # bot_by_chords[b"o"] = self.do_slip_last_right_open
-        # bot_by_chords[b"p"] = self.do_paste_ahead
-        # bot_by_chords[b"q"] = self.do_record
-        # bot_by_chords[b"r"] = self.do_overwrite
-        # bot_by_chords[b"s"] = self.do_cut_behind_open
-        bot_by_chords[b"t"] = self.do_slip_index_minus
-        # bot_by_chords[b"u"] = self.do_undo
-        # bot_by_chords[b"v"] = self.do_mark_chars
-        bot_by_chords[b"w"] = self.do_lil_word_start_ahead
-        # bot_by_chords[b"x"] = self.do_cut_ahead
-        # bot_by_chords[b"y"] = self.do_copy_after
+        # bots_by_chords[b"a"] = (self.do_slip_right_open,)
+        bots_by_chords[b"b"] = (self.do_lil_word_start_behind,)
+        # bots_by_chords[b"c"] = (self.do_chop_after_open,)
+        # bots_by_chords[b"d"] = (self.do_chop_after,)
+        bots_by_chords[b"e"] = (self.do_lil_word_end_ahead,)
+        bots_by_chords[b"f"] = (None, self.do_slip_index)
+        # bots_by_chords[b"g"]
+        bots_by_chords[b"h"] = (self.do_slip_left,)
+        # bots_by_chords[b"i"] = (self.do_open,)
+        bots_by_chords[b"j"] = (self.do_step_down_seek,)
+        bots_by_chords[b"k"] = (self.do_step_up_seek,)
+        bots_by_chords[b"l"] = (self.do_slip_right,)
+        # bots_by_chords[b"m"] = (None, self.do_drop_pin)
+        # bots_by_chords[b"n"] = (self.find_ahead,)
+        # bots_by_chords[b"o"] = (self.do_slip_last_right_open,)
+        # bots_by_chords[b"p"] = (self.do_paste_ahead,)
+        # bots_by_chords[b"q"] = (self.do_record,)
+        # bots_by_chords[b"r"] = (None, self.do_overwrite)
+        # bots_by_chords[b"s"] = (self.do_cut_behind_open,)
+        bots_by_chords[b"t"] = (None, self.do_slip_index_minus)
+        # bots_by_chords[b"u"] = (self.do_undo,)
+        # bots_by_chords[b"v"] = (self.do_mark_chars,)
+        bots_by_chords[b"w"] = (self.do_lil_word_start_ahead,)
+        # bots_by_chords[b"x"] = (self.do_cut_ahead,)
+        # bots_by_chords[b"y"] = (self.do_copy_after,)
 
-        bot_by_chords[b"z"] = None
-        # bot_by_chords[b"zz"] = self.do_scroll_to_center
+        bots_by_chords[b"z"] = None
+        # bots_by_chords[b"zz"] = (self.do_scroll_to_center,)
 
-        bot_by_chords[b"{"] = self.do_paragraph_behind
-        bot_by_chords[b"|"] = self.do_slip
-        bot_by_chords[b"}"] = self.do_paragraph_ahead
-        # bot_by_chords[b"~"] = self.do_flip_case_overwrite
+        bots_by_chords[b"{"] = (self.do_paragraph_behind,)
+        bots_by_chords[b"|"] = (self.do_slip,)
+        bots_by_chords[b"}"] = (self.do_paragraph_ahead,)
+        # bots_by_chords[b"~"] = (self.do_flip_case_overwrite,)
 
-        bot_by_chords[b"\x7F"] = self.do_slip_behind  # DEL, aka ⌃?, aka 127
+        bots_by_chords[b"\x7F"] = (self.do_slip_behind,)  # DEL, aka ⌃?, aka 127
 
-        return bot_by_chords
+        return bots_by_chords
 
-    # FIXME: more_by_chords[b"f"] = (None, self.do_slip_index)
-    # FIXME: and then same across:  F T f m r t
     def _calc_more_by_chords(self):
         """Ask for more keyboard input Chord Sequences after choosing Code to run"""
 
