@@ -212,28 +212,28 @@ class TerminalEditor:
         lines = chars.splitlines(keepends=True)
         self.lines = lines  # edit a copy of a File of Encoded Chars
 
-        # Layer TerminalEditor over TerminalPainter over TerminalDriver
+        # Layer TerminalEditor over TerminalPainter over TerminalShadow over TerminalDriver
 
         self.log = None  # capture Python Tracebacks
 
         self.painter = None  # place one TerminalPainter below
-        self.driver = None  # place one TerminalDriver below
 
         self.row = 0  # point the Screen Cursor to a Row of File
         self.column = 0  # point the Screen Cursor to a Column of File
 
-        self.reply = TerminalNudgeIn()
-        self.do_reopen_vi()  # start with a warmer welcome, not an empty Nudge
-
         self.top_row = 0  # scroll through more Lines than fit on Screen
-        self.more_lag = None  # inject more Lag or not
-        self.set_number = None  # show Line Numbers or not
+        self.injecting_more_lag = None  # inject more Lag or not
+        self.showing_line_number = None  # show Line Numbers or not
 
         self.bots_by_chords = self._calc_bots_by_chords()  # map Nudge in to Reply out
 
         self.nudge = TerminalNudgeIn()  # accept Prefix, main Chords, and Suffix
         self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
         self.arg2 = None  # take the Suffix Bytes as one Encoded Char
+
+        self.sending_bell = None  # ring Bell after writing some Prompt's
+        self.reply = TerminalNudgeIn()  # start with an empty Nudge, except =>
+        self.do_reopen_vi()  # start with a warmer welcome, not an empty Nudge
 
         # Define sequences of keyboard input Chords to walk some State Machines
 
@@ -257,12 +257,14 @@ class TerminalEditor:
     def run_awhile(self):
         """Prompt, take input, react, repeat till quit"""
 
-        # Repeat till quit
+        # Layer Terminal Editor > TerminalPainter > TerminalShadow > TerminalDriver
 
         tty = sys.stderr
         with TerminalDriver(tty) as driver:
-            self.driver = driver
-            self.painter = TerminalPainter(tty)
+            shadow = TerminalShadow(tty=driver)
+            self.painter = TerminalPainter(tty=shadow)
+
+            # Repeat till quit
 
             while True:  # loop till SystemExit
 
@@ -273,7 +275,7 @@ class TerminalEditor:
 
                 try:
 
-                    chord = self.pull_chord()
+                    chord = self.getch()
 
                 except KeyboardInterrupt:
 
@@ -315,30 +317,32 @@ class TerminalEditor:
 
         lines = self.lines
         top_lines = lines[self.top_row :]
-
         str_reply = self.consume_reply()
+
+        injecting_more_lag = self.injecting_more_lag
+        sending_bell = self.sending_bell
 
         # Push into the Painter
 
         painter.top_line_number = 1 + self.top_row
-        painter.bottom_line_number = 1 + len(lines)
-        painter.set_number = self.set_number
+        painter.last_line_number = 1 + len(lines)
+        painter.showing_line_number = self.showing_line_number
 
         painter.cursor_row = self.row - self.top_row
         painter.cursor_column = self.column
 
         # Choose more or less Accuracy & Lag
 
-        if self.more_lag:  # more Accuracy & Lag, because mode toggled by ⌃L
-            painter.paint_screen(lines=top_lines, status=str_reply)
+        if injecting_more_lag or sending_bell:
+            painter._tty_reopen_()
 
-        else:  # less Accuracy & Lag, because mode toggled by ⌃L
-            write_soon = painter.write_soon
-            painter.paint_diffs_of(lines=top_lines, status=str_reply)
+        painter.write_screen(lines=top_lines, status=str_reply)
 
-            assert painter.write_soon is None  # more Accuracy & Lag, because Bell
-            if write_soon:
-                painter.paint_screen(lines=top_lines, status=str_reply)
+        if sending_bell:
+            self.sending_bell = None
+            painter.write_bell()
+
+        painter.flush()
 
     def choose_bot(self, chord):
         """Accept the Prefix of Digits, the main Chords, and a Suffix, or less"""
@@ -505,14 +509,14 @@ class TerminalEditor:
     def send_bell_soon(self):
         """Capture some Status now, to show with next Prompt"""
 
-        self.painter.ring_bell_soon()
+        self.sending_bell = True
 
-    def pull_chord(self):
+    def getch(self):
         """Block till the keyboard input Digit or Chord, else raise KeyboardInterrupt"""
 
-        driver = self.driver
+        painter = self.painter
 
-        chord = driver.getch()
+        chord = painter.getch()
         if chord == b"\x03":
             raise KeyboardInterrupt()
 
@@ -697,10 +701,21 @@ class TerminalEditor:
     def do_redraw(self):  # Vim ⌃L
         """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
 
-        self.more_lag = not self.more_lag
+        injecting_more_lag = not self.injecting_more_lag
+        self.injecting_more_lag = injecting_more_lag
 
-        message = ":set _nolag_" if self.more_lag else ":set _lag_"
+        message = ":set _lag_" if injecting_more_lag else ":set no_lag_"
         self.send_reply_soon(message)
+
+    def do_give_more_status(self):  # Vim ⌃G
+        """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
+
+        injecting_more_lag = self.injecting_more_lag
+
+        message = ":set _lag_" if injecting_more_lag else ":set no_lag_"
+        self.send_reply_soon(message)
+
+        # TODO: echo $(whoami)@$(hostname):$(pwd)/
 
     def do_reopen_vi(self):  # Vim Q v i Return  # not Ex Mode from last century
         """Accept Q v i Return without ringing the bell"""
@@ -717,12 +732,12 @@ class TerminalEditor:
     def do_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
-        driver = self.driver
+        painter = self.painter
 
         exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
-        driver.__exit__(*exc_info)
+        painter.__exit__(*exc_info)
         os.kill(os.getpid(), signal.SIGTSTP)
-        driver.__enter__()
+        painter.__enter__()
 
     def do_quit(self):  # Vim ZQ  # Emacs kill-emacs
         """Lose last changes and quit"""
@@ -748,11 +763,11 @@ class TerminalEditor:
     def do_set_invnumber(self):  # Vi Py \n
         """Toggle Line-in-File numbers in or out"""
 
-        self.set_number = not self.set_number
-        message = ":set number" if self.set_number else ":set nonumber"
+        self.showing_line_number = not self.showing_line_number
+        message = ":set number" if self.showing_line_number else ":set nonumber"
         self.send_reply_soon(message)  # \n Egg
 
-        # TODO: stop occupying the personal \ Chord Sequences
+        # TODO: stop commandeering the personal \ Chord Sequences
 
     #
     # Slip the Cursor into place, in some other Column of the same Row
@@ -1578,7 +1593,7 @@ class TerminalEditor:
         bots_by_chords[b"\x04"] = (self.do_scroll_ahead_some,)  # EOT, aka ⌃D, aka 4
         bots_by_chords[b"\x05"] = (self.do_scroll_ahead_one,)  # ENQ, aka ⌃E, aka 5
         bots_by_chords[b"\x06"] = (self.do_scroll_ahead_much,)  # ACK, aka ⌃F, aka 6
-        # bots_by_chords[b"\x07"}  # BEL, aka ⌃G, aka 7 \a
+        bots_by_chords[b"\x07"] = (self.do_give_more_status,)  # BEL, aka ⌃G, aka 7 \a
         # bots_by_chords[b"\x08"]  # BS, aka ⌃H, aka 8 \b
         # bots_by_chords[b"\x09"]  # TAB, aka ⌃I, aka 9 \t
         bots_by_chords[b"\x0A"] = (self.do_step_down_seek,)  # LF, aka ⌃J, aka 10 \n
@@ -1725,36 +1740,65 @@ class TerminalPainter:
 
     def __init__(self, tty):
 
-        self.tty = tty
+        self.tty = tty  # layer over a TerminalShadow
 
-        fd = tty.fileno()
-        self.fdtty = fd
+        self.rows = None  # count Rows on Screen
+        self.columns = None  # count Columns per Row
+        self.scrolling_rows = None  # divide the Screen into Scrolling Rows and Status
 
-        tty_size = os.get_terminal_size(fd)
-        assert tty_size.lines
-        assert tty_size.columns
+        self.cursor_row = 0  # point the Screen Cursor to a Row of File
+        self.cursor_column = 0  # point the Screen Cursor to a Column of File
 
-        self.rows = tty_size.lines
-        self.scrolling_rows = tty_size.lines - 1  # reserve last 1 line for Status
-        self.columns = tty_size.columns
+        self.top_line_number = 1  # number the Rows of the Screen down from first
+        self.last_line_number = 1  # number all Rows as wide as the last
+        self.showing_line_number = None  # start each Row with its Line Number, or don't
 
-        self.top_line_number = 1
-        self.bottom_line_number = 1
-        self.set_number = None
+        self._tty_reopen_()  # start sized to fit the initial Screen
 
-        self.cursor_row = 0
-        self.cursor_column = 0
+    def __enter__(self):
+        """Connect Keyboard and switch Screen to XTerm Alt Screen"""
 
-        self.write_soon = None
+        self.tty.__enter__()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
+
+        self.tty.__exit__()
+
+    def _tty_reopen_(self):
+        """Clear the Caches layered over the Tty, here and below"""
+
+        tty = self.tty
+
+        terminal_size = tty._tty_reopen_()  # a la os.get_terminal_size(fd)
+        assert terminal_size.lines >= 1
+        assert terminal_size.columns >= 1
+
+        self.rows = terminal_size.lines
+        self.columns = terminal_size.columns
+
+        self.scrolling_rows = terminal_size.lines - 1  # reserve last 1 line for Status
+
+    def flush(self):
+        """Stop waiting for more Writes from above"""
+
+        self.tty.flush()
+
+    def getch(self):
+        """Block till the keyboard input Digit or Chord"""
+
+        chord = self.tty.getch()
+
+        return chord
 
     def format_as_line_number(self, index):
         """Format a Row Index on Screen as a Line Number of File"""
 
-        if not self.set_number:
+        if not self.showing_line_number:
 
             return ""
 
-        last_line_number = "{:3} ".format(self.bottom_line_number)
+        last_line_number = "{:3} ".format(self.last_line_number)
         width = len(last_line_number)
 
         line_number = self.top_line_number + index
@@ -1762,22 +1806,7 @@ class TerminalPainter:
 
         return formatted
 
-    def repaint_soon(self):
-        """Repaint all the Chars when next asked to just paint Diffs"""
-
-        pass  # no work to do here, till we change 'def repaint' to
-
-    def ring_bell_soon(self):
-        """Ring the bell after next painting Diffs"""
-
-        self.write_soon = "\a"
-
-    def paint_diffs_of(self, lines, status):
-        """Write only the changes over the Rows of Chars on Screen"""
-
-        self.paint_screen(lines, status=status)
-
-    def paint_screen(self, lines, status):
+    def write_screen(self, lines, status):
         """Write over the Rows of Chars on Screen"""
 
         tty = self.tty
@@ -1786,9 +1815,6 @@ class TerminalPainter:
 
         visibles = lines[: (rows - 1)]
         texts = list(_.splitlines()[0] for _ in visibles)
-
-        write_soon = self.write_soon
-        self.write_soon = None
 
         # Format chars to display
 
@@ -1825,14 +1851,60 @@ class TerminalPainter:
         x = 1 + len(str_line_number) + self.cursor_column
         tty.write(CUP_Y_X.format(y, x))
 
-        # Ring the bell on demand
+    def write_bell(self):
+        """Ring the bell"""
 
-        if write_soon:
-            tty.write(write_soon)
+        self.tty.write("\a")
 
-        # Flush it all now
 
-        tty.flush()
+class TerminalShadow:
+    """Paint a Screen of Rows of Chars, but mostly write just the Diffs to reduce Lag"""
+
+    def __init__(self, tty):
+
+        self.tty = tty
+
+    def __enter__(self):
+        """Connect Keyboard and switch Screen to XTerm Alt Screen"""
+
+        self.tty.__enter__()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
+
+        self.tty.__exit__()
+
+    def _tty_reopen_(self):
+        """Clear the Caches layered over the Tty, here and below"""
+
+        tty = self.tty
+
+        fd = tty.fileno()
+        terminal_size = os.get_terminal_size(fd)
+
+        return terminal_size
+
+        # TODO: emulate more of 'shutil.get_terminal_size'
+
+    def flush(self):
+        """Stop waiting for more Writes from above"""
+
+        self.tty.flush()
+
+    def getch(self):
+        """Block till the keyboard input Digit or Chord"""
+
+        return self.tty.getch()
+
+    def isatty(self):
+        """Like say True ordinarily, but say False if piped"""
+
+        return self.tty.isatty()
+
+    def write(self, chars):
+        """Compare with Chars at Cursor, write Diffs now, move Cursor soon"""
+
+        self.tty.write(chars)
 
 
 class TerminalDriver:
@@ -1889,6 +1961,16 @@ class TerminalDriver:
             when = termios.TCSADRAIN
             attributes = self.with_termios
             termios.tcsetattr(self.fdtty, when, attributes)
+
+    def fileno(self):
+        """Authorize bypass of Terminal Driver"""
+
+        return self.tty.fileno()
+
+    def flush(self):
+        """Stop waiting for more Writes from above"""
+
+        self.tty.flush()
 
     def getch(self):
         """Block to fetch next Char of Paste, next Keystroke, or empty Eof"""
@@ -1967,6 +2049,11 @@ class TerminalDriver:
 
         if rlist_ == rlist:
             return True
+
+    def write(self, chars):
+        """Compare with Chars at Cursor, write Diffs now, move Cursor soon"""
+
+        self.tty.write(chars)
 
 
 def repr_vi_bytes(xxs):
