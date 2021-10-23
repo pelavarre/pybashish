@@ -13,7 +13,7 @@ optional arguments:
 
 quirks:
   defaults to read Stdin and write Stdout
-  hides eggs at:  Esc ⌃C \n Qvi 123Esc 123⌃C f⌃C 9^ G⌃F⌃F G⌃F⌃E 1G⌃Y ; ,
+  hides eggs at:  Esc ⌃C \n Qvi⌃M 123Esc 123⌃C f⌃C 9^ G⌃F⌃F G⌃F⌃E 1G⌃Y ; ,
 
 demos:
   ZQ ZZ ⌃Zfg  => how to exit Vi Py
@@ -24,6 +24,7 @@ demos:
   1234567890 Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
   \n  => toggle line numbers on and off
+  ⌃L  => toggle more lag on and off
 
 examples:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
@@ -203,40 +204,51 @@ class TerminalEditor:
 
     def __init__(self, iobytearray):
 
-        self.iobytearray = iobytearray
-        self.log = None
+        # Capture arg
 
-        self.driver = None
-        self.painter = None
-
-        self.row = 0
-        self.column = 0
-
-        self.reply = TerminalReplyOut()
+        self.iobytearray = iobytearray  # send mutations back to caller
 
         chars = iobytearray.decode(errors="surrogateescape")
         lines = chars.splitlines(keepends=True)
-        self.lines = lines
-        self.top_row = 0
-        self.set_number = None
+        self.lines = lines  # edit a copy of a File of Encoded Chars
 
-        self.bots_by_chords = self._calc_bots_by_chords()
+        # Layer TerminalEditor over TerminalPainter over TerminalDriver
 
-        self.nudge = TerminalNudgeIn()
-        self.arg1 = None
-        self.arg2 = None
+        self.log = None  # capture Python Tracebacks
 
-        self.doing_more = None
-        self.done = None
+        self.painter = None  # place one TerminalPainter below
+        self.driver = None  # place one TerminalDriver below
 
-        self.slip_choice = None
-        self.slip_after = None
-        self.slip_redo = None
-        self.slip_undo = None
-        # TODO: self.last_slip = instance of collections.namedtuple
+        self.row = 0  # point the Screen Cursor to a Row of File
+        self.column = 0  # point the Screen Cursor to a Column of File
 
-        self.seeking_more = None
-        self.seeking_column = None
+        self.reply = TerminalNudgeIn()
+        self.do_reopen_vi()  # start with a warmer welcome, not an empty Nudge
+
+        self.top_row = 0  # scroll through more Lines than fit on Screen
+        self.more_lag = None  # inject more Lag or not
+        self.set_number = None  # show Line Numbers or not
+
+        self.bots_by_chords = self._calc_bots_by_chords()  # map Nudge in to Reply out
+
+        self.nudge = TerminalNudgeIn()  # accept Prefix, main Chords, and Suffix
+        self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
+        self.arg2 = None  # take the Suffix Bytes as one Encoded Char
+
+        # Define sequences of keyboard input Chords to walk some State Machines
+
+        self.doing_more = None  # take the Arg1 as a Count of Repetition's
+        self.done = None  # count the Repetition's completed before now
+
+        self.slip_choice = None  # find Char in Row
+        self.slip_after = None  # slip off by one Column after finding Char
+        self.slip_redo = None  # find later Char
+        self.slip_undo = None  # find earlier Char
+
+        self.seeking_more = None  # remembering the Seeking Column into next Nudge
+        self.seeking_column = None  # leap to a Column after changing Row
+
+        # TODO: less sourcelines inside "def __init__"
 
     #
     # Work closely with one TerminalDriver and one TerminalPainter
@@ -315,7 +327,18 @@ class TerminalEditor:
         painter.cursor_row = self.row - self.top_row
         painter.cursor_column = self.column
 
-        painter.paint_diffs(lines=top_lines, status=str_reply)
+        # Choose more or less Accuracy & Lag
+
+        if self.more_lag:  # more Accuracy & Lag, because mode toggled by ⌃L
+            painter.paint_screen(lines=top_lines, status=str_reply)
+
+        else:  # less Accuracy & Lag, because mode toggled by ⌃L
+            write_soon = painter.write_soon
+            painter.paint_diffs_of(lines=top_lines, status=str_reply)
+
+            assert painter.write_soon is None  # more Accuracy & Lag, because Bell
+            if write_soon:
+                painter.paint_screen(lines=top_lines, status=str_reply)
 
     def choose_bot(self, chord):
         """Accept the Prefix of Digits, the main Chords, and a Suffix, or less"""
@@ -388,7 +411,7 @@ class TerminalEditor:
     def call_bot(self, bot):
         """Call the Bot once or more"""
 
-        # Default to stop remembering the last Stepping Column
+        # Default to stop remembering the last Seeking Column
 
         self.seeking_more = None
 
@@ -671,16 +694,20 @@ class TerminalEditor:
             self.send_reply_soon("Press ZZ to save changes and quit Vi Py")  # Esc Egg
             self.send_bell_soon()
 
-    def do_repaint_soon(self):  # Vim ⌃L
-        """Clear the screen and repaint every char, just before next Prompt"""
+    def do_redraw(self):  # Vim ⌃L
+        """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
 
-        painter = self.painter
-        painter.repaint_soon()
+        self.more_lag = not self.more_lag
 
-    def do_close_vi(self):  # Vim Q v i Return
-        """Raise NotImplementedError, till we port Ex Mode in from last century"""
+        message = ":set _nolag_" if self.more_lag else ":set _lag_"
+        self.send_reply_soon(message)
 
-        raise NotImplementedError()
+    def do_reopen_vi(self):  # Vim Q v i Return  # not Ex Mode from last century
+        """Accept Q v i Return without ringing the bell"""
+
+        nudge = TerminalNudgeIn(chords=b"Qvi\x0D")  # CR, aka ⌃M, aka 13 \r
+        message = "Would you like to play a game?"
+        self.reply = TerminalReplyOut(nudge=nudge, message=message)
 
     def do_raise_name_error(self):  # such as Esc, such as 'ZB'
         """Reply to a meaningless keyboard input Chord Sequence"""
@@ -1556,7 +1583,7 @@ class TerminalEditor:
         # bots_by_chords[b"\x09"]  # TAB, aka ⌃I, aka 9 \t
         bots_by_chords[b"\x0A"] = (self.do_step_down_seek,)  # LF, aka ⌃J, aka 10 \n
         # bots_by_chords[b"\x0B"]  # VT, aka ⌃K, aka 11 \v
-        bots_by_chords[b"\x0C"] = (self.do_repaint_soon,)  # FF, aka ⌃L, aka 12 \f
+        bots_by_chords[b"\x0C"] = (self.do_redraw,)  # FF, aka ⌃L, aka 12 \f
         bots_by_chords[b"\x0D"] = (self.do_step_down_dent,)  # CR, aka ⌃M, aka 13 \r
         bots_by_chords[b"\x0E"] = (self.do_step_down_seek,)  # SO, aka ⌃N, aka 14
         # bots_by_chords[b"\x0F"]  # SI, aka ⌃O, aka 15
@@ -1625,7 +1652,12 @@ class TerminalEditor:
         # bots_by_chords[b"N"] = (self.find_behind,)
         # bots_by_chords[b"O"] = (self.do_slip_first_open,)
         # bots_by_chords[b"P"] = (self.do_paste_behind,)
-        bots_by_chords[b"Q"] = (self.do_close_vi,)
+
+        bots_by_chords[b"Q"] = None
+        bots_by_chords[b"Qv"] = None
+        bots_by_chords[b"Qvi"] = None
+        bots_by_chords[b"Qvi\x0D"] = (self.do_reopen_vi,)  # CR, aka ⌃M, aka 13 \r
+
         # bots_by_chords[b"R"] = (self.do_open_overwrite,)
         # bots_by_chords[b"S"] = (self.do_slip_first_chop_open,)
         bots_by_chords[b"T"] = (None, self.do_slip_rindex_plus)
@@ -1740,7 +1772,12 @@ class TerminalPainter:
 
         self.write_soon = "\a"
 
-    def paint_diffs(self, lines, status):
+    def paint_diffs_of(self, lines, status):
+        """Write only the changes over the Rows of Chars on Screen"""
+
+        self.paint_screen(lines, status=status)
+
+    def paint_screen(self, lines, status):
         """Write over the Rows of Chars on Screen"""
 
         tty = self.tty
