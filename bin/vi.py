@@ -1878,6 +1878,9 @@ class TerminalShadow:
         fd = terminal.fileno()
         terminal_size = os.get_terminal_size(fd)
 
+        # FIXME: pad with Spaces to grow cache of Rows of Chars
+        # FIXME: chop Chars to shrink cache of Rows of Chars
+
         return terminal_size
 
         # TODO: emulate more of 'shutil.get_terminal_size'
@@ -1892,15 +1895,61 @@ class TerminalShadow:
 
         return self.terminal.getch()
 
-    def isatty(self):
-        """Like say True ordinarily, but say False if piped"""
-
-        return self.terminal.isatty()
-
     def write(self, chars):
         """Compare with Chars at Cursor, write Diffs now, move Cursor soon"""
 
+        if chars.startswith(CSI):
+
+            if chars == ED_2:
+                self.write_erase_in_display(chars)
+            elif chars.endswith("H"):
+                self.write_cursor_position(chars)
+            else:
+                raise NotImplementedError(repr(chars))
+
+        else:
+
+            lines = chars.splitlines(keepends=True)
+            for line in lines:
+
+                if CSI in line:
+                    raise NotImplementedError(repr(line))
+                if len(line.splitlines()) != 1:
+                    raise NotImplementedError(repr(line))
+
+                text = line.splitlines()[0]
+                end = line[len(text) :]
+
+                self.write_text(chars=text)
+                self.write_end(chars=end)
+
+    def write_erase_in_display(self, chars):
+        """Write Spaces over Chars of Screen"""
+
         self.terminal.write(chars)
+
+        # FIXME: fill with Spaces
+
+    def write_cursor_position(self, chars):
+        """Leap to chosen Row and Column of Screen"""
+
+        self.terminal.write(chars)
+
+        # FIXME: parse and shadow Position
+
+    def write_text(self, chars):
+        """Write Chars over this Row, and start next Row if this Row complete"""
+
+        self.terminal.write(chars)
+
+    def write_end(self, chars):
+        """Move Cursor to start of next Row"""
+
+        # FIXME: assert there is a next Row, without Scrolling
+
+        self.terminal.write(chars)
+
+    # TODO: Add API to write Scroll CSI in place of rewriting Screen to Scroll
 
 
 class TerminalDriver:
