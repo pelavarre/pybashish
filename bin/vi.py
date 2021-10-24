@@ -249,7 +249,7 @@ class TerminalEditor:
 
         self.sending_bell = None  # ring the Terminal Bell as part of some Prompt's
         self.reply = TerminalNudgeIn()  # declare an empty Nudge
-        self.do_reopen_vi()  # start with a warmer welcome, not a cold empty Nudge
+        self.do_help_quit()  # start with a warmer welcome, not a cold empty Nudge
 
         # Define Keyboard Input to walk Vim-like State Machines inside this Editor
 
@@ -700,6 +700,8 @@ class TerminalEditor:
         """Suggest ZQ to quit Vi Py"""
 
         self.send_reply_soon("Press ZQ to lose changes and quit Vi Py")  # ⌃C Egg
+
+        # Vim sends Bell here
 
     def do_c0_control_esc(self):  # Vim Esc
         """Cancel Digits Prefix, else suggest ZZ to quit Vi Py"""
