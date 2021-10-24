@@ -39,6 +39,7 @@ import argparse
 import difflib
 import inspect
 import os
+import re
 import select
 import signal
 import string
@@ -53,8 +54,10 @@ import tty
 ESC = "\x1B"  # Esc
 CSI = ESC + "["  # Control Sequence Introducer (CSI)
 CUP_Y_X = CSI + "{};{}H"  # Cursor Position (CUP)
-CUP_1_1 = CUP_Y_X.format(1, 1)  # Cursor Position (CUP)  # (1, 1) = Upper Left
+CUP_1_1 = CSI + "H"  # Cursor Position (CUP)  # (1, 1) = Upper Left
 ED_2 = CSI + "2J"  # Erase in Display (ED)  # 2 = Whole Screen
+
+CUP_Y_X_REGEX = r"^\x1B\[([0-9]+);([0-9]+)H$"
 
 DECSC = ESC + "7"  # DEC Save Cursor
 DECRC = ESC + "8"  # DEC Restore Cursor
@@ -218,6 +221,11 @@ class TerminalEditor:
 
         self.log = None  # capture Python Tracebacks
 
+        self.painter = None
+        self.shadow = None
+        self.driver = None
+        self.stdio = None
+
         self.terminal = None  # place a Terminal I/O Stack below
 
         self.row = 0  # point the Screen Cursor to a Row of File
@@ -233,7 +241,7 @@ class TerminalEditor:
         self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
         self.arg2 = None  # take the Suffix Bytes as one Encoded Char
 
-        self.sending_bell = None  # ring Bell after writing some Prompt's
+        self.sending_bell = None  # ring the Terminal Bell as part of some Prompt's
         self.reply = TerminalNudgeIn()  # declare an empty Nudge
         self.do_reopen_vi()  # start with a warmer welcome, not a cold empty Nudge
 
@@ -264,8 +272,14 @@ class TerminalEditor:
         stdio = sys.stderr
         with TerminalDriver(terminal=stdio) as driver:
             shadow = TerminalShadow(terminal=driver)
-            terminal = TerminalPainter(terminal=shadow)
-            self.terminal = terminal
+            painter = TerminalPainter(terminal=shadow)
+
+            self.painter = painter
+            self.shadow = shadow
+            self.driver = driver
+            self.stdio = stdio
+
+            self.terminal = painter
 
             # Repeat till quit
 
@@ -278,7 +292,7 @@ class TerminalEditor:
 
                 try:
 
-                    chord = terminal.getch()
+                    chord = self.terminal.getch()
 
                 except KeyboardInterrupt:
 
@@ -336,8 +350,10 @@ class TerminalEditor:
 
         # Choose more or less Accuracy & Lag
 
-        if injecting_more_lag or sending_bell:
-            terminal._reopen_terminal_()
+        if not injecting_more_lag:
+            if sending_bell:
+                # time.sleep(0.3)  # delaying Output demos a different kind of lag
+                terminal._reopen_terminal_()
 
         terminal.write_screen(lines=top_lines, status=str_reply)
 
@@ -510,7 +526,7 @@ class TerminalEditor:
         return str_reply
 
     def send_bell_soon(self):
-        """Capture some Status now, to show with next Prompt"""
+        """Ring the Terminal Bell as part of the next Prompt"""
 
         self.sending_bell = True
 
@@ -693,7 +709,15 @@ class TerminalEditor:
     def do_redraw(self):  # Vim ⌃L
         """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
 
+        painter = self.painter
+
         injecting_more_lag = not self.injecting_more_lag
+        if injecting_more_lag:
+            painter.terminal = self.driver
+        else:
+            painter.terminal = self.shadow
+            painter._reopen_terminal_()
+
         self.injecting_more_lag = injecting_more_lag
 
         message = ":set _lag_" if injecting_more_lag else ":set no_lag_"
@@ -710,7 +734,7 @@ class TerminalEditor:
         # TODO: echo $(whoami)@$(hostname):$(pwd)/
 
     def do_reopen_vi(self):  # Vim Q v i Return  # not Ex Mode from last century
-        """Accept Q v i Return without ringing the bell"""
+        """Accept Q v i Return, without ringing the Terminal bell"""
 
         nudge = TerminalNudgeIn(chords=b"Qvi\x0D")  # CR, aka ⌃M, aka 13 \r
         message = "Would you like to play a game?"
@@ -740,14 +764,14 @@ class TerminalEditor:
 
         self.iobytearray[::] = b""
 
-        sys.exit(returncode)
+        sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
 
     def do_save_and_quit(self):  # Vim ZZ  # Emacs save-buffers-kill-terminal
         """Save last changes and quit"""
 
         returncode = self.get_arg1(default=None)
 
-        sys.exit(returncode)
+        sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
 
     #
     # Flip switches
@@ -1756,7 +1780,7 @@ class TerminalPainter:
     def __exit__(self, exc_type, exc_value, traceback):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
-        self.terminal.__exit__()
+        self.terminal.__exit__(exc_type, exc_value, traceback)  # positional args
 
     def _reopen_terminal_(self):
         """Clear the Caches of this Terminal, here and below"""
@@ -1764,6 +1788,7 @@ class TerminalPainter:
         terminal = self.terminal
 
         terminal_size = terminal._reopen_terminal_()  # a la os.get_terminal_size(fd)
+
         assert terminal_size.lines >= 1
         assert terminal_size.columns >= 1
 
@@ -1829,17 +1854,20 @@ class TerminalPainter:
 
         terminal.write(ED_2)
         terminal.write(CUP_1_1)
+
         for (index, text) in enumerate(texts):
             if len(text) < columns:
-                terminal.write(text + "\n\r")
+                terminal.write(text + "\r\n")
             else:
-                terminal.write(text)  # depend on automagic "\n\r" after Last Column
+                terminal.write(text)  # depend on automagic "\r\n" after Last Column
 
         # Show status, inside the last Row
         # but don't write over the Lower Right Char  # TODO: test vs autoscroll
 
         str_status = "" if (status is None) else str(status)
-        terminal.write(str_status.ljust(columns - 1))
+        status_columns = columns - 1
+        status_row_text = str_status.ljust(status_columns)[:status_columns]
+        terminal.write(status_row_text)
 
         # Place the cursor
 
@@ -1848,7 +1876,7 @@ class TerminalPainter:
         terminal.write(CUP_Y_X.format(y, x))
 
     def write_bell(self):
-        """Ring the bell"""
+        """Ring the Terminal bell"""
 
         self.terminal.write("\a")
 
@@ -1860,35 +1888,134 @@ class TerminalShadow:
 
         self.terminal = terminal
 
+        self.rows = ["\n"]
+        self.ringing_bell = None
+        self.cursor_row = 0
+        self.cursor_column = 0
+
+        self.shadow_rows = [None]
+
     def __enter__(self):
         """Connect Keyboard and switch Screen to XTerm Alt Screen"""
 
         self.terminal.__enter__()
+        self._reopen_terminal_()
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
-        self.terminal.__exit__()
+        self.terminal.__exit__(exc_type, exc_value, traceback)  # positional args
 
     def _reopen_terminal_(self):
         """Clear the Caches layered over this Terminal, here and below"""
 
+        # Update the Ask here
+
         terminal = self.terminal
+
+        rows = self.rows
 
         fd = terminal.fileno()
         terminal_size = os.get_terminal_size(fd)
 
-        # FIXME: pad with Spaces to grow cache of Rows of Chars
-        # FIXME: chop Chars to shrink cache of Rows of Chars
+        assert terminal_size.lines >= 1
+        assert terminal_size.columns >= 1
+
+        # Add and drop Rows below the last Row
+
+        blank_row = terminal_size.columns * " "
+        while len(rows) < terminal_size.lines:
+            rows.append(blank_row)
+        rows[::] = rows[: terminal_size.lines]
+
+        got_height = len(rows)
+        assert got_height == terminal_size.lines, (got_height, terminal_size.lines)
+
+        self.cursor_row = min(len(rows) - 1, self.cursor_row)
+
+        # Add and drop Columns beyond the last Column
+
+        for (index, row) in enumerate(rows):
+            patched_row = (row + blank_row)[: terminal_size.columns]
+            rows[index] = patched_row
+
+            got_width = len(patched_row)
+            assert got_width == terminal_size.columns, (
+                got_width,
+                terminal_size.columns,
+            )
+
+        self.cursor_column = min(len(rows[-1]) - 1, self.cursor_column)
+
+        # Clear the Caches here
+
+        self.shadow_rows = len(self.rows) * [None]
+
+        # Clear the Caches below
+
+        terminal.write(ED_2)
+        terminal.write(CUP_1_1)
+        terminal.flush()
 
         return terminal_size
 
-        # TODO: emulate more of 'shutil.get_terminal_size'
+        # TODO: deal with $LINES, $COLUMNS, 'fallback', like 'shutil.get_terminal_size' would
 
     def flush(self):
         """Stop waiting for more Writes from above"""
 
-        self.terminal.flush()
+        terminal = self.terminal
+        rows = self.rows
+        bottom_row = len(rows) - 1
+
+        # Write the rows
+
+        terminal.write(CUP_1_1)
+
+        for (index, row) in enumerate(rows):
+            shadow_row = self.shadow_rows[index]
+
+            if shadow_row != row:  # write only the Rows who changed since last Flush
+
+                self._flush_write_unshadowed_cup(index, column=0)
+                # TODO: figure out when to write "\n" or "\r\n" in place of CUP_Y_X
+                # TODO: figure out when to write 'row.rstrip()' in place of 'row'
+
+                if index < bottom_row:
+
+                    terminal.write(row)
+                    self.shadow_rows[index] = row
+
+                else:
+
+                    shorter_row_text = row[:-1]
+                    terminal.write(shorter_row_text)
+
+                    self.shadow_rows[index] = shorter_row_text + " "
+
+        # Place the cursor
+
+        self._flush_write_unshadowed_cup(self.cursor_row, column=self.cursor_column)
+
+        # Ring the bell
+
+        if self.ringing_bell:
+            terminal.write("\a")
+
+        self.ringing_bell = None
+
+        # Flush the writes
+
+        terminal.flush()
+
+    def _flush_write_unshadowed_cup(self, row, column):
+        """Position the Terminal Cursor, but without telling the Shadow"""
+
+        terminal = self.terminal
+
+        y = 1 + row
+        x = 1 + column
+        terminal.write(CUP_Y_X.format(y, x))
 
     def getch(self):
         """Block till the keyboard input Digit or Chord"""
@@ -1898,56 +2025,128 @@ class TerminalShadow:
     def write(self, chars):
         """Compare with Chars at Cursor, write Diffs now, move Cursor soon"""
 
-        if chars.startswith(CSI):
-
-            if chars == ED_2:
-                self.write_erase_in_display(chars)
-            elif chars.endswith("H"):
-                self.write_cursor_position(chars)
-            else:
-                raise NotImplementedError(repr(chars))
-
+        if chars == "\a":
+            self.shadow_bell()
+        elif chars.startswith(CSI):
+            self.shadow_csi_chars(chars)
         else:
+            self.shadow_row_chars(chars)
 
-            lines = chars.splitlines(keepends=True)
-            for line in lines:
+    def shadow_bell(self):
+        """Ring the Terminal Bell at next Flush"""
 
-                if CSI in line:
-                    raise NotImplementedError(repr(line))
-                if len(line.splitlines()) != 1:
-                    raise NotImplementedError(repr(line))
+        self.ringing_bell = True
 
-                text = line.splitlines()[0]
-                end = line[len(text) :]
+    def shadow_csi_chars(self, chars):
+        """Interpret CSI Escape Sequences"""
 
-                self.write_text(chars=text)
-                self.write_end(chars=end)
+        if chars == ED_2:
+            self.shadow_erase_in_display_whole_screen()
+        elif chars.endswith("H"):
+            self.shadow_cursor_position(chars)
+        else:
+            raise NotImplementedError(repr(chars))
 
-    def write_erase_in_display(self, chars):
+    def shadow_erase_in_display_whole_screen(self):
         """Write Spaces over Chars of Screen"""
 
-        self.terminal.write(chars)
+        blank_row = len(self.rows[0]) * " "
+        self.rows[::] = len(self.rows) * [blank_row]
 
-        # FIXME: fill with Spaces
-
-    def write_cursor_position(self, chars):
+    def shadow_cursor_position(self, chars):
         """Leap to chosen Row and Column of Screen"""
 
-        self.terminal.write(chars)
+        rows = self.rows
 
-        # FIXME: parse and shadow Position
+        # Pick Y and X out of this CUP_Y_X
 
-    def write_text(self, chars):
+        (y, x) = (1, 1)
+        if chars != CUP_1_1:
+
+            match = re.match(CUP_Y_X_REGEX, string=chars)
+            if not match:
+                raise NotImplementedError(repr(chars))
+
+            y = int(match.group(1))
+            x = int(match.group(2))
+
+        # Require simple
+
+        if not ((y >= 1) and (x >= 1)):
+            raise NotImplementedError(y, x)
+
+        # Move the Shadow Cursor
+
+        self.cursor_row = min(len(rows) - 1, y - 1)
+        self.cursor_column = min(len(rows[-1]) - 1, x - 1)
+
+    def shadow_row_chars(self, chars):
+        """Write Chars over this Row, and start next Row per "\r\n" Control, or if complete"""
+
+        # Require simple
+
+        if CSI in chars:
+            raise NotImplementedError(repr(chars))
+        if len(chars.splitlines()) != 1:
+            raise NotImplementedError(repr(chars))
+
+        # Split off the end
+
+        text = chars.splitlines()[0]
+        end = chars[len(text) :]
+        if (text + end) != chars:
+            raise NotImplementedError(repr(chars))
+
+        # Shadow the Text, and require no explicit End after an implicit End
+
+        if self.shadow_row_text(chars=text):
+            if end:
+                raise NotImplementedError(len(self.rows[-1]), len(text), repr(end))
+
+        # Shadow the End
+
+        if end:
+            self.shadow_row_end(chars=end)
+
+    def shadow_row_text(self, chars):
         """Write Chars over this Row, and start next Row if this Row complete"""
 
-        self.terminal.write(chars)
+        cursor_row = self.cursor_row
+        cursor_column = self.cursor_column
+        rows = self.rows
 
-    def write_end(self, chars):
-        """Move Cursor to start of next Row"""
+        # Write Chars over this Row
 
-        # FIXME: assert there is a next Row, without Scrolling
+        row = rows[cursor_row]
+        beyond = cursor_column + len(chars)
+        patched_row = row[:cursor_column] + chars + row[beyond:]
 
-        self.terminal.write(chars)
+        self.rows[cursor_row] = patched_row
+
+        # Start next Row if this Row complete
+
+        if beyond >= len(patched_row):
+            self.shadow_row_end("\r\n")
+
+            return 1
+
+    def shadow_row_end(self, chars):
+        """Move Shadow Cursor to start of next Row, without writing Chars"""
+
+        rows = self.rows
+
+        # Require simple
+
+        if chars != "\r\n":
+            raise NotImplementedError(repr(chars))
+
+        if self.cursor_row >= (len(rows) - 1):
+            raise NotImplementedError(self.cursor_row, len(rows))
+
+        # Move the Shadow Cursor
+
+        self.cursor_row += 1
+        self.cursor_column = 0
 
     # TODO: Add API to write Scroll CSI in place of rewriting Screen to Scroll
 
@@ -2246,9 +2445,10 @@ def compile_argdoc(epi, drop_help=None):
 
     prog = module_doc.strip().splitlines()[0].split()[1]
 
-    description = list(
+    headlines = list(
         _ for _ in module_doc.strip().splitlines() if _ and not _.startswith(" ")
-    )[1]
+    )
+    description = headlines[1]
 
     epilog_at = module_doc.index(epi)
     epilog = module_doc[epilog_at:]
