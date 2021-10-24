@@ -6,16 +6,15 @@ usage: vi.py [-h] [FILE]
 read files, accept zero or more edits, write files
 
 positional arguments:
-  FILE        a file to edit
+  FILE        a file to edit, such as '-' to mean stdin
 
 optional arguments:
   -h, --help  show this help message and exit
 
 quirks:
   defaults to read Stdin and write Stdout
-  hides eggs at:  Esc ⌃C \n Qvi⌃M 123Esc 123⌃C f⌃C 9^ G⌃F⌃F G⌃F⌃E 1G⌃Y ; ,
 
-demos:
+keyboard tests:
   ZQ ZZ ⌃Zfg  => how to exit Vi Py
   ⌃C Up Down Right Left Space Delete Return  => natural enough
   0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
@@ -23,8 +22,9 @@ demos:
   j k G 1G H L M - + _ ⌃J ⌃N ⌃P  => leap to row, leap to line
   1234567890 Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
-  \n  => toggle line numbers on and off
-  ⌃L  => toggle more lag on and off
+  ⌃L ⌃G  => toggle lag and say if lag is toggled
+  \n  => toggle line numbers
+  Esc ⌃C \n Qvi⌃M 123Esc 123⌃C f⌃C 9^ G⌃F⌃F G⌃F⌃E 1G⌃Y ; ,  => eggs
 
 examples:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
@@ -139,7 +139,12 @@ def parse_vi_argv(argv):
     """Convert a Vi Sys ArgV to an Args Namespace, or print some Help and quit"""
 
     parser = compile_argdoc(epi="quirks")
-    parser.add_argument("file", metavar="FILE", nargs="?", help="a file to edit")
+    parser.add_argument(
+        "file",
+        metavar="FILE",
+        nargs="?",
+        help="a file to edit, such as '-' to mean stdin",
+    )
 
     exit_unless_doc_eq(parser)
 
@@ -148,7 +153,8 @@ def parse_vi_argv(argv):
     if args.file is not None:
         if args.file != "-":
             stderr_print(
-                "vi.py: error: file '-' meaning '/dev/stdin' implemented, nothing else yet"
+                "vi.py: error: "
+                "file '-' meaning '/dev/stdin' implemented, nothing else yet"
             )
             sys.exit(2)
 
