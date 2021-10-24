@@ -116,7 +116,7 @@ def main(argv):
 
     returncode = None
     try:
-        editor.run_awhile()
+        editor.run_terminal()
     except SystemExit as exc:
         returncode = exc.code
 
@@ -167,7 +167,7 @@ def parse_vi_argv(argv):
 
 
 class TerminalNudgeIn(argparse.Namespace):
-    """Split up the Terminal Keyboard Chords of one Input"""
+    """Collect the Keyboard Chords of one Input"""
 
     def __init__(self, prefix=None, chords=None, suffix=None):
 
@@ -199,7 +199,7 @@ class TerminalNudgeIn(argparse.Namespace):
 
 
 class TerminalReplyOut(argparse.Namespace):
-    """Collect things to say on the side, apart from main Output, in reply to Input"""
+    """Collect the parts of a Reply to Input, apart from the main Output"""
 
     def __init__(self, nudge=None, message=None):
 
@@ -211,7 +211,9 @@ class TerminalReplyOut(argparse.Namespace):
 
 
 class TerminalEditor:
-    """Write through to the Terminal, but keep a copy"""
+    """Feed Keyboard into Screen of a Partial or Whole View of a Buffer of a File"""
+
+    # Classic Read-Eval-Print Loop, but loop on Keyboard Chords, not whole Lines
 
     def __init__(self, iobytearray):
 
@@ -241,7 +243,7 @@ class TerminalEditor:
         self.injecting_more_lag = None  # inject more Lag or not
         self.showing_line_number = None  # show Line Numbers or not
 
-        self.bots_by_chords = self._vim_bots_by_chords_()  # map Keyboard Inputs to Code
+        self.bots_by_chords = None  # map Keyboard Inputs to Code
 
         self.nudge = TerminalNudgeIn()  # split the Chords of one Keyboard Input
         self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
@@ -266,14 +268,9 @@ class TerminalEditor:
 
         # TODO: less sourcelines inside "def __init__"
 
-    #
-    # Work closely with one TerminalDriver and one TerminalPainter
-    #
-
-    def run_awhile(self):
-        """Prompt, take input, react, repeat till quit"""
-
-        # Layer Terminal Editor > TerminalPainter > TerminalShadow > TerminalDriver
+    def run_terminal(self):
+        """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
+        # Stack TerminalEditor on TerminalPainter on TerminalShadow on TerminalDriver
 
         stdio = sys.stderr
         with TerminalDriver(terminal=stdio) as driver:
@@ -287,36 +284,51 @@ class TerminalEditor:
 
             self.terminal = painter
 
-            # Repeat till quit
+            bots_by_chords = self._vim_bots_by_chords_()
+            self.run_keyboard(bots_by_chords)  # quit by raising SystemExit
 
-            while True:  # loop till SystemExit
+    def run_keyboard(self, bots_by_chords):
+        """Prompt, take input, react, repeat till quit"""
 
-                # Scroll, prompt, take input, react
+        self.bots_by_chords = bots_by_chords
 
-                self.scroll()
-                self.prompt()
+        # Repeat till SystemExit raised
 
-                try:
+        while True:
 
-                    chord = self.terminal.getch()
+            # Scroll and prompt
 
-                except KeyboardInterrupt:
+            self.scroll()
+            self.prompt()
 
-                    if self.nudge != TerminalNudgeIn():
-                        self.nudge.append(b"\x03")  # ETX, aka ⌃C, aka 3
-                        self.send_reply_soon("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
+            # Take one Chord in, or next Chord, or cancel Chords to start again
 
-                        self.nudge = TerminalNudgeIn()
+            try:
 
-                        continue
+                chord = self.terminal.getch()
 
-                    chord = b"\x03"  # ETX, aka ⌃C, aka 3
+            except KeyboardInterrupt:
 
-                bot = self.choose_bot(chord)
-                if bot is not None:
-                    self.call_bot(bot)  # reply to one whole Nudge
+                if self.nudge != TerminalNudgeIn():
+                    self.nudge.append(b"\x03")  # ETX, aka ⌃C, aka 3
+                    self.send_reply_soon("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
 
-                    self.nudge = TerminalNudgeIn()  # consume the whole Nudge
+                    self.nudge = TerminalNudgeIn()
+
+                    continue
+
+                chord = b"\x03"  # ETX, aka ⌃C, aka 3
+
+            bot = self.choose_bot(chord)
+            if bot is None:
+
+                continue
+
+            # Reply
+
+            self.call_bot(bot)  # reply to one whole Nudge
+
+            self.nudge = TerminalNudgeIn()  # consume the whole Nudge
 
     def scroll(self):
         """Scroll to place Cursor on Screen"""
@@ -340,7 +352,9 @@ class TerminalEditor:
 
         lines = self.lines
         top_lines = lines[self.top_row :]
-        str_reply = self.consume_reply()
+
+        str_reply = self.format_reply()
+        self.reply = TerminalReplyOut()
 
         injecting_more_lag = self.injecting_more_lag
         sending_bell = self.sending_bell
@@ -503,13 +517,13 @@ class TerminalEditor:
 
         self.reply = TerminalReplyOut(nudge=nudge, message=message)
 
-    def consume_reply(self):
-        """Send Shout else Mention else Row, Column, Input, & Whisper"""
+    def format_reply(self):
+        """Show Row, Column, Nudge, & Message"""
 
         reply = self.reply
         nudge = reply.nudge
 
-        #
+        # Format parts
 
         row_number = 1 + self.row
         column_number = 1 + self.column
@@ -519,15 +533,11 @@ class TerminalEditor:
 
         str_message = str(reply.message) if reply.message else ""
 
-        #
+        # Join parts
 
         str_reply = "{},{}  {}  {}".format(
             row_number, column_number, str_echo, str_message
         ).rstrip()
-
-        # Consume the Status, before returning a formatted copy of it
-
-        self.reply = TerminalReplyOut()
 
         return str_reply
 
@@ -681,16 +691,36 @@ class TerminalEditor:
         # After fixing it, assert we never got it wrong
 
         after = (row, column)
-        self.check(before == after, before=before, after=after)
+        if before != after:
+            raise KwArgsException(before=before, after=after)
 
     def check(self, truthy, **kwargs):
-        """Fail fast, perhaps with details, else proceed"""
+        """Fail fast, else proceed"""
 
         if not truthy:
-            if kwargs:
-                raise KwArgsException(**kwargs)
-            else:
-                raise IndexError()
+            raise IndexError()
+
+    def readline(self):
+        """Take an Input Line from beneath the Scrolling Rows"""
+
+        raise NotImplementedError()
+
+        self.readline_prompt = self.format_reply()
+        self.readline_text = ""
+
+        with_bots_by_chords = self.bots_by_chords
+        try:
+            bots_by_chords = self._readline_bots_by_chords_()
+            self.run_keyboard(bots_by_chords)
+            assert False  # unreached
+        except SystemExit:
+            pass
+        finally:
+            self.bots_by_chords = with_bots_by_chords
+
+        text = self.readline_text
+
+        return text
 
     #
     # Define keys for entering, pausing, exiting Vi Py
@@ -700,6 +730,7 @@ class TerminalEditor:
         """Suggest ZQ to quit Vi Py"""
 
         self.send_reply_soon("Press ZQ to lose changes and quit Vi Py")  # ⌃C Egg
+        # Vim rings a Bell for each extra ⌃C
 
         # Vim sends Bell here
 
@@ -712,7 +743,7 @@ class TerminalEditor:
             self.send_reply_soon("Escaped")  # 123 Esc Egg, etc
         else:
             self.send_reply_soon("Press ZZ to save changes and quit Vi Py")  # Esc Egg
-            self.send_bell_soon()
+            # Vim rings a Bell for each extra Esc
 
     def do_redraw(self):  # Vim ⌃L
         """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
@@ -780,6 +811,14 @@ class TerminalEditor:
         returncode = self.get_arg1(default=None)
 
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
+
+    def do_find_ahead_readline(self):  # Vim /
+
+        _ = self.readline()
+
+    def do_find_behind_readline(self):  # Vim ?
+
+        _ = self.readline()
 
     #
     # Flip switches
@@ -1645,7 +1684,7 @@ class TerminalEditor:
         bots_by_chords[b"\x1B[C"] = (self.do_slip_right,)  # → Right Arrow
         bots_by_chords[b"\x1B[D"] = (self.do_slip_left,)  # ← Left Arrow
 
-        # bots_by_chords[b"\x1C"] = (self.eval_readline,)   # FS, aka ⌃\, aka 28
+        # bots_by_chords[b"\x1C"] = (self.do_eval_readline,)   # FS, aka ⌃\, aka 28
         # bots_by_chords[b"\x1D"]  # GS, aka ⌃], aka 29
         # bots_by_chords[b"\x1E"]  # RS, aka ⌃^, aka 30  # try this after edit in: |vi -
         # bots_by_chords[b"\x1F"]  # US, aka ⌃_, aka 31
@@ -1664,7 +1703,7 @@ class TerminalEditor:
         bots_by_chords[b"+"] = (self.do_step_down_dent,)
         bots_by_chords[b","] = (self.do_slip_choice_undo,)
         bots_by_chords[b"-"] = (self.do_step_up_dent,)
-        # bots_by_chords[b"/"] = (self.find_ahead_readline,)
+        bots_by_chords[b"/"] = (self.do_find_ahead_readline,)
 
         bots_by_chords[b"0"] = (self.do_slip_first,)
 
@@ -1673,7 +1712,7 @@ class TerminalEditor:
         # bots_by_chords[b"<"]  # TODO: dedent
         # bots_by_chords[b"="]  # TODO: dent after
         # bots_by_chords[b">"]  # TODO: indent
-        # bots_by_chords[b"?"] = (self.find_behind_readline,)
+        bots_by_chords[b"?"] = (self.do_find_behind_readline,)
         # bots_by_chords[b"@"]  # TODO: play
 
         # bots_by_chords[b"A"] = (self.do_slip_last_right_open,)
@@ -1689,7 +1728,7 @@ class TerminalEditor:
         # bots_by_chords[b"K"] = (self.do_lookup,)
         bots_by_chords[b"L"] = (self.do_step_max_low,)
         bots_by_chords[b"M"] = (self.do_step_to_middle,)
-        # bots_by_chords[b"N"] = (self.find_behind,)
+        # bots_by_chords[b"N"] = (self.do_find_behind,)
         # bots_by_chords[b"O"] = (self.do_slip_first_open,)
         # bots_by_chords[b"P"] = (self.do_paste_behind,)
 
@@ -1734,7 +1773,7 @@ class TerminalEditor:
         bots_by_chords[b"k"] = (self.do_step_up_seek,)
         bots_by_chords[b"l"] = (self.do_slip_right,)
         # bots_by_chords[b"m"] = (None, self.do_drop_pin)
-        # bots_by_chords[b"n"] = (self.find_ahead,)
+        # bots_by_chords[b"n"] = (self.do_find_ahead,)
         # bots_by_chords[b"o"] = (self.do_slip_last_right_open,)
         # bots_by_chords[b"p"] = (self.do_paste_ahead,)
         # bots_by_chords[b"q"] = (self.do_record,)
@@ -1756,6 +1795,16 @@ class TerminalEditor:
         # bots_by_chords[b"~"] = (self.do_flip_case_overwrite,)
 
         bots_by_chords[b"\x7F"] = (self.do_slip_behind,)  # DEL, aka ⌃?, aka 127
+
+        return bots_by_chords
+
+    #
+    # Map Keyboard Inputs to Code, for when feeling like Vim /
+    #
+
+    def _readline_bots_by_chords_(self):
+
+        bots_by_chords = dict()
 
         return bots_by_chords
 
@@ -1890,7 +1939,7 @@ class TerminalPainter:
 
 
 class TerminalShadow:
-    """Paint a Screen of Rows of Chars, but mostly write just the Diffs to reduce Lag"""
+    """Simulate a Terminal, to mostly write just the Diffs, to reduce Lag"""
 
     def __init__(self, terminal):
 
