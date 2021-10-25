@@ -24,7 +24,7 @@ keyboard tests:
   ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
   ⌃L ⌃G  => toggle lag and say if lag is toggled
   \n  => toggle line numbers
-  Esc ⌃C \n Qvi⌃M 123Esc 123⌃C f⌃C 9^ G⌃F⌃F G⌃F⌃E 1G⌃Y ; ,  => eggs
+  Esc ⌃C \n Qvi⌃M 123Esc 123⌃C f⌃C 9^ G⌃F⌃F G⌃F⌃E 1G⌃B 1G⌃Y ; ,  => eggs
 
 examples:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
@@ -112,7 +112,7 @@ def main(argv):
     # Edit the input
 
     iobytearray = bytearray(inbytes)
-    editor = TerminalEditor(iobytearray)
+    editor = TerminalVi(iobytearray)
 
     returncode = None
     try:
@@ -210,53 +210,14 @@ class TerminalReplyOut(argparse.Namespace):
     # because Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
 
-class TerminalEditor:
-    """Feed Keyboard into Screen of a Partial or Whole View of a Buffer of a File"""
-
-    # Classic Read-Eval-Print Loop, but loop on Keyboard Chords, not whole Lines
+class TerminalVi:
+    """Feed Keyboard into Screen of File of Lines of chars, a la Vi"""
 
     def __init__(self, iobytearray):
 
-        # Capture arg
-
         self.iobytearray = iobytearray  # send mutations back to caller
 
-        chars = iobytearray.decode(errors="surrogateescape")
-        lines = chars.splitlines(keepends=True)
-        self.lines = lines  # edit a copy of a File of Encoded Chars
-
-        # Layer over a Terminal I/O Stack
-
         self.log = None  # capture Python Tracebacks
-
-        self.painter = None
-        self.shadow = None
-        self.driver = None
-        self.stdio = None
-
-        self.terminal = None  # place a Terminal I/O Stack below
-
-        self.row = 0  # point the Screen Cursor to a Row of File
-        self.column = 0  # point the Screen Cursor to a Column of File
-
-        self.top_row = 0  # scroll through more Lines than fit on Screen
-        self.injecting_more_lag = None  # inject more Lag or not
-        self.showing_line_number = None  # show Line Numbers or not
-
-        self.bots_by_chords = None  # map Keyboard Inputs to Code
-
-        self.nudge = TerminalNudgeIn()  # split the Chords of one Keyboard Input
-        self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
-        self.arg2 = None  # take the Suffix Bytes as one Encoded Char
-
-        self.sending_bell = None  # ring the Terminal Bell as part of some Prompt's
-        self.reply = TerminalNudgeIn()  # declare an empty Nudge
-        self.do_help_quit()  # start with a warmer welcome, not a cold empty Nudge
-
-        # Define Keyboard Input to walk Vim-like State Machines inside this Editor
-
-        self.doing_more = None  # take the Arg1 as a Count of Repetition's
-        self.done = None  # count the Repetition's completed before now
 
         self.slip_choice = None  # find Char in Row
         self.slip_after = None  # slip off by one Column after finding Char
@@ -266,433 +227,48 @@ class TerminalEditor:
         self.seeking_more = None  # remembering the Seeking Column into next Nudge
         self.seeking_column = None  # leap to a Column after changing Row
 
-        # TODO: less sourcelines inside "def __init__"
-
     def run_terminal(self):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
-        # Stack TerminalEditor on TerminalPainter on TerminalShadow on TerminalDriver
 
-        stdio = sys.stderr
-        with TerminalDriver(terminal=stdio) as driver:
-            shadow = TerminalShadow(terminal=driver)
-            painter = TerminalPainter(terminal=shadow)
+        iobytearray = self.iobytearray
 
-            self.painter = painter
-            self.shadow = shadow
-            self.driver = driver
-            self.stdio = stdio
+        chars = iobytearray.decode(errors="surrogateescape")
+        lines = chars.splitlines(keepends=True)
+        runner = TerminalRunner(lines)
 
-            self.terminal = painter
+        self.runner = runner
 
-            bots_by_chords = self._vim_bots_by_chords_()
-            self.run_keyboard(bots_by_chords)  # quit by raising SystemExit
+        self.do_help_quit_vi()  # start with a warmer welcome, not a cold empty Nudge
 
-    def run_keyboard(self, bots_by_chords):
-        """Prompt, take input, react, repeat till quit"""
-
-        self.bots_by_chords = bots_by_chords
-
-        # Repeat till SystemExit raised
-
-        while True:
-
-            # Scroll and prompt
-
-            self.scroll()
-            self.prompt()
-
-            # Take one Chord in, or next Chord, or cancel Chords to start again
-
-            try:
-
-                chord = self.terminal.getch()
-
-            except KeyboardInterrupt:
-
-                if self.nudge != TerminalNudgeIn():
-                    self.nudge.append(b"\x03")  # ETX, aka ⌃C, aka 3
-                    self.send_reply_soon("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
-
-                    self.nudge = TerminalNudgeIn()
-
-                    continue
-
-                chord = b"\x03"  # ETX, aka ⌃C, aka 3
-
-            bot = self.choose_bot(chord)
-            if bot is None:
-
-                continue
-
-            # Reply
-
-            self.call_bot(bot)  # reply to one whole Nudge
-
-            self.nudge = TerminalNudgeIn()  # consume the whole Nudge
-
-    def scroll(self):
-        """Scroll to place Cursor on Screen"""
-
-        row = self.row
-        terminal = self.terminal
-
-        bottom_row = self.find_bottom_row()
-
-        if row < self.top_row:
-            self.top_row = row
-        elif row > bottom_row:
-            self.top_row = row - (terminal.scrolling_rows - 1)
-
-    def prompt(self):
-        """Write over the Rows of Chars on Screen"""
-
-        # Pull from Self
-
-        terminal = self.terminal
-
-        lines = self.lines
-        top_lines = lines[self.top_row :]
-
-        str_reply = self.format_reply()
-        self.reply = TerminalReplyOut()
-
-        injecting_more_lag = self.injecting_more_lag
-        sending_bell = self.sending_bell
-
-        # Push into the Terminal
-
-        terminal.top_line_number = 1 + self.top_row
-        terminal.last_line_number = 1 + len(lines)
-        terminal.showing_line_number = self.showing_line_number
-
-        terminal.cursor_row = self.row - self.top_row
-        terminal.cursor_column = self.column
-
-        # Choose more or less Accuracy & Lag
-
-        if not injecting_more_lag:
-            if sending_bell:
-                # time.sleep(0.3)  # delaying Output demos a different kind of lag
-                terminal._reopen_terminal_()
-
-        terminal.write_screen(lines=top_lines, status=str_reply)
-
-        if sending_bell:
-            self.sending_bell = None
-            terminal.write_bell()
-
-        terminal.flush()
-
-    def choose_bot(self, chord):
-        """Accept one Keyboard Input into Prefix, into main Chords, or as Suffix"""
-
-        prefix = self.nudge.prefix
-        chords = self.nudge.chords
-
-        bots_by_chords = self.bots_by_chords
-
-        assert self.nudge.suffix is None, (chords, chord)  # one Chord only
-
-        # Accept a Prefix of Digits
-
-        if not chords:
-            if (chord in b"123456789") or (prefix and (chord == b"0")):
-
-                prefix_plus = chord if (prefix is None) else (prefix + chord)
-                self.nudge.prefix = prefix_plus
-                self.send_reply_soon()  # show Prefix a la Vim ':set showcmd'
-
-                return None  # ask for more Prefix, else for main Chords
-
-        self.arg1 = int(prefix) if prefix else None
-        assert self.get_arg1() >= 1
-
-        # Accept one or more Chords
-
-        bots = bots_by_chords.get(chords)
-        if not (bots and (len(bots) != 1)):
-
-            chords_plus = chord if (chords is None) else (chords + chord)
-            self.nudge.chords = chords_plus
-            self.send_reply_soon()  # Chords of Vim ':set showcmd'
-
-            default_bots = bots_by_chords[None]  # such as 'self.do_raise_name_error'
-
-            bots_plus = bots_by_chords.get(chords_plus, default_bots)
-            if bots_plus is None:
-
-                return None  # ask for more Chords
-
-            if bots_plus and (len(bots_plus) != 1):
-
-                return None  # ask for Suffix
-
-            self.arg2 = None
-
-            # Call a Bot with or without Prefix, and without Suffix
-
-            bot = bots_plus[-1]
-            assert bot is not None, (chords, chord)
-
-            return bot
-
-        # Accept one last Chord as the Suffix
-
-        suffix = chord
-        self.nudge.suffix = suffix
-        self.send_reply_soon()  # more than Vim ':set showcmd'
-
-        self.arg2 = suffix.decode(errors="surrogateescape")
-
-        # Call a Bot with Suffix, but with or without Prefix
-
-        bot = bots[-1]
-        assert bot is not None, (chords, chord)
-
-        return bot
-
-    def call_bot(self, bot):
-        """Call the Bot once or more, in reply to one Terminal Nudge In"""
-
-        # Default to stop remembering the last Seeking Column
-
-        self.seeking_more = None
-
-        # Start calling
-
-        self.done = 0
-        while True:
-            self.doing_more = None
-
-            try:
-
-                bot()
-                self.keep_cursor_on_file()
-                self.log = None
-
-            # Cancel calls on KeyboardInterrupt
-
-            except KeyboardInterrupt:
-
-                self.nudge.append(b"\x03")  # ETX, aka ⌃C, aka 3
-                self.send_reply_soon("Interrupted")  # TODO: find this Egg
-                self.log = None
-
-                break
-
-            # Stop calls on Exception
-
-            except Exception as exc:
-
-                name = type(exc).__name__
-                str_exc = str(exc)
-                message = "{}: {}".format(name, str_exc) if str_exc else name
-
-                self.log = traceback.format_exc()
-
-                self.send_reply_soon(message)  # Egg of NotImplementedError
-                self.send_bell_soon()
-
-                break
-
-            # Let the Bot take the Arg as a Count of Repetitions
-
-            if self.doing_more:
-                self.done += 1
-                if self.done < self.get_arg1():
-
-                    continue
-
-            break
-
-        # Help many Steps between Rows leave the choice of Column unmoved
-
-        if not self.seeking_more:
-            self.seeking_column = None
-
-    def send_reply_soon(self, message=None):
-        """Capture some Status now, to show with next Prompt"""
-
-        nudge = self.nudge
-
-        self.reply = TerminalReplyOut(nudge=nudge, message=message)
-
-    def format_reply(self):
-        """Show Row, Column, Nudge, & Message"""
-
-        reply = self.reply
-        nudge = reply.nudge
-
-        # Format parts
-
-        row_number = 1 + self.row
-        column_number = 1 + self.column
-
-        echo_bytes = b"" if (nudge is None) else nudge.getch()
-        str_echo = repr_vi_bytes(echo_bytes) if echo_bytes else ""
-
-        str_message = str(reply.message) if reply.message else ""
-
-        # Join parts
-
-        str_reply = "{},{}  {}  {}".format(
-            row_number, column_number, str_echo, str_message
-        ).rstrip()
-
-        return str_reply
-
-    def send_bell_soon(self):
-        """Ring the Terminal Bell as part of the next Prompt"""
-
-        self.sending_bell = True
-
-    def continue_do_loop(self):
-        """Ask to run again, like to run for a total of 'self.arg1' times"""
-
-        self.doing_more = True
-
-    def continue_column_seek(self):
-        """Ask to seek again, like to keep on choosing the last Column in each Row"""
-
-        self.seeking_more = True
+        bots_by_chords = self._vim_bots_by_chords_()
+        try:
+            runner.run_terminal(bots_by_chords)
+            assert False  # unreached
+        finally:
+            self.log = runner.log
 
     #
-    # Focus on one Line of a File of Lines
     #
-
-    def find_column_in_charsets(self, charsets):
-        """Return the Index of the first CharSet containing Column Char, else -1"""
-
-        chars = self.get_column_char()  # may be empty
-        chars = chars if chars else " "
-
-        for (index, charset) in enumerate(charsets):
-            if chars in charset:
-
-                return index
-
-        return -1
-
-    def get_column_char(self):
-        """Get the one Char at the Column in the Row beneath the Cursor"""
-
-        row_line = self.lines[self.row]
-        row_text = row_line.splitlines()[0]  # "flat is better than nested"
-        chars = row_text[self.column :][:1]
-
-        return chars  # 0 or 1 chars
-
-    def get_row_text(self):
-        """Get Chars of Columns in Row beneath Cursor"""
-
-        row_line = self.lines[self.row]
-        row_text = row_line.splitlines()[0]
-
-        return row_text
-
-    def count_columns_in_row(self):
-        """Count Columns in Row beneath Cursor"""
-
-        row_line = self.lines[self.row]
-        row_text = row_line.splitlines()[0]  # "flat is better than nested"
-
-        columns = len(row_text)
-
-        return columns
-
-    def count_rows_in_file(self):
-        """Count Rows in Buffer of File"""
-
-        rows = len(self.lines)
-
-        return rows
+    #
 
     def get_arg1(self, default=1):
         """Get the Int of the Prefix Digits before the Chords, else the Default Int"""
 
-        arg1 = self.arg1
-        arg1 = default if (arg1 is None) else arg1
+        return self.runner.get_arg1(default=default)
 
-        return arg1
-
-    def get_arg2(self, default=1):
+    def get_arg2(self):
         """Get the Bytes of the input Suffix past the input Chords"""
 
-        arg2 = self.arg2
-        assert arg2 is not None
+        return self.runner.get_arg2()
 
-        return arg2
+    def send_reply_soon(self, message):
+        """Capture some Status now, to show with next Prompt"""
 
-    def find_bottom_row(self):
-        """Find the Bottom Row on Screen, as if enough Rows to fill Screen"""
+        self.runner.send_reply_soon(message)
 
-        terminal = self.terminal
-
-        last_row = self.find_last_row()
-
-        bottom_row = self.top_row + (terminal.scrolling_rows - 1)
-        bottom_row = min(bottom_row, last_row)
-
-        return bottom_row
-
-    def find_last_row(self):
-        """Find the last Row in File, else Row Zero when no Rows in File"""
-
-        rows = len(self.lines)  # "flat is better than nested"
-
-        last_row = (rows - 1) if rows else 0
-
-        return last_row
-
-    def find_last_column(self):
-        """Find the last Column in Row, else Column Zero when no Columns in Row"""
-
-        row_line = self.lines[self.row]
-        row_text = row_line.splitlines()[0]  # "flat is better than nested"
-
-        columns = len(row_text)
-        last_column = (columns - 1) if columns else 0
-
-        return last_column
-
-    def find_middle_row(self):
-        """Find the Middle Row on Screen, of the Rows that carry Lines of File"""
-
-        top_row = self.top_row
-        bottom_row = self.find_bottom_row()
-        rows_on_screen = bottom_row - top_row + 1
-
-        middle = (rows_on_screen + 1) // 2  # match +1 bias in Vi's 'find_middle_row'
-        middle_row = top_row + middle
-
-        return middle_row
-
-    def keep_cursor_on_file(self):
-        """Fail faster, like when some Bug shoves the Cursor off of Buffer of File"""
-
-        row = self.row
-        column = self.column
-
-        rows = self.count_rows_in_file()
-        columns = self.count_columns_in_row()
-
-        # Keep the choice of Row and Column non-negative and in File
-
-        before = (row, column)
-
-        if not ((0 <= row < rows) or (row == rows == 0)):
-            row = 0
-        if not ((0 <= column < columns) or (column == columns == 0)):
-            column = 0
-
-        self.row = row
-        self.column = column
-
-        # After fixing it, assert we never got it wrong
-
-        after = (row, column)
-        if before != after:
-            raise KwArgsException(before=before, after=after)
+    #
+    #
+    #
 
     def check(self, truthy, **kwargs):
         """Fail fast, else proceed"""
@@ -700,33 +276,21 @@ class TerminalEditor:
         if not truthy:
             raise IndexError()
 
-    def readline(self):
-        """Take an Input Line from beneath the Scrolling Rows"""
+    def continue_column_seek(self):
+        """Ask to seek again, like to keep on choosing the last Column in each Row"""
 
-        raise NotImplementedError()
-
-        self.readline_prompt = self.format_reply()
-        self.readline_text = ""
-
-        with_bots_by_chords = self.bots_by_chords
-        try:
-            bots_by_chords = self._readline_bots_by_chords_()
-            self.run_keyboard(bots_by_chords)
-            assert False  # unreached
-        except SystemExit:
-            pass
-        finally:
-            self.bots_by_chords = with_bots_by_chords
-
-        text = self.readline_text
-
-        return text
+        self.seeking_more = True
 
     #
-    # Define keys for entering, pausing, exiting Vi Py
+    # Define keys for entering, pausing, and exiting TerminalVi
     #
 
-    def do_help_quit(self):  # Vim ⌃C
+    def do_raise_name_error(self):  # such as Esc, such as 'ZB'
+        """Reply to meaningless Keyboard Input"""
+
+        raise NameError()
+
+    def do_help_quit_vi(self):  # Vim ⌃C
         """Suggest ZQ to quit Vi Py"""
 
         self.send_reply_soon("Press ZQ to lose changes and quit Vi Py")  # ⌃C Egg
@@ -737,7 +301,8 @@ class TerminalEditor:
     def do_c0_control_esc(self):  # Vim Esc
         """Cancel Digits Prefix, else suggest ZZ to quit Vi Py"""
 
-        arg1 = self.arg1
+        runner = self.runner
+        arg1 = runner.arg1
 
         if arg1 is not None:
             self.send_reply_soon("Escaped")  # 123 Esc Egg, etc
@@ -745,57 +310,27 @@ class TerminalEditor:
             self.send_reply_soon("Press ZZ to save changes and quit Vi Py")  # Esc Egg
             # Vim rings a Bell for each extra Esc
 
-    def do_redraw(self):  # Vim ⌃L
-        """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
-
-        painter = self.painter
-
-        injecting_more_lag = not self.injecting_more_lag
-        if injecting_more_lag:
-            painter.terminal = self.driver
-        else:
-            painter.terminal = self.shadow
-            painter._reopen_terminal_()
-
-        self.injecting_more_lag = injecting_more_lag
-
-        message = ":set _lag_" if injecting_more_lag else ":set no_lag_"
-        self.send_reply_soon(message)
-
-    def do_give_more_status(self):  # Vim ⌃G
-        """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
-
-        injecting_more_lag = self.injecting_more_lag
-
-        message = ":set _lag_" if injecting_more_lag else ":set no_lag_"
-        self.send_reply_soon(message)
-
-        # TODO: echo $(whoami)@$(hostname):$(pwd)/
-
     def do_reopen_vi(self):  # Vim Q v i Return  # not Ex Mode from last century
         """Accept Q v i Return, without ringing the Terminal bell"""
+
+        runner = self.runner
 
         nudge = TerminalNudgeIn(chords=b"Qvi\x0D")  # CR, aka ⌃M, aka 13 \r
         message = "Would you like to play a game?"
 
-        self.reply = TerminalReplyOut(nudge=nudge, message=message)
-
-    def do_raise_name_error(self):  # such as Esc, such as 'ZB'
-        """Reply to meaningless Keyboard Input"""
-
-        raise NameError()
+        runner.reply = TerminalReplyOut(nudge=nudge, message=message)
 
     def do_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
-        terminal = self.terminal
+        runner = self.runner
 
-        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
-        terminal.__exit__(*exc_info)
-        os.kill(os.getpid(), signal.SIGTSTP)
-        terminal.__enter__()
+        runner.do_sig_tstp()
 
-    def do_quit(self):  # Vim ZQ  # Emacs kill-emacs
+        if self.seeking_column is not None:
+            self.continue_column_seek()
+
+    def do_quit_vi(self):  # Vim ZQ  # Emacs kill-emacs
         """Lose last changes and quit"""
 
         returncode = 1 if self.iobytearray else None
@@ -805,7 +340,7 @@ class TerminalEditor:
 
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
 
-    def do_save_and_quit(self):  # Vim ZZ  # Emacs save-buffers-kill-terminal
+    def do_save_and_quit_vi(self):  # Vim ZZ  # Emacs save-buffers-kill-terminal
         """Save last changes and quit"""
 
         returncode = self.get_arg1(default=None)
@@ -820,6 +355,21 @@ class TerminalEditor:
 
         _ = self.readline()
 
+    def readline(self):
+
+        raise NotImplementedError()
+
+        runner = self.runner
+
+        runner.nudge = TerminalNudgeIn()
+
+        ex = TerminalEx(runner)
+        try:
+            ex.run_ex_keyboard()
+            assert False  # unreached
+        except SystemExit:
+            pass
+
     #
     # Flip switches
     #
@@ -827,8 +377,10 @@ class TerminalEditor:
     def do_set_invnumber(self):  # Vi Py \n
         """Toggle Line-in-File numbers in or out"""
 
-        self.showing_line_number = not self.showing_line_number
-        message = ":set number" if self.showing_line_number else ":set nonumber"
+        runner = self.runner
+
+        runner.showing_line_number = not runner.showing_line_number
+        message = ":set number" if runner.showing_line_number else ":set nonumber"
         self.send_reply_soon(message)  # \n Egg
 
         # TODO: stop commandeering the personal \ Chord Sequences
@@ -840,16 +392,20 @@ class TerminalEditor:
     def do_slip(self):  # Vim |  # Emacs goto-char
         """Leap to first Column, else to a chosen Column"""
 
-        last_column = self.find_last_column()
+        runner = self.runner
+
+        last_column = runner.find_last_column()
         column = min(last_column, self.get_arg1() - 1)
 
-        self.column = column
+        runner.column = column
 
     def do_slip_dent(self):  # Vim ^
         """Leap to just past the Indent, but first Step Down if Arg"""
 
-        if self.arg1:
-            arg1 = self.get_arg1()
+        runner = self.runner
+
+        if runner.arg1 is not None:
+            arg1 = runner.get_arg1()
             self.send_reply_soon("Did you mean:  {} _".format(arg1))  # 9^ Egg, etc
 
         self.slip_dent()
@@ -857,106 +413,120 @@ class TerminalEditor:
     def slip_dent(self):
         """Leap to the Column after the Indent"""
 
-        text = self.get_row_text()
+        runner = self.runner
+
+        text = runner.get_row_text()
         lstripped = text.lstrip()
         column = len(text) - len(lstripped)
 
-        self.column = column
+        runner.column = column
 
     def do_slip_first(self):  # Vim 0  # Emacs move-beginning-of-line
         """Leap to the first Column in Row"""
 
-        assert self.arg1 is None  # Vi Py takes no Digits before the Chord 0
+        runner = self.runner
 
-        self.column = 0
+        assert runner.arg1 is None  # Vi Py takes no Digits before the Chord 0
+
+        runner.column = 0
 
     def do_slip_left(self):  # Vim h, Left  # Emacs left-char, backward-char
         """Slip left one Column or more"""
 
-        self.check(self.column)
+        runner = self.runner
 
-        left = min(self.column, self.get_arg1())
-        self.column -= left
+        self.check(runner.column)
+
+        left = min(runner.column, self.get_arg1())
+        runner.column -= left
 
     def do_slip_right(self):  # Vim l, Right  #  emacs right-char, forward-char
         """Slip Right one Column or more"""
 
-        last_column = self.find_last_column()
-        self.check(self.column < last_column)
+        runner = self.runner
 
-        right = min(last_column - self.column, self.get_arg1())
-        self.column += right
+        last_column = runner.find_last_column()
+        self.check(runner.column < last_column)
+
+        right = min(last_column - runner.column, self.get_arg1())
+        runner.column += right
 
     #
-    #
+    # Step the Cursor across zero, one, or more Columns of the same Row
     #
 
     def do_slip_ahead(self):  # Vim Space
         """Slip right, then down"""
 
-        last_column = self.find_last_column()
-        last_row = self.find_last_row()
+        runner = self.runner
+        last_column = runner.find_last_column()
+        last_row = runner.find_last_row()
 
-        if not self.done:
-            self.check((self.column < last_column) or (self.row < last_row))
+        if not runner.done:
+            self.check((runner.column < last_column) or (runner.row < last_row))
 
-        if self.column < last_column:
-            self.column += 1
+        if runner.column < last_column:
+            runner.column += 1
 
-            self.continue_do_loop()
+            runner.continue_do_loop()
 
-        elif self.row < last_row:
-            self.column = 0
-            self.row += 1
+        elif runner.row < last_row:
+            runner.column = 0
+            runner.row += 1
 
-            self.continue_do_loop()
+            runner.continue_do_loop()
 
     def slip_ahead(self):
 
-        last_column = self.find_last_column()
-        last_row = self.find_last_row()
+        runner = self.runner
+        last_column = runner.find_last_column()
+        last_row = runner.find_last_row()
 
-        if self.column < last_column:
-            self.column += 1
+        if runner.column < last_column:
+            runner.column += 1
 
             return 1
 
-        elif self.row < last_row:
-            self.column = 0
-            self.row += 1
+        elif runner.row < last_row:
+            runner.column = 0
+            runner.row += 1
 
             return 1
 
     def do_slip_behind(self):  # Vim Delete
         """Slip left, then up"""
 
-        if not self.done:
-            self.check(self.row or self.column)
+        runner = self.runner
 
-        if self.column:
-            self.column -= 1
+        if not runner.done:
+            self.check(runner.row or runner.column)
 
-            self.continue_do_loop()
+        if runner.column:
+            runner.column -= 1
 
-        elif self.row:
-            self.row -= 1
-            self.column = self.find_last_column()
+            runner.continue_do_loop()
 
-            self.continue_do_loop()
+        elif runner.row:
+            runner.row -= 1
+            runner.column = runner.find_last_column()
+
+            runner.continue_do_loop()
 
     def slip_behind(self):  # Vim Delete
         """Slip left, then up"""
 
-        if self.column:
-            self.column -= 1
+        runner = self.runner
 
-            self.continue_do_loop()
+        if runner.column:
+            runner.column -= 1
+
+            runner.continue_do_loop()
 
             return -1
 
-        elif self.row:
-            self.row -= 1
-            self.column = self.find_last_column()
+        elif runner.row:
+            runner.row -= 1
+            runner.column = runner.find_last_column()
 
             return -1
 
@@ -967,12 +537,13 @@ class TerminalEditor:
     def do_step(self):  # Vim G, 1G  # Emacs goto-line
         """Leap to last Row, else to a chosen Row"""
 
-        last_row = self.find_last_row()
+        runner = self.runner
+        last_row = runner.find_last_row()
 
         row = min(last_row, self.get_arg1() - 1)
-        row = last_row if (self.arg1 is None) else row
+        row = last_row if (runner.arg1 is None) else row
 
-        self.row = row
+        runner.row = row
         self.slip_dent()
 
     def do_step_down_dent(self):  # Vim +, Return
@@ -984,12 +555,13 @@ class TerminalEditor:
     def step_down(self):
         """Step down one Row or more"""
 
-        last_row = self.find_last_row()
+        runner = self.runner
+        last_row = runner.find_last_row()
 
-        self.check(self.row < last_row)
-        down = min(last_row - self.row, self.get_arg1())
+        self.check(runner.row < last_row)
+        down = min(last_row - runner.row, self.get_arg1())
 
-        self.row += down
+        runner.row += down
 
     def do_step_down_minus_dent(self):  # Vim _
         """Leap to just past the Indent, but first Step Down if Arg"""
@@ -1008,19 +580,22 @@ class TerminalEditor:
     def do_step_max_low(self):  # Vim L
         """Leap to first Word of Bottom Row on Screen"""
 
-        self.row = self.find_bottom_row()
+        runner = self.runner
+        runner.row = runner.find_bottom_row()
         self.slip_dent()
 
     def do_step_max_high(self):  # Vim H
         """Leap to first Word of Top Row on Screen"""
 
-        self.row = self.top_row
+        runner = self.runner
+        runner.row = runner.top_row
         self.slip_dent()
 
     def do_step_to_middle(self):  # Vim M
         """Leap to first Word of Middle Row on Screen"""
 
-        self.row = self.find_middle_row()
+        runner = self.runner
+        runner.row = runner.find_middle_row()
         self.slip_dent()
 
     def do_step_up_dent(self):  # Vim -
@@ -1032,10 +607,11 @@ class TerminalEditor:
     def step_up(self):
         """Step up one Row or more"""
 
-        self.check(self.row)
-        up = min(self.row, self.get_arg1())
+        runner = self.runner
+        self.check(runner.row)
+        up = min(runner.row, self.get_arg1())
 
-        self.row -= up
+        runner.row -= up
 
     #
     # Step the Cursor up and down between Rows, while holding on to the Column
@@ -1044,38 +620,45 @@ class TerminalEditor:
     def do_slip_last_seek(self):  # Vim $  # Emacs move-end-of-line
         """Leap to the last Column in Row, and keep seeking last Columns"""
 
+        runner = self.runner
+
         self.seeking_column = True
         self.step_down_minus()
-        self.column = self.find_last_column()
+        runner.column = runner.find_last_column()
 
         self.continue_column_seek()
 
     def do_step_down_seek(self):  # Vim j, ⌃J, ⌃N, Down  # Emacs next-line
         """Step down one Row or more, but seek the current Column"""
 
+        runner = self.runner
+
         if self.seeking_column is None:
-            self.seeking_column = self.column
+            self.seeking_column = runner.column
 
         self.step_down()
 
-        self.column = self.seek_column()
+        runner.column = self.seek_column()
         self.continue_column_seek()
 
     def do_step_up_seek(self):  # Vim k, ⌃P, Up  # Emacs previous-line
         """Step up a Row or more, but seek the current Column"""
 
+        runner = self.runner
+
         if self.seeking_column is None:
-            self.seeking_column = self.column
+            self.seeking_column = runner.column
 
         self.step_up()
 
-        self.column = self.seek_column()
+        runner.column = self.seek_column()
         self.continue_column_seek()
 
     def seek_column(self, column=True):
         """Begin seeking a Column, if not begun already"""
 
-        last_column = self.find_last_column()
+        runner = self.runner
+        last_column = runner.find_last_column()
 
         if self.seeking_column is True:
             chosen_column = last_column
@@ -1110,15 +693,18 @@ class TerminalEditor:
     def do_scroll_ahead_much(self):  # Vim ⌃F
         """Scroll ahead much"""
 
-        row = self.row
-        top_row = self.top_row
-        terminal = self.terminal
+        runner = self.runner
 
-        assert terminal.scrolling_rows >= 2
-        rows_per_screen = terminal.scrolling_rows - 2
+        row = runner.row
+        top_row = runner.top_row
+        runner = self.runner
+        painter = runner.painter
 
-        bottom_row = self.find_bottom_row()
-        last_row = self.find_last_row()
+        assert painter.scrolling_rows >= 2
+        rows_per_screen = painter.scrolling_rows - 2
+
+        bottom_row = runner.find_bottom_row()
+        last_row = runner.find_last_row()
 
         # Quit at last Row
 
@@ -1142,36 +728,41 @@ class TerminalEditor:
             top_row += rows_per_screen
             top_row = min(top_row, last_row)
 
-        self.top_row = top_row
+        runner.top_row = top_row
 
         # Choose new Row and Column
 
         if row < top_row:
             row = top_row
 
-        self.row = row
+        runner.row = row
 
         self.slip_dent()
 
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     def do_scroll_behind_much(self):  # Vim ⌃B
         """Show the previous Screen of Rows"""
 
-        row = self.row
-        top_row = self.top_row
-        terminal = self.terminal
+        runner = self.runner
 
-        last_row = self.find_last_row()
+        row = runner.row
+        top_row = runner.top_row
+        runner = self.runner
+        painter = runner.painter
+
+        last_row = runner.find_last_row()
 
         # Quit at top Row
 
         if not top_row:
+            if not self.done:
+                self.send_reply_soon("Did you mean ⌃F")  # 1G⌃B Egg
 
             return
 
-        assert terminal.scrolling_rows >= 2
-        rows_per_screen = terminal.scrolling_rows - 2
+        assert painter.scrolling_rows >= 2
+        rows_per_screen = painter.scrolling_rows - 2
 
         # Step one Down if in Top Row already
 
@@ -1186,17 +777,17 @@ class TerminalEditor:
         else:
             top_row -= rows_per_screen
 
-        self.top_row = top_row
+        runner.top_row = top_row
 
         # Choose new Row and Column
 
-        bottom_row = self.find_bottom_row()
+        bottom_row = runner.find_bottom_row()
         if row > bottom_row:
-            self.row = bottom_row
+            runner.row = bottom_row
 
         self.slip_dent()
 
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     #
     # Scroll ahead or behind one Row of Screen
@@ -1205,14 +796,17 @@ class TerminalEditor:
     def do_scroll_ahead_one(self):  # Vim ⌃E
         """Show the next Row of Screen"""
 
-        row = self.row
-        top_row = self.top_row
+        runner = self.runner
 
-        last_row = self.find_last_row()
+        row = runner.row
+        top_row = runner.top_row
+
+        runner = self.runner
+        last_row = runner.find_last_row()
 
         # Quit at last Row
 
-        if self.top_row == last_row:
+        if runner.top_row == last_row:
             if not self.done:
                 self.send_reply_soon("Did you mean ⌃Y")  # G⌃F⌃E Egg
 
@@ -1225,18 +819,20 @@ class TerminalEditor:
             if row < top_row:
                 row = top_row
 
-        self.top_row = top_row
-        self.row = row
+        runner.top_row = top_row
+        runner.row = row
 
         self.slip_dent()
 
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     def do_scroll_behind_one(self):  # Vim ⌃Y
         """Show the previous Row of Screen"""
 
-        row = self.row
-        top_row = self.top_row
+        runner = self.runner
+
+        row = runner.row
+        top_row = runner.top_row
 
         # Quit at top Row
 
@@ -1252,18 +848,18 @@ class TerminalEditor:
         if top_row:
             top_row -= 1
 
-            self.top_row = top_row  # TODO: ugly mutate
-            bottom_row = self.find_bottom_row()
+            runner.top_row = top_row  # TODO: ugly mutate
+            bottom_row = runner.find_bottom_row()
 
             if row > bottom_row:
                 row = bottom_row
 
-        self.top_row = top_row
-        self.row = row
+        runner.top_row = top_row
+        runner.row = row
 
         self.slip_dent()
 
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     #
     # Search ahead for an empty line
@@ -1272,35 +868,38 @@ class TerminalEditor:
     def do_paragraph_ahead(self):  # Vim {
         """Step down over Empty Lines, then over Non-Empty Lines"""
 
-        last_row = self.find_last_row()
+        runner = self.runner
+        last_row = runner.find_last_row()
 
-        if self.done:
-            if (self.row, self.column) == (last_row, self.find_last_column()):
+        if runner.done:
+            if (runner.row, runner.column) == (last_row, runner.find_last_column()):
                 raise IndexError()
 
-        while (self.row < last_row) and not self.find_last_column():
-            self.row += 1
-        while (self.row < last_row) and self.find_last_column():
-            self.row += 1
+        while (runner.row < last_row) and not runner.find_last_column():
+            runner.row += 1
+        while (runner.row < last_row) and runner.find_last_column():
+            runner.row += 1
 
-        self.column = self.find_last_column()
+        runner.column = runner.find_last_column()
 
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     def do_paragraph_behind(self):  # Vim }
 
-        if self.done:
-            if (self.row, self.column) == (0, 0):
+        runner = self.runner
+
+        if runner.done:
+            if (runner.row, runner.column) == (0, 0):
                 raise IndexError()
 
-        while self.row and not self.find_last_column():
-            self.row -= 1
-        while self.row and self.find_last_column():
-            self.row -= 1
+        while runner.row and not runner.find_last_column():
+            runner.row -= 1
+        while runner.row and runner.find_last_column():
+            runner.row -= 1
 
-        self.column = 0
+        runner.column = 0
 
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     #
     # Search ahead inside the Row for a single Char
@@ -1339,8 +938,10 @@ class TerminalEditor:
     def slip_index(self):
         """Find Char to Right in row, once or more"""
 
-        last_column = self.find_last_column()
-        text = self.get_row_text()
+        runner = self.runner
+
+        last_column = runner.find_last_column()
+        text = runner.get_row_text()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -1349,7 +950,7 @@ class TerminalEditor:
 
         # Index each
 
-        column = self.column
+        column = runner.column
 
         for _ in range(count):
 
@@ -1365,7 +966,7 @@ class TerminalEditor:
             self.check(column)
             column -= 1
 
-        self.column = column
+        runner.column = column
 
     #
     # Step across Chars of CharSets
@@ -1373,35 +974,41 @@ class TerminalEditor:
 
     def do_big_word_end_ahead(self):  # Vim E
 
+        runner = self.runner
+
         charsets = list()
         charsets.append(set(" \t"))
         self.word_end_ahead(charsets)
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     def do_lil_word_end_ahead(self):  # Vim e
+
+        runner = self.runner
 
         charsets = list()
         charsets.append(set(" \t"))
         charsets.append(set(string.ascii_letters + string.digits + "_"))
 
         self.word_end_ahead(charsets)
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     def word_end_ahead(self, charsets):
 
+        runner = self.runner
+
         self.slip_ahead()
 
-        while not self.find_column_in_charsets(charsets):
+        while not runner.find_column_in_charsets(charsets):
             if not self.slip_ahead():
 
                 break
 
-        here = self.find_column_in_charsets(charsets)
+        here = runner.find_column_in_charsets(charsets)
         if here:
 
             beyond = None
-            while self.find_column_in_charsets(charsets) == here:
-                on_last_column = self.column == self.find_last_column()
+            while runner.find_column_in_charsets(charsets) == here:
+                on_last_column = runner.column == runner.find_last_column()
                 if not self.slip_ahead():
                     beyond = False
 
@@ -1417,26 +1024,32 @@ class TerminalEditor:
 
     def do_big_word_start_ahead(self):  # Vim W
 
+        runner = self.runner
+
         charsets = list()
         charsets.append(set(" \t"))
         self.word_start_ahead(charsets)
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     def do_lil_word_start_ahead(self):  # Vim w
+
+        runner = self.runner
 
         charsets = list()
         charsets.append(set(" \t"))
         charsets.append(set(string.ascii_letters + string.digits + "_"))
         self.word_start_ahead(charsets)
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     def word_start_ahead(self, charsets):
 
-        here = self.find_column_in_charsets(charsets)
+        runner = self.runner
+
+        here = runner.find_column_in_charsets(charsets)
         if here:
 
-            while self.find_column_in_charsets(charsets) == here:
-                on_last_column = self.column == self.find_last_column()
+            while runner.find_column_in_charsets(charsets) == here:
+                on_last_column = runner.column == runner.find_last_column()
                 if not self.slip_ahead():
 
                     break
@@ -1445,50 +1058,56 @@ class TerminalEditor:
 
                     break
 
-            if not self.column:
+            if not runner.column:
 
                 return
 
-        while not self.find_column_in_charsets(charsets):
+        while not runner.find_column_in_charsets(charsets):
             if not self.slip_ahead():
 
                 break
 
     def do_big_word_start_behind(self):  # Vim B
 
+        runner = self.runner
+
         charsets = list()
         charsets.append(set(" \t"))
         self.word_start_behind(charsets)
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
         # TODO: add option for 'b e w' and 'B E W' to swap places
 
     def do_lil_word_start_behind(self):  # Vim b
 
+        runner = self.runner
+
         charsets = list()
         charsets.append(set(" \t"))
         charsets.append(set(string.ascii_letters + string.digits + "_"))
         self.word_start_behind(charsets)
-        self.continue_do_loop()
+        runner.continue_do_loop()
 
     def word_start_behind(self, charsets):
 
+        runner = self.runner
+
         self.slip_behind()
 
-        on_first_column = self.column == 0
+        on_first_column = runner.column == 0
         if not on_first_column:
 
-            while not self.find_column_in_charsets(charsets):
+            while not runner.find_column_in_charsets(charsets):
                 if not self.slip_behind():
 
                     break
 
-            here = self.find_column_in_charsets(charsets)
+            here = runner.find_column_in_charsets(charsets)
             if here:
 
                 beyond = None
-                while self.find_column_in_charsets(charsets) == here:
-                    on_first_column = self.column == 0
+                while runner.find_column_in_charsets(charsets) == here:
+                    on_first_column = runner.column == 0
                     if not self.slip_behind():
                         beyond = False
 
@@ -1533,8 +1152,10 @@ class TerminalEditor:
     def slip_rindex(self):
         """Find Char to left in Row, once or more"""
 
-        last_column = self.find_last_column()
-        text = self.get_row_text()
+        runner = self.runner
+
+        last_column = runner.find_last_column()
+        text = runner.get_row_text()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -1543,7 +1164,7 @@ class TerminalEditor:
 
         # R-Index each
 
-        column = self.column
+        column = runner.column
 
         for _ in range(count):
 
@@ -1559,7 +1180,7 @@ class TerminalEditor:
             self.check(column < last_column)
             column += 1
 
-        self.column = column
+        runner.column = column
 
     #
     # Repeat search inside the Row for a single Char
@@ -1567,6 +1188,8 @@ class TerminalEditor:
 
     def do_slip_choice_redo(self):  # Vim ;
         """Repeat the last 'slip_index' or 'slip_rindex' once or more"""
+
+        runner = self.runner
 
         if self.slip_choice is None:
             self.send_reply_soon("Did you mean:  fx;")  # ; Egg
@@ -1581,29 +1204,31 @@ class TerminalEditor:
 
         else:
 
-            last_column = self.find_last_column()
+            last_column = runner.find_last_column()
 
-            with_column = self.column
+            with_column = runner.column
             try:
 
                 if after < 0:
-                    assert self.column < last_column
-                    self.column += 1
+                    assert runner.column < last_column
+                    runner.column += 1
                 elif after > 0:
-                    assert self.column
-                    self.column -= 1
+                    assert runner.column
+                    runner.column -= 1
 
                 self.slip_redo()
 
-                assert self.column != with_column
+                assert runner.column != with_column
 
             except Exception:
-                self.column = with_column
+                runner.column = with_column
 
                 raise
 
     def do_slip_choice_undo(self):  # Vim ,
         """Undo the last 'slip_index' or 'slip_rindex' once or more"""
+
+        runner = self.runner
 
         if self.slip_choice is None:
             self.send_reply_soon("Did you mean:  Fx,")  # , Egg
@@ -1618,24 +1243,24 @@ class TerminalEditor:
 
         else:
 
-            last_column = self.find_last_column()
+            last_column = runner.find_last_column()
 
-            with_column = self.column
+            with_column = runner.column
             try:
 
                 if after < 0:
-                    assert self.column
-                    self.column -= 1
+                    assert runner.column
+                    runner.column -= 1
                 elif after > 0:
-                    assert self.column < last_column
-                    self.column += 1
+                    assert runner.column < last_column
+                    runner.column += 1
 
                 self.slip_undo()
 
-                assert self.column != with_column
+                assert runner.column != with_column
 
             except Exception:
-                self.column = with_column
+                runner.column = with_column
 
                 raise
 
@@ -1643,26 +1268,43 @@ class TerminalEditor:
     # Map Keyboard Inputs to Code, for when feeling like Vim
     #
 
+    def do_before_do(self):
+
+        # Default to stop remembering the last Seeking Column
+
+        self.seeking_more = None
+
+    def do_after_do(self):
+
+        # Remember the last Seeking Column across Bots that ask for it
+
+        if not self.seeking_more:
+            self.seeking_column = None
+
     def _vim_bots_by_chords_(self):
         """Map Keyboard Inputs to Code, for when feeling like Vim"""
+
+        runner = self.runner
 
         bots_by_chords = dict()
 
         bots_by_chords[None] = (self.do_raise_name_error,)
+        bots_by_chords[False] = (self.do_before_do,)
+        bots_by_chords[True] = (self.do_after_do,)
 
         # bots_by_chords[b"\x00"]  # NUL, aka ⌃@, aka 0
         # bots_by_chords[b"\x01"]  # SOH, aka ⌃A, aka 1
         bots_by_chords[b"\x02"] = (self.do_scroll_behind_much,)  # STX, aka ⌃B, aka 2
-        bots_by_chords[b"\x03"] = (self.do_help_quit,)  # ETX, aka ⌃C, aka 3
+        bots_by_chords[b"\x03"] = (self.do_help_quit_vi,)  # ETX, aka ⌃C, aka 3
         bots_by_chords[b"\x04"] = (self.do_scroll_ahead_some,)  # EOT, aka ⌃D, aka 4
         bots_by_chords[b"\x05"] = (self.do_scroll_ahead_one,)  # ENQ, aka ⌃E, aka 5
         bots_by_chords[b"\x06"] = (self.do_scroll_ahead_much,)  # ACK, aka ⌃F, aka 6
-        bots_by_chords[b"\x07"] = (self.do_give_more_status,)  # BEL, aka ⌃G, aka 7 \a
+        bots_by_chords[b"\x07"] = (runner.do_give_more_status,)  # BEL, aka ⌃G, aka 7 \a
         # bots_by_chords[b"\x08"]  # BS, aka ⌃H, aka 8 \b
         # bots_by_chords[b"\x09"]  # TAB, aka ⌃I, aka 9 \t
         bots_by_chords[b"\x0A"] = (self.do_step_down_seek,)  # LF, aka ⌃J, aka 10 \n
         # bots_by_chords[b"\x0B"]  # VT, aka ⌃K, aka 11 \v
-        bots_by_chords[b"\x0C"] = (self.do_redraw,)  # FF, aka ⌃L, aka 12 \f
+        bots_by_chords[b"\x0C"] = (runner.do_redraw,)  # FF, aka ⌃L, aka 12 \f
         bots_by_chords[b"\x0D"] = (self.do_step_down_dent,)  # CR, aka ⌃M, aka 13 \r
         bots_by_chords[b"\x0E"] = (self.do_step_down_seek,)  # SO, aka ⌃N, aka 14
         # bots_by_chords[b"\x0F"]  # SI, aka ⌃O, aka 15
@@ -1747,8 +1389,8 @@ class TerminalEditor:
         # bots_by_chords[b"Y"] = (self.do_copy_row,)
 
         bots_by_chords[b"Z"] = None
-        bots_by_chords[b"ZQ"] = (self.do_quit,)
-        bots_by_chords[b"ZZ"] = (self.do_save_and_quit,)
+        bots_by_chords[b"ZQ"] = (self.do_quit_vi,)
+        bots_by_chords[b"ZZ"] = (self.do_save_and_quit_vi,)
 
         # bots_by_chords[b"["]  # TODO
 
@@ -1798,15 +1440,556 @@ class TerminalEditor:
 
         return bots_by_chords
 
-    #
-    # Map Keyboard Inputs to Code, for when feeling like Vim /
-    #
 
-    def _readline_bots_by_chords_(self):
+class TerminalEx:
+    """Feed Keyboard into Line at Bottom of Screen of Scrolling Rows, a la Ex"""
+
+    def __init__(self, runner):
+
+        self.runner = runner
+
+        self.prompt = None
+        self.text = None
+
+    def run_ex_keyboard(self):
+        """Take an Input Line from beneath the Scrolling Rows"""
+
+        runner = self.runner
+
+        self.prompt = runner.format_reply()
+        self.text = ""
+
+        bots_by_chords = self._ex_bots_by_chords_()
+        runner.run_keyboard(bots_by_chords)
+        assert False  # unreached
+
+        # FIXME: place Runner Cursor in Status Line
+        # FIXME: map Ascii non-controls to append themselves
+        # FIXME: solve Delete and ⌃U
+        # FIXME: solve ⌃C and Esc, but Esc once for 're.escape', twice to leave
+
+    def do_raise_name_error(self):
+        """Reply to meaningless Keyboard Input"""
+
+        raise NameError()
+
+    def do_quit_ex(self):
+
+        runner = self.runner
+
+        runner.send_reply_soon("Search key received")
+
+        sys.exit()
+
+    def _ex_bots_by_chords_(self):
 
         bots_by_chords = dict()
 
+        bots_by_chords[None] = (self.do_raise_name_error,)
+
+        bots_by_chords[b"\x0D"] = (self.do_quit_ex,)  # CR, aka ⌃M, aka 13 \r
+
         return bots_by_chords
+
+
+class TerminalRunner:
+    """Loop on Keyboard Chords, not whole Lines, but then do read-eval-print"""
+
+    def __init__(self, lines):
+
+        self.lines = lines  # view a copy of a File of Chars encoded as Bytes
+
+        self.log = None  # capture Python Tracebacks
+
+        self.painter = None  # layer over a Terminal I/O Stack
+        self.shadow = None
+        self.driver = None
+        self.stdio = None
+
+        self.row = 0  # point the Screen Cursor to a Row of File
+        self.column = 0  # point the Screen Cursor to a Column of File
+
+        self.top_row = 0  # scroll through more Lines than fit on Screen
+        self.injecting_more_lag = None  # inject more Lag or not
+        self.showing_line_number = None  # show Line Numbers or not
+
+        self.bots_by_chords = None  # map Keyboard Inputs to Code
+
+        self.nudge = TerminalNudgeIn()  # split the Chords of one Keyboard Input
+        self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
+        self.arg2 = None  # take the Suffix Bytes as one Encoded Char
+
+        self.sending_bell = None  # ring the Terminal Bell as part of some Prompt's
+        self.reply = TerminalNudgeIn()  # declare an empty Nudge
+
+        self.doing_more = None  # take the Arg1 as a Count of Repetition's
+        self.done = None  # count the Repetition's completed before now
+
+    def run_terminal(self, bots_by_chords):
+        """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
+
+        stdio = sys.stderr
+        with TerminalDriver(terminal=stdio) as driver:
+            shadow = TerminalShadow(terminal=driver)
+            painter = TerminalPainter(terminal=shadow)
+
+            self.painter = painter
+            self.shadow = shadow
+            self.driver = driver
+            self.stdio = stdio
+
+            self.run_keyboard(bots_by_chords)  # till SystemExit
+
+    def run_keyboard(self, bots_by_chords):
+        """Prompt, take input, react, repeat till quit"""
+
+        terminal = self.painter
+
+        # Repeat till SystemExit raised
+
+        while True:
+
+            # Choose keyboard
+
+            self.bots_by_chords = bots_by_chords
+
+            # Scroll and prompt
+
+            self.scroll()
+            self.prompt()
+
+            # Take one Chord in, or next Chord, or cancel Chords to start again
+
+            try:
+
+                chord = terminal.getch()
+
+            except KeyboardInterrupt:
+
+                if self.nudge != TerminalNudgeIn():
+                    self.nudge.append(b"\x03")  # ETX, aka ⌃C, aka 3
+                    self.send_reply_soon("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
+
+                    self.nudge = TerminalNudgeIn()
+
+                    continue
+
+                chord = b"\x03"  # ETX, aka ⌃C, aka 3
+
+            bot = self.choose_bot(chord)
+            if bot is None:
+
+                continue
+
+            # Reply
+
+            if False in bots_by_chords.keys():
+                before_bots = bots_by_chords[False]
+                assert len(before_bots) == 1, before_bots
+                before_bots[-1]()
+
+            self.call_bot(bot)  # reply to one whole Nudge
+
+            if True in bots_by_chords.keys():
+                after_bots = bots_by_chords[True]
+                assert len(after_bots) == 1, after_bots
+                after_bots[-1]()
+
+            self.nudge = TerminalNudgeIn()  # consume the whole Nudge
+
+    def scroll(self):
+        """Scroll to place Cursor on Screen"""
+
+        row = self.row
+        painter = self.painter
+
+        bottom_row = self.find_bottom_row()
+
+        if row < self.top_row:
+            self.top_row = row
+        elif row > bottom_row:
+            self.top_row = row - (painter.scrolling_rows - 1)
+
+    def prompt(self):
+        """Write over the Rows of Chars on Screen"""
+
+        # Pull from Self
+
+        painter = self.painter
+        terminal = painter
+
+        lines = self.lines
+        top_lines = lines[self.top_row :]
+
+        str_reply = self.format_reply()
+        self.reply = TerminalReplyOut()
+
+        injecting_more_lag = self.injecting_more_lag
+        sending_bell = self.sending_bell
+
+        # Push into the Terminal
+
+        painter.top_line_number = 1 + self.top_row
+        painter.last_line_number = 1 + len(lines)
+        painter.showing_line_number = self.showing_line_number
+
+        painter.cursor_row = self.row - self.top_row
+        painter.cursor_column = self.column
+
+        # Choose more or less Accuracy & Lag
+
+        if not injecting_more_lag:
+            if sending_bell:
+                # time.sleep(0.3)  # delaying Output demos a different kind of lag
+                terminal._reopen_terminal_()
+
+        painter.write_screen(lines=top_lines, status=str_reply)
+
+        if sending_bell:
+            self.sending_bell = None
+            painter.write_bell()
+
+        terminal.flush()
+
+    def choose_bot(self, chord):
+        """Accept one Keyboard Input into Prefix, into main Chords, or as Suffix"""
+
+        prefix = self.nudge.prefix
+        chords = self.nudge.chords
+
+        bots_by_chords = self.bots_by_chords
+
+        assert self.nudge.suffix is None, (chords, chord)  # one Chord only
+
+        # Accept a Prefix of Digits
+
+        if not chords:
+            if (chord in b"123456789") or (prefix and (chord == b"0")):
+
+                prefix_plus = chord if (prefix is None) else (prefix + chord)
+                self.nudge.prefix = prefix_plus
+                self.send_reply_soon(message=None)
+
+                return None  # ask for more Prefix, else for main Chords
+
+        self.arg1 = int(prefix) if prefix else None
+        assert self.get_arg1() >= 1
+
+        # Accept one or more Chords
+
+        bots = bots_by_chords.get(chords)
+        if not (bots and (len(bots) != 1)):
+
+            chords_plus = chord if (chords is None) else (chords + chord)
+            self.nudge.chords = chords_plus
+            self.send_reply_soon(message=None)
+
+            default_bots = bots_by_chords[None]  # such as 'self.do_raise_name_error'
+
+            bots_plus = bots_by_chords.get(chords_plus, default_bots)
+            if bots_plus is None:
+
+                return None  # ask for more Chords
+
+            if bots_plus and (len(bots_plus) != 1):
+
+                return None  # ask for Suffix
+
+            self.arg2 = None
+
+            # Call a Bot with or without Prefix, and without Suffix
+
+            bot = bots_plus[-1]
+            assert bot is not None, (chords, chord)
+
+            return bot
+
+        # Accept one last Chord as the Suffix
+
+        suffix = chord
+        self.nudge.suffix = suffix
+        self.send_reply_soon(message=None)
+
+        self.arg2 = suffix.decode(errors="surrogateescape")
+
+        # Call a Bot with Suffix, but with or without Prefix
+
+        bot = bots[-1]
+        assert bot is not None, (chords, chord)
+
+        return bot
+
+    def call_bot(self, bot):
+        """Call the Bot once or more, in reply to one Terminal Nudge In"""
+
+        # Start calling
+
+        self.done = 0
+        while True:
+            self.doing_more = None
+
+            try:
+
+                bot()
+                self.keep_cursor_on_file()
+                self.log = None
+
+            # Cancel calls on KeyboardInterrupt
+
+            except KeyboardInterrupt:
+
+                self.nudge.append(b"\x03")  # ETX, aka ⌃C, aka 3
+                self.send_reply_soon("Interrupted")  # TODO: find this Egg
+                self.log = None
+
+                break
+
+            # Stop calls on Exception
+
+            except Exception as exc:
+
+                name = type(exc).__name__
+                str_exc = str(exc)
+                message = "{}: {}".format(name, str_exc) if str_exc else name
+
+                self.log = traceback.format_exc()
+
+                self.send_reply_soon(message)  # Egg of NotImplementedError
+                self.send_bell_soon()
+
+                break
+
+            # Let the Bot take the Arg as a Count of Repetitions
+
+            if self.doing_more:
+                self.done += 1
+                if self.done < self.get_arg1():
+
+                    continue
+
+            break
+
+    def send_reply_soon(self, message):
+        """Capture some Status now, to show with next Prompt"""
+
+        nudge = self.nudge
+
+        self.reply = TerminalReplyOut(nudge=nudge, message=message)
+
+    def format_reply(self):
+        """Show Row, Column, Nudge, & Message"""
+
+        reply = self.reply
+        nudge = reply.nudge
+
+        # Format parts, a la Vim ':set showcmd' etc
+
+        row_number = 1 + self.row
+        column_number = 1 + self.column
+
+        echo_bytes = b"" if (nudge is None) else nudge.getch()
+        str_echo = repr_vi_bytes(echo_bytes) if echo_bytes else ""
+
+        str_message = str(reply.message) if reply.message else ""
+
+        # Join parts
+
+        str_reply = "{},{}  {}  {}".format(
+            row_number, column_number, str_echo, str_message
+        ).rstrip()
+
+        return str_reply
+
+    def send_bell_soon(self):
+        """Ring the Terminal Bell as part of the next Prompt"""
+
+        self.sending_bell = True
+
+    def continue_do_loop(self):
+        """Ask to run again, like to run for a total of 'self.arg1' times"""
+
+        self.doing_more = True
+
+    #
+    # Focus on one Line of a File of Lines
+    #
+
+    def find_column_in_charsets(self, charsets):
+        """Return the Index of the first CharSet containing Column Char, else -1"""
+
+        chars = self.get_column_char()  # may be empty
+        chars = chars if chars else " "
+
+        for (index, charset) in enumerate(charsets):
+            if chars in charset:
+
+                return index
+
+        return -1
+
+    def get_column_char(self):
+        """Get the one Char at the Column in the Row beneath the Cursor"""
+
+        row_line = self.lines[self.row]
+        row_text = row_line.splitlines()[0]  # "flat is better than nested"
+        chars = row_text[self.column :][:1]
+
+        return chars  # 0 or 1 chars
+
+    def get_row_text(self):
+        """Get Chars of Columns in Row beneath Cursor"""
+
+        row_line = self.lines[self.row]
+        row_text = row_line.splitlines()[0]
+
+        return row_text
+
+    def count_columns_in_row(self):
+        """Count Columns in Row beneath Cursor"""
+
+        row_line = self.lines[self.row]
+        row_text = row_line.splitlines()[0]  # "flat is better than nested"
+
+        columns = len(row_text)
+
+        return columns
+
+    def count_rows_in_file(self):
+        """Count Rows in Buffer of File"""
+
+        rows = len(self.lines)
+
+        return rows
+
+    def get_arg1(self, default=1):
+        """Get the Int of the Prefix Digits before the Chords, else the Default Int"""
+
+        arg1 = self.arg1
+        arg1 = default if (arg1 is None) else arg1
+
+        return arg1
+
+    def get_arg2(self):
+        """Get the Bytes of the input Suffix past the input Chords"""
+
+        arg2 = self.arg2
+        assert arg2 is not None
+
+        return arg2
+
+    def find_bottom_row(self):
+        """Find the Bottom Row on Screen, as if enough Rows to fill Screen"""
+
+        painter = self.painter
+
+        rows = len(self.lines)  # "flat is better than nested"
+        last_row = (rows - 1) if rows else 0  # "flat is better than nested"
+
+        bottom_row = self.top_row + (painter.scrolling_rows - 1)
+        bottom_row = min(bottom_row, last_row)
+
+        return bottom_row
+
+    def find_last_row(self):
+        """Find the last Row in File, else Row Zero when no Rows in File"""
+
+        rows = len(self.lines)  # "flat is better than nested"
+        last_row = (rows - 1) if rows else 0
+
+        return last_row
+
+    def find_last_column(self):
+        """Find the last Column in Row, else Column Zero when no Columns in Row"""
+
+        row_line = self.lines[self.row]
+        row_text = row_line.splitlines()[0]  # "flat is better than nested"
+
+        columns = len(row_text)
+        last_column = (columns - 1) if columns else 0
+
+        return last_column
+
+    def find_middle_row(self):
+        """Find the Middle Row on Screen, of the Rows that carry Lines of File"""
+
+        runner = self.runner
+
+        top_row = self.top_row
+        bottom_row = runner.find_bottom_row()
+        rows_on_screen = bottom_row - top_row + 1
+
+        middle = (rows_on_screen + 1) // 2  # match +1 bias in Vi's 'find_middle_row'
+        middle_row = top_row + middle
+
+        return middle_row
+
+    def keep_cursor_on_file(self):
+        """Fail faster, like when some Bug shoves the Cursor off of Buffer of File"""
+
+        row = self.row
+        column = self.column
+
+        rows = self.count_rows_in_file()
+        columns = self.count_columns_in_row()
+
+        # Keep the choice of Row and Column non-negative and in File
+
+        before = (row, column)
+
+        if not ((0 <= row < rows) or (row == rows == 0)):
+            row = 0
+        if not ((0 <= column < columns) or (column == columns == 0)):
+            column = 0
+
+        self.row = row
+        self.column = column
+
+        # After fixing it, assert we never got it wrong
+
+        after = (row, column)
+        if before != after:
+            raise KwArgsException(before=before, after=after)
+
+    #
+    # Define keys for entering, pausing, and exiting TerminalRunner
+    #
+
+    def do_redraw(self):  # Vim ⌃L
+        """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
+
+        painter = self.painter
+
+        injecting_more_lag = not self.injecting_more_lag
+        if injecting_more_lag:
+            painter.terminal = self.driver
+        else:
+            painter.terminal = self.shadow
+            painter._reopen_terminal_()
+
+        self.injecting_more_lag = injecting_more_lag
+
+        message = ":set _lag_" if injecting_more_lag else ":set no_lag_"
+        self.send_reply_soon(message)
+
+    def do_give_more_status(self):  # Vim ⌃G
+        """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
+
+        injecting_more_lag = self.injecting_more_lag
+
+        message = ":set _lag_" if injecting_more_lag else ":set no_lag_"
+        self.send_reply_soon(message)
+
+        # TODO: echo $(whoami)@$(hostname):$(pwd)/
+
+    def do_sig_tstp(self):  # Vim ⌃Zfg
+        """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
+
+        terminal = self.painter
+
+        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
+        terminal.__exit__(*exc_info)
+        os.kill(os.getpid(), signal.SIGTSTP)
+        terminal.__enter__()
 
 
 class TerminalPainter:
