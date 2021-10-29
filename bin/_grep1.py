@@ -779,7 +779,7 @@ FILES_CHARS = r"""
     #
     # emacs  ⌃A ⌃B ⌃E ⌃F ⌥M  => move column
     # emacs  ⌥B ⌥F ⌥A ⌥E  => move small word, sentence
-    # emacs  ⌃P ⌃N ⌥< ⌥> ⌥G  => move row, goto line
+    # emacs  ⌃P ⌃N ⌥< ⌥> ⌥GG  => move row, goto line
     # emacs  fixme  => move match balance pair
     #
     # emacs  ⌃D ⌥D ⌥Z  => delete char, word, to char
@@ -801,7 +801,7 @@ FILES_CHARS = r"""
     #
     # emacs  ⌃X⌃C ⌥~⌃X⌃C  => quit emacs, without saving
     #
-    # emacs  ⌃Hk... ⌃Hkb ⌃Ha...   => help for key chord sequence, for all keys, for word
+    # emacs  ⌃Hk... ⌃Hb ⌃Ha...   => help for key chord sequence, for all keys, for word
     # emacs  ⌥X ⌥:  => execute-extended-command, eval-expression  => dry run ~/.emacs
     #
     # emacs  ⌃Z  => as per terminal or no-op
@@ -996,21 +996,21 @@ FILES_CHARS = r"""
     #
 
     #
-    # vim  0 ^ $ fx h l tx Fx Tx | ; ,  => move column
-    # vim  b e w B E W ( ) { }  => move small word, large word, sentence, paragraph
-    # vim  j k G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => move row, goto line
-    # vim  %  => move match balance pair
+    # vim  0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
+    # vim  b e w B E W ( ) { }  => leap across small word, large word, sentence, paragraph
+    # vim  j k G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => leap to row, leap to line
+    # vim  %  => leap to match balance pair
     #
     # vim  dx dd x D X p yx yy P Y J  => cut, copy, paste, join
     # vim  a cx i o s Esc A C O S  => enter/ exit insert mode
     # vim  R Esc  => enter/ exit overlay mode
     #
     # vim  . 1234567890 u ⌃R ⌃O ⌃I  => do again, repeat, undo, redo, revisit
-    # vim  ~ ⌃G ⌃L ⌃A ⌃X  => toggle case, say where, redraw, increment
+    # vim  ~ ⌃G ⌃L ⌃A ⌃X  => toggle case, say where, redraw, increment, decrement
     # vim  * / ? n N / .  => this, ahead, behind, next, previous, do again
     #
     # vim  :g/regex/  => preview what will be found
-    # vim  :s/regex/repl/gc  => find and replace, .../g for no confirmations
+    # vim  :1,$s/regex/repl/gc  => find and replace, .../g for no confirmations
     #
     # vim  mm 'm '' `` `m  => mark, goto, bounce, bounce, bounce and mark
     # vim  qqq @q  => record, replay
@@ -1018,7 +1018,7 @@ FILES_CHARS = r"""
     # vim  >x <x  => dent/dedent
     # vim  !x  => pipe bash, such as {}!G or 1G!G
     #
-    # vim  zb zt zz ⌃B ⌃D ⌃E ⌃F ⌃U ⌃Y  => scroll rows
+    # vim  zb zt zz ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
     # vim  ⌃Wo ⌃WW ⌃Ww ⌃]  => close others, previous, next, goto link
     # vim  ⌃^  => replace panel with previous buffer
     #

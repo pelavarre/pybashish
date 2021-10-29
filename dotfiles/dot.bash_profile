@@ -103,7 +103,6 @@ _LOGME_='echo "$$ $(whoami)@$(hostname):$(pwd)$(history 1)" >>~/.bash_command.lo
 PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND ; }$_LOGME_"
 unset _LOGME_
 
-alias -- -h=--history
 HISTTIMEFORMAT='%b %d %H:%M:%S  '
 function --history () {
     --exec-echo-xe "history"  # a la Zsh:  history -t '%b %d %H:%M:%S' 0"
@@ -173,14 +172,18 @@ function a () {
 function b () { --exec-echo-xe pbpaste "$@"; }
 function c () { --exec-echo-xe pbcopy "$@"; }
 function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
-function h () { --more-history; }
+function h () { --exec-echo-xe head "$@"; }
+alias h='(--more-history; --history) | g'
 function l () { --exec-echo-xe less -FIXR "$@"; }
 function m () { --exec-echo-xe make "$@"; }
-function n () { --exec-echo-xe cat -n "|expand" "$@"; }
+function n () { --exec-echo-xe cat -tvn "$@" "|expand"; }
 function p () { --exec-echo-xe popd "$@"; }
 function s () { --exec-echo-xe sort "$@"; }
-function u () { --exec-echo-xe uniq "$@"; }
-function x () { hexdump -C"$@"; }
+function t () { --exec-echo-xe tail "$@"; }
+function u () { --exec-echo-xe uniq "$@" "|expand"; }
+function v () { --exec-echo-xe vi - "$@"; }
+function w () { --exec-echo-xe wc -l "$@"; }
+function x () { --exec-echo-xe hexdump -C"$@"; }
 
 
 #
@@ -497,6 +500,7 @@ alias -- -gl='--exec-echo-xe git log'
 alias -- -gp='--exec-echo-xe git prune'
 alias -- -gr='--exec-echo-xe git rebase'
 alias -- -gs='--exec-echo-xe git show'
+alias -- -gsp='--exec-echo-xe git show --pretty='
 
 alias -- -gap='--exec-echo-xe git add --patch'
 alias -- -gba='--exec-echo-xe git branch --all'
@@ -515,12 +519,12 @@ alias -- -ggl='--exec-echo-xe git grep -l'  # --files-with-matches
 alias -- -gl1='--exec-echo-xe git log -1 --decorate'
 alias -- -glf=--git-ls-files
 alias -- -glg='--exec-echo-xe git log --no-decorate --oneline --grep'
-alias -- -glq='--exec-echo-xe git log -19 --no-decorate --oneline'
+alias -- -glq=--git-log-nodecorate-oneline
 alias -- -gls='--exec-echo-xe git log --stat'
 alias -- -grh='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard'
 alias -- -gri=--git-rebase-interactive
 alias -- -grl='--exec-echo-xe git reflog'
-alias -- -grv='--exec-echo-xe git remote -vvv'
+alias -- -grv='--exec-echo-xe git remote -v'
 alias -- -gs1='--git-show-conflict :1'
 alias -- -gs2='--git-show-conflict :2'
 alias -- -gs3='--git-show-conflict :3'
@@ -533,7 +537,7 @@ alias -- -gcls='pwd && --exec-echo-xe-maybe sudo git clean -ffxdq'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
 alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
 alias -- -glq1='--exec-echo-xe git log -1 --no-decorate --oneline'
-alias -- -glqv='--exec-echo-xe git log -19 --decorate --oneline'
+alias -- -glqv=--git-log-decorate-oneline
 alias -- -gpod='--exec-echo-xe-maybe git push origin --delete'
 alias -- -gpoh=--git-push-origin-head-maybe
 alias -- -grhu='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard @{upstream}'
@@ -621,6 +625,22 @@ function --git-diff-head () {
     fi
 }
 
+function --git-log-decorate-oneline () {
+    if [ $# = 0 ]; then
+        --exec-echo-xe git log --decorate --oneline -19
+    else
+        --exec-echo-xe git log --decorate --oneline "$@"
+    fi
+}
+
+function --git-log-nodecorate-oneline () {
+    if [ $# = 0 ]; then
+        --exec-echo-xe git log --no-decorate --oneline -19
+    else
+        --exec-echo-xe git log --no-decorate --oneline "$@"
+    fi
+}
+
 function --git-ls-files () {
     : :: 'Find tracked files at and beneath root of Git Clone, else below some Dir'
     if [ $# = 0 ]; then
@@ -632,12 +652,10 @@ function --git-ls-files () {
     fi
 }
 
-
 function --git-push-origin-head-maybe () {  # for '-gpoh'
     : :: 'Push Origin to Head Colon'
     --exec-echo-xe-maybe git push origin HEAD:"$@"
 }
-
 
 function --git-rebase-interactive () {
     : :: 'Rebase Interactive with Auto Squash of the last 19, else of the last N'
@@ -647,7 +665,6 @@ function --git-rebase-interactive () {
         --exec-echo-xe git rebase -i --autosquash "HEAD~$@"
     fi
 }
-
 
 function --git-show-conflict () {
     : :: 'Exit loud & nonzero, else Show Conflict Base, else Show choice of Conflict'
