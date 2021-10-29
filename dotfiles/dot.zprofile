@@ -195,6 +195,7 @@ function --dotfiles-restore () {
 
 #
 # Abbreviate command lines down to:  ?
+# mostly for pipe filters, but also 'm' for 'make', 'p' for 'popd', ...
 #
 
 
@@ -204,11 +205,10 @@ function a () {
     eval $shline
 }
 
-function b () { --exec-echo-xe pbpaste "$@"; }
 function c () { --exec-echo-xe pbcopy "$@"; }
 function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
 function h () { --exec-echo-xe head "$@"; }
-alias h='(--more-history; --history) | g'
+alias hi='(--more-history; --history) | g'
 function l () { --exec-echo-xe less -FIXR "$@"; }
 function m () { --exec-echo-xe make "$@"; }
 function n () { --exec-echo-xe cat -tvn "$@" "|expand"; }
@@ -216,7 +216,7 @@ function p () { --exec-echo-xe popd "$@"; }
 function s () { --exec-echo-xe sort "$@"; }
 function t () { --exec-echo-xe tail "$@"; }
 function u () { --exec-echo-xe uniq "$@" "|expand"; }
-function v () { --exec-echo-xe vi - "$@"; }
+function v () { --exec-echo-xe pbpaste "$@"; }
 function w () { --exec-echo-xe wc -l "$@"; }
 function x () { --exec-echo-xe hexdump -C"$@"; }
 
@@ -569,6 +569,7 @@ alias -- -gcaa='--exec-echo-xe git commit --all --amend'
 alias -- -gcaf=--git-commit-all-fixup
 alias -- -gcam='--exec-echo-xe git commit --all -m WIP-$(basename $(pwd))'
 alias -- -gcls='pwd && --exec-echo-xe-maybe sudo git clean -ffxdq'
+alias -- -gcpc='--exec-echo-xe git cherry-pick --continue'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
 alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
 alias -- -glq1='--exec-echo-xe git log -1 --no-decorate --oneline'
@@ -697,8 +698,10 @@ function --git-rebase-interactive () {
     : :: 'Rebase Interactive with Auto Squash of the last 19, else of the last N'
     if [ $# = 0 ]; then
         --exec-echo-xe git rebase -i --autosquash HEAD~19
-    else
+    elif [[ "$1" =~ ^[0-9_]+$ ]]; then
         --exec-echo-xe git rebase -i --autosquash "HEAD~$@"
+    else
+        --exec-echo-xe git rebase -i --autosquash "$@"
     fi
 }
 
