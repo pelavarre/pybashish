@@ -23,8 +23,9 @@ keyboard tests:
   1234567890 Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
   ⌃L ⌃G  => toggle lag and say if lag is toggled
-  \n  => toggle line numbers
-  Esc ⌃C \n Qvi⌃M 123Esc 123⌃C f⌃C 9^ G⌃F⌃F G⌃F⌃E 1G⌃B 1G⌃Y ; ,  => eggs
+  \n \i \F  => toggle line numbers, toggle ignoring case, toggle searching regex
+  /... Delete ⌃U ⌃C Return  ?...  => enter a search key
+  Esc ⌃C Qvi⌃M 123Esc 123⌃C f⌃C 9^ G⌃F⌃F G⌃F⌃E 1G⌃B 1G⌃Y ; ,  => eggs
 
 examples:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
@@ -240,7 +241,7 @@ class TerminalVi:
 
         self.do_help_quit_vi()  # start with a warmer welcome, not a cold empty Nudge
 
-        bots_by_chords = self._vim_bots_by_chords_()
+        bots_by_chords = self._vi_bots_by_chords_()
         try:
             runner.run_terminal(bots_by_chords)
             assert False  # unreached
@@ -285,12 +286,12 @@ class TerminalVi:
     # Define keys for entering, pausing, and exiting TerminalVi
     #
 
-    def do_raise_name_error(self):  # such as Esc, such as 'ZB'
+    def do_raise_vi_name_error(self):  # such as Esc, such as 'ZB'
         """Reply to meaningless Keyboard Input"""
 
         raise NameError()
 
-    def do_help_quit_vi(self):  # Vim ⌃C
+    def do_help_quit_vi(self):  # Vim ⌃C  # Vi Py Init
         """Suggest ZQ to quit Vi Py"""
 
         self.send_reply_soon("Press ZQ to lose changes and quit Vi Py")  # ⌃C Egg
@@ -348,16 +349,35 @@ class TerminalVi:
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
 
     def do_find_ahead_readline(self):  # Vim /
+        """Collect a Search Key and look ahead for it"""
 
-        _ = self.readline()
+        runner = self.runner
+
+        with_searching_behind = runner.searching_behind
+        runner.searching_behind = False
+        try:
+            _ = self.readline()
+        except Exception:
+            runner.searching_behind = with_searching_behind
+            raise
 
     def do_find_behind_readline(self):  # Vim ?
+        """Collect a Search Key and look behind for it"""
 
-        _ = self.readline()
+        runner = self.runner
+
+        with_searching_behind = runner.searching_behind
+        runner.searching_behind = True
+        try:
+            _ = self.readline()
+        except Exception:
+            runner.searching_behind = with_searching_behind
+            raise
 
     def readline(self):
+        """Collect a Search Key"""
 
-        raise NotImplementedError()
+        # raise NotImplementedError()
 
         runner = self.runner
 
@@ -372,7 +392,17 @@ class TerminalVi:
 
     #
     # Flip switches
+    # TODO: stop commandeering the personal \ Chord Sequences
     #
+
+    def do_set_invignorecase(self):  # Vi Py \i
+        """Ignore Upper/Lower Case in Searching or not"""
+
+        runner = self.runner
+
+        runner.searching_case = not runner.searching_case
+        message = ":set noignorecase" if runner.searching_case else ":set ignorecase"
+        self.send_reply_soon(message)  # \i Egg
 
     def do_set_invnumber(self):  # Vi Py \n
         """Toggle Line-in-File numbers in or out"""
@@ -383,7 +413,14 @@ class TerminalVi:
         message = ":set number" if runner.showing_line_number else ":set nonumber"
         self.send_reply_soon(message)  # \n Egg
 
-        # TODO: stop commandeering the personal \ Chord Sequences
+    def do_set_invregex(self):  # Vi Py \F
+        """Search as Regex or search as Chars"""
+
+        runner = self.runner
+
+        runner.searching_regex = not runner.searching_regex
+        message = ":set regex" if runner.searching_regex else ":set noregex"
+        self.send_reply_soon(message)  # \F Egg  # but Vim never gives you 'noregex'
 
     #
     # Slip the Cursor into place, in some other Column of the same Row
@@ -1265,32 +1302,57 @@ class TerminalVi:
                 raise
 
     #
-    # Map Keyboard Inputs to Code, for when feeling like Vim
+    # Map Keyboard Inputs to Code, for when feeling like Vi
     #
 
-    def do_before_do(self):
+    def run_before_do_vi(self):
+        """Run before each Vi Bot chosen by Chords"""
 
         # Default to stop remembering the last Seeking Column
 
         self.seeking_more = None
 
-    def do_after_do(self):
+    def run_after_do_vi(self):
+        """Run after each Vi Bot chosen by Chords"""
 
         # Remember the last Seeking Column across Bots that ask for it
 
         if not self.seeking_more:
             self.seeking_column = None
 
-    def _vim_bots_by_chords_(self):
-        """Map Keyboard Inputs to Code, for when feeling like Vim"""
+    def run_before_vi_prompt(self):
+        """Run before Vi Prompt written"""
+
+        runner = self.runner
+
+        painter = runner.painter
+        terminal = painter
+
+        # Place the Screen Cursor
+
+        terminal.cursor_row = runner.row - runner.top_row
+        terminal.cursor_column = runner.column
+
+        # Choose the Status to surface
+
+        str_reply = runner.format_vi_reply()
+        runner.reply = TerminalReplyOut()
+
+        return str_reply
+
+    def _vi_bots_by_chords_(self):
+        """Map Keyboard Inputs to Code, for when feeling like Vi"""
 
         runner = self.runner
 
         bots_by_chords = dict()
 
-        bots_by_chords[None] = (self.do_raise_name_error,)
-        bots_by_chords[False] = (self.do_before_do,)
-        bots_by_chords[True] = (self.do_after_do,)
+        bots_by_chords[None] = (self.do_raise_vi_name_error,)
+
+        bots_by_chords[False] = (self.run_before_do_vi,)
+        bots_by_chords[True] = (self.run_after_do_vi,)
+        bots_by_chords[""] = (self.run_before_vi_prompt,)
+        # TODO: ok yes callbacks, but less of kluge than wild types for keys
 
         # bots_by_chords[b"\x00"]  # NUL, aka ⌃@, aka 0
         # bots_by_chords[b"\x01"]  # SOH, aka ⌃A, aka 1
@@ -1395,6 +1457,8 @@ class TerminalVi:
         # bots_by_chords[b"["]  # TODO
 
         bots_by_chords[b"\\"] = None
+        bots_by_chords[b"\\F"] = (self.do_set_invregex,)
+        bots_by_chords[b"\\i"] = (self.do_set_invignorecase,)
         bots_by_chords[b"\\n"] = (self.do_set_invnumber,)
 
         # bots_by_chords[b"]"]  # TODO
@@ -1448,46 +1512,143 @@ class TerminalEx:
 
         self.runner = runner
 
-        self.prompt = None
-        self.text = None
+        self.ex_head = None
+        self.ex_tail = None
+
+        self.ex_flags = ""
+
+    def format_ex_reply(self):
+
+        ex_head = self.ex_head
+        ex_flags = self.ex_flags
+        ex_tail = self.ex_tail
+
+        word0 = ex_head.split()[0]
+        dashed_ex_flags = "-" + ex_flags
+        repl = word0 + "  " + dashed_ex_flags
+
+        ex_head_repl = ex_head
+        if ex_flags:
+            count = 1
+            ex_head_repl = ex_head.replace(word0, repl, count)
+
+        str_reply = ex_head_repl + ex_tail
+
+        return str_reply
 
     def run_ex_keyboard(self):
         """Take an Input Line from beneath the Scrolling Rows"""
 
         runner = self.runner
 
-        self.prompt = runner.format_reply()
-        self.text = ""
+        ex_flags = ""
+        if not runner.searching_regex:
+            ex_flags += "F"
+        if not runner.searching_case:
+            ex_flags += "i"
+        if runner.showing_line_number:
+            ex_flags += "n"
+        self.ex_flags = ex_flags
+
+        self.ex_head = runner.format_vi_reply()
+        self.ex_tail = ""
 
         bots_by_chords = self._ex_bots_by_chords_()
         runner.run_keyboard(bots_by_chords)
         assert False  # unreached
 
-        # FIXME: place Runner Cursor in Status Line
-        # FIXME: map Ascii non-controls to append themselves
-        # FIXME: solve Delete and ⌃U
-        # FIXME: solve ⌃C and Esc, but Esc once for 're.escape', twice to leave
+    def do_append_char(self):
+        """Append the Chords to the Collected Text"""
 
-    def do_raise_name_error(self):
+        chords = self.runner.arg0
+        chars = chords.decode()
+
+        self.ex_tail += chars
+
+    def do_undo_append_char(self):
+        """Undo the last Append Char, else Quit Ex"""
+
+        runner = self.runner
+        ex_tail = self.ex_tail
+
+        if not ex_tail:
+            runner.send_reply_soon("Search cancelled")
+
+            sys.exit()
+
+        self.ex_tail = ex_tail[:-1]
+
+    def do_clear_chars(self):  # Vim ⌃U
+        """Undo all the Append Chars, if any Not undone already"""
+
+        self.ex_tail = ""
+
+    def do_raise_ex_name_error(self):
         """Reply to meaningless Keyboard Input"""
 
         raise NameError()
 
-    def do_quit_ex(self):
+    def do_quit_ex(self):  # Vim ⌃C
+
+        self.runner.send_reply_soon("Search cancelled")
+
+        sys.exit()
+
+    def do_save_and_quit_ex(self):  # Vim ⌃M
+        """Place the Screen Cursor, like while prompting for more Chords"""
+
+        ex_tail = self.ex_tail
+        runner = self.runner
+
+        if runner.searching_behind:
+            runner.send_reply_soon("Search behind key received:  {!r}".format(ex_tail))
+        else:
+            runner.send_reply_soon("Search ahead key received:  {!r}".format(ex_tail))
+
+        sys.exit()
+
+    def run_before_ex_prompt(self):
+        """Place the Screen Cursor, like while prompting for more Chords"""
 
         runner = self.runner
 
-        runner.send_reply_soon("Search key received")
+        painter = runner.painter
+        terminal = painter
 
-        sys.exit()
+        # Place the Screen Cursor
+
+        str_reply = self.format_ex_reply()
+
+        terminal.cursor_row = painter.status_row
+        terminal.cursor_column = len(str_reply)
+
+        # Replace the Status
+
+        return str_reply
 
     def _ex_bots_by_chords_(self):
 
         bots_by_chords = dict()
 
-        bots_by_chords[None] = (self.do_raise_name_error,)
+        bots_by_chords[None] = (self.do_raise_ex_name_error,)
+        bots_by_chords[""] = (self.run_before_ex_prompt,)
 
-        bots_by_chords[b"\x0D"] = (self.do_quit_ex,)  # CR, aka ⌃M, aka 13 \r
+        for chords in sorted(C0_CONTROL_STDINS):
+            bots_by_chords[chords] = (self.do_raise_ex_name_error,)
+
+        bots_by_chords[b"\x03"] = (self.do_quit_ex,)  # ETX, aka ⌃C, aka 3
+        bots_by_chords[b"\x0D"] = (self.do_save_and_quit_ex,)  # CR, aka ⌃M, aka 13 \r
+        bots_by_chords[b"\x15"] = (self.do_clear_chars,)  # NAK, aka ⌃U, aka 21
+
+        for xx in range(0x80):
+            chords = chr(xx).encode()
+            if chords not in C0_CONTROL_STDINS:
+                bots_by_chords[chords] = (self.do_append_char,)
+
+        bots_by_chords[b"\x7F"] = (self.do_undo_append_char,)  # DEL, aka ⌃?, aka 127
+
+        # TODO: define Esc to replace live Regex punctuation with calmer r"."
+        # TODO: search for more than US Ascii
 
         return bots_by_chords
 
@@ -1513,6 +1674,10 @@ class TerminalRunner:
         self.injecting_more_lag = None  # inject more Lag or not
         self.showing_line_number = None  # show Line Numbers or not
 
+        self.searching_behind = None  # search behind or search ahead
+        self.searching_regex = None  # search as Regex or search as Chars
+        self.searching_case = None  # ignore Upper/Lower Case in Searching or not
+
         self.bots_by_chords = None  # map Keyboard Inputs to Code
 
         self.nudge = TerminalNudgeIn()  # split the Chords of one Keyboard Input
@@ -1520,7 +1685,7 @@ class TerminalRunner:
         self.arg2 = None  # take the Suffix Bytes as one Encoded Char
 
         self.sending_bell = None  # ring the Terminal Bell as part of some Prompt's
-        self.reply = TerminalNudgeIn()  # declare an empty Nudge
+        self.reply = TerminalReplyOut()  # declare an empty Reply
 
         self.doing_more = None  # take the Arg1 as a Count of Repetition's
         self.done = None  # count the Repetition's completed before now
@@ -1556,6 +1721,7 @@ class TerminalRunner:
             # Scroll and prompt
 
             self.scroll()
+
             self.prompt()
 
             # Take one Chord in, or next Chord, or cancel Chords to start again
@@ -1584,14 +1750,14 @@ class TerminalRunner:
             # Reply
 
             if False in bots_by_chords.keys():
-                before_bots = bots_by_chords[False]
+                before_bots = bots_by_chords[False]  # callback to Client
                 assert len(before_bots) == 1, before_bots
                 before_bots[-1]()
 
             self.call_bot(bot)  # reply to one whole Nudge
 
             if True in bots_by_chords.keys():
-                after_bots = bots_by_chords[True]
+                after_bots = bots_by_chords[True]  # callback to Client
                 assert len(after_bots) == 1, after_bots
                 after_bots[-1]()
 
@@ -1613,16 +1779,18 @@ class TerminalRunner:
     def prompt(self):
         """Write over the Rows of Chars on Screen"""
 
-        # Pull from Self
-
         painter = self.painter
         terminal = painter
 
+        # Call back to Client
+
+        run_before_prompt = self.bots_by_chords[""][-1]  # TODO: cope with len != 1?
+        str_reply = run_before_prompt()
+
+        # Pull from Self
+
         lines = self.lines
         top_lines = lines[self.top_row :]
-
-        str_reply = self.format_reply()
-        self.reply = TerminalReplyOut()
 
         injecting_more_lag = self.injecting_more_lag
         sending_bell = self.sending_bell
@@ -1632,9 +1800,6 @@ class TerminalRunner:
         painter.top_line_number = 1 + self.top_row
         painter.last_line_number = 1 + len(lines)
         painter.showing_line_number = self.showing_line_number
-
-        painter.cursor_row = self.row - self.top_row
-        painter.cursor_column = self.column
 
         # Choose more or less Accuracy & Lag
 
@@ -1684,8 +1849,9 @@ class TerminalRunner:
             self.nudge.chords = chords_plus
             self.send_reply_soon(message=None)
 
-            default_bots = bots_by_chords[None]  # such as 'self.do_raise_name_error'
+            default_bots = bots_by_chords[None]  # such as 'self.do_raise_'
 
+            self.arg0 = chords_plus
             bots_plus = bots_by_chords.get(chords_plus, default_bots)
             if bots_plus is None:
 
@@ -1703,6 +1869,8 @@ class TerminalRunner:
             assert bot is not None, (chords, chord)
 
             return bot
+
+        assert self.arg0 == chords, (chords, chord, self.arg0)
 
         # Accept one last Chord as the Suffix
 
@@ -1776,7 +1944,7 @@ class TerminalRunner:
 
         self.reply = TerminalReplyOut(nudge=nudge, message=message)
 
-    def format_reply(self):
+    def format_vi_reply(self):  # TODO: move this to TerminalVi from TerminalRunner
         """Show Row, Column, Nudge, & Message"""
 
         reply = self.reply
@@ -2036,6 +2204,7 @@ class TerminalPainter:
         self.columns = terminal_size.columns
 
         self.scrolling_rows = terminal_size.lines - 1  # reserve last 1 line for Status
+        self.status_row = self.scrolling_rows
 
     def flush(self):
         """Stop waiting for more Writes from above"""
@@ -2586,7 +2755,7 @@ def repr_vi_bytes(xxs):
 
 
 #
-# List the Vim idioms active while testing Vi Py for compatibility with Vim
+# Track how to configure Vim to feel like Vi Py
 #
 
 _VIMRC_ = r"""
