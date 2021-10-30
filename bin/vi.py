@@ -181,22 +181,21 @@ def parse_vi_argv(argv):
 class TerminalNudgeIn(argparse.Namespace):
     """Take the Keyboard Chords of one Input"""
 
-    def __init__(self, prefix=None, chords=None, suffix=None):
+    def __init__(self, prefix=None, chords=None, suffix=None, epilog=None):
 
         self.prefix = prefix
         self.chords = chords
         self.suffix = suffix
+        self.epilog = epilog
 
-    def append(self, chords):
-        """Take next Chord into Suffix, like after taking Prefix and Chords"""
+    def add_epilog(self, epilog):
+        """Add more Chords to echo, Chords that came later"""
 
-        suffix = b"" if (self.suffix is None) else self.suffix
-        suffix += chords
+        assert self.epilog is None
+        self.epilog = epilog
 
-        self.suffix = suffix
-
-    def getch(self):
-        """Echo input, in order"""
+    def join_echo_bytes(self):
+        """Echo all the Chords of this one Input, in order"""
 
         echo = b""
 
@@ -206,6 +205,8 @@ class TerminalNudgeIn(argparse.Namespace):
             echo += self.chords
         if self.suffix is not None:
             echo += self.suffix
+        if self.epilog is not None:
+            echo += self.epilog
 
         return echo
 
@@ -373,7 +374,7 @@ class TerminalVi:
 
         self.runner.send_bell()
 
-    def check(self, truthy, **kwargs):
+    def check_index(self, truthy, **kwargs):
         """Fail fast, else proceed"""
 
         if not truthy:
@@ -450,10 +451,10 @@ class TerminalVi:
 
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
 
-    def do_find_ahead_readline(self):  # Vim /
+    def do_find_ahead_vi_line(self):  # Vim /
         """Take a Search Key and look ahead for it"""
 
-        if self.take_readline_to_find(slip=+1):
+        if self.read_vi_find_line(slip=+1):
             self.find_ahead()  # TODO: add scroll ahead when far  # <= zb H 23Up n
 
     def find_ahead(self):
@@ -496,10 +497,10 @@ class TerminalVi:
         else:
             self.send_vi_reply("No chars found: not ahead and not behind")
 
-    def do_find_behind_readline(self):  # Vim ?
+    def do_find_behind_vi_line(self):  # Vim ?
         """Take a Search Key and look behind for it"""
 
-        if self.take_readline_to_find(slip=-1):
+        if self.read_vi_find_line(slip=-1):
             self.find_behind()  # TODO: add scroll behind when far  # <= zt L 23Down N
 
     def find_behind(self):
@@ -556,7 +557,7 @@ class TerminalVi:
         else:
             self.find_behind()
 
-    def take_readline_to_find(self, slip):
+    def read_vi_find_line(self, slip):
         """Take a Search Key"""
 
         runner = self.runner
@@ -565,7 +566,7 @@ class TerminalVi:
         with_finding_slip = runner.finding_slip
         runner.finding_slip = slip
         try:
-            runner.finding_line = self.readline()
+            runner.finding_line = self.read_vi_line()
         except Exception:
             runner.finding_line = with_finding_line
             runner.finding_slip = with_finding_slip
@@ -584,14 +585,14 @@ class TerminalVi:
 
         return True
 
-    def readline(self):
+    def read_vi_line(self):
         """Take a Line of Input"""
 
         runner = self.runner
         runner.nudge = TerminalNudgeIn()
 
         ex = TerminalEx(runner)
-        line = ex.readline()
+        line = ex.read_ex_line()
 
         return line
 
@@ -692,7 +693,7 @@ class TerminalVi:
 
         runner = self.runner
 
-        self.check(runner.column)
+        self.check_index(runner.column)
 
         left = min(runner.column, self.get_vi_arg1())
         runner.column -= left
@@ -703,7 +704,7 @@ class TerminalVi:
         runner = self.runner
 
         last_column = runner.find_last_column()
-        self.check(runner.column < last_column)
+        self.check_index(runner.column < last_column)
 
         right = min(last_column - runner.column, self.get_vi_arg1())
         runner.column += right
@@ -720,7 +721,7 @@ class TerminalVi:
         last_row = runner.find_last_row()
 
         if not runner.doing_done:
-            self.check((runner.column < last_column) or (runner.row < last_row))
+            self.check_index((runner.column < last_column) or (runner.row < last_row))
 
         if runner.column < last_column:
             runner.column += 1
@@ -756,7 +757,7 @@ class TerminalVi:
         runner = self.runner
 
         if not runner.doing_done:
-            self.check(runner.row or runner.column)
+            self.check_index(runner.row or runner.column)
 
         if runner.column:
             runner.column -= 1
@@ -815,7 +816,7 @@ class TerminalVi:
         runner = self.runner
         last_row = runner.find_last_row()
 
-        self.check(runner.row < last_row)
+        self.check_index(runner.row < last_row)
         down = min(last_row - runner.row, self.get_vi_arg1())
 
         runner.row += down
@@ -865,7 +866,7 @@ class TerminalVi:
         """Step up one Row or more"""
 
         runner = self.runner
-        self.check(runner.row)
+        self.check_index(runner.row)
         up = min(runner.row, self.get_vi_arg1())
 
         runner.row -= up
@@ -1159,76 +1160,6 @@ class TerminalVi:
         runner.continue_do_loop()
 
     #
-    # Search ahead inside the Row for a single Char
-    #
-
-    def do_slip_index(self):  # Vim fx
-        """Find Char to right in Row, once or more"""
-
-        choice = self.get_vi_arg2()
-
-        self.slip_choice = choice
-        self.slip_after = 0
-        self.slip_redo = self.slip_index
-        self.slip_undo = self.slip_rindex
-
-        self.slip_redo()
-
-        # TODO: Vim f⎋ means escaped without Bell
-        # TODO: Vim f⌃C means cancelled with Bell
-        # TODO: Vim f⌃? means cancelled with Bell
-
-        # TODO: Vim f⌃Vx means go find a ⌃V char, not go find X
-
-    def do_slip_index_minus(self):  # Vim tx
-        """Find Char to Right in row, once or more, but then slip left one Column"""
-
-        choice = self.get_vi_arg2()
-
-        self.slip_choice = choice
-        self.slip_after = -1
-        self.slip_redo = self.slip_index
-        self.slip_undo = self.slip_rindex
-
-        self.slip_redo()
-
-    def slip_index(self):
-        """Find Char to Right in row, once or more"""
-
-        runner = self.runner
-
-        last_column = runner.find_last_column()
-        text = runner.get_row_text()
-
-        choice = self.slip_choice
-        after = self.slip_after
-
-        count = self.get_vi_arg1()
-
-        # Index each
-
-        column = runner.column
-
-        for _ in range(count):
-
-            self.check(column < last_column)
-            column += 1
-
-            try:
-                right = text[column:].index(choice)
-            except ValueError:
-                raise ValueError("substring {!r} not found ahead".format(choice))
-            column += right
-
-        # Option to slip back one column
-
-        if after:
-            self.check(column)
-            column -= 1
-
-        runner.column = column
-
-    #
     # Step across Chars of CharSets
     #
 
@@ -1381,7 +1312,75 @@ class TerminalVi:
                 if beyond:
                     self.slip_ahead()
 
-    # FIXME: Shuffle 'do_slip_index' to here
+    #
+    # Search ahead inside the Row for a single Char
+    #
+
+    def do_slip_index(self):  # Vim fx
+        """Find Char to right in Row, once or more"""
+
+        choice = self.get_vi_arg2()
+
+        self.slip_choice = choice
+        self.slip_after = 0
+        self.slip_redo = self.slip_index
+        self.slip_undo = self.slip_rindex
+
+        self.slip_redo()
+
+        # TODO: Vim f⎋ means escaped without Bell
+        # TODO: Vim f⌃C means cancelled with Bell
+        # TODO: Vim f⌃? means cancelled with Bell
+
+        # TODO: Vim f⌃Vx means go find a ⌃V char, not go find X
+
+    def do_slip_index_minus(self):  # Vim tx
+        """Find Char to Right in row, once or more, but then slip left one Column"""
+
+        choice = self.get_vi_arg2()
+
+        self.slip_choice = choice
+        self.slip_after = -1
+        self.slip_redo = self.slip_index
+        self.slip_undo = self.slip_rindex
+
+        self.slip_redo()
+
+    def slip_index(self):
+        """Find Char to Right in row, once or more"""
+
+        runner = self.runner
+
+        last_column = runner.find_last_column()
+        text = runner.get_row_text()
+
+        choice = self.slip_choice
+        after = self.slip_after
+
+        count = self.get_vi_arg1()
+
+        # Index each
+
+        column = runner.column
+
+        for _ in range(count):
+
+            self.check_index(column < last_column)
+            column += 1
+
+            try:
+                right = text[column:].index(choice)
+            except ValueError:
+                raise ValueError("substring {!r} not found ahead".format(choice))
+            column += right
+
+        # Option to slip back one column
+
+        if after:
+            self.check_index(column)
+            column -= 1
+
+        runner.column = column
 
     #
     # Search behind inside the Row for a single Char
@@ -1430,7 +1429,7 @@ class TerminalVi:
 
         for _ in range(count):
 
-            self.check(column)
+            self.check_index(column)
             column -= 1
 
             try:
@@ -1442,7 +1441,7 @@ class TerminalVi:
 
         if after:
 
-            self.check(column < last_column)
+            self.check_index(column < last_column)
             column += 1
 
         runner.column = column
@@ -1616,7 +1615,7 @@ class TerminalVi:
         bots_by_chords[b"\x1B[C"] = (self.do_slip_right,)  # → Right Arrow
         bots_by_chords[b"\x1B[D"] = (self.do_slip_left,)  # ← Left Arrow
 
-        # bots_by_chords[b"\x1C"] = (self.do_eval_readline,)   # FS, aka ⌃\, aka 28
+        # bots_by_chords[b"\x1C"] = (self.do_eval_vi_line,)   # FS, aka ⌃\, aka 28
         # bots_by_chords[b"\x1D"]  # GS, aka ⌃], aka 29
         # bots_by_chords[b"\x1E"]  # RS, aka ⌃^, aka 30  # try this after edit in: |vi -
         # bots_by_chords[b"\x1F"]  # US, aka ⌃_, aka 31
@@ -1635,7 +1634,7 @@ class TerminalVi:
         bots_by_chords[b"+"] = (self.do_step_down_dent,)
         bots_by_chords[b","] = (self.do_slip_choice_undo,)
         bots_by_chords[b"-"] = (self.do_step_up_dent,)
-        bots_by_chords[b"/"] = (self.do_find_ahead_readline,)
+        bots_by_chords[b"/"] = (self.do_find_ahead_vi_line,)
 
         bots_by_chords[b"0"] = (self.do_slip_first,)
         bots_by_chords[b"1234567890"] = None
@@ -1650,7 +1649,7 @@ class TerminalVi:
         # bots_by_chords[b"<"]  # TODO: dedent
         # bots_by_chords[b"="]  # TODO: dent after
         # bots_by_chords[b">"]  # TODO: indent
-        bots_by_chords[b"?"] = (self.do_find_behind_readline,)
+        bots_by_chords[b"?"] = (self.do_find_behind_vi_line,)
         # bots_by_chords[b"@"]  # TODO: play
 
         # bots_by_chords[b"A"] = (self.do_slip_last_right_open,)
@@ -1771,7 +1770,7 @@ class TerminalEx:
 
         return str_reply
 
-    def readline(self):
+    def read_ex_line(self):
         """Take an Input Line from beneath the Scrolling Rows"""
 
         try:
@@ -1805,6 +1804,11 @@ class TerminalEx:
         runner.run_keyboard(bots_by_chords)
         assert False  # unreached
 
+    def do_clear_chars(self):  # Vim ⌃U
+        """Undo all the Append Chars, if any Not undone already"""
+
+        self.ex_line = ""
+
     def do_append_char(self):
         """Append the Chords to the Input Line"""
 
@@ -1826,11 +1830,6 @@ class TerminalEx:
             self.ex_line = None
 
             sys.exit()
-
-    def do_clear_chars(self):  # Vim ⌃U
-        """Undo all the Append Chars, if any Not undone already"""
-
-        self.ex_line = ""
 
     def do_raise_ex_name_error(self):  # such as ⌃D
         """Reply to meaningless Keyboard Input"""
@@ -1966,27 +1965,24 @@ class TerminalRunner:
 
             # Scroll and prompt
 
-            self.scroll()
+            self.scroll_cursor_into_screen()
 
-            self.prompt()
+            self.prompt_for_chords()
 
             # Take one Chord in, or next Chord, or cancel Chords to start again
 
             try:
-
                 chord = terminal.getch()
-
             except KeyboardInterrupt:
+                chord = b"\x03"  # ETX, aka ⌃C, aka 3
 
                 if self.nudge != TerminalNudgeIn():
-                    self.nudge.append(b"\x03")  # ETX, aka ⌃C, aka 3
+                    self.nudge.add_epilog(epilog=chord)
                     self.send_reply("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
 
                     self.nudge = TerminalNudgeIn()
 
                     continue
-
-                chord = b"\x03"  # ETX, aka ⌃C, aka 3
 
             bot = self.choose_bot(chord)
             if bot is None:
@@ -2009,7 +2005,7 @@ class TerminalRunner:
 
             self.nudge = TerminalNudgeIn()  # consume the whole Nudge
 
-    def scroll(self):
+    def scroll_cursor_into_screen(self):
         """Scroll to place Cursor on Screen"""
 
         row = self.row
@@ -2022,7 +2018,7 @@ class TerminalRunner:
         elif row > bottom_row:
             self.top_row = row - (painter.scrolling_rows - 1)
 
-    def prompt(self):
+    def prompt_for_chords(self):
         """Write over the Rows of Chars on Screen"""
 
         painter = self.painter
@@ -2149,16 +2145,6 @@ class TerminalRunner:
                 self.keep_cursor_on_file()
                 self.traceback = None
 
-            # Cancel calls on KeyboardInterrupt
-
-            except KeyboardInterrupt:
-
-                self.nudge.append(b"\x03")  # ETX, aka ⌃C, aka 3
-                self.send_reply("Interrupted")  # TODO: find this Egg
-                self.traceback = None
-
-                break
-
             # Stop calls on Exception
 
             except Exception as exc:
@@ -2187,10 +2173,10 @@ class TerminalRunner:
     def raise_chords_as_name_error(self):
         """Reply to meaningless Keyboard Input"""
 
-        chords = self.nudge.getch()  # similar or same as 'self.arg0'
+        echo_bytes = self.nudge.join_echo_bytes()  # similar or same as 'self.arg0'
 
         escapes = ""
-        for xx in chords:
+        for xx in echo_bytes:
             escapes += r"\x{:02X}".format(xx)
 
         arg = "b'{}'".format(escapes)
@@ -2214,7 +2200,7 @@ class TerminalRunner:
         row_number = 1 + self.row
         column_number = 1 + self.column
 
-        echo_bytes = b"" if (nudge is None) else nudge.getch()
+        echo_bytes = b"" if (nudge is None) else nudge.join_echo_bytes()
         str_echo = repr_vi_bytes(echo_bytes) if echo_bytes else ""
 
         str_message = str(reply.message) if reply.message else ""
