@@ -55,17 +55,22 @@ import tty
 
 ESC = "\x1B"  # Esc
 CSI = ESC + "["  # Control Sequence Introducer (CSI)
-CUP_Y_X = CSI + "{};{}H"  # Cursor Position (CUP)
-CUP_1_1 = CSI + "H"  # Cursor Position (CUP)  # (1, 1) = Upper Left
-ED_2 = CSI + "2J"  # Erase in Display (ED)  # 2 = Whole Screen
+
+ED_2 = "\x1B[2J"  # Erase in Display (ED)  # 2 = Whole Screen
+CUP_Y_X = "\x1B[{};{}H"  # Cursor Position (CUP)
+CUP_1_1 = "\x1B[H"  # Cursor Position (CUP)  # (1, 1) = Upper Left
+
+SGR_N = "\x1B[{}m"  # Select Graphic Rendition
+SGR_7 = SGR_N.format(7)  # SGR > Reverse Video, Invert
+SGR = "\x1B[m"  # SGR > Reset, Normal, All Attributes Off
 
 CUP_Y_X_REGEX = r"^\x1B\[([0-9]+);([0-9]+)H$"
 
 DECSC = ESC + "7"  # DEC Save Cursor
 DECRC = ESC + "8"  # DEC Restore Cursor
 
-_XTERM_ALT_ = CSI + "?1049h"
-_XTERM_MAIN_ = CSI + "?1049l"
+_XTERM_ALT_ = "\x1B[?1049h"
+_XTERM_MAIN_ = "\x1B[?1049l"
 
 SMCUP = DECSC + _XTERM_ALT_  # Set-Mode Cursor-Positioning
 RMCUP = ED_2 + _XTERM_MAIN_ + DECRC  # Reset-Mode Cursor-Positioning
@@ -215,38 +220,62 @@ class TerminalReplyOut(argparse.Namespace):
     # because Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
 
-class TerminalMatch(argparse.Namespace):
-    """Convert a Match of Chars to a match of Columns in Rows"""
+class TerminalSpan(argparse.Namespace):
+    """Pick out the Columns of Rows covered by a Match of Chars"""
 
-    def __init__(self, re_match):
+    def __init__(self, match):
 
-        self.re_match = re_match
+        self.match = match
+        self.row = None
+        self.column = None
 
-        (self.row, self.column) = self._count_row_column_()
+    @staticmethod
+    def place_spans_in_lines(spans):
+        """Quickly calculate the Row and Column of each of a List of Spans"""
 
-    def terminal_row_column(self):
-        """FIXME"""
+        if spans:
 
-        return (self.row, self.column)
+            # Split the Lines apart
 
-    def _count_row_column_(self):
-        """FIXME"""
+            some_span = spans[-1]
+            chars = some_span.match.string
+            lines = chars.splitlines(keepends=True)
 
-        re_match = self.re_match
+            # Search each Row for the next Span
 
-        start = re_match.start()
-        chars = re_match.string
+            spanned_lines = list()
+            spanned_chars = ""
 
-        head = chars[:start] + "."  # TODO: ugly '+ ":"', so think more
+            for span in spans:
+                assert span.match.string is some_span.match.string
 
-        lines = head.splitlines()
+                start = span.match.start()
+                while start > len(spanned_chars):
+                    line = lines[len(spanned_lines)]
 
-        (row, column) = (0, 0)
-        if lines:
-            row = len(lines) - 1
-            column = len(lines[-1][:-1])  # TODO: ugly '[:-1]', so think more
+                    spanned_lines.append(line)
+                    spanned_chars += line
 
-        return (row, column)
+                # Find the Row
+
+                row = 0
+                line_at = 0
+                if spanned_lines:
+                    row = len(spanned_lines) - 1
+                    line_at = len(spanned_chars) - len(spanned_lines[-1])
+                    if start == len(spanned_chars):
+                        row = len(spanned_lines)
+                        line_at = len(spanned_chars)
+
+                # Find the Column
+
+                column = start - line_at
+
+                # Place the Span at the Row and Column
+
+                assert (span.row, span.column) == (None, None), span
+                span.row = row
+                span.column = column
 
 
 class TerminalVi:
@@ -266,7 +295,7 @@ class TerminalVi:
         self.seeking_more = None  # remembering the Seeking Column into next Nudge
         self.seeking_column = None  # leap to a Column after changing Row
 
-        self.terminal_matches = list()
+        self.terminal_spans = list()
 
     def run_terminal(self):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
@@ -288,35 +317,37 @@ class TerminalVi:
         finally:
             self.log = runner.log
 
-    def replace_matches(self):
+    def replace_spans(self):
         """Find Chars in File"""
 
         iobytearray = self.iobytearray
         runner = self.runner
-        terminal_matches = self.terminal_matches
+        terminal_spans = self.terminal_spans
 
-        # Cancel the old Matches
+        # Cancel the old Spans
 
-        terminal_matches.clear()
+        terminal_spans.clear()
 
-        # Find the New Matches
+        # Find the New Spans
 
-        pattern = runner.finding_line
-        if not runner.finding_regex:
-            pattern = re.escape(pattern)
+        if runner.finding_line is not None:
 
-        flags = 0
-        if not runner.finding_case:
-            flags |= re.IGNORECASE
+            pattern = runner.finding_line
+            if not runner.finding_regex:
+                pattern = re.escape(pattern)
 
-        chars = iobytearray.decode(errors="surrogateescape")
+            flags = 0
+            flags |= re.MULTILINE
+            if not runner.finding_case:
+                flags |= re.IGNORECASE
 
-        re_matches = list(re.finditer(pattern, string=chars, flags=flags))
-        terminal_matches[::] = list(TerminalMatch(_) for _ in re_matches)
+            chars = iobytearray.decode(errors="surrogateescape")
 
-        # runner.painter.pdb_set_trace()
+            matches = list(re.finditer(pattern, string=chars, flags=flags))
 
-    #
+            terminal_spans[::] = list(TerminalSpan(_) for _ in matches)
+            TerminalSpan.place_spans_in_lines(terminal_spans)
+
     #
     #
 
@@ -353,7 +384,7 @@ class TerminalVi:
     def do_raise_vi_name_error(self):  # such as Esc, such as 'ZB'
         """Reply to meaningless Keyboard Input"""
 
-        raise NameError()
+        self.runner.raise_chords_as_name_error()
 
     def do_help_quit_vi(self):  # Vim ⌃C  # Vi Py Init
         """Suggest ZQ to quit Vi Py"""
@@ -415,20 +446,21 @@ class TerminalVi:
     def do_find_ahead_readline(self):  # Vim /
         """Take a Search Key and look ahead for it"""
 
-        self.take_readline_to_find(slip=+1)
+        runner = self.runner
 
-        self.replace_matches()
-        self.find_ahead()
+        self.take_readline_to_find(slip=+1)
+        if runner.finding_line is not None:
+            self.find_ahead()
 
     def find_ahead(self):
         """Find the Search Key ahead, else after start, else fail"""
 
-        matches = self.terminal_matches
+        spans = self.terminal_spans
         runner = self.runner
         row = runner.row
         column = runner.column
 
-        if matches:
+        if spans:
 
             mark0 = (row, column)
             mark1 = (-1, -1)  # before start
@@ -436,14 +468,18 @@ class TerminalVi:
             message_pattern = "Found {} chars ahead"
             for mark in (mark0, mark1):
 
-                for match in matches:
-                    re_match = match.re_match
-                    re_match_len = re_match.end() - re_match.start()
+                for span in spans:
+                    match = span.match
+                    match = match.end() - match.start()
 
-                    found_mark = match.terminal_row_column()
+                    found_mark = (span.row, span.column)
                     if mark < found_mark:
-                        (runner.row, runner.column) = found_mark
-                        self.send_reply_soon(message_pattern.format(re_match_len))
+                        self.send_reply_soon(message_pattern.format(match))
+
+                        (row, column) = found_mark
+                        runner.row = row
+                        last_column = runner.find_last_column()
+                        runner.column = min(last_column, column)
 
                         return
 
@@ -456,20 +492,21 @@ class TerminalVi:
     def do_find_behind_readline(self):  # Vim ?
         """Take a Search Key and look behind for it"""
 
-        self.take_readline_to_find(slip=-1)
+        runner = self.runner
 
-        self.replace_matches()
-        self.find_behind()
+        self.take_readline_to_find(slip=-1)
+        if runner.finding_line is not None:
+            self.find_behind()
 
     def find_behind(self):
         """Find the Search Key behind, else above bottom, else fail"""
 
-        matches = self.terminal_matches
+        spans = self.terminal_spans
         runner = self.runner
         row = runner.row
         column = runner.column
 
-        if matches:
+        if spans:
 
             mark0 = (row, column)
             mark1 = (runner.find_last_row() + 1, 0)  # after end
@@ -477,14 +514,14 @@ class TerminalVi:
             message_pattern = "Found {} chars behind"
             for mark in (mark0, mark1):
 
-                for match in reversed(matches):
-                    re_match = match.re_match
-                    re_match_len = re_match.end() - re_match.start()
+                for span in reversed(spans):
+                    match = span.match
+                    match = match.end() - match.start()
 
-                    found_mark = match.terminal_row_column()
+                    found_mark = (span.row, span.column)
                     if found_mark < mark:
                         (runner.row, runner.column) = found_mark
-                        self.send_reply_soon(message_pattern.format(re_match_len))
+                        self.send_reply_soon(message_pattern.format(match))
 
                         return
 
@@ -527,8 +564,13 @@ class TerminalVi:
             runner.finding_slip = with_finding_slip
             raise
 
+        if runner.finding_line == "":
+            runner.finding_line = with_finding_line  # same Line, fresh Slip
+
         if runner.finding_line is None:
             runner.send_reply_soon("Search cancelled")
+        else:
+            self.replace_spans()
 
     def readline(self):
         """Take a Line of Input"""
@@ -564,7 +606,7 @@ class TerminalVi:
         runner = self.runner
 
         runner.finding_case = not runner.finding_case
-        self.replace_matches()
+        self.replace_spans()
 
         message = ":set noignorecase" if runner.finding_case else ":set ignorecase"
         self.send_reply_soon(message)  # \i Egg
@@ -585,7 +627,7 @@ class TerminalVi:
         runner = self.runner
 
         runner.finding_regex = not runner.finding_regex
-        self.replace_matches()
+        self.replace_spans()
 
         message = ":set regex" if runner.finding_regex else ":set noregex"
         self.send_reply_soon(message)  # \F Egg  # but Vim never gives you 'noregex'
@@ -1751,7 +1793,10 @@ class TerminalEx:
         chords = self.runner.arg0
         chars = chords.decode()
 
-        self.ex_line += chars
+        if chars == "£":  # TODO: less personal choice
+            self.ex_line += "#"  # a la Vim :abbrev £ #
+        else:
+            self.ex_line += chars
 
     def do_undo_append_char(self):
         """Undo the last Append Char, else Quit Ex"""
@@ -1769,10 +1814,10 @@ class TerminalEx:
 
         self.ex_line = ""
 
-    def do_raise_ex_name_error(self):
+    def do_raise_ex_name_error(self):  # such as ⌃D
         """Reply to meaningless Keyboard Input"""
 
-        raise NameError()
+        self.runner.raise_chords_as_name_error()
 
     def do_quit_ex(self):  # Vim ⌃C
 
@@ -1823,6 +1868,8 @@ class TerminalEx:
             if chords not in C0_CONTROL_STDINS:
                 bots_by_chords[chords] = (self.do_append_char,)
 
+        bots_by_chords["£".encode()] = (self.do_append_char,)
+
         bots_by_chords[b"\x7F"] = (self.do_undo_append_char,)  # DEL, aka ⌃?, aka 127
 
         # TODO: define Esc to replace live Regex punctuation with calmer r"."
@@ -1854,9 +1901,9 @@ class TerminalRunner:
 
         self.bots_by_chords = None  # map Keyboard Inputs to Code
 
-        self.finding_regex = None  # search as Regex or search as Chars
         self.finding_case = None  # ignore Upper/Lower Case in Searching or not
         self.finding_line = None  # remember the Search Key
+        self.finding_regex = None  # search as Regex or search as Chars
         self.finding_slip = 0  # remember to Search again ahead or again behind
         self.finding_the_one = None  # highlight all matches on screen or no matches
 
@@ -2117,6 +2164,18 @@ class TerminalRunner:
                     continue
 
             break
+
+    def raise_chords_as_name_error(self):
+        """Reply to meaningless Keyboard Input"""
+
+        chords = self.nudge.getch()
+
+        escapes = ""
+        for xx in chords:
+            escapes += r"\x{:02X}".format(xx)
+
+        arg = "b'{}'".format(escapes)
+        raise NameError(arg)
 
     def send_reply_soon(self, message):
         """Capture some Status now, to show with next Prompt"""
@@ -2588,6 +2647,7 @@ class TerminalShadow:
                 else:
 
                     shorter_row_text = row[:-1]
+                    # terminal.write(SGR_7 + shorter_row_text + SGR)
                     terminal.write(shorter_row_text)
 
                     self.shadow_rows[index] = shorter_row_text + " "
@@ -2905,34 +2965,34 @@ def repr_vi_bytes(xxs):
     """Echo keyboard input without asking people to memorise b'\a\b\t\n\v\f\r'"""
 
     rep = ""
-    for xx in xxs:
-        chr_xx = chr(xx)
+    for ch in xxs.decode(errors="surrogateescape"):
+        ord_ch = ord(ch)
 
-        if xx == 9:
+        if ord_ch == 9:
             # rep += " ⇥"  # ⇥ \u21E5 Rightward Arrows to Bar
             rep += " Tab"
-        elif xx == 13:
+        elif ord_ch == 13:
             # rep += " ⏎"  # ⏎ \u23CE Return Symbol
             rep += " Return"
-        elif xx == 27:
+        elif ord_ch == 27:
             # rep += " ⎋"  # ⎋ \u238B Broken Circle With Northwest Arrow
             rep += " Esc"
-        elif xx == 127:
+        elif ord_ch == 127:
             # rep += " ⌫"  # ⌫ \u232B Erase To The Left
             rep += " Delete"
-        elif chr_xx == " ":
+        elif ch == " ":
             # rep += " ␢"  # ␢ \u2422 Blank Symbol
             # rep += " ␣"  # ␣ \u2423 Open Box
             rep += " Space"
 
-        elif chr_xx.encode() in C0_CONTROL_STDINS:  # xx in 0x00..0x1F,0x7F
-            rep += " ⌃" + chr(xx ^ 0x40)
+        elif ch.encode() in C0_CONTROL_STDINS:  # ord_ch in 0x00..0x1F,0x7F
+            rep += " ⌃" + chr(ord_ch ^ 0x40)
 
-        elif (chr_xx in "0123456789") and rep and (rep[-1] in "0123456789"):
-            rep += chr_xx  # no Space between Digits in Prefix or Chords or Suffix
+        elif (ch in "0123456789") and rep and (rep[-1] in "0123456789"):
+            rep += ch  # no Space between Digits in Prefix or Chords or Suffix
 
         else:
-            rep += " " + chr_xx
+            rep += " " + ch
 
     rep = rep.replace("Esc [ A", "Up")  # aka ↑ \u2191 Upwards Arrow
     rep = rep.replace("Esc [ B", "Down")  # aka ↓ \u2193 Downwards Arrow
