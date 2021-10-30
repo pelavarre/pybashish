@@ -180,7 +180,7 @@ function --dotfiles-backup () {
     for F in $(--dotfiles-find); do
         --exec-echo-xe "cp -p ~/$F $dotfiles/dot$F"
     done
-    echo ": not backing up ~/.zprofile-zsecrets" >&2
+    echo ": not backing up ~/.zprofilesecrets" >&2
 }
 
 function --dotfiles-restore () {
@@ -189,7 +189,7 @@ function --dotfiles-restore () {
     for F in $(--dotfiles-find); do
         --exec-echo-xe "echo cp -p $dotfiles/dot$F ~/$F"
     done
-    touch ~/.zprofile-zsecrets
+    touch ~/.zprofilesecrets
 }
 
 
@@ -208,7 +208,7 @@ function a () {
 function c () { --exec-echo-xe pbcopy "$@"; }
 function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
 function h () { --exec-echo-xe head "$@"; }
-alias hi='(--more-history; --history) | g'
+function hi () { local arg1=$1; shift; (--more-history; --history) | g $arg1"$@"; }
 function l () { --exec-echo-xe less -FIXR "$@"; }
 function m () { --exec-echo-xe make "$@"; }
 function n () { --exec-echo-xe cat -tvn "$@" "|expand"; }
@@ -527,7 +527,7 @@ alias -- -g=--git
 
 alias -- -ga='--exec-echo-xe git add'
 alias -- -gb='--exec-echo-xe git branch'
-alias -- -gc='--exec-echo-xe git commit'
+alias -- -gc=--git-commit
 alias -- -gf='--exec-echo-xe git fetch'
 alias -- -gd='--exec-echo-xe git diff'
 alias -- -gg='--exec-echo-xe git grep'
@@ -632,6 +632,15 @@ function --git () {
 function --git-chdir () {
     : :: 'ChDir to root of Git Clone'
     --exec-echo-xe 'cd $(git rev-parse --show-toplevel) && cd ./'$@' && dirs -p |head -1'
+}
+
+function --git-commit () {
+    : :: 'Add and commit all tracked, else less simple, such as:  git commit .'
+    if [ $# = 0 ]; then
+        --exec-echo-xe git commit --all
+    else
+        --exec-echo-xe git commit "$@"
+    fi
 }
 
 function --git-commit-all-fixup () {
@@ -864,7 +873,7 @@ alias -- --flake8='~/.venvs/pips/bin/flake8 --max-line-length=999 --max-complexi
 : --ignore=E203  # Black '[ : ]' rules over Flake8 E203 whitespace before ':'
 : --ignore=W503  # 2017 Pep 8 and Black over Flake8 W503 line break before binary op
 
-source ~/.zprofile-zsecrets
+source ~/.zprofilesecrets
 echo $(dirs -p |head -1)/
 
 
