@@ -12,7 +12,7 @@ optional arguments:
   -h, --help  show this help message and exit
 
 quirks:
-  defaults to read Stdin and write Stdout
+  defaults to read Stdin, and writes Stdout at ZZ (but not at ZQ)
 
 keyboard tests:
   ZQ ZZ ⌃Zfg  => how to exit Vi Py
@@ -23,8 +23,8 @@ keyboard tests:
   1234567890 Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y ⌃D ⌃U  => scroll rows
   ⌃L ⌃G  => toggle lag and say if lag is toggled
-  \n \i \F  => toggle line numbers, toggle ignoring case, toggle searching regex
-  /... Delete ⌃U ⌃C Return  ?...  => enter a search key
+  \n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
+  /... Delete ⌃U ⌃C Return  ?...  n  N  => enter a search key, find later/ earlier
   Esc ⌃C Qvi⌃M 123Esc 123⌃C f⌃C 9^ G⌃F⌃F G⌃F⌃E 1G⌃B 1G⌃Y ; ,  => eggs
 
 examples:
@@ -40,6 +40,7 @@ import argparse
 import difflib
 import inspect
 import os
+import pdb
 import re
 import select
 import signal
@@ -101,16 +102,27 @@ X20_UPPER_MASK = 0x20
 def main(argv):
     """Run from the Command Line"""
 
-    parse_vi_argv(argv)
+    args = parse_vi_argv(argv)
 
-    # Sponge up input
+    # Choose an Input File
+
+    args_file = args.file
+    if args.file is None:
+        if not sys.stdin.isatty():
+            args_file = "/dev/stdin"
+    elif args.file == "-":
+        args_file = "/dev/stdin"
+        if sys.stdin.isatty():
+            stderr_print("Press ⌃D EOF to quit giving input")
+
+    # Take a Copy of the whole Input File
 
     inbytes = b""
-    if not sys.stdin.isatty():
-        with open("/dev/stdin", "rb") as reading:
+    if args_file is not None:
+        with open(args_file, "rb") as reading:
             inbytes = reading.read()
 
-    # Edit the input
+    # Edit the Copy
 
     iobytearray = bytearray(inbytes)
     editor = TerminalVi(iobytearray)
@@ -151,14 +163,6 @@ def parse_vi_argv(argv):
 
     args = parser.parse_args(argv[1:])
 
-    if args.file is not None:
-        if args.file != "-":
-            stderr_print(
-                "vi.py: error: "
-                "file '-' meaning '/dev/stdin' implemented, nothing else yet"
-            )
-            sys.exit(2)
-
     return args
 
 
@@ -168,7 +172,7 @@ def parse_vi_argv(argv):
 
 
 class TerminalNudgeIn(argparse.Namespace):
-    """Collect the Keyboard Chords of one Input"""
+    """Take the Keyboard Chords of one Input"""
 
     def __init__(self, prefix=None, chords=None, suffix=None):
 
@@ -177,7 +181,7 @@ class TerminalNudgeIn(argparse.Namespace):
         self.suffix = suffix
 
     def append(self, chords):
-        """Collect next Chord into Suffix, like after collecting Prefix and Chords"""
+        """Take next Chord into Suffix, like after taking Prefix and Chords"""
 
         suffix = b"" if (self.suffix is None) else self.suffix
         suffix += chords
@@ -200,7 +204,7 @@ class TerminalNudgeIn(argparse.Namespace):
 
 
 class TerminalReplyOut(argparse.Namespace):
-    """Collect the parts of a Reply to Input, apart from the main Output"""
+    """Give the parts of a Reply to Input, apart from the main Output"""
 
     def __init__(self, nudge=None, message=None):
 
@@ -209,6 +213,40 @@ class TerminalReplyOut(argparse.Namespace):
 
     # 'class TerminalReplyOut' could become an immutable 'collections.namedtuple'
     # because Jun/2018 Python 3.7 can say '._defaults=(None, None),'
+
+
+class TerminalMatch(argparse.Namespace):
+    """Convert a Match of Chars to a match of Columns in Rows"""
+
+    def __init__(self, re_match):
+
+        self.re_match = re_match
+
+        (self.row, self.column) = self._count_row_column_()
+
+    def terminal_row_column(self):
+        """FIXME"""
+
+        return (self.row, self.column)
+
+    def _count_row_column_(self):
+        """FIXME"""
+
+        re_match = self.re_match
+
+        start = re_match.start()
+        chars = re_match.string
+
+        head = chars[:start] + "."  # TODO: ugly '+ ":"', so think more
+
+        lines = head.splitlines()
+
+        (row, column) = (0, 0)
+        if lines:
+            row = len(lines) - 1
+            column = len(lines[-1][:-1])  # TODO: ugly '[:-1]', so think more
+
+        return (row, column)
 
 
 class TerminalVi:
@@ -227,6 +265,8 @@ class TerminalVi:
 
         self.seeking_more = None  # remembering the Seeking Column into next Nudge
         self.seeking_column = None  # leap to a Column after changing Row
+
+        self.terminal_matches = list()
 
     def run_terminal(self):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
@@ -248,6 +288,34 @@ class TerminalVi:
         finally:
             self.log = runner.log
 
+    def replace_matches(self):
+        """Find Chars in File"""
+
+        iobytearray = self.iobytearray
+        runner = self.runner
+        terminal_matches = self.terminal_matches
+
+        # Cancel the old Matches
+
+        terminal_matches.clear()
+
+        # Find the New Matches
+
+        pattern = runner.finding_line
+        if not runner.finding_regex:
+            pattern = re.escape(pattern)
+
+        flags = 0
+        if not runner.finding_case:
+            flags |= re.IGNORECASE
+
+        chars = iobytearray.decode(errors="surrogateescape")
+
+        re_matches = list(re.finditer(pattern, string=chars, flags=flags))
+        terminal_matches[::] = list(TerminalMatch(_) for _ in re_matches)
+
+        # runner.painter.pdb_set_trace()
+
     #
     #
     #
@@ -266,10 +334,6 @@ class TerminalVi:
         """Capture some Status now, to show with next Prompt"""
 
         self.runner.send_reply_soon(message)
-
-    #
-    #
-    #
 
     def check(self, truthy, **kwargs):
         """Fail fast, else proceed"""
@@ -321,7 +385,7 @@ class TerminalVi:
 
         runner.reply = TerminalReplyOut(nudge=nudge, message=message)
 
-    def do_sig_tstp(self):  # Vim ⌃Zfg
+    def do_vi_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
         runner = self.runner
@@ -349,67 +413,169 @@ class TerminalVi:
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
 
     def do_find_ahead_readline(self):  # Vim /
-        """Collect a Search Key and look ahead for it"""
+        """Take a Search Key and look ahead for it"""
 
+        self.take_readline_to_find(slip=+1)
+
+        self.replace_matches()
+        self.find_ahead()
+
+    def find_ahead(self):
+        """Find the Search Key ahead, else after start, else fail"""
+
+        matches = self.terminal_matches
         runner = self.runner
+        row = runner.row
+        column = runner.column
 
-        with_searching_behind = runner.searching_behind
-        runner.searching_behind = False
-        try:
-            _ = self.readline()
-        except Exception:
-            runner.searching_behind = with_searching_behind
-            raise
+        if matches:
+
+            mark0 = (row, column)
+            mark1 = (-1, -1)  # before start
+
+            message_pattern = "Found {} chars ahead"
+            for mark in (mark0, mark1):
+
+                for match in matches:
+                    re_match = match.re_match
+                    re_match_len = re_match.end() - re_match.start()
+
+                    found_mark = match.terminal_row_column()
+                    if mark < found_mark:
+                        (runner.row, runner.column) = found_mark
+                        self.send_reply_soon(message_pattern.format(re_match_len))
+
+                        return
+
+                message_pattern = "Found {} chars, not ahead, found instead after start"
+
+            assert False  # unreached
+
+        self.send_reply_soon("No chars found: none ahead, and none behind")
 
     def do_find_behind_readline(self):  # Vim ?
-        """Collect a Search Key and look behind for it"""
+        """Take a Search Key and look behind for it"""
+
+        self.take_readline_to_find(slip=-1)
+
+        self.replace_matches()
+        self.find_behind()
+
+    def find_behind(self):
+        """Find the Search Key behind, else above bottom, else fail"""
+
+        matches = self.terminal_matches
+        runner = self.runner
+        row = runner.row
+        column = runner.column
+
+        if matches:
+
+            mark0 = (row, column)
+            mark1 = (runner.find_last_row() + 1, 0)  # after end
+
+            message_pattern = "Found {} chars behind"
+            for mark in (mark0, mark1):
+
+                for match in reversed(matches):
+                    re_match = match.re_match
+                    re_match_len = re_match.end() - re_match.start()
+
+                    found_mark = match.terminal_row_column()
+                    if found_mark < mark:
+                        (runner.row, runner.column) = found_mark
+                        self.send_reply_soon(message_pattern.format(re_match_len))
+
+                        return
+
+                message_pattern = "Found {} chars, not behind, found instead before end"
+
+            assert False  # unreached
+
+        self.send_reply_soon("No chars found: none behind, and none ahead")
+
+    def do_find_earlier(self):  # Vim n
 
         runner = self.runner
 
-        with_searching_behind = runner.searching_behind
-        runner.searching_behind = True
+        if runner.finding_slip > 0:
+            self.find_behind()
+        else:
+            self.find_ahead()
+
+    def do_find_later(self):  # Vim N
+
+        runner = self.runner
+
+        if runner.finding_slip > 0:
+            self.find_ahead()
+        else:
+            self.find_behind()
+
+    def take_readline_to_find(self, slip):
+        """Take a Search Key"""
+
+        runner = self.runner
+
+        with_finding_line = runner.finding_line
+        with_finding_slip = runner.finding_slip
+        runner.finding_slip = slip
         try:
-            _ = self.readline()
+            runner.finding_line = self.readline()
         except Exception:
-            runner.searching_behind = with_searching_behind
+            runner.finding_line = with_finding_line
+            runner.finding_slip = with_finding_slip
             raise
 
-    def readline(self):
-        """Collect a Search Key"""
+        if runner.finding_line is None:
+            runner.send_reply_soon("Search cancelled")
 
-        # raise NotImplementedError()
+    def readline(self):
+        """Take a Line of Input"""
 
         runner = self.runner
-
         runner.nudge = TerminalNudgeIn()
 
         ex = TerminalEx(runner)
-        try:
-            ex.run_ex_keyboard()
-            assert False  # unreached
-        except SystemExit:
-            pass
+        line = ex.readline()
+
+        return line
 
     #
     # Flip switches
-    # TODO: stop commandeering the personal \ Chord Sequences
+    # TODO: somehow soon stop commandeering the personal \ Chord Sequences
     #
 
-    def do_set_invignorecase(self):  # Vi Py \i
-        """Ignore Upper/Lower Case in Searching or not"""
+    def do_invhlsearch(self):  # Vi Py \Esc
+        """Toggle highlighting matches"""
 
         runner = self.runner
 
-        runner.searching_case = not runner.searching_case
-        message = ":set noignorecase" if runner.searching_case else ":set ignorecase"
+        runner.finding_the_one = not runner.finding_the_one
+        message = ":nohlsearch" if runner.finding_the_one else ":set hlsearch"
+        self.send_reply_soon(message)  # \Esc Egg
+
+        # Vim lacks ':invhlsearch' and lacks ':hlsearch'
+        # Vi Py stretches Vim ':noh' to mean ':invhlsearch', not just ':nohlsearch'
+
+    def do_set_invignorecase(self):  # Vi Py \i
+        """Search Upper/Lower Case or not"""
+
+        runner = self.runner
+
+        runner.finding_case = not runner.finding_case
+        self.replace_matches()
+
+        message = ":set noignorecase" if runner.finding_case else ":set ignorecase"
         self.send_reply_soon(message)  # \i Egg
 
     def do_set_invnumber(self):  # Vi Py \n
-        """Toggle Line-in-File numbers in or out"""
+        """Show Line Numbers or not"""
 
         runner = self.runner
 
         runner.showing_line_number = not runner.showing_line_number
+
         message = ":set number" if runner.showing_line_number else ":set nonumber"
         self.send_reply_soon(message)  # \n Egg
 
@@ -418,8 +584,10 @@ class TerminalVi:
 
         runner = self.runner
 
-        runner.searching_regex = not runner.searching_regex
-        message = ":set regex" if runner.searching_regex else ":set noregex"
+        runner.finding_regex = not runner.finding_regex
+        self.replace_matches()
+
+        message = ":set regex" if runner.finding_regex else ":set noregex"
         self.send_reply_soon(message)  # \F Egg  # but Vim never gives you 'noregex'
 
     #
@@ -1380,7 +1548,7 @@ class TerminalVi:
         # bots_by_chords[b"\x17"]  # ETB, aka ⌃W, aka 23
         # bots_by_chords[b"\x18"]  # CAN, aka ⌃X , aka 24
         bots_by_chords[b"\x19"] = (self.do_scroll_behind_one,)  # EM, aka ⌃Y, aka 25
-        bots_by_chords[b"\x1A"] = (self.do_sig_tstp,)  # SUB, aka ⌃Z, aka 26
+        bots_by_chords[b"\x1A"] = (self.do_vi_sig_tstp,)  # SUB, aka ⌃Z, aka 26
 
         bots_by_chords[b"\x1B"] = (self.do_c0_control_esc,)  # ESC, aka ⌃[, aka 27
         bots_by_chords[b"\x1B[A"] = (self.do_step_up_seek,)  # ↑ Up Arrow
@@ -1410,8 +1578,14 @@ class TerminalVi:
         bots_by_chords[b"/"] = (self.do_find_ahead_readline,)
 
         bots_by_chords[b"0"] = (self.do_slip_first,)
+        bots_by_chords[b"1234567890"] = None
 
-        # bots_by_chords[b":"]  # TODO: escape vi
+        bots_by_chords[b":"] = None
+        bots_by_chords[b":n"] = None
+        bots_by_chords[b":no"] = None
+        bots_by_chords[b":noh"] = None
+        bots_by_chords[b":noh\x0D"] = (self.do_invhlsearch,)  # CR, aka ⌃M, aka 13 \r
+
         bots_by_chords[b";"] = (self.do_slip_choice_redo,)
         # bots_by_chords[b"<"]  # TODO: dedent
         # bots_by_chords[b"="]  # TODO: dent after
@@ -1432,7 +1606,7 @@ class TerminalVi:
         # bots_by_chords[b"K"] = (self.do_lookup,)
         bots_by_chords[b"L"] = (self.do_step_max_low,)
         bots_by_chords[b"M"] = (self.do_step_to_middle,)
-        # bots_by_chords[b"N"] = (self.do_find_behind,)
+        bots_by_chords[b"N"] = (self.do_find_earlier,)
         # bots_by_chords[b"O"] = (self.do_slip_first_open,)
         # bots_by_chords[b"P"] = (self.do_paste_behind,)
 
@@ -1457,6 +1631,7 @@ class TerminalVi:
         # bots_by_chords[b"["]  # TODO
 
         bots_by_chords[b"\\"] = None
+        bots_by_chords[b"\\\x1B"] = (self.do_invhlsearch,)
         bots_by_chords[b"\\F"] = (self.do_set_invregex,)
         bots_by_chords[b"\\i"] = (self.do_set_invignorecase,)
         bots_by_chords[b"\\n"] = (self.do_set_invnumber,)
@@ -1479,7 +1654,7 @@ class TerminalVi:
         bots_by_chords[b"k"] = (self.do_step_up_seek,)
         bots_by_chords[b"l"] = (self.do_slip_right,)
         # bots_by_chords[b"m"] = (None, self.do_drop_pin)
-        # bots_by_chords[b"n"] = (self.do_find_ahead,)
+        bots_by_chords[b"n"] = (self.do_find_later,)
         # bots_by_chords[b"o"] = (self.do_slip_last_right_open,)
         # bots_by_chords[b"p"] = (self.do_paste_ahead,)
         # bots_by_chords[b"q"] = (self.do_record,)
@@ -1513,7 +1688,7 @@ class TerminalEx:
         self.runner = runner
 
         self.ex_head = None
-        self.ex_tail = None
+        self.ex_line = None
 
         self.ex_flags = ""
 
@@ -1521,7 +1696,7 @@ class TerminalEx:
 
         ex_head = self.ex_head
         ex_flags = self.ex_flags
-        ex_tail = self.ex_tail
+        ex_line = self.ex_line
 
         word0 = ex_head.split()[0]
         dashed_ex_flags = "-" + ex_flags
@@ -1532,56 +1707,67 @@ class TerminalEx:
             count = 1
             ex_head_repl = ex_head.replace(word0, repl, count)
 
-        str_reply = ex_head_repl + ex_tail
+        str_reply = ex_head_repl + ex_line
 
         return str_reply
 
-    def run_ex_keyboard(self):
+    def readline(self):
         """Take an Input Line from beneath the Scrolling Rows"""
+
+        try:
+            self.run_ex_keyboard()
+            assert False  # unreached
+        except SystemExit:
+            pass
+
+        line = self.ex_line
+
+        return line
+
+    def run_ex_keyboard(self):
+        """Edit an Input Line beneath the Scrolling Rows"""
 
         runner = self.runner
 
         ex_flags = ""
-        if not runner.searching_regex:
+        if not runner.finding_regex:
             ex_flags += "F"
-        if not runner.searching_case:
+        if not runner.finding_case:
             ex_flags += "i"
         if runner.showing_line_number:
             ex_flags += "n"
         self.ex_flags = ex_flags
 
         self.ex_head = runner.format_vi_reply()
-        self.ex_tail = ""
+        self.ex_line = ""
 
         bots_by_chords = self._ex_bots_by_chords_()
         runner.run_keyboard(bots_by_chords)
         assert False  # unreached
 
     def do_append_char(self):
-        """Append the Chords to the Collected Text"""
+        """Append the Chords to the Input Line"""
 
         chords = self.runner.arg0
         chars = chords.decode()
 
-        self.ex_tail += chars
+        self.ex_line += chars
 
     def do_undo_append_char(self):
         """Undo the last Append Char, else Quit Ex"""
 
-        runner = self.runner
-        ex_tail = self.ex_tail
-
-        if not ex_tail:
-            runner.send_reply_soon("Search cancelled")
+        ex_line = self.ex_line
+        if ex_line:
+            self.ex_line = ex_line[:-1]
+        else:
+            self.ex_line = None
 
             sys.exit()
-
-        self.ex_tail = ex_tail[:-1]
 
     def do_clear_chars(self):  # Vim ⌃U
         """Undo all the Append Chars, if any Not undone already"""
 
-        self.ex_tail = ""
+        self.ex_line = ""
 
     def do_raise_ex_name_error(self):
         """Reply to meaningless Keyboard Input"""
@@ -1590,20 +1776,12 @@ class TerminalEx:
 
     def do_quit_ex(self):  # Vim ⌃C
 
-        self.runner.send_reply_soon("Search cancelled")
+        self.ex_line = None
 
         sys.exit()
 
     def do_save_and_quit_ex(self):  # Vim ⌃M
         """Place the Screen Cursor, like while prompting for more Chords"""
-
-        ex_tail = self.ex_tail
-        runner = self.runner
-
-        if runner.searching_behind:
-            runner.send_reply_soon("Search behind key received:  {!r}".format(ex_tail))
-        else:
-            runner.send_reply_soon("Search ahead key received:  {!r}".format(ex_tail))
 
         sys.exit()
 
@@ -1671,14 +1849,16 @@ class TerminalRunner:
         self.column = 0  # point the Screen Cursor to a Column of File
 
         self.top_row = 0  # scroll through more Lines than fit on Screen
-        self.injecting_more_lag = None  # inject more Lag or not
         self.showing_line_number = None  # show Line Numbers or not
-
-        self.searching_behind = None  # search behind or search ahead
-        self.searching_regex = None  # search as Regex or search as Chars
-        self.searching_case = None  # ignore Upper/Lower Case in Searching or not
+        self.injecting_more_lag = None  # inject more Lag or not
 
         self.bots_by_chords = None  # map Keyboard Inputs to Code
+
+        self.finding_regex = None  # search as Regex or search as Chars
+        self.finding_case = None  # ignore Upper/Lower Case in Searching or not
+        self.finding_line = None  # remember the Search Key
+        self.finding_slip = 0  # remember to Search again ahead or again behind
+        self.finding_the_one = None  # highlight all matches on screen or no matches
 
         self.nudge = TerminalNudgeIn()  # split the Chords of one Keyboard Input
         self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
@@ -1828,14 +2008,15 @@ class TerminalRunner:
 
         # Accept a Prefix of Digits
 
-        if not chords:
-            if (chord in b"123456789") or (prefix and (chord == b"0")):
+        if b"1234567890" in bots_by_chords.keys():
+            if not chords:
+                if (chord in b"123456789") or (prefix and (chord == b"0")):
 
-                prefix_plus = chord if (prefix is None) else (prefix + chord)
-                self.nudge.prefix = prefix_plus
-                self.send_reply_soon(message=None)
+                    prefix_plus = chord if (prefix is None) else (prefix + chord)
+                    self.nudge.prefix = prefix_plus
+                    self.send_reply_soon(message=None)
 
-                return None  # ask for more Prefix, else for main Chords
+                    return None  # ask for more Prefix, else for main Chords
 
         self.arg1 = int(prefix) if prefix else None
         assert self.get_arg1() >= 1
@@ -2184,11 +2365,20 @@ class TerminalPainter:
         """Connect Keyboard and switch Screen to XTerm Alt Screen"""
 
         self.terminal.__enter__()
+        self._reopen_terminal_()
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
         self.terminal.__exit__(exc_type, exc_value, traceback)  # positional args
+
+    def pdb_set_trace(self):
+        """Visit Pdb, if Stdin is Tty, else raise 'bdb.BdbQuit'"""
+
+        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
+        self.__exit__(*exc_info)
+        pdb.set_trace()
+        self.__enter__()
 
     def _reopen_terminal_(self):
         """Clear the Caches of this Terminal, here and below"""
