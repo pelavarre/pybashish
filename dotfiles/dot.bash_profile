@@ -838,7 +838,13 @@ alias -- --flake8='~/.venvs/pips/bin/flake8 --max-line-length=999 --max-complexi
 : --ignore=W503  # 2017 Pep 8 and Black over Flake8 W503 line break before binary op
 
 source ~/.bash_profile_secrets
-echo $(dirs -p |head -1)/
+
+if [[ "$(uname)" == "Darwin" ]]; then
+    dirs -p |tail -r
+else
+    # dirs -p |tac  # Linux 'tac' needs free space at shared '/tmp/' dir
+    dirs -p |cat -n |sort -nr |cut -d$'\t' -f2-
+fi
 
 
 #
