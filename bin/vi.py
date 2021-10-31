@@ -151,128 +151,8 @@ def parse_vi_argv(argv):
 
 
 #
-# Edit a Buffer of Chars Fetched from a File
+# Edit some Scrolling Rows, backed by Lines of a File of Chars encoded as Bytes
 #
-
-
-
-# FIXME: shuffle far far down the TerminalNudgeIn TerminalReplyOut TerminalSpan
-
-
-class TerminalNudgeIn(argparse.Namespace):
-    """Take the Keyboard Chords of one Input"""
-
-    def __init__(self, prefix=None, chords=None, suffix=None, epilog=None):
-
-        self.prefix = prefix
-        self.chords = chords
-        self.suffix = suffix
-        self.epilog = epilog
-
-    def add_epilog(self, epilog):
-        """Add more Chords to echo, Chords that came later"""
-
-        assert self.epilog is None
-        self.epilog = epilog
-
-    def join_echo_bytes(self):
-        """Echo all the Chords of this one Input, in order"""
-
-        echo = b""
-
-        if self.prefix is not None:
-            echo += self.prefix
-        if self.chords is not None:
-            echo += self.chords
-        if self.suffix is not None:
-            echo += self.suffix
-        if self.epilog is not None:
-            echo += self.epilog
-
-        return echo
-
-
-class TerminalReplyOut(argparse.Namespace):
-    """Give the parts of a Reply to Input, apart from the main Output"""
-
-    def __init__(self, nudge=None, message=None):
-
-        self.nudge = nudge
-        self.message = message
-
-    # 'class TerminalReplyOut' could become an immutable 'collections.namedtuple'
-    # because Jun/2018 Python 3.7 can say '._defaults=(None, None),'
-
-
-class TerminalSpan(
-    collections.namedtuple("TerminalSpan", "row, column, beyond".split(", "))
-):
-    """Pick out the Columns of Rows covered by a Match of Chars"""
-
-    @staticmethod
-    def find_spans(matches):
-        """Quickly calculate the Row and Column of each of a List of Spans"""
-
-        if not matches:
-
-            return list()
-
-        # Split the Lines apart
-
-        some_match = matches[-1]
-
-        chars = some_match.string
-        lines = chars.splitlines(keepends=True)
-
-        # Search each Line for the next Match
-
-        spanned_lines = list()
-        spanned_chars = ""
-
-        spans = list()
-        for match in matches:
-            assert match.string is some_match.string
-
-            start = match.start()
-            while start > len(spanned_chars):
-                line = lines[len(spanned_lines)]
-
-                spanned_lines.append(line)
-                spanned_chars += line
-
-            # Find the Row of the Match, in or beyond the Spanned Lines
-
-            row = 0
-            line_at = 0
-            if spanned_lines:
-                row = len(spanned_lines) - 1
-                line_at = len(spanned_chars) - len(spanned_lines[-1])
-                if start == len(spanned_chars):
-                    row = len(spanned_lines)
-                    line_at = len(spanned_chars)
-
-            # Find the Column of the Match
-
-            column = start - line_at
-            beyond = column + (match.end() - match.start())
-
-            # Collect this Span
-
-            span = TerminalSpan(row, column=column, beyond=beyond)
-            spans.append(span)
-
-        # Silently drop the extra Match past the last Line,
-        # to duck out of the case of an extra Match past the End of the last Line
-        # as per: list(re.finditer(r"$", string="a\n\nz\n", flags=re.MULTILINE))
-
-        if spans:
-
-            last_span = spans[-1]
-            if last_span.row >= len(lines):
-
-                del spans[-1]
-
-        return spans
 
 
 class TerminalVi:
@@ -1774,6 +1654,11 @@ class TerminalVi:
         return bots_by_chords
 
 
+#
+# Edit some Chars in the Bottom Lines of the Screen
+#
+
+
 class TerminalEx:
     """Feed Keyboard into Line at Bottom of Screen of Scrolling Rows, a la Ex"""
 
@@ -1940,6 +1825,127 @@ class TerminalEx:
         # TODO: search for more than US Ascii
 
         return bots_by_chords
+
+
+#
+# Define the Editors above in terms of Inputs, Outputs, & Selections of Chars
+#
+
+
+class TerminalNudgeIn(argparse.Namespace):
+    """Take the Keyboard Chords of one Input"""
+
+    def __init__(self, prefix=None, chords=None, suffix=None, epilog=None):
+
+        self.prefix = prefix
+        self.chords = chords
+        self.suffix = suffix
+        self.epilog = epilog
+
+    def add_epilog(self, epilog):
+        """Add more Chords to echo, Chords that came later"""
+
+        assert self.epilog is None
+        self.epilog = epilog
+
+    def join_echo_bytes(self):
+        """Echo all the Chords of this one Input, in order"""
+
+        echo = b""
+
+        if self.prefix is not None:
+            echo += self.prefix
+        if self.chords is not None:
+            echo += self.chords
+        if self.suffix is not None:
+            echo += self.suffix
+        if self.epilog is not None:
+            echo += self.epilog
+
+        return echo
+
+
+class TerminalReplyOut(argparse.Namespace):
+    """Give the parts of a Reply to Input, apart from the main Output"""
+
+    def __init__(self, nudge=None, message=None):
+
+        self.nudge = nudge
+        self.message = message
+
+    # 'class TerminalReplyOut' could become an immutable 'collections.namedtuple'
+    # because Jun/2018 Python 3.7 can say '._defaults=(None, None),'
+
+
+class TerminalSpan(
+    collections.namedtuple("TerminalSpan", "row, column, beyond".split(", "))
+):
+    """Pick out the Columns of Rows covered by a Match of Chars"""
+
+    @staticmethod
+    def find_spans(matches):
+        """Quickly calculate the Row and Column of each of a List of Spans"""
+
+        if not matches:
+
+            return list()
+
+        # Split the Lines apart
+
+        some_match = matches[-1]
+
+        chars = some_match.string
+        lines = chars.splitlines(keepends=True)
+
+        # Search each Line for the next Match
+
+        spanned_lines = list()
+        spanned_chars = ""
+
+        spans = list()
+        for match in matches:
+            assert match.string is some_match.string
+
+            start = match.start()
+            while start > len(spanned_chars):
+                line = lines[len(spanned_lines)]
+
+                spanned_lines.append(line)
+                spanned_chars += line
+
+            # Find the Row of the Match, in or beyond the Spanned Lines
+
+            row = 0
+            line_at = 0
+            if spanned_lines:
+                row = len(spanned_lines) - 1
+                line_at = len(spanned_chars) - len(spanned_lines[-1])
+                if start == len(spanned_chars):
+                    row = len(spanned_lines)
+                    line_at = len(spanned_chars)
+
+            # Find the Column of the Match
+
+            column = start - line_at
+            beyond = column + (match.end() - match.start())
+
+            # Collect this Span
+
+            span = TerminalSpan(row, column=column, beyond=beyond)
+            spans.append(span)
+
+        # Silently drop the extra Match past the last Line,
+        # to duck out of the case of an extra Match past the End of the last Line
+        # as per: list(re.finditer(r"$", string="a\n\nz\n", flags=re.MULTILINE))
+
+        if spans:
+
+            last_span = spans[-1]
+            if last_span.row >= len(lines):
+
+                del spans[-1]
+
+        return spans
 
 
 class TerminalRunner:
@@ -2628,6 +2634,12 @@ class TerminalRunner:
             raise IndexError(span)
 
         return there
+
+
+#
+# Stack the I/O of a Terminal
+# as TerminalPainter > TerminalShadow > TerminalDriver
+#
 
 
 class TerminalPainter:
