@@ -21,7 +21,7 @@ keyboard tests:
   b e w B E W { }  => leap across small word, large word, paragraph
   j k G 1G H L M - + _ ⌃J ⌃N ⌃P  => leap to row, leap to line
   1234567890 Esc  => repeat, or don't
-  ⌃F ⌃B ⌃E ⌃Y  => scroll rows
+  ⌃F ⌃B ⌃E ⌃Y zb zt zz  => scroll rows
   ⌃L ⌃G  => toggle lag and say if lag is toggled
   \n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
   /... Delete ⌃U ⌃C Return  ?...  n  N  => enter a search key, find later/ earlier
@@ -1013,6 +1013,50 @@ class TerminalVi:
         runner.continue_do_loop()
 
     #
+    # Scroll to move Cursor on Screen
+    #
+
+    def do_scroll_till_top(self):  # Vim zt
+        """Scroll up or down till Cursor Row lands in Top Row of Screen"""
+
+        runner = self.runner
+        row = self.get_vi_arg1(runner.row)
+
+        runner.top_row = row
+
+    def do_scroll_till_middle(self):  # Vim zz  # not to be confused with Vim ZZ
+        """Scroll up or down till Cursor Row lands in Middle Row of Screen"""
+
+        runner = self.runner
+        painter = runner.painter
+        scrolling_rows = painter.scrolling_rows
+
+        assert scrolling_rows
+
+        row = self.get_vi_arg1(runner.row)
+
+        up = scrolling_rows // 2
+        top_row = (row - up) if (row >= up) else 0
+
+        runner.top_row = top_row
+
+    def do_scroll_till_bottom(self):  # Vim zb
+        """Scroll up or down till Cursor Row lands in Bottom Row of Screen"""
+
+        runner = self.runner
+        painter = runner.painter
+        scrolling_rows = painter.scrolling_rows
+
+        assert scrolling_rows
+
+        row = self.get_vi_arg1(runner.row)
+
+        up = scrolling_rows - 1
+        top_row = (row - up) if (row >= up) else 0
+
+        runner.top_row = top_row
+
+    #
     # Search ahead for an empty line
     #
 
@@ -1642,7 +1686,9 @@ class TerminalVi:
         # bots_by_chords[b"y"] = (self.do_copy_after,)
 
         bots_by_chords[b"z"] = None
-        # bots_by_chords[b"zz"] = (self.do_scroll_to_center,)
+        bots_by_chords[b"zb"] = (self.do_scroll_till_bottom,)
+        bots_by_chords[b"zt"] = (self.do_scroll_till_top,)
+        bots_by_chords[b"zz"] = (self.do_scroll_till_middle,)
 
         bots_by_chords[b"{"] = (self.do_paragraph_behind,)
         bots_by_chords[b"|"] = (self.do_slip,)
@@ -2074,13 +2120,22 @@ class TerminalRunner:
 
         row = self.row
         painter = self.painter
+        top_row = self.top_row
 
-        bottom_row = self.find_bottom_row()
+        if not (0 <= top_row < len(self.lines)):
+            self.top_row = 0
 
         if row < self.top_row:
             self.top_row = row
-        elif row > bottom_row:
+
+        bottom_row = self.find_bottom_row()
+        if row > bottom_row:
             self.top_row = row - (painter.scrolling_rows - 1)
+
+        # After fixing it, assert we never got it wrong
+
+        if not (0 <= top_row < len(self.lines)):
+            raise KwArgsException(before=top_row, after=self.top_row)
 
     def prompt_for_chords(self):
         """Write over the Rows of Chars on Screen"""
@@ -3539,8 +3594,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
-
-# TODO: zt zb zz scrolling
 
 # TODO: hunt out the Fixme's
 
