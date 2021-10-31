@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: vi.py [-h] [FILE]
+usage: vi.py [-h] [FILE ...]
 
 read files, accept zero or more edits, write files
 
@@ -36,15 +36,9 @@ examples:
 # we do define the arcane ⌃L to redraw, but we don't mention it in the help
 # we also don't mention ⌃D ⌃U till they stop raising NotImplementedError
 
-# TODO: stop passing through Controls from the File
-# TODO: accept b"\t" as a form of b" "
-# TODO: solve /⌃V⌃IReturn
-
-# TODO: zz zt zb scrolling
-# TODO: ⌃D ⌃U scrolling
-
 
 import argparse
+import collections
 import difflib
 import inspect
 import os
@@ -117,32 +111,14 @@ def main(argv):
 
     args = parse_vi_argv(argv)
 
-    # Choose an Input File
+    # Visit each File
 
-    args_file = args.file
-    if args.file is None:
-        if not sys.stdin.isatty():
-            args_file = "/dev/stdin"
-    elif args.file == "-":
-        args_file = "/dev/stdin"
-        if sys.stdin.isatty():
-            stderr_print("Press ⌃D EOF to quit giving input")
-
-    # Take a Copy of the whole Input File
-
-    inbytes = b""
-    if args_file is not None:
-        with open(args_file, "rb") as reading:
-            inbytes = reading.read()
-
-    # Edit the Copy
-
-    iobytearray = bytearray(inbytes)
-    editor = TerminalVi(iobytearray)
+    editor = TerminalVi(files=args.files)
 
     returncode = None
     try:
         editor.run_terminal()
+        assert False  # unreached
     except SystemExit as exc:
         returncode = exc.code
 
@@ -150,11 +126,6 @@ def main(argv):
             stderr_print(editor.log)
 
         # TODO: log keystrokes interpreted before exit, or dropped by exit
-
-    # Flush output
-
-    os.write(sys.stdout.fileno(), iobytearray)
-    sys.stdout.flush()
 
     # Exit
 
@@ -166,9 +137,9 @@ def parse_vi_argv(argv):
 
     parser = compile_argdoc(epi="quirks")
     parser.add_argument(
-        "file",
+        "files",
         metavar="FILE",
-        nargs="?",
+        nargs="*",
         help="a file to edit, such as '-' to mean stdin",
     )
 
@@ -182,6 +153,10 @@ def parse_vi_argv(argv):
 #
 # Edit a Buffer of Chars Fetched from a File
 #
+
+
+
+# FIXME: shuffle far far down the TerminalNudgeIn TerminalReplyOut TerminalSpan
 
 
 class TerminalNudgeIn(argparse.Namespace):
@@ -229,14 +204,10 @@ class TerminalReplyOut(argparse.Namespace):
     # because Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
 
-class TerminalSpan(argparse.Namespace):
+class TerminalSpan(
+    collections.namedtuple("TerminalSpan", "row, column, beyond".split(", "))
+):
     """Pick out the Columns of Rows covered by a Match of Chars"""
-
-    def __init__(self, row, column, beyond):
-
-        self.row = row
-        self.column = column
-        self.beyond = beyond
 
     @staticmethod
     def find_spans(matches):
@@ -253,7 +224,7 @@ class TerminalSpan(argparse.Namespace):
         chars = some_match.string
         lines = chars.splitlines(keepends=True)
 
-        # Search each Row for the next Span
+        # Search each Line for the next Match
 
         spanned_lines = list()
         spanned_chars = ""
@@ -269,7 +240,7 @@ class TerminalSpan(argparse.Namespace):
                 spanned_lines.append(line)
                 spanned_chars += line
 
-            # Find the Row
+            # Find the Row of the Match, in or beyond the Spanned Lines
 
             row = 0
             line_at = 0
@@ -280,15 +251,26 @@ class TerminalSpan(argparse.Namespace):
                     row = len(spanned_lines)
                     line_at = len(spanned_chars)
 
-            # Find the Columns
+            # Find the Column of the Match
 
             column = start - line_at
             beyond = column + (match.end() - match.start())
 
-            # Place the Span
+            # Collect this Span
 
             span = TerminalSpan(row, column=column, beyond=beyond)
             spans.append(span)
+
+        # Silently drop the extra Match past the last Line,
+        # to duck out of the case of an extra Match past the End of the last Line
+        # as per: list(re.finditer(r"$", string="a\n\nz\n", flags=re.MULTILINE))
+
+        if spans:
+
+            last_span = spans[-1]
+            if last_span.row >= len(lines):
+
+                del spans[-1]
 
         return spans
 
@@ -296,9 +278,11 @@ class TerminalSpan(argparse.Namespace):
 class TerminalVi:
     """Feed Keyboard into Screen of File of Lines of chars, a la Vi"""
 
-    def __init__(self, iobytearray):
+    def __init__(self, files):
 
-        self.iobytearray = iobytearray  # send mutations back to caller
+        self.files = files  # read zero or more files
+        self.file_index = None
+        self.reading_path = None
 
         self.log = None  # capture Python Tracebacks
 
@@ -313,14 +297,10 @@ class TerminalVi:
     def run_terminal(self):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
 
-        iobytearray = self.iobytearray
-
-        chars = iobytearray.decode(errors="surrogateescape")
-        lines = chars.splitlines(keepends=True)
-        runner = TerminalRunner(lines)
-
+        runner = TerminalRunner()
         self.runner = runner
 
+        self.do_next_vi_file()
         self.do_help_quit_vi()  # start with a warmer welcome, not a cold empty Nudge
 
         bots_by_chords = self._vi_bots_by_chords_()
@@ -329,6 +309,73 @@ class TerminalVi:
             assert False  # unreached
         finally:
             self.log = runner.traceback
+
+    def do_next_vi_file(self):
+        """Visit the next File, else the first File"""
+
+        files = self.files
+        file_index = self.file_index
+
+        # Explicitly reject the traditional Vim Count argument
+
+        arg1 = self.get_vi_arg1(default=None)
+        if arg1 is not None:
+            raise NotImplementedError
+
+        # Close this File
+
+        if self.reading_path is not None:
+            self.do_might_flush_vi()
+
+        # Choose next File, else quit after last File
+
+        if file_index is None:
+            next_file_index = 0
+            next_file = None if (not files) else files[next_file_index]
+        elif file_index < (len(files) - 1):
+            next_file_index = file_index + 1
+            next_file = files[next_file_index]
+        else:
+            self.do_quit_vi()  # Vim chokes here, because no next File
+            assert False  # unreached
+
+        self.file_index = next_file_index
+
+        # Visit the chosen File
+
+        path = next_file
+        if next_file == "-":
+            path = "/dev/stdin"
+        elif next_file is None:
+            if not sys.stdin.isatty():
+                path = "/dev/stdin"
+
+        self.reopen_path(path)
+
+    def reopen_path(self, path):
+        """Visit a chosen File"""
+
+        self.reading_path = path
+
+        runner = self.runner
+
+        # Fetch Bytes of File
+
+        iobytes = b""
+        if path is not None:
+
+            if sys.stdin.isatty():
+                if path == "/dev/stdin":
+                    stderr_print("Press ⌃D EOF to quit giving input")
+
+            with open(path, "rb") as reading:
+                iobytes = reading.read()
+
+        iobytearray = bytearray(iobytes)
+
+        # Start editing Lines of Columns, given a File of Bytes
+
+        runner.reopen_iobytearray(iobytearray)
 
     #
     # Layer thinly over TerminalRunner
@@ -343,11 +390,6 @@ class TerminalVi:
         """Get the Bytes of the input Suffix past the input Chords"""
 
         return self.runner.get_arg2()
-
-    def replace_vi_spans(self):
-        """Find Chars in File"""
-
-        self.runner.replace_spans(self.iobytearray)
 
     def send_vi_reply(self, message):
         """Capture some Status now, to show with next Prompt"""
@@ -375,7 +417,7 @@ class TerminalVi:
         self.seeking_more = True
 
     #
-    # Define keys for entering, pausing, and exiting TerminalVi
+    # Define keys for pausing TerminalVi
     #
 
     def do_raise_vi_name_error(self):  # such as Esc, such as 'ZB'
@@ -383,32 +425,22 @@ class TerminalVi:
 
         self.runner.raise_chords_as_name_error()
 
-    def do_help_quit_vi(self):  # Vim ⌃C  # Vi Py Init
-        """Suggest ZQ to quit Vi Py"""
-
-        self.send_vi_reply("Press ZQ to lose changes and quit Vi Py")  # ⌃C Egg
-        # Vim rings a Bell for each extra ⌃C
-
-        # Vim sends Bell here
-
     def do_c0_control_esc(self):  # Vim Esc
         """Cancel Digits Prefix, else suggest ZZ to quit Vi Py"""
 
-        runner = self.runner
-        arg1 = runner.arg1
-
+        arg1 = self.get_vi_arg1(default=None)
         if arg1 is not None:
             self.send_vi_reply("Escaped")  # 123 Esc Egg, etc
         else:
             self.send_vi_reply("Press ZZ to save changes and quit Vi Py")  # Esc Egg
             # Vim rings a Bell for each extra Esc
 
-    def do_reopen_vi(self):  # Vim Q v i Return  # not Ex Mode from last century
+    def do_continue_vi(self):  # Vim Q v i Return  # not Ex Mode from last century
         """Accept Q v i Return, without ringing the Terminal bell"""
 
         runner = self.runner
 
-        nudge = TerminalNudgeIn(chords=b"Qvi\x0D")  # CR, aka ⌃M, aka 13 \r
+        nudge = TerminalNudgeIn(chords=b"Qvi\r")
         message = "Would you like to play a game?"
 
         runner.reply = TerminalReplyOut(nudge=nudge, message=message)
@@ -423,22 +455,68 @@ class TerminalVi:
         if self.seeking_column is not None:
             self.continue_column_seek()
 
-    def do_quit_vi(self):  # Vim ZQ  # Emacs kill-emacs
-        """Lose last changes and quit"""
+    #
+    # Define keys for entering, pausing, and exiting TerminalVi
+    #
 
-        returncode = 1 if self.iobytearray else None
-        returncode = self.get_vi_arg1(default=returncode)
-
-        self.iobytearray[::] = b""
-
-        sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
-
-    def do_save_and_quit_vi(self):  # Vim ZZ  # Emacs save-buffers-kill-terminal
+    def do_flush_quit_vi(self):  # Vim ZZ  # Vim :wq!\r
         """Save last changes and quit"""
 
+        self.do_flush_vi()
+
         returncode = self.get_vi_arg1(default=None)
+        sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
+
+    def do_flush_vi(self):  # Vim :w!\r
+
+        runner = self.runner
+        iobytearray = runner.iobytearray
+        os.write(sys.stdout.fileno(), iobytearray)
+        sys.stdout.flush()
+
+    def do_help_quit_vi(self):  # Vim ⌃C  # Vi Py Init
+        """Suggest ZQ to quit Vi Py"""
+
+        self.send_vi_reply("Press ZQ to lose changes and quit Vi Py")  # ⌃C Egg
+        # Vim rings a Bell for each extra ⌃C
+
+    def do_might_flush_quit_vi(self):  # Vim :wq\r
+        """Halt if more files, else quit"""
+
+        self.do_might_flush_vi()
+        self.do_might_quit_vi()
+
+    def do_might_flush_vi(self):  # Vim :w\r
+
+        self.do_flush_vi()
+
+    def do_might_quit_vi(self):  # Vim :q\r
+        """Halt if more files, else quit"""
+
+        file_index = self.file_index
+        files = self.files
+
+        more_files = files[file_index:][1:]
+        if more_files:
+            raise IndexError("{} more files".format(len(more_files)))
+            # Vim raises this IndexError only once, til next ':w' write
+
+        self.do_quit_vi()
+
+    def do_quit_vi(self):  # Vim ZQ  # Vim :q!\r
+        """Lose last changes and quit"""
+
+        runner = self.runner
+        iobytearray = runner.iobytearray
+
+        returncode = 1 if iobytearray else None
+        returncode = self.get_vi_arg1(default=returncode)
 
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
+
+    #
+    # Define keys for entering Search Keys and leaping to the matching Span
+    #
 
     def do_find_ahead_vi_line(self):  # Vim /
         """Take a Search Key and look ahead for it"""
@@ -513,7 +591,7 @@ class TerminalVi:
 
         assert runner.finding_line != ""
 
-        self.replace_vi_spans()
+        runner.reopen_finding_spans()
 
         return True
 
@@ -551,7 +629,7 @@ class TerminalVi:
         runner = self.runner
 
         runner.finding_case = not runner.finding_case
-        self.replace_vi_spans()
+        runner.reopen_finding_spans()
 
         message = ":set noignorecase" if runner.finding_case else ":set ignorecase"
         self.send_vi_reply(message)  # \i Egg
@@ -572,7 +650,7 @@ class TerminalVi:
         runner = self.runner
 
         runner.finding_regex = not runner.finding_regex
-        self.replace_vi_spans()
+        runner.reopen_finding_spans()
 
         message = ":set regex" if runner.finding_regex else ":set noregex"
         self.send_vi_reply(message)  # \F Egg  # but Vim never gives you 'noregex'
@@ -1579,15 +1657,28 @@ class TerminalVi:
         bots_by_chords[b":"] = None
 
         bots_by_chords[b":n"] = None
+        bots_by_chords[b":n\r"] = (self.do_next_vi_file,)
+
         bots_by_chords[b":no"] = None
         bots_by_chords[b":noh"] = None
-        bots_by_chords[b":noh\x0D"] = (self.do_invhlsearch,)  # CR, aka ⌃M, aka 13 \r
+        bots_by_chords[b":noh\r"] = (self.do_invhlsearch,)
 
         bots_by_chords[b":q"] = None
-        bots_by_chords[b":q\x0D"] = (self.do_save_and_quit_vi,)
+        bots_by_chords[b":q\r"] = (self.do_might_quit_vi,)
 
         bots_by_chords[b":q!"] = None
-        bots_by_chords[b":q!\x0D"] = (self.do_quit_vi,)
+        bots_by_chords[b":q!\r"] = (self.do_quit_vi,)
+
+        bots_by_chords[b":w"] = None
+        bots_by_chords[b":w\r"] = (self.do_might_flush_vi,)
+
+        bots_by_chords[b":w!\r"] = (self.do_flush_vi,)
+
+        bots_by_chords[b":wq"] = None
+        bots_by_chords[b":wq\r"] = (self.do_might_flush_quit_vi,)
+
+        bots_by_chords[b":wq!"] = None
+        bots_by_chords[b":wq!\r"] = (self.do_flush_quit_vi,)
 
         bots_by_chords[b";"] = (self.do_slip_choice_redo,)
         # bots_by_chords[b"<"]  # TODO: dedent
@@ -1616,7 +1707,7 @@ class TerminalVi:
         bots_by_chords[b"Q"] = None
         bots_by_chords[b"Qv"] = None
         bots_by_chords[b"Qvi"] = None
-        bots_by_chords[b"Qvi\x0D"] = (self.do_reopen_vi,)  # CR, aka ⌃M, aka 13 \r
+        bots_by_chords[b"Qvi\r"] = (self.do_continue_vi,)
 
         # bots_by_chords[b"R"] = (self.do_open_overwrite,)
         # bots_by_chords[b"S"] = (self.do_slip_first_chop_open,)
@@ -1629,7 +1720,7 @@ class TerminalVi:
 
         bots_by_chords[b"Z"] = None
         bots_by_chords[b"ZQ"] = (self.do_quit_vi,)
-        bots_by_chords[b"ZZ"] = (self.do_save_and_quit_vi,)
+        bots_by_chords[b"ZZ"] = (self.do_flush_quit_vi,)
 
         # bots_by_chords[b"["]  # TODO
 
@@ -1756,7 +1847,9 @@ class TerminalEx:
     def do_append_char(self):
         """Append the Chords to the Input Line"""
 
-        chords = self.runner.arg0
+        runner = self.runner
+        chords = runner.get_arg0()
+
         chars = chords.decode(errors="surrogateescape")
 
         if chars == "£":  # TODO: less personal choice
@@ -1852,21 +1945,13 @@ class TerminalEx:
 class TerminalRunner:
     """Loop on Keyboard Chords, not whole Lines, but then do read-eval-print"""
 
-    def __init__(self, lines):
-
-        self.lines = lines  # view a copy of a File of Chars encoded as Bytes
-
-        self.traceback = None  # capture Python Tracebacks
+    def __init__(self):
 
         self.painter = None  # layer over a Terminal I/O Stack
         self.shadow = None
         self.driver = None
         self.stdio = None
 
-        self.row = 0  # point the Screen Cursor to a Row of File
-        self.column = 0  # point the Screen Cursor to a Column of File
-
-        self.top_row = 0  # scroll through more Lines than fit on Screen
         self.showing_line_number = None  # show Line Numbers or not
         self.injecting_lag = None  # inject extra Lag or not
 
@@ -1877,7 +1962,6 @@ class TerminalRunner:
         self.finding_regex = None  # search as Regex or search as Chars
         self.finding_slip = 0  # remember to Search again ahead or again behind
         self.finding_the_one = None  # highlight all spans on screen or no spans
-        self.finding_spans = list()  # cache the spans in file
 
         self.nudge = TerminalNudgeIn()  # split the Chords of one Keyboard Input
         self.arg0 = None  # take all the Chords as Chars in a Row
@@ -1889,6 +1973,25 @@ class TerminalRunner:
 
         self.doing_more = None  # take the Arg1 as a Count of Repetition's
         self.doing_done = None  # count the Repetition's completed before now
+
+    def reopen_iobytearray(self, iobytearray):
+        "Start editing Lines of Columns, given a File of Bytes" ""
+
+        self.iobytearray = iobytearray
+
+        chars = iobytearray.decode(errors="surrogateescape")
+        lines = chars.splitlines(keepends=True)
+        self.lines = lines  # view a copy of a File of Chars encoded as Bytes
+
+        self.traceback = None  # capture Python Tracebacks
+
+        self.row = 0  # point the Screen Cursor to a Row of File
+        self.column = 0  # point the Screen Cursor to a Column of File
+
+        self.top_row = 0  # scroll through more Lines than fit on Screen
+
+        self.finding_spans = list()  # cache the spans in file
+        self.reopen_finding_spans()
 
     def run_terminal(self, bots_by_chords):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
@@ -2206,6 +2309,14 @@ class TerminalRunner:
     # Take the Args as given, or substitute a Default Arg Value
     #
 
+    def get_arg0(self):
+        """Get the Bytes of the input Chords"""
+
+        arg0 = self.arg0
+        assert arg0 is not None
+
+        return arg0
+
     def get_arg1(self, default=1):
         """Get the Int of the Prefix Digits before the Chords, else the Default Int"""
 
@@ -2243,7 +2354,7 @@ class TerminalRunner:
         """Get the one Char at the Column in the Row beneath the Cursor"""
 
         row_line = self.lines[self.row]
-        row_text = row_line.splitlines()[0]  # "flat is better than nested"
+        row_text = row_line.splitlines()[0]
         chars = row_text[self.column :][:1]
 
         return chars  # 0 or 1 chars
@@ -2259,8 +2370,14 @@ class TerminalRunner:
     def count_columns_in_row(self):
         """Count Columns in Row beneath Cursor"""
 
-        row_line = self.lines[self.row]
-        row_text = row_line.splitlines()[0]  # "flat is better than nested"
+        lines = self.lines
+        row = self.row
+
+        if row >= len(lines):
+            raise IndexError(row)
+
+        row_line = lines[row]
+        row_text = row_line.splitlines()[0]
 
         columns = len(row_text)
 
@@ -2278,8 +2395,8 @@ class TerminalRunner:
 
         painter = self.painter
 
-        rows = len(self.lines)  # "flat is better than nested"
-        last_row = (rows - 1) if rows else 0  # "flat is better than nested"
+        rows = len(self.lines)
+        last_row = (rows - 1) if rows else 0
 
         bottom_row = self.top_row + (painter.scrolling_rows - 1)
         bottom_row = min(bottom_row, last_row)
@@ -2289,7 +2406,7 @@ class TerminalRunner:
     def find_last_row(self):
         """Find the last Row in File, else Row Zero when no Rows in File"""
 
-        rows = len(self.lines)  # "flat is better than nested"
+        rows = len(self.lines)
         last_row = (rows - 1) if rows else 0
 
         return last_row
@@ -2298,8 +2415,13 @@ class TerminalRunner:
         """Find the last Column in Row, else Column Zero when no Columns in Row"""
 
         chosen_row = self.row if (row is None) else row
-        row_line = self.lines[chosen_row]
-        row_text = row_line.splitlines()[0]  # "flat is better than nested"
+        lines = self.lines
+
+        if chosen_row >= len(lines):
+            raise IndexError(row)
+
+        row_line = lines[chosen_row]
+        row_text = row_line.splitlines()[0]
 
         columns = len(row_text)
         last_column = (columns - 1) if columns else 0
@@ -2325,7 +2447,7 @@ class TerminalRunner:
         column = self.column
 
         rows = self.count_rows_in_file()
-        columns = self.count_columns_in_row()
+        columns = 0 if (not rows) else self.count_columns_in_row()
 
         # Keep the choice of Row and Column non-negative and in File
 
@@ -2390,9 +2512,10 @@ class TerminalRunner:
     # Find Spans of Chars
     #
 
-    def replace_spans(self, iobytearray):
+    def reopen_finding_spans(self):
         """Find Chars in File"""
 
+        iobytearray = self.iobytearray
         finding_spans = self.finding_spans
 
         # Cancel the old Spans
@@ -2413,9 +2536,12 @@ class TerminalRunner:
                 flags |= re.IGNORECASE
 
             chars = iobytearray.decode(errors="surrogateescape")
-
             matches = list(re.finditer(pattern, string=chars, flags=flags))
             finding_spans[::] = TerminalSpan.find_spans(matches)
+
+            if matches:  # as many Spans as Matches, except for such as r"$" in "abc\n"
+                assert finding_spans
+                assert len(finding_spans) in (len(matches), len(matches) - 1)
 
     def find_ahead(self):
         """Find the Search Key ahead, else after start, else fail"""
@@ -2424,37 +2550,33 @@ class TerminalRunner:
         row = self.row
         column = self.column
 
-        if spans:
+        if not spans:
 
-            mark0 = (row, column)
-            mark1 = (-1, -1)  # before start
+            self.send_reply("No chars found: not ahead and not behind")
 
-            message_pattern = "Found {} chars ahead"
-            for mark in (mark0, mark1):
+        else:
+
+            here0 = (row, column)
+            here1 = (-1, -1)  # before start
+            heres = (here0, here1)
+
+            message0 = "Found {} chars ahead"
+            message1 = "Found {} chars, not ahead, found instead after start"
+            messages = (message0, message1)
+
+            for (here, message) in zip(heres, messages):
                 for span in spans:
+                    len_chars = span.beyond - span.column
+                    there = self.find_row_column_near_span(span)
 
-                    found_mark = (span.row, span.column)
-                    len_match = span.beyond - span.column
+                    if here < there:
+                        self.send_reply(message.format(len_chars))
 
-                    if mark < found_mark:
-                        self.send_reply(message_pattern.format(len_match))
+                        (self.row, self.column) = there
 
-                        (mark_row, mark_column) = found_mark
-                        mark_last_column = self.find_last_column(row=mark_row)
-                        mark_column = min(mark_last_column, mark_column)
+                        return
 
-                        if (mark_row, mark_column) != (row, column):  # if not r"$"
-
-                            self.row = mark_row
-                            self.column = mark_column
-
-                            return
-
-                message_pattern = "Found {} chars, not ahead, found instead after start"
-
-            assert False  # unreached
-
-        self.send_reply("No chars found: not ahead and not behind")
+            assert False, spans  # unreached
 
     def find_behind(self):
         """Find the Search Key behind, else above bottom, else fail"""
@@ -2463,35 +2585,49 @@ class TerminalRunner:
         row = self.row
         column = self.column
 
-        if spans:
+        if not spans:
 
-            mark0 = (row, column)
-            mark1 = (self.find_last_row() + 1, 0)  # after end
+            self.send_reply("No chars found: not behind and not ahead")
 
-            message_pattern = "Found {} chars behind"
-            for mark in (mark0, mark1):
+        else:
+
+            here0 = (row, column)
+            here1 = (self.find_last_row() + 1, 0)  # after end
+            heres = (here0, here1)
+
+            message0 = "Found {} chars behind"
+            message1 = "Found {} chars, not behind, found instead before end"
+            messages = (message0, message1)
+
+            for (here, message) in zip(heres, messages):
                 for span in reversed(spans):
+                    len_chars = span.beyond - span.column
+                    there = self.find_row_column_near_span(span)
 
-                    found_mark = (span.row, span.column)
-                    len_match = span.beyond - span.column
+                    if there < here:
+                        self.send_reply(message.format(len_chars))
 
-                    if found_mark < mark:
-                        self.send_reply(message_pattern.format(len_match))
-
-                        (mark_row, mark_column) = found_mark
-                        mark_last_column = self.find_last_column(row=mark_row)
-                        mark_column = min(mark_last_column, mark_column)
-
-                        self.row = mark_row
-                        self.column = mark_column
+                        (self.row, self.column) = there
 
                         return
 
-                message_pattern = "Found {} chars, not behind, found instead before end"
+            assert False, spans  # unreached
 
-            assert False  # unreached
+    def find_row_column_near_span(self, span):
+        """Find the Row:Column in File nearest to a Span"""
 
-        self.send_reply("No chars found: not behind and not ahead")
+        try:
+
+            there_row = span.row
+            there_last_column = self.find_last_column(row=there_row)
+            there_column = min(there_last_column, span.column)
+            there = (there_row, there_column)
+
+        except IndexError:
+
+            raise IndexError(span)
+
+        return there
 
 
 class TerminalPainter:
@@ -2761,7 +2897,7 @@ class TerminalPainter:
         if len_text > len(text):
 
             text_plus = text + " "
-            assert len_text == len(text_plus), (len_text, len(text_plus))
+            assert len_text == len(text_plus), (row, len_text, len(text_plus))
 
         # Succeed
 
@@ -2824,10 +2960,6 @@ class TerminalShadow:
 
         flushed_lines[::] = rows * [None]
 
-        if False:
-            with open("l.log", "a") as writing:
-                writing.write("-- no flushed lines --\n")
-
         # Clear the Caches below
 
         terminal.write(ED_2)
@@ -2877,10 +3009,6 @@ class TerminalShadow:
                     terminal.write(held_line.rstrip())
 
                 flushed_lines[row] = held_line
-
-                if True:
-                    with open("l.log", "a") as writing:
-                        writing.write("{}\n".format(row))
 
         held_lines[::] = list()
 
@@ -3322,43 +3450,48 @@ def exit_unless_doc_eq(parser):
 
     # Fetch the two docs
 
-    got_doc = module_doc.strip()
-
     with_columns = os.getenv("COLUMNS")
     os.environ["COLUMNS"] = str(89)  # Black promotes 89 columns per line
     try:
-        want_doc = parser.format_help()
+        parser_doc = parser.format_help()
     finally:
         if with_columns is None:
             os.environ.pop("COLUMNS")
         else:
             os.environ["COLUMNS"] = with_columns
 
-    # Ignore Line-Break's jittering across Python Versions
+    # Cut the worthless jitter we wish away
 
-    (alt_got, alt_want) = (got_doc, want_doc)
+    alt_module_doc = module_doc.strip()
+    alt_parser_doc = parser_doc
+
     if sys.version_info[:3] < (3, 9, 6):
-        alt_got = join_first_paragraph(got_doc)
-        alt_want = join_first_paragraph(want_doc)
 
-    # Count differences
+        alt_module_doc = join_first_paragraph(alt_module_doc)
+        alt_parser_doc = join_first_paragraph(alt_parser_doc)
 
-    got_file = module_file
-    got_file = os.path.split(got_file)[-1]
-    got_file = "./{} --help".format(got_file)
+        if "[FILE ...]" in module_doc:
+            alt_parser_doc = alt_parser_doc.replace("[FILE [FILE ...]]", "[FILE ...]")
+            # older Python needed this accomodation, such as Feb/2015 Python 3.4.3
 
-    want_file = "argparse.ArgumentParser(..."
+    # Count significant differences
+
+    alt_module_file = module_file
+    alt_module_file = os.path.split(alt_module_file)[-1]
+    alt_module_file = "./{} --help".format(alt_module_file)
+
+    alt_parser_file = "argparse.ArgumentParser(..."
 
     diff_lines = list(
         difflib.unified_diff(
-            a=alt_got.splitlines(),
-            b=alt_want.splitlines(),
-            fromfile=got_file,
-            tofile=want_file,
+            a=alt_module_doc.splitlines(),
+            b=alt_parser_doc.splitlines(),
+            fromfile=alt_module_file,
+            tofile=alt_parser_file,
         )
     )
 
-    # Exit if differences, but print them first
+    # Exit if significant differences, but print them first
 
     if diff_lines:
 
@@ -3366,6 +3499,14 @@ def exit_unless_doc_eq(parser):
         stderr_print("\n".join(lines))
 
         sys.exit(1)  # trust caller to log SystemExit exceptions well
+
+
+# deffed in many files  # missing from docs.python.org
+def file_print(*args):  # later Python 3 accepts ', **kwargs' here
+    """Save out the Str of an Object as a File"""
+
+    with open("f.file", "a") as printing:
+        print(*args, file=printing)
 
 
 # deffed in many files
@@ -3381,10 +3522,24 @@ def join_first_paragraph(doc):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
+    print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+
+
+# TODO: zt zb zz scrolling
+
+# TODO: hunt out the Fixme's
+
+# TODO: stop passing through Controls from the File
+# TODO: accept b"\t" as a form of b" "
+# TODO: solve /⌃V⌃IReturn
+# TODO: solve:  echo -n abc |vi -
+# TODO: show the first ~ past the end differently when No End for Last Line
+# TODO: revive the last Match of r"$" out there
+
+# TODO: ⌃D ⌃U scrolling
 
 
 if __name__ == "__main__":
