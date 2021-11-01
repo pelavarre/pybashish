@@ -14,8 +14,9 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 # vim  ⌃V  => literal input, such as ⌃I Tab
 # vim  Q :+1,+5 :vi  => line-editor/ screen-editor mode
 #
-# vim  :set hlsearch / :set nohlsearch
 # vim  :set number / :set nonumber
+# vim  :set hlsearch / :set nohlsearch
+# vim  / ⌃V ⌃I ⌃M  => show Tab's inside set :hlsearch
 #
 
 #
@@ -37,7 +38,7 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 #
 # vim  mm 'm '' `` `m  => mark, goto, bounce, bounce, bounce and mark
 # vim  qqq @q  => record, replay
-# vim  ⌃V o I X Y P  => rectangular: opposite, insert, delete, copy, paste
+# vim  ⌃V I X Y P  => vertical: insert, delete, copy, paste
 # vim  >x <x  => dent/dedent
 # vim  !x  => pipe bash, such as {}!G or 1G!G
 #

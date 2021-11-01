@@ -173,17 +173,26 @@ function a () {
 function c () { --exec-echo-xe pbcopy "$@"; }
 function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
 function h () { --exec-echo-xe head "$@"; }
-function hi () { local arg1=$1; shift; (--more-history; --history) | g $arg1$"@"; }
+function hi () { local arg1=$1; shift; (--more-history; --history) | g "$arg1$@"; }
 function l () { --exec-echo-xe less -FIXR "$@"; }
 function m () { --exec-echo-xe make "$@"; }
 function n () { --exec-echo-xe cat -tvn "$@" "|expand"; }
-function p () { --exec-echo-xe popd "$@"; }
+function p () { --exec-echo-xe popd >/dev/null && --dir-p-tac; }
 function s () { --exec-echo-xe sort "$@"; }
 function t () { --exec-echo-xe tail "$@"; }
 function u () { --exec-echo-xe uniq "$@" "|expand"; }
 function v () { --exec-echo-xe pbpaste "$@"; }
 function w () { --exec-echo-xe wc -l "$@"; }
 function x () { --exec-echo-xe hexdump -C"$@"; }
+
+function --dir-p-tac () {
+    if [[ "$(uname)" == "Darwin" ]]; then
+        dirs -p |tail -r
+    else
+        # dirs -p |tac  # Linux 'tac' needs free space at shared '/tmp/' dir
+        dirs -p |cat -n |sort -nr |cut -d$'\t' -f2-
+    fi
+}
 
 
 #
