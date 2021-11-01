@@ -37,7 +37,7 @@ vim '+$' ~/.vimrc  # + option to say what line to start on
 #
 # vim  mm 'm '' `` `m  => mark, goto, bounce, bounce, bounce and mark
 # vim  qqq @q  => record, replay
-# vim  ⌃V I X Y P  => vertical: insert, delete, copy, paste
+# vim  ⌃V o I X Y P  => rectangular: opposite, insert, delete, copy, paste
 # vim  >x <x  => dent/dedent
 # vim  !x  => pipe bash, such as {}!G or 1G!G
 #

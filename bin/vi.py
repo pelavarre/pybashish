@@ -2122,17 +2122,23 @@ class TerminalRunner:
         painter = self.painter
         top_row = self.top_row
 
+        # Keep the choice of Top Row on File
+
         if not (0 <= top_row < len(self.lines)):
             self.top_row = 0
 
+        # Scroll behind to get Cursor on Screen, if need be
+
         if row < self.top_row:
             self.top_row = row
+
+        # Scroll ahead to get Cursor on Screen, if need be
 
         bottom_row = self.find_bottom_row()
         if row > bottom_row:
             self.top_row = row - (painter.scrolling_rows - 1)
 
-        # After fixing it, assert we never got it wrong
+        # After fixing the choice, assert the Top Row always was on File
 
         if not (0 <= top_row < len(self.lines)):
             raise KwArgsException(before=top_row, after=self.top_row)
@@ -2510,7 +2516,7 @@ class TerminalRunner:
         rows = self.count_rows_in_file()
         columns = 0 if (not rows) else self.count_columns_in_row()
 
-        # Keep the choice of Row and Column non-negative and in File
+        # Keep the choice of Row and Column on File
 
         before = (row, column)
 
@@ -2522,7 +2528,7 @@ class TerminalRunner:
         self.row = row
         self.column = column
 
-        # After fixing it, assert we never got it wrong
+        # After fixing the choice, assert the Row and Column always were on File
 
         after = (row, column)
         if before != after:
@@ -3604,6 +3610,18 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # TODO: show the first ~ past the end differently when No End for Last Line
 # TODO: revive the last Match of r"$" out there
 
+# TODO: * #£ for / ? \b...\b of line's next r"[A-Za-z0-9_]", else next r"[^ ]", else no
+# TODO: VI_SYMBOLIC = set(string.ascii_letters + string.digits + "_")  # r"[A-Za-z0-9_]"
+
+# TODO: :g/patternReturn  => preview lines found
+
+# TODO: ⌃I ⌃O walk the Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
+# TODO: despite Doc, to match Vim, include in the Jump List the * # forms of / ?
+
+# TODO: ⌃V o  => rectangular: opposite
+
+# TODO: mm '' `` marks
+# TODO: qqq @q  => record, replay
 # TODO: ⌃D ⌃U scrolling
 
 
