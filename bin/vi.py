@@ -24,7 +24,7 @@ keyboard tests:
   ⌃F ⌃B ⌃E ⌃Y zb zt zz  => scroll rows
   ⌃L ⌃G  => toggle lag and say if lag is toggled
   \n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
-  /... Delete ⌃U ⌃C Return  ?...  n  N  => enter a search key, find later/ earlier
+  /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
   Esc ⌃C Qvi⌃M 123Esc 123⌃C 3ZQ f⌃C 9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N  => eggs
   \F/$Return  => more eggs
 
@@ -153,6 +153,10 @@ def parse_vi_argv(argv):
 #
 # Edit some Scrolling Rows, backed by Lines of a File of Chars encoded as Bytes
 #
+
+
+VI_BLANK_SET = set(" \t")
+VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # aka r"[A-Za-z0-9_]"
 
 
 class TerminalVi:
@@ -300,7 +304,7 @@ class TerminalVi:
     # Define keys for pausing TerminalVi
     #
 
-    def do_raise_vi_name_error(self):  # such as Esc, such as 'ZB'
+    def do_raise_vi_name_error(self):  # such as Esc, such as ZB
         """Reply to meaningless Keyboard Input"""
 
         self.runner.raise_chords_as_name_error()
@@ -398,49 +402,138 @@ class TerminalVi:
     # Define keys for entering Search Keys and leaping to the matching Span
     #
 
+    def do_find_ahead_this(self):  # Vim *
+        """Take a Search Key from this Line, and then look ahead for it"""
+
+        runner = self.runner
+
+        if self.get_find_vi_this(slip=+1) is None:
+            self.send_vi_reply("Press * and # only when Not on a blank line")
+        else:
+            runner.highlighting_matches = True
+            if runner.find_ahead():
+
+                runner.continue_do_loop()
+
+    def do_find_behind_this(self):  # Vim #
+        """Take a Search Key from this Line, and then look behind for it"""
+
+        runner = self.runner
+
+        if self.get_find_vi_this(slip=-1) is None:
+            self.send_vi_reply("Press # and * only when Not on a blank line")
+        else:
+            runner.highlighting_matches = True
+            if runner.find_behind():
+
+                runner.continue_do_loop()
+
     def do_find_ahead_vi_line(self):  # Vim /
-        """Take a Search Key and look ahead for it"""
+        """Take a Search Key as input, and then look ahead for it"""
 
         runner = self.runner
 
         if self.read_find_vi_line(slip=+1):
-            runner.finding_the_one = False
-            runner.find_ahead()  # TODO: add scroll ahead when far  # <= zb H 23Up n
+            runner.highlighting_matches = True
+            if runner.find_ahead():  # TODO: scroll ahead when far  # <= zb H 23Up n
+
+                runner.continue_do_loop()
 
     def do_find_behind_vi_line(self):  # Vim ?
-        """Take a Search Key and look behind for it"""
+        """Take a Search Key as input, and then look behind for it"""
 
         runner = self.runner
 
         if self.read_find_vi_line(slip=-1):
-            runner.finding_the_one = False
-            runner.find_behind()  # TODO: add scroll behind when far  # <= zt L 23Down N
+            runner.highlighting_matches = True
+            if runner.find_behind():  # TODO: scroll behind when far  # <= zt L 23Down N
+
+                runner.continue_do_loop()
 
     def do_find_earlier(self):  # Vim N
+        """Leap to earlier Search Key Match"""
 
         runner = self.runner
 
         if runner.finding_line is None:
             self.send_vi_reply("Press ? to enter a Search Key")
         elif runner.finding_slip >= 0:
-            runner.finding_the_one = False
-            runner.find_behind()
+            runner.highlighting_matches = True
+            if runner.find_behind():
+
+                runner.continue_do_loop()
         else:
-            runner.finding_the_one = False
-            runner.find_ahead()
+            runner.highlighting_matches = True
+            if runner.find_ahead():
+
+                runner.continue_do_loop()
 
     def do_find_later(self):  # Vim n
+        """Leap to later Search Key Match"""
 
         runner = self.runner
 
         if runner.finding_line is None:
             self.send_vi_reply("Press / to enter a Search Key")
         elif runner.finding_slip >= 0:
-            runner.finding_the_one = False
-            runner.find_ahead()
+            runner.highlighting_matches = True
+            if runner.find_ahead():
+
+                runner.continue_do_loop()
         else:
-            runner.finding_the_one = False
-            runner.find_behind()
+            runner.highlighting_matches = True
+            if runner.find_behind():
+
+                runner.continue_do_loop()
+
+    def get_find_vi_this(self, slip):
+        """Take a Search Key from this Line and return Truthy, else don't"""
+
+        runner = self.runner
+
+        search_key = self.get_vi_this()
+        if search_key is not None:
+
+            runner.finding_line = search_key
+            runner.finding_slip = slip
+
+            assert runner.finding_line != ""
+            runner.reopen_finding_spans()
+
+            return search_key
+
+    def get_vi_this(self):
+        """Take a Symbolic word, else a Non-Blank word, from the rest of this Line"""
+
+        runner = self.runner
+
+        column = runner.column
+        columns = runner.count_columns_in_row()
+
+        def is_vi_symbolic(ch):
+            return ch in VI_SYMBOLIC_SET
+
+        def is_not_vi_blank(ch):
+            return ch not in VI_BLANK_SET
+
+        search_key = None
+
+        for func in (is_vi_symbolic, is_not_vi_blank):
+            for start in range(column, columns):
+                ch = runner.get_column_char(column=start)
+                if func(ch):
+
+                    search_key = ""
+
+                    for stepper in range(start, columns):
+                        ch = runner.get_column_char(column=stepper)
+                        if func(ch):
+                            search_key += ch
+                        else:
+
+                            break
+
+                    return search_key
 
     def read_find_vi_line(self, slip):
         """Take a Search Key"""
@@ -470,7 +563,6 @@ class TerminalVi:
                 return
 
         assert runner.finding_line != ""
-
         runner.reopen_finding_spans()
 
         return True
@@ -488,7 +580,7 @@ class TerminalVi:
 
     #
     # Flip switches
-    # TODO: somehow soon stop commandeering the personal \ Chord Sequences
+    # TODO: somehow soon stop commandeering the personal \ or Q Chord Sequences
     #
 
     def do_invhlsearch(self):  # Vi Py \Esc
@@ -496,8 +588,8 @@ class TerminalVi:
 
         runner = self.runner
 
-        runner.finding_the_one = not runner.finding_the_one
-        message = ":nohlsearch" if runner.finding_the_one else ":set hlsearch"
+        runner.highlighting_matches = not runner.highlighting_matches
+        message = ":set hlsearch" if runner.highlighting_matches else ":nohlsearch"
         self.send_vi_reply(message)  # \Esc Egg
 
         # Vim lacks ':invhlsearch' and lacks ':hlsearch'
@@ -1105,8 +1197,9 @@ class TerminalVi:
         runner = self.runner
 
         charsets = list()
-        charsets.append(set(" \t"))
+        charsets.append(VI_BLANK_SET)
         self.word_end_ahead(charsets)
+
         runner.continue_do_loop()
 
     def do_lil_word_end_ahead(self):  # Vim e
@@ -1114,10 +1207,11 @@ class TerminalVi:
         runner = self.runner
 
         charsets = list()
-        charsets.append(set(" \t"))
-        charsets.append(set(string.ascii_letters + string.digits + "_"))
+        charsets.append(VI_BLANK_SET)
+        charsets.append(VI_SYMBOLIC_SET)
 
         self.word_end_ahead(charsets)
+
         runner.continue_do_loop()
 
     def word_end_ahead(self, charsets):
@@ -1156,8 +1250,9 @@ class TerminalVi:
         runner = self.runner
 
         charsets = list()
-        charsets.append(set(" \t"))
+        charsets.append(VI_BLANK_SET)
         self.word_start_ahead(charsets)
+
         runner.continue_do_loop()
 
     def do_lil_word_start_ahead(self):  # Vim w
@@ -1165,9 +1260,10 @@ class TerminalVi:
         runner = self.runner
 
         charsets = list()
-        charsets.append(set(" \t"))
-        charsets.append(set(string.ascii_letters + string.digits + "_"))
+        charsets.append(VI_BLANK_SET)
+        charsets.append(VI_SYMBOLIC_SET)
         self.word_start_ahead(charsets)
+
         runner.continue_do_loop()
 
     def word_start_ahead(self, charsets):
@@ -1202,8 +1298,9 @@ class TerminalVi:
         runner = self.runner
 
         charsets = list()
-        charsets.append(set(" \t"))
+        charsets.append(VI_BLANK_SET)
         self.word_start_behind(charsets)
+
         runner.continue_do_loop()
 
         # TODO: add option for 'b e w' and 'B E W' to swap places
@@ -1213,9 +1310,10 @@ class TerminalVi:
         runner = self.runner
 
         charsets = list()
-        charsets.append(set(" \t"))
-        charsets.append(set(string.ascii_letters + string.digits + "_"))
+        charsets.append(VI_BLANK_SET)
+        charsets.append(VI_SYMBOLIC_SET)
         self.word_start_behind(charsets)
+
         runner.continue_do_loop()
 
     def word_start_behind(self, charsets):
@@ -1562,14 +1660,14 @@ class TerminalVi:
         bots_by_chords[b" "] = (self.do_slip_ahead,)
         # bots_by_chords[b"!"] = (self.do_pipe,)
         # bots_by_chords[b'"'] = (self.do_arg,)
-        # bots_by_chords[b'#'] = (self.do_lil_word_find_behind,)
+        bots_by_chords[b"#"] = (self.do_find_behind_this,)
         bots_by_chords[b"$"] = (self.do_slip_last_seek,)
         # bots_by_chords[b"%"]  # TODO: leap to match
         # bots_by_chords[b"&"]  # TODO: & and && for repeating substitution
         # bots_by_chords[b"'"]  # TODO: leap to pin
         # bots_by_chords[b"("]  # TODO: sentence behind
         # bots_by_chords[b")"]  # TODO: sentence ahead
-        # bots_by_chords[b'*'] = (self.do_lil_word_find_ahead,)
+        bots_by_chords[b"*"] = (self.do_find_ahead_this,)
         bots_by_chords[b"+"] = (self.do_step_down_dent,)
         bots_by_chords[b","] = (self.do_slip_choice_undo,)
         bots_by_chords[b"-"] = (self.do_step_up_dent,)
@@ -1696,6 +1794,8 @@ class TerminalVi:
         # bots_by_chords[b"~"] = (self.do_flip_case_overwrite,)
 
         bots_by_chords[b"\x7F"] = (self.do_slip_behind,)  # DEL, aka ⌃?, aka 127
+
+        bots_by_chords["£".encode()] = (self.do_find_behind_this,)  # \u00A3 Pound Sign
 
         return bots_by_chords
 
@@ -2013,7 +2113,7 @@ class TerminalRunner:
         self.finding_line = None  # remember the Search Key
         self.finding_regex = None  # search as Regex or search as Chars
         self.finding_slip = 0  # remember to Search again ahead or again behind
-        self.finding_the_one = None  # highlight all spans on screen or no spans
+        self.highlighting_matches = None  # highlight all spans on screen or no spans
 
         self.nudge = TerminalNudgeIn()  # split the Chords of one Keyboard Input
         self.arg0 = None  # take all the Chords as Chars in a Row
@@ -2187,7 +2287,7 @@ class TerminalRunner:
     def find_spans_on_screen(self):
         """Mark some Chars on Screen as more equal than others"""
 
-        if self.finding_the_one:
+        if not self.highlighting_matches:
 
             return list()
 
@@ -2417,12 +2517,14 @@ class TerminalRunner:
 
         return -1
 
-    def get_column_char(self):
+    def get_column_char(self, column=None):
         """Get the one Char at the Column in the Row beneath the Cursor"""
+
+        chosen_column = self.column if (column is None) else column
 
         row_line = self.lines[self.row]
         row_text = row_line.splitlines()[0]
-        chars = row_text[self.column :][:1]
+        chars = row_text[chosen_column:][:1]
 
         return chars  # 0 or 1 chars
 
@@ -2621,6 +2723,8 @@ class TerminalRunner:
 
             self.send_reply("No chars found: not ahead and not behind")
 
+            return False
+
         else:
 
             here0 = (row, column)
@@ -2641,7 +2745,7 @@ class TerminalRunner:
 
                         (self.row, self.column) = there
 
-                        return
+                        return True
 
             assert False, spans  # unreached
 
@@ -2655,6 +2759,8 @@ class TerminalRunner:
         if not spans:
 
             self.send_reply("No chars found: not behind and not ahead")
+
+            return False
 
         else:
 
@@ -2676,7 +2782,7 @@ class TerminalRunner:
 
                         (self.row, self.column) = there
 
-                        return
+                        return True
 
             assert False, spans  # unreached
 
@@ -3603,6 +3709,15 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # TODO: hunt out the Fixme's
 
+# TODO: :g/patternReturn  => preview lines found
+
+# TODO: ⌃I ⌃O walk the Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
+# TODO: despite Doc, to match Vim, include in the Jump List the * # forms of / ?
+
+# TODO: mm '' `` marks
+# TODO: qqq @q  => record, replay
+# TODO: ⌃D ⌃U scrolling
+
 # TODO: QR to draw with a Logo Turtle till QR,
 # TODO: infinite Spaces per Row, rstrip at exit, moving relative not absolute
 # TODO: 1234567890 Up Down Left Right, initially headed Up with |
@@ -3616,19 +3731,7 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # TODO: show the first ~ past the end differently when No End for Last Line
 # TODO: revive the last Match of r"$" out there
 
-# TODO: * #£ for / ? \b...\b of line's next r"[A-Za-z0-9_]", else next r"[^ ]", else no
-# TODO: VI_SYMBOLIC = set(string.ascii_letters + string.digits + "_")  # r"[A-Za-z0-9_]"
-
-# TODO: :g/patternReturn  => preview lines found
-
-# TODO: ⌃I ⌃O walk the Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
-# TODO: despite Doc, to match Vim, include in the Jump List the * # forms of / ?
-
 # TODO: ⌃V o  => rectangular: opposite
-
-# TODO: mm '' `` marks
-# TODO: qqq @q  => record, replay
-# TODO: ⌃D ⌃U scrolling
 
 
 if __name__ == "__main__":
