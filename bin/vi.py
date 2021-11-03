@@ -25,6 +25,7 @@ keyboard tests:
   ⌃L ⌃G  => toggle lag and say if lag is toggled
   \n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
   /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
+  :g/... Delete ⌃U ⌃C Return  => enter a search key and print every line found
   Esc ⌃C Qvi⌃M 123Esc 123⌃C 3ZQ f⌃C 9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N  => eggs
   \F/$Return  => more eggs
 
@@ -259,7 +260,7 @@ class TerminalVi:
 
         # Start editing Lines of Columns, given a File of Bytes
 
-        runner.reopen_iobytearray(iobytearray)
+        runner._reinit_iobytearray_etc_(iobytearray)
 
     #
     # Layer thinly over TerminalRunner
@@ -407,48 +408,126 @@ class TerminalVi:
 
         runner = self.runner
 
-        if self.get_find_vi_this(slip=+1) is None:
-            self.send_vi_reply("Press * and # only when Not on a blank line")
-        else:
-            runner.highlighting_matches = True
-            if runner.find_ahead():
+        if not runner.doing_done:
+            if self.get_find_vi_this(slip=+1) is not None:
+                runner.finding_highlights = True
+            else:
+                self.send_vi_reply("Press * and # only when Not on a blank line")
 
-                runner.continue_do_loop()
+                return
+
+        if runner.find_ahead_and_reply():
+
+            runner.continue_do_loop()
 
     def do_find_behind_this(self):  # Vim #
         """Take a Search Key from this Line, and then look behind for it"""
 
         runner = self.runner
 
-        if self.get_find_vi_this(slip=-1) is None:
-            self.send_vi_reply("Press # and * only when Not on a blank line")
-        else:
-            runner.highlighting_matches = True
-            if runner.find_behind():
+        if not runner.doing_done:
+            if self.get_find_vi_this(slip=-1) is not None:
+                runner.finding_highlights = True
+            else:
+                self.send_vi_reply("Press # and * only when Not on a blank line")
 
-                runner.continue_do_loop()
+                return
+
+        if runner.find_behind_and_reply():
+
+            runner.continue_do_loop()
 
     def do_find_ahead_vi_line(self):  # Vim /
         """Take a Search Key as input, and then look ahead for it"""
 
         runner = self.runner
 
-        if self.read_find_vi_line(slip=+1):
-            runner.highlighting_matches = True
-            if runner.find_ahead():  # TODO: scroll ahead when far  # <= zb H 23Up n
+        #
 
-                runner.continue_do_loop()
+        if not runner.doing_done:
+            if self.read_find_vi_line(slip=+1) is None:
+
+                return
+
+            runner.finding_highlights = True
+
+        #
+
+        if runner.find_ahead_and_reply():  # TODO: extra far scroll <= zb H 23Up n
+
+            runner.continue_do_loop()
+
+    def do_find_all_vi_line(self):  # Vim :g/
+        """Across all the File, print each Line containing 1 or More Matches"""
+
+        # FIXME: start Screen with count of Lines lost, when some scrolled into the Void
+        # TODO: highlight Matches in :g/ Lines
+        # TODO: Vim :4g/ means search only line 4, not pick +-Nth match
+
+        runner = self.runner
+        painter = runner.painter
+        terminal = painter
+
+        last_line_number = 1 + len(runner.lines)
+        str_last_line_number = "{:3} ".format(last_line_number)
+        last_width = len(str_last_line_number)
+
+        #
+
+        if self.read_find_vi_line(slip=+1) is None:
+
+            return
+
+        #
+
+        (found_row, found_column) = (runner.row, runner.column)
+
+        if runner.find_ahead_and_reply():
+            runner.finding_highlights = True
+
+            runner.print_text("")
+
+            printed_row = None
+            for span in runner.iobytespans:
+
+                (found_row, found_column, _) = span
+
+                line_number = 1 + found_row
+                str_line_number = ""  # TODO: merge with 'format_as_line_number'
+                if runner.showing_line_number:
+                    str_line_number = "{:3} ".format(line_number).rjust(last_width)
+
+                text = runner.fetch_row_text(row=found_row)
+
+                if found_row != printed_row:
+                    runner.print_text(str_line_number + text)
+
+            runner.print_text("Press Return to continue . . .")
+            _ = terminal.getch()
+
+            terminal._reopen_terminal_()
+
+        (runner.row, runner.column) = (found_row, found_column)
 
     def do_find_behind_vi_line(self):  # Vim ?
         """Take a Search Key as input, and then look behind for it"""
 
         runner = self.runner
 
-        if self.read_find_vi_line(slip=-1):
-            runner.highlighting_matches = True
-            if runner.find_behind():  # TODO: scroll behind when far  # <= zt L 23Down N
+        #
 
-                runner.continue_do_loop()
+        if not runner.doing_done:
+            if self.read_find_vi_line(slip=-1) is None:
+
+                return
+
+            runner.finding_highlights = True
+
+        #
+
+        if runner.find_behind_and_reply():  # TODO: extra far scroll # <= zt L 23Down N
+
+            runner.continue_do_loop()
 
     def do_find_earlier(self):  # Vim N
         """Leap to earlier Search Key Match"""
@@ -458,13 +537,13 @@ class TerminalVi:
         if runner.finding_line is None:
             self.send_vi_reply("Press ? to enter a Search Key")
         elif runner.finding_slip >= 0:
-            runner.highlighting_matches = True
-            if runner.find_behind():
+            runner.finding_highlights = True
+            if runner.find_behind_and_reply():
 
                 runner.continue_do_loop()
         else:
-            runner.highlighting_matches = True
-            if runner.find_ahead():
+            runner.finding_highlights = True
+            if runner.find_ahead_and_reply():
 
                 runner.continue_do_loop()
 
@@ -476,13 +555,13 @@ class TerminalVi:
         if runner.finding_line is None:
             self.send_vi_reply("Press / to enter a Search Key")
         elif runner.finding_slip >= 0:
-            runner.highlighting_matches = True
-            if runner.find_ahead():
+            runner.finding_highlights = True
+            if runner.find_ahead_and_reply():
 
                 runner.continue_do_loop()
         else:
-            runner.highlighting_matches = True
-            if runner.find_behind():
+            runner.finding_highlights = True
+            if runner.find_behind_and_reply():
 
                 runner.continue_do_loop()
 
@@ -498,7 +577,7 @@ class TerminalVi:
             runner.finding_slip = slip
 
             assert runner.finding_line != ""
-            runner.reopen_finding_spans()
+            runner.reopen_iobytespans()
 
             return search_key
 
@@ -520,13 +599,13 @@ class TerminalVi:
 
         for func in (is_vi_symbolic, is_not_vi_blank):
             for start in range(column, columns):
-                ch = runner.get_column_char(column=start)
+                ch = runner.fetch_column_char(column=start)
                 if func(ch):
 
                     search_key = ""
 
                     for stepper in range(start, columns):
-                        ch = runner.get_column_char(column=stepper)
+                        ch = runner.fetch_column_char(column=stepper)
                         if func(ch):
                             search_key += ch
                         else:
@@ -563,7 +642,7 @@ class TerminalVi:
                 return
 
         assert runner.finding_line != ""
-        runner.reopen_finding_spans()
+        runner.reopen_iobytespans()
 
         return True
 
@@ -588,8 +667,8 @@ class TerminalVi:
 
         runner = self.runner
 
-        runner.highlighting_matches = not runner.highlighting_matches
-        message = ":set hlsearch" if runner.highlighting_matches else ":nohlsearch"
+        runner.finding_highlights = not runner.finding_highlights
+        message = ":set hlsearch" if runner.finding_highlights else ":nohlsearch"
         self.send_vi_reply(message)  # \Esc Egg
 
         # Vim lacks ':invhlsearch' and lacks ':hlsearch'
@@ -601,7 +680,7 @@ class TerminalVi:
         runner = self.runner
 
         runner.finding_case = not runner.finding_case
-        runner.reopen_finding_spans()
+        runner.reopen_iobytespans()
 
         message = ":set noignorecase" if runner.finding_case else ":set ignorecase"
         self.send_vi_reply(message)  # \i Egg
@@ -622,7 +701,7 @@ class TerminalVi:
         runner = self.runner
 
         runner.finding_regex = not runner.finding_regex
-        runner.reopen_finding_spans()
+        runner.reopen_iobytespans()
 
         message = ":set regex" if runner.finding_regex else ":set noregex"
         self.send_vi_reply(message)  # \F Egg  # but Vim never gives you 'noregex'
@@ -636,7 +715,7 @@ class TerminalVi:
 
         runner = self.runner
 
-        last_column = runner.find_last_column()
+        last_column = runner.spot_last_column()
         column = min(last_column, self.get_vi_arg1() - 1)
 
         runner.column = column
@@ -655,7 +734,7 @@ class TerminalVi:
 
         runner = self.runner
 
-        text = runner.get_row_text()
+        text = runner.fetch_row_text()
         lstripped = text.lstrip()
         column = len(text) - len(lstripped)
 
@@ -685,7 +764,7 @@ class TerminalVi:
 
         runner = self.runner
 
-        last_column = runner.find_last_column()
+        last_column = runner.spot_last_column()
         self.check_index(runner.column < last_column)
 
         right = min(last_column - runner.column, self.get_vi_arg1())
@@ -699,8 +778,8 @@ class TerminalVi:
         """Slip right, then down"""
 
         runner = self.runner
-        last_column = runner.find_last_column()
-        last_row = runner.find_last_row()
+        last_column = runner.spot_last_column()
+        last_row = runner.spot_last_row()
 
         if not runner.doing_done:
             self.check_index((runner.column < last_column) or (runner.row < last_row))
@@ -719,8 +798,8 @@ class TerminalVi:
     def slip_ahead(self):
 
         runner = self.runner
-        last_column = runner.find_last_column()
-        last_row = runner.find_last_row()
+        last_column = runner.spot_last_column()
+        last_row = runner.spot_last_row()
 
         if runner.column < last_column:
             runner.column += 1
@@ -748,7 +827,7 @@ class TerminalVi:
 
         elif runner.row:
             runner.row -= 1
-            row_last_column = runner.find_last_column(row=runner.row)
+            row_last_column = runner.spot_last_column(row=runner.row)
             runner.column = row_last_column
 
             runner.continue_do_loop()
@@ -767,7 +846,7 @@ class TerminalVi:
 
         elif runner.row:
             runner.row -= 1
-            row_last_column = runner.find_last_column(row=runner.row)
+            row_last_column = runner.spot_last_column(row=runner.row)
             runner.column = row_last_column
 
             return -1
@@ -780,7 +859,7 @@ class TerminalVi:
         """Leap to last Row, else to a chosen Row"""
 
         runner = self.runner
-        last_row = runner.find_last_row()
+        last_row = runner.spot_last_row()
 
         row = min(last_row, self.get_vi_arg1() - 1)
         row = last_row if (runner.arg1 is None) else row
@@ -798,7 +877,7 @@ class TerminalVi:
         """Step down one Row or more"""
 
         runner = self.runner
-        last_row = runner.find_last_row()
+        last_row = runner.spot_last_row()
 
         self.check_index(runner.row < last_row)
         down = min(last_row - runner.row, self.get_vi_arg1())
@@ -823,7 +902,7 @@ class TerminalVi:
         """Leap to first Word of Bottom Row on Screen"""
 
         runner = self.runner
-        runner.row = runner.find_bottom_row()
+        runner.row = runner.spot_bottom_row()
         self.slip_dent()
 
     def do_step_max_high(self):  # Vim H
@@ -837,7 +916,7 @@ class TerminalVi:
         """Leap to first Word of Middle Row on Screen"""
 
         runner = self.runner
-        runner.row = runner.find_middle_row()
+        runner.row = runner.spot_middle_row()
         self.slip_dent()
 
     def do_step_up_dent(self):  # Vim -
@@ -866,7 +945,7 @@ class TerminalVi:
 
         self.seeking_column = True
         self.step_down_minus()
-        row_last_column = runner.find_last_column(row=runner.row)
+        row_last_column = runner.spot_last_column(row=runner.row)
         runner.column = row_last_column
 
         self.continue_column_seek()
@@ -901,7 +980,7 @@ class TerminalVi:
         """Begin seeking a Column, if not begun already"""
 
         runner = self.runner
-        last_column = runner.find_last_column()
+        last_column = runner.spot_last_column()
 
         if self.seeking_column is True:
             sought_column = last_column
@@ -946,8 +1025,8 @@ class TerminalVi:
         assert painter.scrolling_rows >= 2
         rows_per_screen = painter.scrolling_rows - 2
 
-        bottom_row = runner.find_bottom_row()
-        last_row = runner.find_last_row()
+        bottom_row = runner.spot_bottom_row()
+        last_row = runner.spot_last_row()
 
         # Quit at last Row
 
@@ -994,7 +1073,7 @@ class TerminalVi:
         runner = self.runner
         painter = runner.painter
 
-        last_row = runner.find_last_row()
+        last_row = runner.spot_last_row()
 
         # Quit at top Row
 
@@ -1024,7 +1103,7 @@ class TerminalVi:
 
         # Choose new Row and Column
 
-        bottom_row = runner.find_bottom_row()
+        bottom_row = runner.spot_bottom_row()
         if row > bottom_row:
             runner.row = bottom_row
 
@@ -1045,7 +1124,7 @@ class TerminalVi:
         top_row = runner.top_row
 
         runner = self.runner
-        last_row = runner.find_last_row()
+        last_row = runner.spot_last_row()
 
         # Quit at last Row
 
@@ -1092,7 +1171,7 @@ class TerminalVi:
             top_row -= 1
 
             runner.top_row = top_row  # TODO: ugly mutate
-            bottom_row = runner.find_bottom_row()
+            bottom_row = runner.spot_bottom_row()
 
             if row > bottom_row:
                 row = bottom_row
@@ -1156,18 +1235,18 @@ class TerminalVi:
         """Step down over Empty Lines, then over Non-Empty Lines"""
 
         runner = self.runner
-        last_row = runner.find_last_row()
+        last_row = runner.spot_last_row()
 
         if runner.doing_done:
-            if (runner.row, runner.column) == (last_row, runner.find_last_column()):
+            if (runner.row, runner.column) == (last_row, runner.spot_last_column()):
                 raise IndexError()
 
-        while (runner.row < last_row) and not runner.find_last_column(row=runner.row):
+        while (runner.row < last_row) and not runner.spot_last_column(row=runner.row):
             runner.row += 1
-        while (runner.row < last_row) and runner.find_last_column(row=runner.row):
+        while (runner.row < last_row) and runner.spot_last_column(row=runner.row):
             runner.row += 1
 
-        runner.column = runner.find_last_column(row=runner.row)
+        runner.column = runner.spot_last_column(row=runner.row)
 
         runner.continue_do_loop()
 
@@ -1179,9 +1258,9 @@ class TerminalVi:
             if (runner.row, runner.column) == (0, 0):
                 raise IndexError()
 
-        while runner.row and not runner.find_last_column(row=runner.row):
+        while runner.row and not runner.spot_last_column(row=runner.row):
             runner.row -= 1
-        while runner.row and runner.find_last_column(row=runner.row):
+        while runner.row and runner.spot_last_column(row=runner.row):
             runner.row -= 1
 
         runner.column = 0
@@ -1189,10 +1268,11 @@ class TerminalVi:
         runner.continue_do_loop()
 
     #
-    # Step across Chars of CharSets
+    # Between blanks, step across "Big" Words, and "Lil" Words of Symbolic/Not Chars
     #
 
     def do_big_word_end_ahead(self):  # Vim E
+        """Slip ahead to last Char of this else next Big Word"""
 
         runner = self.runner
 
@@ -1203,6 +1283,7 @@ class TerminalVi:
         runner.continue_do_loop()
 
     def do_lil_word_end_ahead(self):  # Vim e
+        """Slip ahead to last Char of this else next Lil Word"""
 
         runner = self.runner
 
@@ -1215,37 +1296,35 @@ class TerminalVi:
         runner.continue_do_loop()
 
     def word_end_ahead(self, charsets):
+        """Slip ahead to last Char of this else next Word"""
 
         runner = self.runner
 
+        # Slip ahead at least once (unless at end of File)
+
         self.slip_ahead()
 
-        while not runner.find_column_in_charsets(charsets):
+        # Slip ahead across the leading Charset
+
+        while not runner.charsets_find_column(charsets):
             if not self.slip_ahead():
 
                 break
 
-        here = runner.find_column_in_charsets(charsets)
+        # Slip ahead across other Charset's, except stop at End of Line
+
+        here = runner.charsets_find_column(charsets)
         if here:
-
-            beyond = None
-            while runner.find_column_in_charsets(charsets) == here:
-                row_last_column = runner.find_last_column(row=runner.row)
-                on_last_column = runner.column == row_last_column
-                if not self.slip_ahead():
-                    beyond = False
+            while runner.charsets_find_column(charsets) == here:
+                row_last_column = runner.spot_last_column(row=runner.row)
+                if runner.column == row_last_column:
 
                     break
 
-                beyond = True
-                if on_last_column:
-
-                    break
-
-            if beyond:
-                self.slip_behind()
+                self.slip_ahead()
 
     def do_big_word_start_ahead(self):  # Vim W
+        """Slip ahead to first Char of next Big Word"""
 
         runner = self.runner
 
@@ -1256,6 +1335,7 @@ class TerminalVi:
         runner.continue_do_loop()
 
     def do_lil_word_start_ahead(self):  # Vim w
+        """Slip ahead to first Char of next Lil Word"""
 
         runner = self.runner
 
@@ -1267,33 +1347,38 @@ class TerminalVi:
         runner.continue_do_loop()
 
     def word_start_ahead(self, charsets):
+        """Slip ahead to first Char of this else next Word"""
 
         runner = self.runner
 
-        here = runner.find_column_in_charsets(charsets)
+        # Slip across other Charset's
+
+        here = runner.charsets_find_column(charsets)
         if here:
 
-            while runner.find_column_in_charsets(charsets) == here:
-                row_last_column = runner.find_last_column(row=runner.row)
-                on_last_column = runner.column == row_last_column
-                if not self.slip_ahead():
+            while runner.charsets_find_column(charsets) == here:
+                row_last_column = runner.spot_last_column(row=runner.row)
+                if runner.column == row_last_column:
 
                     break
 
-                if on_last_column:
+                self.slip_ahead()
 
-                    break
+            # Stop at a blank Line
 
             if not runner.column:
 
                 return
 
-        while not runner.find_column_in_charsets(charsets):
+        # Slip ahead across the leading Charset
+
+        while not runner.charsets_find_column(charsets):
             if not self.slip_ahead():
 
                 break
 
     def do_big_word_start_behind(self):  # Vim B
+        """Slip behind to first Char of Big Word"""
 
         runner = self.runner
 
@@ -1306,6 +1391,7 @@ class TerminalVi:
         # TODO: add option for 'b e w' and 'B E W' to swap places
 
     def do_lil_word_start_behind(self):  # Vim b
+        """Slip behind first Char of Lil Word"""
 
         runner = self.runner
 
@@ -1317,37 +1403,37 @@ class TerminalVi:
         runner.continue_do_loop()
 
     def word_start_behind(self, charsets):
+        """Slip behind to first Char of this else next Word"""
 
         runner = self.runner
 
+        # Slip behind at least once (unless at start of File)
+
         self.slip_behind()
 
-        on_first_column = runner.column == 0
-        if not on_first_column:
+        # Stop at a blank Line
 
-            while not runner.find_column_in_charsets(charsets):
-                if not self.slip_behind():
+        if not runner.column:
+
+            return
+
+        # Slip behind across the leading Charset
+
+        while not runner.charsets_find_column(charsets):
+            if not self.slip_behind():
+
+                break
+
+        # Slip behind across other Charset's, except stop at Start of Line
+
+        here = runner.charsets_find_column(charsets)
+        if here:
+            while runner.charsets_find_column(charsets) == here:
+                if not runner.column:
 
                     break
 
-            here = runner.find_column_in_charsets(charsets)
-            if here:
-
-                beyond = None
-                while runner.find_column_in_charsets(charsets) == here:
-                    on_first_column = runner.column == 0
-                    if not self.slip_behind():
-                        beyond = False
-
-                        break
-
-                    beyond = True
-                    if on_first_column:
-
-                        break
-
-                if beyond:
-                    self.slip_ahead()
+                self.slip_behind()
 
     #
     # Search ahead inside the Row for a single Char
@@ -1388,8 +1474,8 @@ class TerminalVi:
 
         runner = self.runner
 
-        last_column = runner.find_last_column()
-        text = runner.get_row_text()
+        last_column = runner.spot_last_column()
+        text = runner.fetch_row_text()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -1452,8 +1538,8 @@ class TerminalVi:
 
         runner = self.runner
 
-        last_column = runner.find_last_column()
-        text = runner.get_row_text()
+        last_column = runner.spot_last_column()
+        text = runner.fetch_row_text()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -1505,7 +1591,7 @@ class TerminalVi:
 
         else:
 
-            row_last_column = runner.find_last_column(row=runner.row)
+            row_last_column = runner.spot_last_column(row=runner.row)
 
             with_column = runner.column
             try:
@@ -1544,7 +1630,7 @@ class TerminalVi:
 
         else:
 
-            row_last_column = runner.find_last_column(row=runner.row)
+            row_last_column = runner.spot_last_column(row=runner.row)
 
             with_column = runner.column
             try:
@@ -1678,6 +1764,9 @@ class TerminalVi:
 
         bots_by_chords[b":"] = None
 
+        bots_by_chords[b":g"] = None
+        bots_by_chords[b":g/"] = (self.do_find_all_vi_line,)
+
         bots_by_chords[b":n"] = None
         bots_by_chords[b":n\r"] = (self.do_next_vi_file,)
 
@@ -1735,7 +1824,7 @@ class TerminalVi:
         # bots_by_chords[b"S"] = (self.do_slip_first_chop_open,)
         bots_by_chords[b"T"] = (None, self.do_slip_rindex_plus)
         # bots_by_chords[b"U"] = (self.do_row_undo,)
-        # bots_by_chords[b"V"] = (self.do_mark_rows,)
+        # bots_by_chords[b"V"] = (self.do_gloss_rows,)
         bots_by_chords[b"W"] = (self.do_big_word_start_ahead,)
         # bots_by_chords[b"X"] = (self.do_cut_behind,)
         # bots_by_chords[b"Y"] = (self.do_copy_row,)
@@ -1778,7 +1867,7 @@ class TerminalVi:
         # bots_by_chords[b"s"] = (self.do_cut_behind_open,)
         bots_by_chords[b"t"] = (None, self.do_slip_index_minus)
         # bots_by_chords[b"u"] = (self.do_undo,)
-        # bots_by_chords[b"v"] = (self.do_mark_chars,)
+        # bots_by_chords[b"v"] = (self.do_gloss_chars,)
         bots_by_chords[b"w"] = (self.do_lil_word_start_ahead,)
         # bots_by_chords[b"x"] = (self.do_cut_ahead,)
         # bots_by_chords[b"y"] = (self.do_copy_after,)
@@ -1811,17 +1900,24 @@ class TerminalEx:
     def __init__(self, runner):
 
         self.runner = runner
-
-        self.ex_head = None
-        self.ex_line = None
-
-        self.ex_flags = ""
+        self.ex_head = runner.format_vi_reply()
+        self.ex_line = ""
 
     def format_ex_reply(self):
+        """Show Search Flags, after Row:Column but before Nudge and Message"""
+
+        runner = self.runner
 
         ex_head = self.ex_head
-        ex_flags = self.ex_flags
         ex_line = self.ex_line
+
+        ex_flags = ""
+        if not runner.finding_regex:
+            ex_flags += "F"
+        if not runner.finding_case:
+            ex_flags += "i"
+        if runner.showing_line_number:
+            ex_flags += "n"
 
         word0 = ex_head.split()[0]
         dashed_ex_flags = "-" + ex_flags
@@ -1839,6 +1935,8 @@ class TerminalEx:
     def read_ex_line(self):
         """Take an Input Line from beneath the Scrolling Rows"""
 
+        self.ex_line = ""
+
         try:
             self.run_ex_keyboard()
             assert False  # unreached
@@ -1854,20 +1952,14 @@ class TerminalEx:
 
         runner = self.runner
 
-        ex_flags = ""
-        if not runner.finding_regex:
-            ex_flags += "F"
-        if not runner.finding_case:
-            ex_flags += "i"
-        if runner.showing_line_number:
-            ex_flags += "n"
-        self.ex_flags = ex_flags
-
-        self.ex_head = runner.format_vi_reply()
-        self.ex_line = ""
-
         bots_by_chords = self._ex_bots_by_chords_()
-        runner.run_keyboard(bots_by_chords)
+
+        runner._enter_keyboard_()
+        try:
+            runner.run_keyboard(bots_by_chords)
+        finally:
+            runner._exit_keyboard_(*sys.exc_info())
+
         assert False  # unreached
 
     def do_clear_chars(self):  # Vim Ex ⌃U
@@ -1934,14 +2026,14 @@ class TerminalEx:
 
         # Place the Screen Cursor
 
-        str_reply = self.format_ex_reply()
+        ex_reply = self.format_ex_reply()
 
         terminal.row = painter.status_row
-        terminal.column = len(str_reply)
+        terminal.column = len(ex_reply)
 
         # Replace the Status
 
-        return str_reply
+        return ex_reply
 
     def _ex_bots_by_chords_(self):
 
@@ -2023,6 +2115,9 @@ class TerminalReplyOut(argparse.Namespace):
     # because Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
 
+# FIXME:  class TerminalMark - just the Row:Column pair
+
+
 class TerminalSpan(
     collections.namedtuple("TerminalSpan", "row, column, beyond".split(", "))
 ):
@@ -2097,6 +2192,8 @@ class TerminalSpan(
 class TerminalRunner:
     """Loop on Keyboard Chords, not whole Lines, but then do read-eval-print"""
 
+    keyboard_stack = list()
+
     def __init__(self):
 
         self.painter = None  # layer over a Terminal I/O Stack
@@ -2107,26 +2204,32 @@ class TerminalRunner:
         self.showing_line_number = None  # show Line Numbers or not
         self.injecting_lag = None  # inject extra Lag or not
 
-        self.bots_by_chords = None  # map Keyboard Inputs to Code
-
         self.finding_case = None  # ignore Upper/Lower Case in Searching or not
         self.finding_line = None  # remember the Search Key
         self.finding_regex = None  # search as Regex or search as Chars
         self.finding_slip = 0  # remember to Search again ahead or again behind
-        self.highlighting_matches = None  # highlight all spans on screen or no spans
+        self.finding_highlights = None  # highlight all spans on screen or no spans
+        # FIXME: self.finding = mutable namespace
+
+        #
+
+        self.bots_by_chords = None  # map Keyboard Inputs to Code
 
         self.nudge = TerminalNudgeIn()  # split the Chords of one Keyboard Input
         self.arg0 = None  # take all the Chords as Chars in a Row
         self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
         self.arg2 = None  # take the Suffix Bytes as one Encoded Char
+        # FIXME: self.argv = mutable namespace
 
         self.sending_bell = None  # ring the Terminal Bell as part of some Prompt's
         self.reply = TerminalReplyOut()  # declare an empty Reply
+        # FIXME: self.replying = mutable namespace
 
         self.doing_more = None  # take the Arg1 as a Count of Repetition's
         self.doing_done = None  # count the Repetition's completed before now
+        # FIXME: self.doing = mutable namespace
 
-    def reopen_iobytearray(self, iobytearray):
+    def _reinit_iobytearray_etc_(self, iobytearray):
         "Start editing Lines of Columns, given a File of Bytes" ""
 
         self.iobytearray = iobytearray
@@ -2142,8 +2245,47 @@ class TerminalRunner:
 
         self.top_row = 0  # scroll through more Lines than fit on Screen
 
-        self.finding_spans = list()  # cache the spans in file
-        self.reopen_finding_spans()
+        self.iobytespans = list()  # cache the spans in file
+        self.reopen_iobytespans()
+
+    def print_text(self, text):
+        """Scroll up the screen and write a Line of Text"""
+
+        self.driver.write(text + "\r\n")
+
+    def _enter_keyboard_(self):
+
+        keyboard_state = (
+            self.bots_by_chords,
+            self.nudge,
+            self.arg0,
+            self.arg1,
+            self.arg2,
+            self.sending_bell,
+            self.reply,
+            self.doing_more,
+            self.doing_done,
+        )
+
+        TerminalRunner.keyboard_stack.append(keyboard_state)
+
+    def _exit_keyboard_(self, exc_type, exc_value, traceback):
+
+        _ = (exc_type, exc_value, traceback)
+
+        keyboard_state = TerminalRunner.keyboard_stack.pop()
+
+        (
+            self.bots_by_chords,
+            self.nudge,
+            self.arg0,
+            self.arg1,
+            self.arg2,
+            self.sending_bell,
+            self.reply,
+            self.doing_more,
+            self.doing_done,
+        ) = keyboard_state
 
     def run_terminal(self, bots_by_chords):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
@@ -2234,7 +2376,7 @@ class TerminalRunner:
 
         # Scroll ahead to get Cursor on Screen, if need be
 
-        bottom_row = self.find_bottom_row()
+        bottom_row = self.spot_bottom_row()
         if row > bottom_row:
             self.top_row = row - (painter.scrolling_rows - 1)
 
@@ -2258,7 +2400,7 @@ class TerminalRunner:
 
         lines = self.lines
         screen_lines = lines[self.top_row :][: painter.scrolling_rows]
-        screen_spans = self.find_spans_on_screen()
+        screen_spans = self.spot_spans_on_screen()
 
         injecting_lag = self.injecting_lag
         sending_bell = self.sending_bell
@@ -2267,7 +2409,7 @@ class TerminalRunner:
 
         painter.top_line_number = 1 + self.top_row
         painter.last_line_number = 1 + len(lines)
-        painter.showing_line_number = self.showing_line_number
+        painter.painting_line_number = self.showing_line_number
 
         # Choose more or less Accuracy & Lag
 
@@ -2284,19 +2426,19 @@ class TerminalRunner:
 
         terminal.flush()
 
-    def find_spans_on_screen(self):
-        """Mark some Chars on Screen as more equal than others"""
+    def spot_spans_on_screen(self):
+        """Say where to highlight each Match of the Search Key on Screen"""
 
-        if not self.highlighting_matches:
+        if not self.finding_highlights:
 
             return list()
 
-        finding_spans = self.finding_spans
+        iobytespans = self.iobytespans
         top_row = self.top_row
-        bottom_row = self.find_bottom_row()
+        bottom_row = self.spot_bottom_row()
 
         screen_spans = list()
-        for span in finding_spans:
+        for span in iobytespans:
             if top_row <= span.row <= bottom_row:
 
                 screen_span_row = span.row - top_row
@@ -2439,7 +2581,7 @@ class TerminalRunner:
         self.reply = TerminalReplyOut(nudge=nudge, message=message)
 
     def format_vi_reply(self):  # TODO: move this to TerminalVi from TerminalRunner
-        """Show Row, Column, Nudge, & Message"""
+        """Show Row:Column, Nudge, and Message"""
 
         reply = self.reply
         nudge = reply.nudge
@@ -2456,11 +2598,11 @@ class TerminalRunner:
 
         # Join parts
 
-        str_reply = "{},{}  {}  {}".format(
+        vi_reply = "{},{}  {}  {}".format(
             row_number, column_number, str_echo, str_message
         ).rstrip()
 
-        return str_reply
+        return vi_reply
 
     def send_bell(self):
         """Ring the Terminal Bell as part of the next Prompt"""
@@ -2504,10 +2646,10 @@ class TerminalRunner:
     # Focus on one Line of a File of Lines
     #
 
-    def find_column_in_charsets(self, charsets):
+    def charsets_find_column(self, charsets):
         """Return the Index of the first CharSet containing Column Char, else -1"""
 
-        chars = self.get_column_char()  # may be empty
+        chars = self.fetch_column_char()  # may be empty
         chars = chars if chars else " "
 
         for (index, charset) in enumerate(charsets):
@@ -2517,21 +2659,23 @@ class TerminalRunner:
 
         return -1
 
-    def get_column_char(self, column=None):
+    def fetch_column_char(self, column=None):
         """Get the one Char at the Column in the Row beneath the Cursor"""
 
-        chosen_column = self.column if (column is None) else column
+        column_ = self.column if (column is None) else column
 
         row_line = self.lines[self.row]
         row_text = row_line.splitlines()[0]
-        chars = row_text[chosen_column:][:1]
+        chars = row_text[column_:][:1]
 
         return chars  # 0 or 1 chars
 
-    def get_row_text(self):
+    def fetch_row_text(self, row=None):
         """Get Chars of Columns in Row beneath Cursor"""
 
-        row_line = self.lines[self.row]
+        row_ = self.row if (row is None) else row
+
+        row_line = self.lines[row_]
         row_text = row_line.splitlines()[0]
 
         return row_text
@@ -2559,7 +2703,7 @@ class TerminalRunner:
 
         return rows
 
-    def find_bottom_row(self):
+    def spot_bottom_row(self):
         """Find the Bottom Row of File on Screen"""
 
         painter = self.painter
@@ -2572,7 +2716,7 @@ class TerminalRunner:
 
         return bottom_row
 
-    def find_last_row(self):
+    def spot_last_row(self):
         """Find the last Row in File, else Row Zero when no Rows in File"""
 
         rows = len(self.lines)
@@ -2580,16 +2724,16 @@ class TerminalRunner:
 
         return last_row
 
-    def find_last_column(self, row=None):
+    def spot_last_column(self, row=None):
         """Find the last Column in Row, else Column Zero when no Columns in Row"""
 
-        chosen_row = self.row if (row is None) else row
+        row_ = self.row if (row is None) else row
         lines = self.lines
 
-        if chosen_row >= len(lines):
+        if row_ >= len(lines):
             raise IndexError(row)
 
-        row_line = lines[chosen_row]
+        row_line = lines[row_]
         row_text = row_line.splitlines()[0]
 
         columns = len(row_text)
@@ -2597,14 +2741,14 @@ class TerminalRunner:
 
         return last_column
 
-    def find_middle_row(self):
+    def spot_middle_row(self):
         """Find the Middle Row on Screen, of the Rows that carry Lines of File"""
 
         top_row = self.top_row
-        bottom_row = self.find_bottom_row()
+        bottom_row = self.spot_bottom_row()
         rows_on_screen = bottom_row - top_row + 1
 
-        middle = (rows_on_screen + 1) // 2  # match +1 bias in Vi's 'find_middle_row'
+        middle = (rows_on_screen + 1) // 2  # match +1 bias in Vi's 'spot_middle_row'
         middle_row = top_row + middle
 
         return middle_row
@@ -2672,7 +2816,7 @@ class TerminalRunner:
 
         terminal = self.painter
 
-        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
+        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()'
         terminal.__exit__(*exc_info)
         os.kill(os.getpid(), signal.SIGTSTP)
         terminal.__enter__()
@@ -2681,15 +2825,15 @@ class TerminalRunner:
     # Find Spans of Chars
     #
 
-    def reopen_finding_spans(self):
+    def reopen_iobytespans(self):
         """Find Chars in File"""
 
         iobytearray = self.iobytearray
-        finding_spans = self.finding_spans
+        iobytespans = self.iobytespans
 
         # Cancel the old Spans
 
-        finding_spans.clear()
+        iobytespans.clear()
 
         # Find the New Spans
 
@@ -2706,22 +2850,20 @@ class TerminalRunner:
 
             chars = iobytearray.decode(errors="surrogateescape")
             matches = list(re.finditer(pattern, string=chars, flags=flags))
-            finding_spans[::] = TerminalSpan.find_spans(matches)
+            iobytespans[::] = TerminalSpan.find_spans(matches)
 
             if matches:  # as many Spans as Matches, except for such as r"$" in "abc\n"
-                assert finding_spans
-                assert len(finding_spans) in (len(matches), len(matches) - 1)
+                assert iobytespans
+                assert len(iobytespans) in (len(matches), len(matches) - 1)
 
-    def find_ahead(self):
-        """Find the Search Key ahead, else after start, else fail"""
+    def find_ahead_and_reply(self):
+        """Find the Search Key ahead, else after start, else fail silently"""
 
-        spans = self.finding_spans
+        spans = self.iobytespans
         row = self.row
         column = self.column
 
         if not spans:
-
-            self.send_reply("No chars found: not ahead and not behind")
 
             return False
 
@@ -2731,17 +2873,17 @@ class TerminalRunner:
             here1 = (-1, -1)  # before start
             heres = (here0, here1)
 
-            message0 = "Found {} chars ahead"
-            message1 = "Found {} chars, not ahead, found instead after start"
-            messages = (message0, message1)
+            how0 = "Found {} chars ahead"
+            how1 = "Found {} chars, not ahead, found instead after start"
+            hows = (how0, how1)
 
-            for (here, message) in zip(heres, messages):
+            for (here, how) in zip(heres, hows):
                 for span in spans:
                     len_chars = span.beyond - span.column
-                    there = self.find_row_column_near_span(span)
+                    there = self.spot_row_column_near_span(span)
 
                     if here < there:
-                        self.send_reply(message.format(len_chars))
+                        self.send_reply(how.format(len_chars))  # "Found..."
 
                         (self.row, self.column) = there
 
@@ -2749,36 +2891,32 @@ class TerminalRunner:
 
             assert False, spans  # unreached
 
-    def find_behind(self):
-        """Find the Search Key behind, else above bottom, else fail"""
+        self.send_reply("No chars found: not ahead and not after start")
 
-        spans = self.finding_spans
+    def find_behind_and_reply(self):
+        """Find the Search Key loudly: behind, else before end, else not"""
+
+        spans = self.iobytespans
         row = self.row
         column = self.column
 
-        if not spans:
-
-            self.send_reply("No chars found: not behind and not ahead")
-
-            return False
-
-        else:
+        if spans:
 
             here0 = (row, column)
-            here1 = (self.find_last_row() + 1, 0)  # after end
+            here1 = (self.spot_last_row() + 1, 0)  # after end
             heres = (here0, here1)
 
-            message0 = "Found {} chars behind"
-            message1 = "Found {} chars, not behind, found instead before end"
-            messages = (message0, message1)
+            how0 = "Found {} chars behind"
+            how1 = "Found {} chars, not behind, found instead before end"
+            hows = (how0, how1)
 
-            for (here, message) in zip(heres, messages):
+            for (here, how) in zip(heres, hows):
                 for span in reversed(spans):
                     len_chars = span.beyond - span.column
-                    there = self.find_row_column_near_span(span)
+                    there = self.spot_row_column_near_span(span)
 
                     if there < here:
-                        self.send_reply(message.format(len_chars))
+                        self.send_reply(how.format(len_chars))  # "Found ..."
 
                         (self.row, self.column) = there
 
@@ -2786,13 +2924,15 @@ class TerminalRunner:
 
             assert False, spans  # unreached
 
-    def find_row_column_near_span(self, span):
+        self.send_reply("No chars found: not behind and not before end")
+
+    def spot_row_column_near_span(self, span):
         """Find the Row:Column in File nearest to a Span"""
 
         try:
 
             there_row = span.row
-            there_last_column = self.find_last_column(row=there_row)
+            there_last_column = self.spot_last_column(row=there_row)
             there_column = min(there_last_column, span.column)
             there = (there_row, there_column)
 
@@ -2825,7 +2965,9 @@ class TerminalPainter:
 
         self.top_line_number = 1  # number the Rows of the Screen down from first
         self.last_line_number = 1  # number all Rows as wide as the last
-        self.showing_line_number = None  # start each Row with its Line Number, or don't
+        self.painting_line_number = (
+            None  # start each Row with its Line Number, or don't
+        )
 
         self._reopen_terminal_()  # start sized to fit the initial Screen
 
@@ -2885,7 +3027,7 @@ class TerminalPainter:
         terminal = self.terminal
 
         columns = self.columns
-        left_column = self.find_left_column()
+        left_column = self.spot_left_column()
         scrolling_rows = self.scrolling_rows
 
         # Format chars to display
@@ -2936,7 +3078,7 @@ class TerminalPainter:
 
         self.terminal.write("\a")
 
-    def find_left_column(self):
+    def spot_left_column(self):
         """Find the leftmost Column occupied by Scrolling Text"""
 
         formatted = self.format_as_line_number(row=1)
@@ -2947,12 +3089,12 @@ class TerminalPainter:
     def format_as_line_number(self, row):
         """Format a Row Index on Screen as a Line Number of File"""
 
-        if not self.showing_line_number:
+        if not self.painting_line_number:
 
             return ""
 
-        last_line_number = "{:3} ".format(self.last_line_number)
-        last_width = len(last_line_number)
+        str_last_line_number = "{:3} ".format(self.last_line_number)
+        last_width = len(str_last_line_number)
 
         line_number = self.top_line_number + row
         formatted = "{:3} ".format(line_number).rjust(last_width)
@@ -3016,7 +3158,7 @@ class TerminalPainter:
         """Spread each Empty Span to cover one more Column beyond it"""
 
         columns = self.columns
-        left_column = self.find_left_column()
+        left_column = self.spot_left_column()
 
         assert len(text) <= columns, (len(text), columns)
 
@@ -3707,12 +3849,16 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
-# TODO: hunt out the Fixme's
-
 # TODO: :g/patternReturn  => preview lines found
+
+# FIXME: TerminalKeyboard <- bots_by_chars, run/_before|_after/_prompt|_do/
+# FIXME: TerminalKeyboard is a delegate inside TerminalRunner
 
 # TODO: ⌃I ⌃O walk the Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
 # TODO: despite Doc, to match Vim, include in the Jump List the * # forms of / ?
+
+
+# TODO: hunt out the Fixme's
 
 # TODO: mm '' `` marks
 # TODO: qqq @q  => record, replay
