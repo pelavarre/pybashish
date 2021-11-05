@@ -334,12 +334,7 @@ class TerminalVi:
     def do_continue_vi(self):  # Vim Q v i Return  # not Ex Mode from last century
         """Accept Q v i Return, without ringing the Terminal bell"""
 
-        runner = self.runner
-
-        nudge = TerminalNudgeIn(chords=b"Qvi\r")
-        message = "Would you like to play a game?"
-
-        runner.reply = TerminalReplyOut(nudge=nudge, message=message)
+        self.send_vi_reply("Would you like to play a game?")
 
     def do_vi_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
@@ -420,9 +415,7 @@ class TerminalVi:
         runner = self.runner
 
         if not runner.doing_done:
-            if self.find_fetch_vi_this(slip=+1) is not None:
-                runner.finding_highlights = True
-            else:
+            if self.find_fetch_vi_this(slip=+1) is None:
                 self.send_vi_reply("Press * and # only when Not on a blank line")
 
                 return
@@ -431,15 +424,16 @@ class TerminalVi:
 
             runner.continue_do_loop()
 
+        runner.accent_reply_with_find()  # after last 'send_reply'
+        # FIXME:  make the choice of Reply Flags stick no matter when it happens
+
     def do_find_behind_vi_this(self):  # Vim #
         """Take a Search Key from this Line, and then look behind for it"""
 
         runner = self.runner
 
         if not runner.doing_done:
-            if self.find_fetch_vi_this(slip=-1) is not None:
-                runner.finding_highlights = True
-            else:
+            if self.find_fetch_vi_this(slip=-1) is None:
                 self.send_vi_reply("Press # and £ and * only when Not on a blank line")
 
                 return
@@ -447,6 +441,8 @@ class TerminalVi:
         if runner.find_behind_and_reply():
 
             runner.continue_do_loop()
+
+        runner.accent_reply_with_find()  # after last 'send_reply'
 
     #
     # FIXME: shuffle:  def.*find_
@@ -458,14 +454,16 @@ class TerminalVi:
         runner = self.runner
 
         if not runner.doing_done:
+            runner.accent_reply_with_find()  # before 'read_vi_line'
             if self.find_read_vi_line(slip=+1) is None:
 
                 return
 
-        runner.finding_highlights = True
         if runner.find_ahead_and_reply():  # TODO: extra far scroll <= zb H 23Up n
 
             runner.continue_do_loop()
+
+        runner.accent_reply_with_find()  # after last 'send_reply'
 
     def do_find_all_vi_line(self):  # Vim :g/
         """Across all the File, print each Line containing 1 or More Matches"""
@@ -480,6 +478,7 @@ class TerminalVi:
 
         #
 
+        runner.accent_reply_with_find()  # before 'read_vi_line'
         if self.find_read_vi_line(slip=+1) is None:
 
             return
@@ -489,7 +488,6 @@ class TerminalVi:
         (found_row, found_column) = (runner.row, runner.column)
 
         if runner.find_ahead_and_reply():
-            runner.finding_highlights = True
 
             runner.print_text("")
 
@@ -515,6 +513,8 @@ class TerminalVi:
 
         (runner.row, runner.column) = (found_row, found_column)
 
+        runner.accent_reply_with_find()  # after last 'send_reply'
+
         # TODO: highlight Matches in :g/ Lines
         # TODO: Vim :4g/ means search only line 4, not pick +-Nth match
 
@@ -524,14 +524,16 @@ class TerminalVi:
         runner = self.runner
 
         if not runner.doing_done:
+            runner.accent_reply_with_find()  # before 'read_vi_line'
             if self.find_read_vi_line(slip=-1) is None:
 
                 return
 
-        runner.finding_highlights = True
         if runner.find_behind_and_reply():  # TODO: extra far scroll # <= zt L 23Down N
 
             runner.continue_do_loop()
+
+        runner.accent_reply_with_find()  # after last 'send_reply'
 
     #
     # FIXME: shuffle:  def.*find_
@@ -551,11 +553,12 @@ class TerminalVi:
 
             return
 
-        runner.finding_highlights = True
         func = behind_and_reply if (slip >= 0) else ahead_and_reply
         if func():
 
             runner.continue_do_loop()
+
+        runner.accent_reply_with_find()  # after last 'send_reply'
 
     def do_find_later(self):  # Vim n
         """Leap to later Search Key Match"""
@@ -571,11 +574,12 @@ class TerminalVi:
 
             return
 
-        runner.finding_highlights = True
         func = ahead_and_reply if (slip >= 0) else behind_and_reply
         if func():
 
             runner.continue_do_loop()
+
+        runner.accent_reply_with_find()
 
     #
     # FIXME: shuffle:  def.*find_
@@ -707,10 +711,10 @@ class TerminalVi:
         """Take a Line of Input"""
 
         runner = self.runner
-        runner.nudge = TerminalNudgeIn()
 
-        ex_head = self.format_vi_reply()
-        ex = TerminalEx(runner, ex_head=ex_head)
+        vi_reply = self.format_vi_reply()
+        ex = TerminalEx(runner, ex_reply=vi_reply)
+
         line = ex.read_ex_line()
 
         return line
@@ -1733,15 +1737,15 @@ class TerminalVi:
         terminal.row = runner.row - runner.top_row
         terminal.column = runner.column
 
-        # Choose the Status to surface
+        # Fill out the Status Line
 
-        str_reply = self.format_vi_reply()
-        runner.reply = TerminalReplyOut()
+        str_status = self.format_vi_reply()
 
-        return str_reply
+        return str_status
 
+    # FIXME: shuffle back down into TerminalRunner
     def format_vi_reply(self):
-        """Show Row:Column, Nudge, and Message"""
+        """Format a Status Line of Row:Column, Nudge, and Message"""
 
         runner = self.runner
         reply = runner.reply
@@ -1749,19 +1753,19 @@ class TerminalVi:
 
         # Format parts, a la Vim ':set showcmd' etc
 
-        row_number = 1 + self.runner.row
-        column_number = 1 + self.runner.column
+        str_pin = "{},{}".format(1 + self.runner.row, 1 + self.runner.column)
+
+        str_flags = str(reply.flags) if reply.flags else ""
 
         echo_bytes = b"" if (nudge is None) else nudge.join_echo_bytes()
-        str_echo = repr_vi_bytes(echo_bytes) if echo_bytes else ""
+        str_echo = format(repr_vi_bytes(echo_bytes)) if echo_bytes else ""
 
         str_message = str(reply.message) if reply.message else ""
 
         # Join parts
 
-        vi_reply = "{},{}  {}  {}".format(
-            row_number, column_number, str_echo, str_message
-        ).rstrip()
+        replies = (str_pin, str_flags, str_echo, str_message)
+        vi_reply = "  ".join(_ for _ in replies if _)
 
         return vi_reply
 
@@ -1973,40 +1977,21 @@ class TerminalVi:
 class TerminalEx:
     """Feed Keyboard into Line at Bottom of Screen of Scrolling Rows, a la Ex"""
 
-    def __init__(self, runner, ex_head):
+    def __init__(self, runner, ex_reply):
 
         self.runner = runner
-        self.ex_head = ex_head
+        self.ex_reply = ex_reply
         self.ex_line = ""
 
     def format_ex_reply(self):
-        """Show Search Flags, after Row:Column but before Nudge and Message"""
+        """Keep up the Vi Reply while working the Ex Keyboard, but add the Input Line"""
 
-        runner = self.runner
-
-        ex_head = self.ex_head
+        ex_reply = self.ex_reply
         ex_line = self.ex_line
 
-        ex_flags = ""
-        if not runner.finding_regex:
-            ex_flags += "F"
-        if not runner.finding_case:
-            ex_flags += "i"
-        if runner.showing_line_number:
-            ex_flags += "n"
+        str_status = ex_reply + ex_line
 
-        word0 = ex_head.split()[0]
-        dashed_ex_flags = "-" + ex_flags
-        repl = word0 + "  " + dashed_ex_flags
-
-        ex_head_repl = ex_head
-        if ex_flags:
-            count = 1
-            ex_head_repl = ex_head.replace(word0, repl, count)
-
-        str_reply = ex_head_repl + ex_line
-
-        return str_reply
+        return str_status
 
     def read_ex_line(self):
         """Take an Input Line from beneath the Scrolling Rows"""
@@ -2027,7 +2012,6 @@ class TerminalEx:
         """Edit an Input Line beneath the Scrolling Rows"""
 
         runner = self.runner
-
         funcs_by_chords = self._ex_funcs_by_chords_()
 
         runner._enter_keyboard_()
@@ -2102,14 +2086,14 @@ class TerminalEx:
 
         # Place the Screen Cursor
 
-        ex_reply = self.format_ex_reply()
+        str_status = self.format_ex_reply()
 
         terminal.row = painter.status_row
-        terminal.column = len(ex_reply)
+        terminal.column = len(str_status)
 
-        # Replace the Status
+        # Fill out the Status Line
 
-        return ex_reply
+        return str_status
 
     def _ex_funcs_by_chords_(self):
 
@@ -2151,16 +2135,10 @@ class TerminalNudgeIn(argparse.Namespace):
 
     def __init__(self, prefix=None, chords=None, suffix=None, epilog=None):
 
-        self.prefix = prefix
-        self.chords = chords
-        self.suffix = suffix
-        self.epilog = epilog
-
-    def add_epilog(self, epilog):
-        """Add more Chords to echo, Chords that came later"""
-
-        assert self.epilog is None
-        self.epilog = epilog
+        self.prefix = prefix  # such as Repeat Count Digits before Vi Chords
+        self.chords = chords  # such as b"Qvi\r" Vi Chords
+        self.suffix = suffix  # such as b"x" of b"fx" to Find Char "x" in Vi
+        self.epilog = epilog  # such as b"⌃C" of b"f⌃C" to cancel b"f"
 
     def join_echo_bytes(self):
         """Echo all the Chords of this one Input, in order"""
@@ -2182,10 +2160,11 @@ class TerminalNudgeIn(argparse.Namespace):
 class TerminalReplyOut(argparse.Namespace):
     """Give the parts of a Reply to Input, apart from the main Output"""
 
-    def __init__(self, nudge=None, message=None):
+    def __init__(self, flags=None, nudge=None, message=None):
 
-        self.nudge = nudge
-        self.message = message
+        self.flags = flags  # such as "-Fin" Grep-Like Search
+        self.nudge = nudge  # keep up a trace of the last input that got us here
+        self.message = message  # say more
 
     # Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
@@ -2384,6 +2363,8 @@ class TerminalRunner:
 
         # Repeat till SystemExit raised
 
+        self.nudge = TerminalNudgeIn()
+
         while True:
 
             # Choose keyboard
@@ -2404,7 +2385,7 @@ class TerminalRunner:
                 chord = b"\x03"  # ETX, aka ⌃C, aka 3
 
                 if self.nudge != TerminalNudgeIn():
-                    self.nudge.add_epilog(epilog=chord)
+                    self.nudge.epilog = chord
                     self.send_reply("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
 
                     self.nudge = TerminalNudgeIn()
@@ -2471,7 +2452,11 @@ class TerminalRunner:
         funcs = self.funcs_by_chords[""]
         assert len(funcs) == 1, funcs  # TODO: cope with more
         run_before_prompt = self.funcs_by_chords[""][-1]
-        str_reply = run_before_prompt()
+        str_status = run_before_prompt()
+
+        # Consume from Self
+
+        self.reply = TerminalReplyOut()
 
         # Pull from Self
 
@@ -2495,7 +2480,7 @@ class TerminalRunner:
                 # time.sleep(0.3)  # delaying Output demos a different kind of lag
                 terminal._reopen_terminal_()
 
-        painter.write_screen(status=str_reply, lines=screen_lines, spans=screen_spans)
+        painter.write_screen(status=str_status, lines=screen_lines, spans=screen_spans)
 
         if sending_bell:
             self.sending_bell = None
@@ -2656,6 +2641,27 @@ class TerminalRunner:
         nudge = self.nudge
 
         self.reply = TerminalReplyOut(nudge=nudge, message=message)
+
+    def accent_reply_with_find(self):
+        """Add the Find Flags into the last Reply, before showing it"""
+
+        self.reply.flags = self.format_find_flags()
+        self.finding_highlights = True
+
+    def format_find_flags(self):
+        """Show Search Flags a la Bash Grep Switches"""
+
+        flags = ""
+        if not self.finding_regex:
+            flags += "F"
+        if not self.finding_case:
+            flags += "i"
+        if self.showing_line_number:
+            flags += "n"
+
+        str_flags = "-{}".format(flags) if flags else ""
+
+        return str_flags
 
     def send_bell(self):
         """Ring the Terminal Bell as part of the next Prompt"""
@@ -3922,6 +3928,8 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # FIXME: don't scroll the : g / search off screen
 # FIXME: do count the lines not shown by : g / because they don't fit on screen
+
+# FIXME: talk of Lines and Closed Lines, not of Texts and Lines
 
 # FIXME: TerminalKeyboard <- funcs_by_chars, run/_before|_after/_prompt|_do/
 # FIXME: TerminalKeyboard is a delegate inside TerminalRunner
