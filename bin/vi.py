@@ -460,10 +460,6 @@ class TerminalVi:
     def do_find_all_vi_line(self):  # Vim :g/
         """Across all the File, print each Line containing 1 or More Matches"""
 
-        # FIXME: start Screen with count of Lines lost, when some scrolled into the Void
-        # TODO: highlight Matches in :g/ Lines
-        # TODO: Vim :4g/ means search only line 4, not pick +-Nth match
-
         runner = self.runner
         painter = runner.painter
         terminal = painter
@@ -508,6 +504,9 @@ class TerminalVi:
             terminal._reopen_terminal_()
 
         (runner.row, runner.column) = (found_row, found_column)
+
+        # TODO: highlight Matches in :g/ Lines
+        # TODO: Vim :4g/ means search only line 4, not pick +-Nth match
 
     def do_find_behind_vi_line(self):  # Vim ?
         """Take a Search Key as input, and then look behind for it"""
@@ -1003,11 +1002,6 @@ class TerminalVi:
 
         raise NotImplementedError()
 
-    def scroll_ahead_some_once(self):
-        """TODO: Scroll ahead some"""
-
-        raise NotImplementedError()
-
     #
     # Scroll ahead or behind almost one Whole Screen of Rows
     #
@@ -1141,10 +1135,10 @@ class TerminalVi:
             if row < top_row:
                 row = top_row
 
-        runner.top_row = top_row
-        runner.row = row
+        runner.top_row = top_row  # always different Top Row
 
-        self.slip_dent()
+        runner.row = row  # same or different Row
+        self.slip_dent()  # same or different Column
 
         runner.continue_do_loop()
 
@@ -1159,7 +1153,6 @@ class TerminalVi:
         # Quit at top Row
 
         if not top_row:
-
             if not runner.doing_done:
                 self.send_vi_reply("Did you mean ⌃E")  # 1G⌃Y Egg
 
@@ -1170,16 +1163,14 @@ class TerminalVi:
         if top_row:
             top_row -= 1
 
-            runner.top_row = top_row  # TODO: ugly mutate
-            bottom_row = runner.spot_bottom_row()
-
+            bottom_row = runner.spot_bottom_row(top_row)
             if row > bottom_row:
                 row = bottom_row
 
-        runner.top_row = top_row
-        runner.row = row
+        runner.top_row = top_row  # always different Top Row
 
-        self.slip_dent()
+        runner.row = row  # same or different Row
+        self.slip_dent()  # same or different Column
 
         runner.continue_do_loop()
 
@@ -1702,7 +1693,7 @@ class TerminalVi:
         bots_by_chords[False] = (self.run_before_do_vi,)
         bots_by_chords[True] = (self.run_after_do_vi,)
         bots_by_chords[""] = (self.run_before_vi_prompt,)
-        # TODO: ok yes callbacks, but less of kluge than wild types for keys
+        # FIXME: ok yes callbacks, but less of kluge than wild types for keys
 
         # bots_by_chords[b"\x00"]  # NUL, aka ⌃@, aka 0
         # bots_by_chords[b"\x01"]  # SOH, aka ⌃A, aka 1
@@ -1796,7 +1787,7 @@ class TerminalVi:
         # bots_by_chords[b"="]  # TODO: dent after
         # bots_by_chords[b">"]  # TODO: indent
         bots_by_chords[b"?"] = (self.do_find_behind_vi_line,)
-        # bots_by_chords[b"@"]  # TODO: play
+        # bots_by_chords[b"@"] = (self.do_replay_input,)
 
         # bots_by_chords[b"A"] = (self.do_slip_last_right_open,)
         bots_by_chords[b"B"] = (self.do_big_word_start_behind,)
@@ -1819,6 +1810,7 @@ class TerminalVi:
         bots_by_chords[b"Qv"] = None
         bots_by_chords[b"Qvi"] = None
         bots_by_chords[b"Qvi\r"] = (self.do_continue_vi,)
+        # FIXME: send "b"Qvi\r" into a new method, to map all its leading substrings
 
         # bots_by_chords[b"R"] = (self.do_open_overwrite,)
         # bots_by_chords[b"S"] = (self.do_slip_first_chop_open,)
@@ -1844,7 +1836,7 @@ class TerminalVi:
         # bots_by_chords[b"]"]  # TODO
         bots_by_chords[b"^"] = (self.do_slip_dent,)
         bots_by_chords[b"_"] = (self.do_step_down_minus_dent,)
-        # bots_by_chords[b"`"]  # TODO: same as '
+        # bots_by_chords[b"`"]  # TODO: close to b"'"
 
         # bots_by_chords[b"a"] = (self.do_slip_right_open,)
         bots_by_chords[b"b"] = (self.do_lil_word_start_behind,)
@@ -1862,7 +1854,7 @@ class TerminalVi:
         bots_by_chords[b"n"] = (self.do_find_later,)
         # bots_by_chords[b"o"] = (self.do_slip_last_right_open,)
         # bots_by_chords[b"p"] = (self.do_paste_ahead,)
-        # bots_by_chords[b"q"] = (self.do_record,)
+        # bots_by_chords[b"q"] = (self.do_record_input,)
         # bots_by_chords[b"r"] = (None, self.do_overwrite)
         # bots_by_chords[b"s"] = (self.do_cut_behind_open,)
         bots_by_chords[b"t"] = (None, self.do_slip_index_minus)
@@ -2059,10 +2051,10 @@ class TerminalEx:
 
         bots_by_chords[b"\x7F"] = (self.do_undo_append_char,)  # DEL, aka ⌃?, aka 127
 
+        return bots_by_chords
+
         # TODO: define Esc to replace live Regex punctuation with calmer r"."
         # TODO: search for more than US Ascii
-
-        return bots_by_chords
 
 
 #
@@ -2111,11 +2103,10 @@ class TerminalReplyOut(argparse.Namespace):
         self.nudge = nudge
         self.message = message
 
-    # 'class TerminalReplyOut' could become an immutable 'collections.namedtuple'
-    # because Jun/2018 Python 3.7 can say '._defaults=(None, None),'
+    # Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
 
-# FIXME:  class TerminalMark - just the Row:Column pair
+# FIXME:  class TerminalPin - just the Row:Column pair
 
 
 class TerminalSpan(
@@ -2393,7 +2384,9 @@ class TerminalRunner:
 
         # Call back to Client
 
-        run_before_prompt = self.bots_by_chords[""][-1]  # TODO: cope with len != 1?
+        bots = self.bots_by_chords[""]
+        assert len(bots) == 1, bots  # TODO: cope with more
+        run_before_prompt = self.bots_by_chords[""][-1]
         str_reply = run_before_prompt()
 
         # Pull from Self
@@ -2580,7 +2573,7 @@ class TerminalRunner:
 
         self.reply = TerminalReplyOut(nudge=nudge, message=message)
 
-    def format_vi_reply(self):  # TODO: move this to TerminalVi from TerminalRunner
+    def format_vi_reply(self):  # FIXME: move this to TerminalVi from TerminalRunner
         """Show Row:Column, Nudge, and Message"""
 
         reply = self.reply
@@ -2703,15 +2696,16 @@ class TerminalRunner:
 
         return rows
 
-    def spot_bottom_row(self):
+    def spot_bottom_row(self, top_row=None):
         """Find the Bottom Row of File on Screen"""
 
+        top_row_ = self.top_row if (top_row is None) else top_row
         painter = self.painter
 
         rows = len(self.lines)
         last_row = (rows - 1) if rows else 0
 
-        bottom_row = self.top_row + (painter.scrolling_rows - 1)
+        bottom_row = top_row_ + (painter.scrolling_rows - 1)
         bottom_row = min(bottom_row, last_row)
 
         return bottom_row
@@ -3348,8 +3342,6 @@ class TerminalShadow:
 
         terminal.flush()
 
-        # TODO: maybe complexify to reduce latency:  Erase Row, CUP_Y, etc
-
     def _terminal_write_cup(self, row, column):
         """Position the Terminal Cursor, but without telling the Shadow"""
 
@@ -3396,7 +3388,7 @@ class TerminalShadow:
             self.row += 1
             self.column = 0
 
-        # FIXME: interpret Chars enough to affirm one Line written
+        # TODO: interpret Chars enough to check precisely 1 Line written
 
     def shadow_csi_chars(self, chars):
         """Interpret CSI Escape Sequences"""
@@ -3445,6 +3437,7 @@ class TerminalShadow:
         self.column = min(columns - 1, x - 1)
 
     # TODO: Add API to write Scroll CSI in place of rewriting Screen to Scroll
+    # TODO: Reduce writes to Chars needed, smaller than whole Lines needed
 
 
 class TerminalDriver:
@@ -3849,26 +3842,35 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
-# TODO: :g/patternReturn  => preview lines found
+# FIXME: don't scroll the : g / search off screen
+# FIXME: do count the lines not shown by : g / because they don't fit on screen
 
 # FIXME: TerminalKeyboard <- bots_by_chars, run/_before|_after/_prompt|_do/
 # FIXME: TerminalKeyboard is a delegate inside TerminalRunner
+# FIXME: TerminalViCursor to slip & step
+
+# FIXME: radically simplified undo:  3u to rollback 3 keystrokes
+# FIXME: radically simplified undo:  u to explain radically simplified undo
+
 
 # TODO: ⌃I ⌃O walk the Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
 # TODO: despite Doc, to match Vim, include in the Jump List the * # forms of / ?
 
+# TODO: mm '' `` pins
+# TODO: qqq @q  => record input, replay input
 
 # TODO: hunt out the Fixme's
-
-# TODO: mm '' `` marks
-# TODO: qqq @q  => record, replay
-# TODO: ⌃D ⌃U scrolling
 
 # TODO: QR to draw with a Logo Turtle till QR,
 # TODO: infinite Spaces per Row, rstrip at exit, moving relative not absolute
 # TODO: 1234567890 Up Down Left Right, initially headed Up with |
 # TODO: | - =| =- to draw a rectangle, |=-=|=- to draw a square
 # TODO: [ ] for macro repetition
+# TODO: escape to complete unabbreviated Logo:  Repeat 4 [ Forward 10 Right 90 ]
+# TODO: escape to complete abbreviated Logo:  Rep 4 [ Fd 10 Rt 90 ]
+# TODO: contrast with default Emacs Picture Modes |-/\+ ...
+
+# TODO: save/load to/from local Os CopyPaste Buffer, like via Mac pbpaste/pbcopy
 
 # TODO: stop passing through Controls from the File
 # TODO: accept b"\t" as a form of b" "
@@ -3876,6 +3878,9 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # TODO: solve:  echo -n abc |vi -
 # TODO: show the first ~ past the end differently when No End for Last Line
 # TODO: revive the last Match of r"$" out there
+
+
+# TODO: ⌃D ⌃U scrolling
 
 # TODO: ⌃V o  => rectangular: opposite
 
