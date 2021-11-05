@@ -411,16 +411,16 @@ class TerminalVi:
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
 
     #
-    # Define keys for entering Search Keys and leaping to the matching Span
+    # Define keys for choosing Search Keys and leaping to the matching Span
     #
 
-    def do_find_ahead_this(self):  # Vim *
+    def do_find_ahead_vi_this(self):  # Vim *
         """Take a Search Key from this Line, and then look ahead for it"""
 
         runner = self.runner
 
         if not runner.doing_done:
-            if self.get_find_vi_this(slip=+1) is not None:
+            if self.find_fetch_vi_this(slip=+1) is not None:
                 runner.finding_highlights = True
             else:
                 self.send_vi_reply("Press * and # only when Not on a blank line")
@@ -431,16 +431,16 @@ class TerminalVi:
 
             runner.continue_do_loop()
 
-    def do_find_behind_this(self):  # Vim #
+    def do_find_behind_vi_this(self):  # Vim #
         """Take a Search Key from this Line, and then look behind for it"""
 
         runner = self.runner
 
         if not runner.doing_done:
-            if self.get_find_vi_this(slip=-1) is not None:
+            if self.find_fetch_vi_this(slip=-1) is not None:
                 runner.finding_highlights = True
             else:
-                self.send_vi_reply("Press # and * only when Not on a blank line")
+                self.send_vi_reply("Press # and £ and * only when Not on a blank line")
 
                 return
 
@@ -448,22 +448,21 @@ class TerminalVi:
 
             runner.continue_do_loop()
 
+    #
+    # FIXME: shuffle:  def.*find_
+    #
+
     def do_find_ahead_vi_line(self):  # Vim /
         """Take a Search Key as input, and then look ahead for it"""
 
         runner = self.runner
 
-        #
-
         if not runner.doing_done:
-            if self.read_find_vi_line(slip=+1) is None:
+            if self.find_read_vi_line(slip=+1) is None:
 
                 return
 
-            runner.finding_highlights = True
-
-        #
-
+        runner.finding_highlights = True
         if runner.find_ahead_and_reply():  # TODO: extra far scroll <= zb H 23Up n
 
             runner.continue_do_loop()
@@ -481,7 +480,7 @@ class TerminalVi:
 
         #
 
-        if self.read_find_vi_line(slip=+1) is None:
+        if self.find_read_vi_line(slip=+1) is None:
 
             return
 
@@ -524,64 +523,82 @@ class TerminalVi:
 
         runner = self.runner
 
-        #
-
         if not runner.doing_done:
-            if self.read_find_vi_line(slip=-1) is None:
+            if self.find_read_vi_line(slip=-1) is None:
 
                 return
 
-            runner.finding_highlights = True
-
-        #
-
+        runner.finding_highlights = True
         if runner.find_behind_and_reply():  # TODO: extra far scroll # <= zt L 23Down N
 
             runner.continue_do_loop()
+
+    #
+    # FIXME: shuffle:  def.*find_
+    #
 
     def do_find_earlier(self):  # Vim N
         """Leap to earlier Search Key Match"""
 
         runner = self.runner
 
+        ahead_and_reply = runner.find_ahead_and_reply
+        behind_and_reply = runner.find_behind_and_reply
+        slip = runner.finding_slip
+
         if runner.finding_line is None:
             self.send_vi_reply("Press ? to enter a Search Key")
-        elif runner.finding_slip >= 0:
-            runner.finding_highlights = True
-            if runner.find_behind_and_reply():
 
-                runner.continue_do_loop()
-        else:
-            runner.finding_highlights = True
-            if runner.find_ahead_and_reply():
+            return
 
-                runner.continue_do_loop()
+        runner.finding_highlights = True
+        func = behind_and_reply if (slip >= 0) else ahead_and_reply
+        if func():
+
+            runner.continue_do_loop()
 
     def do_find_later(self):  # Vim n
         """Leap to later Search Key Match"""
 
         runner = self.runner
 
+        ahead_and_reply = runner.find_ahead_and_reply
+        behind_and_reply = runner.find_behind_and_reply
+        slip = runner.finding_slip
+
         if runner.finding_line is None:
             self.send_vi_reply("Press / to enter a Search Key")
-        elif runner.finding_slip >= 0:
-            runner.finding_highlights = True
-            if runner.find_ahead_and_reply():
 
-                runner.continue_do_loop()
-        else:
-            runner.finding_highlights = True
-            if runner.find_behind_and_reply():
+            return
 
-                runner.continue_do_loop()
+        runner.finding_highlights = True
+        func = ahead_and_reply if (slip >= 0) else behind_and_reply
+        if func():
 
-    def get_find_vi_this(self, slip):
-        """Take a Search Key from this Line and return Truthy, else don't"""
+            runner.continue_do_loop()
+
+    #
+    # FIXME: shuffle:  def.*find_
+    #
+
+    def find_fetch_vi_this(self, slip):
+        """Take a Word from this Line and return Truthy, else don't"""
 
         runner = self.runner
 
-        search_key = self.get_vi_this()
-        if search_key is not None:
+        # Take this Word
+
+        word = self.go_fetch_vi_word_here()
+        if word is not None:
+            assert word != ""
+
+            # Make this Word into a Search Key for Words
+
+            search_key = word  # partial Words and whole Words
+            if word and runner.finding_regex:
+                search_key = r"\b" + re.escape(search_key) + r"\b"  # whole Words only
+
+            # Search for the Key
 
             runner.finding_line = search_key
             runner.finding_slip = slip
@@ -589,10 +606,14 @@ class TerminalVi:
             assert runner.finding_line != ""
             runner.reopen_iobytespans()
 
-            return search_key
+            # Pass back Word found, but with no mention of more Match'es found or not
 
-    def get_vi_this(self):
+            return word
+
+    def go_fetch_vi_word_here(self):
         """Take a Symbolic word, else a Non-Blank word, from the rest of this Line"""
+
+        # Setup
 
         runner = self.runner
 
@@ -605,26 +626,52 @@ class TerminalVi:
         def is_not_vi_blank(ch):
             return ch not in VI_BLANK_SET
 
-        search_key = None
+        # Take a Symbolic word, else a Non-Blank word
 
+        behind = column
         for func in (is_vi_symbolic, is_not_vi_blank):
-            for start in range(column, columns):
+
+            # Look behind to first Char of Word
+
+            while behind:
+                ch = runner.fetch_column_char(column=behind)
+                if not func(ch):
+
+                    break
+
+                behind -= 1
+
+            # Look ahead to first Char of Word
+
+            for start in range(behind, columns):
                 ch = runner.fetch_column_char(column=start)
                 if func(ch):
 
-                    search_key = ""
+                    # Slip ahead to Start of Word
 
-                    for stepper in range(start, columns):
-                        ch = runner.fetch_column_char(column=stepper)
+                    self.column = start
+
+                    # Collect one or more Chars of Word
+
+                    word = ""
+
+                    for end in range(start, columns):
+                        ch = runner.fetch_column_char(column=end)
                         if func(ch):
-                            search_key += ch
+                            word += ch
                         else:
 
                             break
 
-                    return search_key
+                    assert word
 
-    def read_find_vi_line(self, slip):
+                    return word
+
+    #
+    # FIXME: shuffle:  def.*find_
+    #
+
+    def find_read_vi_line(self, slip):
         """Take a Search Key"""
 
         runner = self.runner
@@ -1739,7 +1786,7 @@ class TerminalVi:
         funcs_by_chords[b"\x04"] = (self.do_scroll_ahead_some,)  # EOT, aka ⌃D, aka 4
         funcs_by_chords[b"\x05"] = (self.do_scroll_ahead_one,)  # ENQ, aka ⌃E, aka 5
         funcs_by_chords[b"\x06"] = (self.do_scroll_ahead_much,)  # ACK, aka ⌃F, aka 6
-        funcs_by_chords[b"\x07"] = (runner.do_give_more_status,)  # BEL, aka ⌃G, aka 7 \a
+        funcs_by_chords[b"\x07"] = (runner.do_say_more,)  # BEL, aka ⌃G, aka 7 \a
         # funcs_by_chords[b"\x08"]  # BS, aka ⌃H, aka 8 \b
         # funcs_by_chords[b"\x09"]  # TAB, aka ⌃I, aka 9 \t
         funcs_by_chords[b"\x0A"] = (self.do_step_down_seek,)  # LF, aka ⌃J, aka 10 \n
@@ -1774,14 +1821,14 @@ class TerminalVi:
         funcs_by_chords[b" "] = (self.do_slip_ahead,)
         # funcs_by_chords[b"!"] = (self.do_pipe,)
         # funcs_by_chords[b'"'] = (self.do_arg,)
-        funcs_by_chords[b"#"] = (self.do_find_behind_this,)
+        funcs_by_chords[b"#"] = (self.do_find_behind_vi_this,)
         funcs_by_chords[b"$"] = (self.do_slip_last_seek,)
         # funcs_by_chords[b"%"]  # TODO: leap to match
         # funcs_by_chords[b"&"]  # TODO: & and && for repeating substitution
         # funcs_by_chords[b"'"]  # TODO: leap to pin
         # funcs_by_chords[b"("]  # TODO: sentence behind
         # funcs_by_chords[b")"]  # TODO: sentence ahead
-        funcs_by_chords[b"*"] = (self.do_find_ahead_this,)
+        funcs_by_chords[b"*"] = (self.do_find_ahead_vi_this,)
         funcs_by_chords[b"+"] = (self.do_step_down_dent,)
         funcs_by_chords[b","] = (self.do_slip_choice_undo,)
         funcs_by_chords[b"-"] = (self.do_step_up_dent,)
@@ -1913,7 +1960,7 @@ class TerminalVi:
 
         funcs_by_chords[b"\x7F"] = (self.do_slip_behind,)  # DEL, aka ⌃?, aka 127
 
-        funcs_by_chords["£".encode()] = (self.do_find_behind_this,)  # \u00A3 Pound Sign
+        funcs_by_chords["£".encode()] = (self.do_find_behind_vi_this,)  # \u00A3 GBP
 
         return funcs_by_chords
 
@@ -2792,7 +2839,7 @@ class TerminalRunner:
     #
 
     def do_redraw(self):  # Vim ⌃L
-        """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
+        """Toggle between more and less Lag (vs Vim injects lots of Lag exactly once)"""
 
         painter = self.painter
 
@@ -2808,8 +2855,8 @@ class TerminalRunner:
         message = ":set _lag_" if injecting_lag else ":set no_lag_"
         self.send_reply(message)
 
-    def do_give_more_status(self):  # Vim ⌃G
-        """Toggle betwene more and less Lag (vs Vim injects lots of Lag exactly once)"""
+    def do_say_more(self):  # Vim ⌃G
+        """Toggle between more and less Lag (vs Vim injects lots of Lag exactly once)"""
 
         injecting_lag = self.injecting_lag
 
@@ -2870,35 +2917,45 @@ class TerminalRunner:
         row = self.row
         column = self.column
 
+        # Find none
+
         if not spans:
+            self.send_reply("No chars found: not ahead and not after start")
 
-            return False
+            return
 
-        else:
+        # Sketch the Search
 
-            here0 = (row, column)
-            here1 = (-1, -1)  # before start
-            heres = (here0, here1)
+        ex_flags = ""
 
-            how0 = "Found {} chars ahead"
-            how1 = "Found {} chars, not ahead, found instead after start"
-            hows = (how0, how1)
+        # Find one or more, ahead, else after start
 
-            for (here, how) in zip(heres, hows):
-                for span in spans:
-                    len_chars = span.beyond - span.column
-                    there = self.spot_row_column_near_span(span)
+        here0 = (row, column)
+        here1 = (-1, -1)  # before start
+        heres = (here0, here1)
 
-                    if here < there:
-                        self.send_reply(how.format(len_chars))  # "Found..."
+        how0 = "{}{}/{}  Found {} chars ahead"
+        how1 = "{}{}/{}  Found {} chars, not ahead, found instead after start"
+        hows = (how0, how1)
 
-                        (self.row, self.column) = there
+        for (here, how) in zip(heres, hows):
+            for (index, span) in enumerate(spans):
+                len_chars = span.beyond - span.column
+                there = self.spot_row_column_near_span(span)
 
-                        return True
+                if here < there:
 
-            assert False, spans  # unreached
+                    if there == here0:
+                        how = "{}{}/{}  Found {} chars, here and only here"
+                    self.send_reply(
+                        how.format(ex_flags, 1 + index, len(spans), len_chars)
+                    )
 
-        self.send_reply("No chars found: not ahead and not after start")
+                    (self.row, self.column) = there
+
+                    return True
+
+        assert False, spans  # unreached
 
     def find_behind_and_reply(self):
         """Find the Search Key loudly: behind, else before end, else not"""
@@ -2907,31 +2964,39 @@ class TerminalRunner:
         row = self.row
         column = self.column
 
-        if spans:
+        # Find none
 
-            here0 = (row, column)
-            here1 = (self.spot_last_row() + 1, 0)  # after end
-            heres = (here0, here1)
+        if not spans:
+            self.send_reply("No chars found: not behind and not before end")
 
-            how0 = "Found {} chars behind"
-            how1 = "Found {} chars, not behind, found instead before end"
-            hows = (how0, how1)
+            return
 
-            for (here, how) in zip(heres, hows):
-                for span in reversed(spans):
-                    len_chars = span.beyond - span.column
-                    there = self.spot_row_column_near_span(span)
+        # Find one or more, behind, else before end
 
-                    if there < here:
-                        self.send_reply(how.format(len_chars))  # "Found ..."
+        here0 = (row, column)
+        here1 = (self.spot_last_row() + 1, 0)  # after end
+        heres = (here0, here1)
 
-                        (self.row, self.column) = there
+        how0 = "{}/{}  Found {} chars behind"
+        how1 = "{}/{}  Found {} chars, not behind, found instead before end"
+        hows = (how0, how1)
 
-                        return True
+        for (here, how) in zip(heres, hows):
+            for (index, span) in enumerate(reversed(spans)):
+                len_chars = span.beyond - span.column
+                there = self.spot_row_column_near_span(span)
 
-            assert False, spans  # unreached
+                if there < here:
 
-        self.send_reply("No chars found: not behind and not before end")
+                    if there == here0:
+                        how = "{}/{}  Found {} chars, here and only here"
+                    self.send_reply(how.format(1 + index, len(spans), len_chars))
+
+                    (self.row, self.column) = there
+
+                    return True
+
+        assert False, spans  # unreached
 
     def spot_row_column_near_span(self, span):
         """Find the Row:Column in File nearest to a Span"""
