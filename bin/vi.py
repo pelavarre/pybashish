@@ -651,7 +651,8 @@ class TerminalVi:
         runner = self.runner
         runner.nudge = TerminalNudgeIn()
 
-        ex = TerminalEx(runner)
+        ex_head = self.format_vi_reply()
+        ex = TerminalEx(runner, ex_head=ex_head)
         line = ex.read_ex_line()
 
         return line
@@ -1676,10 +1677,35 @@ class TerminalVi:
 
         # Choose the Status to surface
 
-        str_reply = runner.format_vi_reply()
+        str_reply = self.format_vi_reply()
         runner.reply = TerminalReplyOut()
 
         return str_reply
+
+    def format_vi_reply(self):
+        """Show Row:Column, Nudge, and Message"""
+
+        runner = self.runner
+        reply = runner.reply
+        nudge = reply.nudge
+
+        # Format parts, a la Vim ':set showcmd' etc
+
+        row_number = 1 + self.runner.row
+        column_number = 1 + self.runner.column
+
+        echo_bytes = b"" if (nudge is None) else nudge.join_echo_bytes()
+        str_echo = repr_vi_bytes(echo_bytes) if echo_bytes else ""
+
+        str_message = str(reply.message) if reply.message else ""
+
+        # Join parts
+
+        vi_reply = "{},{}  {}  {}".format(
+            row_number, column_number, str_echo, str_message
+        ).rstrip()
+
+        return vi_reply
 
     def _vi_bots_by_chords_(self):
         """Map Keyboard Inputs to Code, for when feeling like Vi"""
@@ -1889,10 +1915,10 @@ class TerminalVi:
 class TerminalEx:
     """Feed Keyboard into Line at Bottom of Screen of Scrolling Rows, a la Ex"""
 
-    def __init__(self, runner):
+    def __init__(self, runner, ex_head):
 
         self.runner = runner
-        self.ex_head = runner.format_vi_reply()
+        self.ex_head = ex_head
         self.ex_line = ""
 
     def format_ex_reply(self):
@@ -2572,30 +2598,6 @@ class TerminalRunner:
         nudge = self.nudge
 
         self.reply = TerminalReplyOut(nudge=nudge, message=message)
-
-    def format_vi_reply(self):  # FIXME: move this to TerminalVi from TerminalRunner
-        """Show Row:Column, Nudge, and Message"""
-
-        reply = self.reply
-        nudge = reply.nudge
-
-        # Format parts, a la Vim ':set showcmd' etc
-
-        row_number = 1 + self.row
-        column_number = 1 + self.column
-
-        echo_bytes = b"" if (nudge is None) else nudge.join_echo_bytes()
-        str_echo = repr_vi_bytes(echo_bytes) if echo_bytes else ""
-
-        str_message = str(reply.message) if reply.message else ""
-
-        # Join parts
-
-        vi_reply = "{},{}  {}  {}".format(
-            row_number, column_number, str_echo, str_message
-        ).rstrip()
-
-        return vi_reply
 
     def send_bell(self):
         """Ring the Terminal Bell as part of the next Prompt"""
