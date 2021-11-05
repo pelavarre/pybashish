@@ -22,7 +22,7 @@ keyboard tests:
   j k G 1G H L M - + _ ⌃J ⌃N ⌃P  => leap to row, leap to line
   1234567890 Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y zb zt zz  => scroll rows
-  ⌃L ⌃G  => toggle lag and say if lag is toggled
+  ⌃L ⌃G  => toggle lag, say if lag is toggled
   \n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
   /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
   :g/... Delete ⌃U ⌃C Return  => enter a search key and print every line found
@@ -45,7 +45,6 @@ simplest demo:
   python3 vi.py vi.py
   /egg
 """
-# we do define the arcane ⌃L to redraw, but we don't mention it in the help
 # we also don't mention ⌃D ⌃U till they stop raising NotImplementedError
 
 
@@ -2438,8 +2437,9 @@ class TerminalRunner:
 
         # After fixing the choice, assert the Top Row always was on File
 
-        if not (0 <= top_row < len(self.lines)):
-            raise KwArgsException(before=top_row, after=self.top_row)
+        if top_row:
+            if not (0 <= top_row < len(self.lines)):
+                raise KwArgsException(before=top_row, after=self.top_row)
 
     def prompt_for_chords(self):
         """Write over the Rows of Chars on Screen"""
@@ -3924,6 +3924,34 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     sys.stdout.flush()
     print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+
+
+
+# -- FIXME: bug reports of Fri 5/Nov --
+
+# add doc of :wq\r :wq!\r and so on
+
+# make it easy to update, once you start playing:  vi.py --pwnme
+# also vi.py --pwnme=master, vi.py --pwnme=pelavarre-patch-1 Git Branch names
+
+# accept :noh\r and :set ignorecase and so on
+
+# Qvi\r n y  => shouldn't be feeding those N Y keystrokes back into normal Vi
+
+# ZZ no print  => supposed to write File Buffer to Stdout
+
+# do echo the Search Key, and better than Vim does
+#   Vim echoes / ? keys till you press Return
+#   Vim echoes / ? keys if you come back and / Up or ? Up
+#   Vim echoes * keys only when found ahead, # keys only when found behind
+#   Vim never echoes n N keys
+
+# Vi Py should 'md5sum' its own source to speak as its version
+# Vi Py with no args should show version, same as Vim
+# CLI --version should show version, same as Vim
+# ⌃G should show version, beyond Vim
+
+# --
 
 
 # FIXME: don't scroll the : g / search off screen
