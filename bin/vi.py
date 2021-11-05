@@ -29,10 +29,21 @@ keyboard tests:
   Esc ⌃C Qvi⌃M 123Esc 123⌃C 3ZQ f⌃C 9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N  => eggs
   \F/$Return  => more eggs
 
-examples:
+pipe demos:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
   cat bin/vi.py |bin/vi.py -  # demo ZQ, etc
   cat bin/vi.py |bin/vi.py - |grep import  # demo ZQ vs ZZ
+
+how to get vi py:
+  cd ~/Desktop/
+  R=pelavarre/pybashish/pelavarre-patch-1/
+  F=bin/vi.py
+  curl -sSO --location https://raw.githubusercontent.com/$R/$F
+  ls -alF -drt vi.py
+
+simplest demo:
+  python3 vi.py vi.py
+  /egg
 """
 # we do define the arcane ⌃L to redraw, but we don't mention it in the help
 # we also don't mention ⌃D ⌃U till they stop raising NotImplementedError
