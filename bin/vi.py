@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 
 r"""
-usage: vi.py [-h] [FILE ...]
+usage: vi.py [-h] [--pwnme [BRANCH]] [--version] [FILE ...]
 
 read files, accept zero or more edits, write files
 
 positional arguments:
-  FILE        a file to edit, such as '-' to mean stdin
+  FILE              a file to edit, such as '-' to mean stdin
 
 optional arguments:
-  -h, --help  show this help message and exit
+  -h, --help        show this help message and exit
+  --pwnme [BRANCH]  download fresh Code to run in place of this Code (default: 'master')
+  --version         print a hash of this Code (its Md5Sum)
 
 quirks:
   defaults to read Stdin, and writes Stdout at ZZ (but not at ZQ)
@@ -36,10 +38,11 @@ pipe demos:
 
 how to get vi py:
   cd ~/Desktop/
-  R=pelavarre/pybashish/pelavarre-patch-1/
+  R=pelavarre/pybashish/master
   F=bin/vi.py
   curl -sSO --location https://raw.githubusercontent.com/$R/$F
   ls -alF -drt vi.py
+  python3 vi.py --pwnme +q  # 6 lines to start, but repeat just this 1 line to refresh
 
 simplest demo:
   python3 vi.py vi.py
@@ -51,6 +54,7 @@ simplest demo:
 import argparse
 import collections
 import difflib
+import hashlib
 import inspect
 import os
 import pdb
@@ -121,6 +125,10 @@ def main(argv):
     """Run from the Command Line"""
 
     args = parse_vi_argv(argv)
+    if args.pwnme is not False:
+        pwnme(branch=args.pwnme)
+    if args.version:
+        print_version_and_exit()
 
     # Visit each File
 
@@ -132,6 +140,13 @@ def main(argv):
         assert False  # unreached
     except SystemExit as exc:
         returncode = exc.code
+
+        if (not returncode) and editor.file_written:
+
+            runner = editor.runner
+            iobytearray = runner.iobytearray
+            os.write(sys.stdout.fileno(), iobytearray)
+            sys.stdout.flush()
 
         if editor.log:
             stderr_print(editor.log)
@@ -147,6 +162,7 @@ def parse_vi_argv(argv):
     """Convert a Vi Sys ArgV to an Args Namespace, or print some Help and quit"""
 
     parser = compile_argdoc(epi="quirks")
+
     parser.add_argument(
         "files",
         metavar="FILE",
@@ -154,11 +170,64 @@ def parse_vi_argv(argv):
         help="a file to edit, such as '-' to mean stdin",
     )
 
+    parser.add_argument(
+        "--pwnme",
+        metavar="BRANCH",
+        nargs="?",
+        default=False,
+        help="download fresh Code to run in place of this Code (default: 'master')",
+    )
+
+    parser.add_argument(
+        "--version",
+        action="count",
+        help="print a hash of this Code (its Md5Sum)",
+    )
+
     exit_unless_doc_eq(parser)
 
     args = parser.parse_args(argv[1:])
 
     return args
+
+
+def print_version_and_exit():
+    """Print a hash of this Code (its Md5Sum) and exit"""
+
+    version = module_file_version()
+    str_hash = module_file_hash()
+    str_short_hash = str_hash[:4]  # conveniently fewer nybbles  # good enough?
+
+    print("Vi Py {} hash {} ({})".format(version, str_short_hash, str_hash))
+
+    sys.exit()
+
+
+def pwnme(branch):
+    """Download fresh Code to run in place of this stale Code"""
+
+    path = module_file_path()
+
+    assert branch in (None, "master", "pelavarre-patch-1"), branch
+    branch_ = "master" if (branch is None) else branch
+
+    link = (
+        "https://raw.githubusercontent.com/" "pelavarre/pybashish/{}/" "bin/vi.py"
+    ).format(branch_)
+
+    curl_shline = "curl -sS --location {link} >{path}".format(link=link, path=path)
+
+    chmod_shline = "chmod ugo+x {path}".format(path=path)
+    vi_py_shline = "{path} ... FIXME ...".format(path=path)
+
+    stderr_print("FIXME: do for you, what is roughly")
+    shlines = (curl_shline, chmod_shline, vi_py_shline)
+    for shline in shlines:
+        stderr_print("+ {}".format(shline))
+
+    raise NotImplementedError()
+
+    sys.exit()
 
 
 #
@@ -171,13 +240,14 @@ VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # aka r"[A-Za
 
 
 class TerminalVi:
-    """Feed Keyboard into Screen of File of Lines of chars, a la Vi"""
+    """Feed Keyboard into Screen of File of Lines of chars, a la Vim"""
 
     def __init__(self, files):
 
         self.files = files  # read zero or more files
         self.file_index = None
-        self.reading_path = None
+        self.file_path = None
+        self.file_written = None
 
         self.log = None  # capture Python Tracebacks
 
@@ -200,10 +270,20 @@ class TerminalVi:
 
         funcs_by_chords = self._vi_funcs_by_chords_()
         try:
+
             runner.run_terminal(funcs_by_chords)
             assert False  # unreached
+
         finally:
+
             self.log = runner.traceback
+            stderr_print(self.file_written, len(self.runner.iobytearray))
+
+            if not self.file_written:
+                stderr_print(
+                    "vi.py: quit without write, "
+                    "like because ZQ, or :q!, or didn't read Stdin"
+                )
 
     def do_next_vi_file(self):
         """Visit the next File, else the first File"""
@@ -219,7 +299,7 @@ class TerminalVi:
 
         # Close this File
 
-        if self.reading_path is not None:
+        if self.file_path is not None:
             self.do_might_flush_vi()
 
         # Choose next File, else quit after last File
@@ -250,7 +330,7 @@ class TerminalVi:
     def reopen_path(self, path):
         """Visit a chosen File"""
 
-        self.reading_path = path
+        self.file_path = path
 
         runner = self.runner
 
@@ -323,17 +403,20 @@ class TerminalVi:
     def do_c0_control_esc(self):  # Vim Esc
         """Cancel Digits Prefix, else suggest ZZ to quit Vi Py"""
 
+        version = module_file_version()
+
         arg1 = self.get_vi_arg1(default=None)
         if arg1 is not None:
             self.send_vi_reply("Escaped")  # 123 Esc Egg, etc
         else:
-            self.send_vi_reply("Press ZZ to save changes and quit Vi Py")  # Esc Egg
-            # Vim rings a Bell for each extra Esc
+            self.send_vi_reply(
+                "Press ZZ to save changes and quit Vi Py {}".format(version)
+            )  # Esc Egg  # Vim rings a Bell for each extra Esc
 
     def do_continue_vi(self):  # Vim Q v i Return  # not Ex Mode from last century
         """Accept Q v i Return, without ringing the Terminal bell"""
 
-        self.send_vi_reply("Would you like to play a game?")
+        self.send_vi_reply("Would you like to play a game? Try to quit Vi Py")
 
     def do_vi_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
@@ -352,33 +435,26 @@ class TerminalVi:
     def do_flush_quit_vi(self):  # Vim ZZ  # Vim :wq!\r
         """Save last changes and quit"""
 
-        self.do_flush_vi()
+        if self.file_path == "/dev/stdin":
+            self.file_written = True
 
         returncode = self.get_vi_arg1(default=None)
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
 
-    def do_flush_vi(self):  # Vim :w!\r
-
-        runner = self.runner
-        iobytearray = runner.iobytearray
-        os.write(sys.stdout.fileno(), iobytearray)
-        sys.stdout.flush()
-
     def do_help_quit_vi(self):  # Vim ⌃C  # Vi Py Init
         """Suggest ZQ to quit Vi Py"""
 
-        self.send_vi_reply("Press ZQ to lose changes and quit Vi Py")  # ⌃C Egg
-        # Vim rings a Bell for each extra ⌃C
+        version = module_file_version()
+
+        self.send_vi_reply(
+            "Press ZQ to lose changes and quit Vi Py {}".format(version)
+        )  # ⌃C Egg  # Vim rings a Bell for each extra ⌃C
 
     def do_might_flush_quit_vi(self):  # Vim :wq\r
         """Halt if more files, else quit"""
 
         self.do_might_flush_vi()
         self.do_might_quit_vi()
-
-    def do_might_flush_vi(self):  # Vim :w\r
-
-        self.do_flush_vi()
 
     def do_might_quit_vi(self):  # Vim :q\r
         """Halt if more files, else quit"""
@@ -399,7 +475,9 @@ class TerminalVi:
         runner = self.runner
         iobytearray = runner.iobytearray
 
-        returncode = 1 if iobytearray else None
+        returncode = 0
+        if self.file_path == "/dev/stdin":
+            returncode = 1 if iobytearray else None
         returncode = self.get_vi_arg1(default=returncode)
 
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
@@ -1724,7 +1802,7 @@ class TerminalVi:
             self.seeking_column = None
 
     def run_before_vi_prompt(self):
-        """Run before Vi Prompt written"""
+        """Place Screen Cursor and fill Status Line, before Vi Prompt written"""
 
         runner = self.runner
 
@@ -1858,10 +1936,11 @@ class TerminalVi:
         funcs_by_chords[b":q!"] = None
         funcs_by_chords[b":q!\r"] = (self.do_quit_vi,)
 
-        funcs_by_chords[b":w"] = None
-        funcs_by_chords[b":w\r"] = (self.do_might_flush_vi,)
+        # funcs_by_chords[b":w"] = None
+        # funcs_by_chords[b":w\r"] = (self.do_might_flush_vi,)
 
-        funcs_by_chords[b":w!\r"] = (self.do_flush_vi,)
+        # funcs_by_chords[b":w!"] = None
+        # funcs_by_chords[b":w!\r"] = (self.do_flush_vi,)
 
         funcs_by_chords[b":wq"] = None
         funcs_by_chords[b":wq\r"] = (self.do_might_flush_quit_vi,)
@@ -2076,7 +2155,7 @@ class TerminalEx:
         sys.exit()
 
     def run_before_ex_prompt(self):
-        """Place the Screen Cursor, like while prompting for more Chords"""
+        """Place Screen Cursor and fill Status Line, before Ex Prompt written"""
 
         runner = self.runner
 
@@ -2865,9 +2944,11 @@ class TerminalRunner:
         """Toggle between more and less Lag (vs Vim injects lots of Lag exactly once)"""
 
         injecting_lag = self.injecting_lag
+        version = module_file_version()
 
         message = ":set _lag_" if injecting_lag else ":set no_lag_"
         self.send_reply(message)
+        self.reply.flags = version
 
         # TODO: echo $(whoami)@$(hostname):$(pwd)/
 
@@ -3041,11 +3122,9 @@ class TerminalPainter:
         self.row = 0  # point the Screen Cursor to a Row of File
         self.column = 0  # point the Screen Cursor to a Column of File
 
-        self.top_line_number = 1  # number the Rows of the Screen down from first
-        self.last_line_number = 1  # number all Rows as wide as the last
-        self.painting_line_number = (
-            None  # start each Row with its Line Number, or don't
-        )
+        self.top_line_number = 1  # number the Scrolling Rows down from First of Screen
+        self.last_line_number = 1  # number all Rows as wide as the Last Row of File
+        self.painting_line_number = None  # number the Scrolling Rows visibly, or not
 
         self._reopen_terminal_()  # start sized to fit the initial Screen
 
@@ -3104,34 +3183,36 @@ class TerminalPainter:
 
         terminal = self.terminal
 
+        column = self.column
         columns = self.columns
         left_column = self.spot_left_column()
+        row = self.row
         scrolling_rows = self.scrolling_rows
 
         # Format chars to display
 
         texts = list(_.splitlines()[0] for _ in lines)
 
-        for (row, text) in enumerate(texts):
-            texts[row] = text
+        for (row_, text) in enumerate(texts):
+            texts[row_] = text
         while len(texts) < scrolling_rows:
             texts.append("~")
 
         assert len(texts) == scrolling_rows, (len(texts), scrolling_rows)
 
-        for (row, text) in enumerate(texts):
-            str_line_number = self.format_as_line_number(row)
+        for (row_, text) in enumerate(texts):
+            str_line_number = self.format_as_line_number(row_)
             numbered_and_chopped = (str_line_number + text)[:columns]
-            if row < len(lines):
-                texts[row] = numbered_and_chopped
+            if row_ < len(lines):
+                texts[row_] = numbered_and_chopped
 
         # Write the formatted chars
 
         terminal.write(ED_2)
         terminal.write(CUP_1_1)
 
-        for (row, text) in enumerate(texts):
-            (styled, text_plus) = self.style_text(row, text=text, spans=spans)
+        for (row_, text) in enumerate(texts):
+            (styled, text_plus) = self.style_text(row_, text=text, spans=spans)
             if len(text_plus) < columns:
                 terminal.write(styled + "\r\n")
             else:
@@ -3147,8 +3228,10 @@ class TerminalPainter:
 
         # Place the cursor
 
-        y = 1 + self.row
-        x = 1 + left_column + self.column
+        cursor_left_column = left_column if (row < scrolling_rows) else 0
+
+        y = 1 + row
+        x = 1 + cursor_left_column + column
         terminal.write(CUP_Y_X.format(y, x))
 
     def write_bell(self):
@@ -3841,6 +3924,8 @@ def compile_argdoc(epi, drop_help=None):
 def exit_unless_doc_eq(parser):
     """Exit nonzero, unless __main__.__doc__ equals "parser.format_help()" """
 
+    # Name the Sourcefile of this Module
+
     f = inspect.currentframe()
     module = inspect.getmodule(f.f_back)
     module_doc = module.__doc__
@@ -3900,6 +3985,49 @@ def exit_unless_doc_eq(parser):
 
 
 # deffed in many files  # missing from docs.python.org
+def module_file_hash():
+    """Hash the Bytes of this SourceFile"""
+
+    abs_module_file = os.path.abspath(module_file_path())
+    with open(abs_module_file, "rb") as reading:
+        file_bytes = reading.read()
+
+    hasher = hashlib.md5()
+    hasher.update(file_bytes)
+    hash_bytes = hasher.digest()
+
+    str_hash = hash_bytes.hex()
+    str_hash = str_hash.upper()  # such as 32 nybbles 'D41D8CD98F00B204E9800998ECF8427E'
+
+    return str_hash
+
+
+# deffed in many files  # missing from docs.python.org
+def module_file_path():
+    """Name the Sourcefile of this Module"""
+
+    f = inspect.currentframe()
+    module_file = f.f_back.f_code.co_filename  # more available than 'module.__file__'
+
+    return module_file
+
+
+# deffed in many files  # missing from docs.python.org
+def module_file_version():
+    """Pick a conveniently small, reasonably distinct, decimal Version Number"""
+
+    str_hash = module_file_hash()
+
+    major = int(str_hash[0], 0x10)
+    minor = int(str_hash[1], 0x10)
+    micro = int(str_hash[2:][:2], 0x10)
+
+    version = "{}.{}.{}".format(major, minor, micro)
+
+    return version
+
+
+# deffed in many files  # missing from docs.python.org
 def file_print(*args):  # later Python 3 accepts ', **kwargs' here
     """Save out the Str of an Object as a File"""
 
@@ -3926,46 +4054,28 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
-
-# -- FIXME: bug reports of Fri 5/Nov --
-
-# add doc of :wq\r :wq!\r and so on
-
-# make it easy to update, once you start playing:  vi.py --pwnme
-# also vi.py --pwnme=master, vi.py --pwnme=pelavarre-patch-1 Git Branch names
-
-# accept :noh\r and :set ignorecase and so on
-
-# Qvi\r n y  => shouldn't be feeding those N Y keystrokes back into normal Vi
-
-# ZZ no print  => supposed to write File Buffer to Stdout
-
-# do echo the Search Key, and better than Vim does
-#   Vim echoes / ? keys till you press Return
-#   Vim echoes / ? keys if you come back and / Up or ? Up
-#   Vim echoes * keys only when found ahead, # keys only when found behind
-#   Vim never echoes n N keys
-
-# Vi Py should 'md5sum' its own source to speak as its version
-# Vi Py with no args should show version, same as Vim
-# CLI --version should show version, same as Vim
-# ⌃G should show version, beyond Vim
-
-# --
-
-
-# FIXME: don't scroll the : g / search off screen
-# FIXME: do count the lines not shown by : g / because they don't fit on screen
-
 # FIXME: talk of Lines and Closed Lines, not of Texts and Lines
 
 # FIXME: TerminalKeyboard <- funcs_by_chars, run/_before|_after/_prompt|_do/
 # FIXME: TerminalKeyboard is a delegate inside TerminalRunner
 # FIXME: TerminalViCursor to slip & step
 
+# FIXME: don't scroll the : g / search off screen
+# FIXME: do count the lines not shown by : g / because they don't fit on screen
+
+# FIXME: add doc of :wq\r :wq!\r and so on
+# FIXME: accept :noh\r and :set ignorecase and so on
+
+# FIXME: do echo the Search Key, and better than Vim does
+# FIXME:   Vim echoes / ? keys till you press Return
+# FIXME:   Vim echoes / ? keys if you come back and / Up or ? Up
+# FIXME:   Vim echoes * keys only when found ahead, # keys only when found behind
+# FIXME:   Vim never echoes n N keys
+
+# FIXME: somehow need two ⌃L after each Terminal Window Resize?  \ n \ n doesn't work?
+
 # FIXME: radically simplified undo:  3u to rollback 3 keystrokes
 # FIXME: radically simplified undo:  u to explain radically simplified undo
-
 
 # TODO: ⌃I ⌃O walk the Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
 # TODO: despite Doc, to match Vim, include in the Jump List the * # forms of / ?
@@ -3992,6 +4102,8 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # TODO: solve:  echo -n abc |vi -
 # TODO: show the first ~ past the end differently when No End for Last Line
 # TODO: revive the last Match of r"$" out there
+
+# TODO: toggled :set wrap, :set nowrap
 
 
 # TODO: ⌃D ⌃U scrolling
