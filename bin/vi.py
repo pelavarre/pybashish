@@ -2462,12 +2462,6 @@ class TerminalRunner:
         self.iobytespans = list()  # cache the spans in file
         self.reopen_iobytespans()
 
-    def terminal_print(self, *args):
-        """Scroll up and write Line"""
-
-        line = " ".join(str(_) for _ in args)
-        self.driver.write(line + "\r\n")
-
     def _enter_keyboard_(self):
 
         keyboard_state = (
@@ -2501,6 +2495,10 @@ class TerminalRunner:
             self.doing_more,
             self.doing_done,
         ) = keyboard_state
+
+    #
+    #
+    #
 
     def run_terminal(self, keyboard):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
@@ -2567,17 +2565,6 @@ class TerminalRunner:
                 keyboard.exit_do_func()
 
             self.nudge = TerminalNudgeIn()  # consume the whole Nudge
-
-    def terminal_getch(self):
-        """Block till next keyboard input Chord"""
-
-        terminal = self.painter
-        try:
-            chord = terminal.getch()
-        except KeyboardInterrupt:
-            chord = b"\x03"  # ETX, aka ⌃C, aka 3
-
-        return chord
 
     def scroll_cursor_into_screen(self):
         """Scroll to place Cursor on Screen"""
@@ -2652,7 +2639,8 @@ class TerminalRunner:
 
         terminal.flush()
 
-        # Rewrite whole Screen slowly as late as possible
+        # Rewrite whole Screen slowly as late as practical
+        # to override bugs in the TerminalShadow cache, if those bugs exist
 
         if not injecting_lag:
             # time.sleep(0.3)  # compile-time option for a different kind of lag
@@ -2790,6 +2778,70 @@ class TerminalRunner:
 
             break
 
+    def keep_cursor_on_file(self):
+        """Fail faster, like when some Bug shoves the Cursor off of Buffer of File"""
+
+        row = self.row
+        column = self.column
+
+        rows = self.count_rows_in_file()
+        columns = 0 if (not rows) else self.count_columns_in_row()
+
+        # Keep the choice of Row and Column on File
+
+        before = (row, column)
+
+        if not ((0 <= row < rows) or (row == rows == 0)):
+            row = 0
+        if not ((0 <= column < columns) or (column == columns == 0)):
+            column = 0
+
+        self.row = row
+        self.column = column
+
+        # After fixing the choice, assert the Row and Column always were on File
+
+        after = (row, column)
+        if before != after:
+            raise KwArgsException(before=before, after=after)
+
+    #
+    # Take the Args as given, or substitute a Default Arg Value
+    #
+
+    def get_arg0(self):
+        """Get the Bytes of the input Chords"""
+
+        arg0 = self.arg0
+        assert arg0 is not None
+
+        return arg0
+
+    def get_arg1(self, default=1):
+        """Get the Int of the Prefix Digits before the Chords, else the Default Int"""
+
+        arg1 = self.arg1
+        arg1 = default if (arg1 is None) else arg1
+
+        return arg1
+
+    def get_arg2(self):
+        """Get the Bytes of the input Suffix past the input Chords"""
+
+        arg2 = self.arg2
+        assert arg2 is not None
+
+        return arg2
+
+    def continue_do_loop(self):
+        """Ask to run again, like to run for a total of 'self.arg1' times"""
+
+        self.doing_more = True
+
+    #
+    # Send and tweak replies
+    #
+
     def editor_print(self, *args):
         """Capture some Status now, to show with next Prompt"""
 
@@ -2824,38 +2876,22 @@ class TerminalRunner:
 
         self.sending_bell = True
 
-    def continue_do_loop(self):
-        """Ask to run again, like to run for a total of 'self.arg1' times"""
+    def terminal_print(self, *args):
+        """Scroll up and write Line"""
 
-        self.doing_more = True
+        line = " ".join(str(_) for _ in args)
+        self.driver.write(line + "\r\n")
 
-    #
-    # Take the Args as given, or substitute a Default Arg Value
-    #
+    def terminal_getch(self):
+        """Block till next keyboard input Chord"""
 
-    def get_arg0(self):
-        """Get the Bytes of the input Chords"""
+        terminal = self.painter
+        try:
+            chord = terminal.getch()
+        except KeyboardInterrupt:
+            chord = b"\x03"  # ETX, aka ⌃C, aka 3
 
-        arg0 = self.arg0
-        assert arg0 is not None
-
-        return arg0
-
-    def get_arg1(self, default=1):
-        """Get the Int of the Prefix Digits before the Chords, else the Default Int"""
-
-        arg1 = self.arg1
-        arg1 = default if (arg1 is None) else arg1
-
-        return arg1
-
-    def get_arg2(self):
-        """Get the Bytes of the input Suffix past the input Chords"""
-
-        arg2 = self.arg2
-        assert arg2 is not None
-
-        return arg2
+        return chord
 
     #
     # Focus on one Line of a File of Lines
@@ -2983,37 +3019,6 @@ class TerminalRunner:
         middle_row = top_row + middle
 
         return middle_row
-
-    #
-    # FIXME: Say what this is
-    #
-
-    def keep_cursor_on_file(self):
-        """Fail faster, like when some Bug shoves the Cursor off of Buffer of File"""
-
-        row = self.row
-        column = self.column
-
-        rows = self.count_rows_in_file()
-        columns = 0 if (not rows) else self.count_columns_in_row()
-
-        # Keep the choice of Row and Column on File
-
-        before = (row, column)
-
-        if not ((0 <= row < rows) or (row == rows == 0)):
-            row = 0
-        if not ((0 <= column < columns) or (column == columns == 0)):
-            column = 0
-
-        self.row = row
-        self.column = column
-
-        # After fixing the choice, assert the Row and Column always were on File
-
-        after = (row, column)
-        if before != after:
-            raise KwArgsException(before=before, after=after)
 
     #
     # Define keys common to many TerminalEditor's
