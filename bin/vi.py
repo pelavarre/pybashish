@@ -231,7 +231,7 @@ def pwnme(branch):
 
 
 #
-# Edit some Scrolling Rows, backed by Lines of a File of Chars encoded as Bytes
+# Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim
 #
 
 
@@ -240,11 +240,12 @@ VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # aka r"[A-Za
 
 
 class TerminalVi:
-    """Feed Keyboard into Screen of File of Lines of chars, a la Vim"""
+    """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim"""
 
     def __init__(self, files):
 
         self.files = files  # read zero or more files
+
         self.file_index = None
         self.file_path = None
         self.file_written = None
@@ -259,6 +260,7 @@ class TerminalVi:
         self.seeking_more = None  # remembering the Seeking Column into next Nudge
         self.seeking_column = None  # leap to a Column after changing Row
 
+    # FIXME: shuffle - do_next_vi_file, then run_terminal
     def run_terminal(self):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
 
@@ -285,6 +287,7 @@ class TerminalVi:
                     "like because ZQ, or :q!, or didn't read Stdin"
                 )
 
+    # FIXME: shuffle - do_next_vi_file, then run_terminal
     def do_next_vi_file(self):
         """Visit the next File, else the first File"""
 
@@ -348,7 +351,7 @@ class TerminalVi:
 
         iobytearray = bytearray(iobytes)
 
-        # Start editing Lines of Columns, given a File of Bytes
+        # Swap in a new File of Lines
 
         runner._reinit_iobytearray_etc_(iobytearray)
 
@@ -549,24 +552,24 @@ class TerminalVi:
         painter = runner.painter
         terminal = painter
 
-        last_line_number = 1 + len(runner.lines)
+        last_line_number = 1 + len(runner.ended_lines)
         str_last_line_number = "{:3} ".format(last_line_number)
         last_width = len(str_last_line_number)
 
-        #
+        # Take Search Key as input
 
         runner.accent_reply_with_find()  # before 'read_vi_line'
         if self.find_read_vi_line(slip=+1) is None:
 
             return
 
-        #
+        # Print Matches
 
         (found_row, found_column) = (runner.row, runner.column)
 
         if runner.find_ahead_and_reply():
 
-            runner.print_text("")
+            runner.terminal_print("")
 
             printed_row = None
             for span in runner.iobytespans:
@@ -578,12 +581,12 @@ class TerminalVi:
                 if runner.showing_line_number:
                     str_line_number = "{:3} ".format(line_number).rjust(last_width)
 
-                text = runner.fetch_row_text(row=found_row)
+                line = runner.fetch_row_line(row=found_row)
 
                 if found_row != printed_row:
-                    runner.print_text(str_line_number + text)
+                    runner.terminal_print(str_line_number + line)
 
-            runner.print_text("Press Return to continue . . .")
+            runner.terminal_print("Press Return to continue . . .")
             _ = terminal.getch()
 
             terminal._reopen_terminal_()
@@ -873,9 +876,9 @@ class TerminalVi:
 
         runner = self.runner
 
-        text = runner.fetch_row_text()
-        lstripped = text.lstrip()
-        column = len(text) - len(lstripped)
+        line = runner.fetch_row_line()
+        lstripped = line.lstrip()
+        column = len(line) - len(lstripped)
 
         runner.column = column
 
@@ -1359,7 +1362,7 @@ class TerminalVi:
         runner.top_row = top_row
 
     #
-    # Search ahead for an empty line
+    # Search ahead for an Empty Line
     #
 
     def do_paragraph_ahead(self):  # Vim {
@@ -1606,7 +1609,7 @@ class TerminalVi:
         runner = self.runner
 
         last_column = runner.spot_last_column()
-        text = runner.fetch_row_text()
+        line = runner.fetch_row_line()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -1623,7 +1626,7 @@ class TerminalVi:
             column += 1
 
             try:
-                right = text[column:].index(choice)
+                right = line[column:].index(choice)
             except ValueError:
                 raise ValueError("substring {!r} not found ahead".format(choice))
             column += right
@@ -1670,7 +1673,7 @@ class TerminalVi:
         runner = self.runner
 
         last_column = runner.spot_last_column()
-        text = runner.fetch_row_text()
+        line = runner.fetch_row_line()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -1687,7 +1690,7 @@ class TerminalVi:
             column -= 1
 
             try:
-                column = text[: (column + 1)].rindex(choice)
+                column = line[: (column + 1)].rindex(choice)
             except ValueError:
                 raise ValueError("substring {!r} not found behind".format(choice))
 
@@ -2268,7 +2271,7 @@ class TerminalSpan(
         some_match = matches[-1]
 
         chars = some_match.string
-        lines = chars.splitlines(keepends=True)
+        ended_lines = chars.splitlines(keepends=True)
 
         # Search each Line for the next Match
 
@@ -2281,19 +2284,23 @@ class TerminalSpan(
 
             start = match.start()
             while start > len(spanned_chars):
-                line = lines[len(spanned_lines)]
+                ended_line = ended_lines[len(spanned_lines)]
 
-                spanned_lines.append(line)
-                spanned_chars += line
+                spanned_lines.append(ended_line)
+                spanned_chars += ended_line
 
             # Find the Row of the Match, in or beyond the Spanned Lines
 
             row = 0
             line_at = 0
             if spanned_lines:
+
                 row = len(spanned_lines) - 1
-                line_at = len(spanned_chars) - len(spanned_lines[-1])
+                spanned_line = spanned_lines[-1]
+                line_at = len(spanned_chars) - len(spanned_line)
+
                 if start == len(spanned_chars):
+
                     row = len(spanned_lines)
                     line_at = len(spanned_chars)
 
@@ -2314,7 +2321,7 @@ class TerminalSpan(
         if spans:
 
             last_span = spans[-1]
-            if last_span.row >= len(lines):
+            if last_span.row >= len(ended_lines):
 
                 del spans[-1]
 
@@ -2322,7 +2329,7 @@ class TerminalSpan(
 
 
 class TerminalRunner:
-    """Loop on Keyboard Chords, not whole Lines, but then do read-eval-print"""
+    """Feed Keyboard into Scrolling Rows of File of Lines of Chars"""
 
     keyboard_stack = list()
 
@@ -2362,13 +2369,13 @@ class TerminalRunner:
         # FIXME: self.doing = mutable namespace
 
     def _reinit_iobytearray_etc_(self, iobytearray):
-        "Start editing Lines of Columns, given a File of Bytes" ""
+        """Swap in a new File of Lines"""
 
         self.iobytearray = iobytearray
 
         chars = iobytearray.decode(errors="surrogateescape")
-        lines = chars.splitlines(keepends=True)
-        self.lines = lines  # view a copy of a File of Chars encoded as Bytes
+        ended_lines = chars.splitlines(keepends=True)
+        self.ended_lines = ended_lines  # Ended Lines of Chars decoded from Bytes
 
         self.traceback = None  # capture Python Tracebacks
 
@@ -2380,10 +2387,10 @@ class TerminalRunner:
         self.iobytespans = list()  # cache the spans in file
         self.reopen_iobytespans()
 
-    def print_text(self, text):
-        """Scroll up the screen and write a Line of Text"""
+    def terminal_print(self, line):
+        """Scroll up and write Line"""
 
-        self.driver.write(text + "\r\n")
+        self.driver.write(line + "\r\n")
 
     def _enter_keyboard_(self):
 
@@ -2500,7 +2507,7 @@ class TerminalRunner:
 
         # Keep the choice of Top Row on File
 
-        if not (0 <= top_row < len(self.lines)):
+        if not (0 <= top_row < len(self.ended_lines)):
             self.top_row = 0
 
         # Scroll behind to get Cursor on Screen, if need be
@@ -2517,7 +2524,7 @@ class TerminalRunner:
         # After fixing the choice, assert the Top Row always was on File
 
         if top_row:
-            if not (0 <= top_row < len(self.lines)):
+            if not (0 <= top_row < len(self.ended_lines)):
                 raise KwArgsException(before=top_row, after=self.top_row)
 
     def prompt_for_chords(self):
@@ -2539,8 +2546,8 @@ class TerminalRunner:
 
         # Pull from Self
 
-        lines = self.lines
-        screen_lines = lines[self.top_row :][: painter.scrolling_rows]
+        ended_lines = self.ended_lines
+        screen_lines = ended_lines[self.top_row :][: painter.scrolling_rows]
         screen_spans = self.spot_spans_on_screen()
 
         injecting_lag = self.injecting_lag
@@ -2549,7 +2556,7 @@ class TerminalRunner:
         # Push into the Terminal
 
         painter.top_line_number = 1 + self.top_row
-        painter.last_line_number = 1 + len(lines)
+        painter.last_line_number = 1 + len(ended_lines)
         painter.painting_line_number = self.showing_line_number
 
         # Choose more or less Accuracy & Lag
@@ -2559,7 +2566,9 @@ class TerminalRunner:
                 # time.sleep(0.3)  # delaying Output demos a different kind of lag
                 terminal._reopen_terminal_()
 
-        painter.write_screen(status=str_status, lines=screen_lines, spans=screen_spans)
+        painter.write_screen(
+            status=str_status, ended_lines=screen_lines, spans=screen_spans
+        )
 
         if sending_bell:
             self.sending_bell = None
@@ -2802,42 +2811,42 @@ class TerminalRunner:
 
         column_ = self.column if (column is None) else column
 
-        row_line = self.lines[self.row]
-        row_text = row_line.splitlines()[0]
-        chars = row_text[column_:][:1]
+        ended_line = self.ended_lines[self.row]
+        line = ended_line.splitlines()[0]
+        chars = line[column_:][:1]
 
         return chars  # 0 or 1 chars
 
-    def fetch_row_text(self, row=None):
+    def fetch_row_line(self, row=None):
         """Get Chars of Columns in Row beneath Cursor"""
 
         row_ = self.row if (row is None) else row
 
-        row_line = self.lines[row_]
-        row_text = row_line.splitlines()[0]
+        ended_line = self.ended_lines[row_]
+        line = ended_line.splitlines()[0]
 
-        return row_text
+        return line
 
     def count_columns_in_row(self):
         """Count Columns in Row beneath Cursor"""
 
-        lines = self.lines
+        ended_lines = self.ended_lines
         row = self.row
 
-        if row >= len(lines):
+        if row >= len(ended_lines):
             raise IndexError(row)
 
-        row_line = lines[row]
-        row_text = row_line.splitlines()[0]
+        ended_line = ended_lines[row]
+        line = ended_line.splitlines()[0]
 
-        columns = len(row_text)
+        columns = len(line)
 
         return columns
 
     def count_rows_in_file(self):
         """Count Rows in Buffer of File"""
 
-        rows = len(self.lines)
+        rows = len(self.ended_lines)
 
         return rows
 
@@ -2847,7 +2856,7 @@ class TerminalRunner:
         top_row_ = self.top_row if (top_row is None) else top_row
         painter = self.painter
 
-        rows = len(self.lines)
+        rows = len(self.ended_lines)
         last_row = (rows - 1) if rows else 0
 
         bottom_row = top_row_ + (painter.scrolling_rows - 1)
@@ -2858,7 +2867,7 @@ class TerminalRunner:
     def spot_last_row(self):
         """Find the last Row in File, else Row Zero when no Rows in File"""
 
-        rows = len(self.lines)
+        rows = len(self.ended_lines)
         last_row = (rows - 1) if rows else 0
 
         return last_row
@@ -2867,15 +2876,15 @@ class TerminalRunner:
         """Find the last Column in Row, else Column Zero when no Columns in Row"""
 
         row_ = self.row if (row is None) else row
-        lines = self.lines
+        ended_lines = self.ended_lines
 
-        if row_ >= len(lines):
+        if row_ >= len(ended_lines):
             raise IndexError(row)
 
-        row_line = lines[row_]
-        row_text = row_line.splitlines()[0]
+        ended_line = ended_lines[row_]
+        line = ended_line.splitlines()[0]
 
-        columns = len(row_text)
+        columns = len(line)
         last_column = (columns - 1) if columns else 0
 
         return last_column
@@ -3178,7 +3187,7 @@ class TerminalPainter:
 
         return chord
 
-    def write_screen(self, status, lines, spans):
+    def write_screen(self, status, ended_lines, spans):
         """Write over the Rows of Chars on Screen"""
 
         terminal = self.terminal
@@ -3189,31 +3198,30 @@ class TerminalPainter:
         row = self.row
         scrolling_rows = self.scrolling_rows
 
-        # Format chars to display
+        # Fill the Screen with Lines of "~" past the last Line of File
 
-        texts = list(_.splitlines()[0] for _ in lines)
+        lines = list(_.splitlines()[0] for _ in ended_lines)
 
-        for (row_, text) in enumerate(texts):
-            texts[row_] = text
-        while len(texts) < scrolling_rows:
-            texts.append("~")
+        while len(lines) < scrolling_rows:
+            lines.append("~")
 
-        assert len(texts) == scrolling_rows, (len(texts), scrolling_rows)
+        assert len(lines) == scrolling_rows, (len(lines), scrolling_rows)
 
-        for (row_, text) in enumerate(texts):
-            str_line_number = self.format_as_line_number(row_)
-            numbered_and_chopped = (str_line_number + text)[:columns]
-            if row_ < len(lines):
-                texts[row_] = numbered_and_chopped
+        # Number the Scrolling Lines of the Screen
+
+        for (index, line) in enumerate(lines):
+            str_line_number = self.format_as_line_number(index)
+            numbered_and_chopped = (str_line_number + line)[:columns]
+            lines[index] = numbered_and_chopped
 
         # Write the formatted chars
 
         terminal.write(ED_2)
         terminal.write(CUP_1_1)
 
-        for (row_, text) in enumerate(texts):
-            (styled, text_plus) = self.style_text(row_, text=text, spans=spans)
-            if len(text_plus) < columns:
+        for (index, line) in enumerate(lines):
+            (styled, line_plus) = self.style_line(index, line=line, spans=spans)
+            if len(line_plus) < columns:
                 terminal.write(styled + "\r\n")
             else:
                 terminal.write(styled)  # depend on automagic "\r\n" after Last Column
@@ -3223,8 +3231,8 @@ class TerminalPainter:
 
         str_status = "" if (status is None) else str(status)
         status_columns = columns - 1
-        status_row_text = str_status[:status_columns].ljust(status_columns)
-        terminal.write(status_row_text)
+        status_line = str_status[:status_columns].ljust(status_columns)
+        terminal.write(status_line)
 
         # Place the cursor
 
@@ -3240,7 +3248,7 @@ class TerminalPainter:
         self.terminal.write("\a")
 
     def spot_left_column(self):
-        """Find the leftmost Column occupied by Scrolling Text"""
+        """Find the leftmost Column occupied by the Chars of the Scrolling Lines"""
 
         formatted = self.format_as_line_number(row=1)
         left_column = len(formatted)
@@ -3262,16 +3270,16 @@ class TerminalPainter:
 
         return formatted
 
-    def style_text(self, row, text, spans):
-        """Inject SGR_7 and SGR to style the Text of a Row"""
+    def style_line(self, row, line, spans):
+        """Inject SGR_7 and SGR to style the Chars of a Row"""
 
         # Work only inside this Row
 
-        (row_spans, text_plus) = self.spread_spans(row, text=text, spans=spans)
+        (row_spans, line_plus) = self.spread_spans(row, line=line, spans=spans)
 
         # Add one empty Span beyond the end, to place all Chars between Spans
 
-        beyond = len(text_plus)
+        beyond = len(line_plus)
         empty_beyond_span = TerminalSpan(row, column=beyond, beyond=beyond)
 
         row_spans_plus = list(row_spans)
@@ -3289,7 +3297,7 @@ class TerminalPainter:
 
             if visited < span.column:
 
-                fragment = text_plus[visited : span.column]
+                fragment = line_plus[visited : span.column]
 
                 styled += SGR if lit else ""
                 styled += fragment
@@ -3301,7 +3309,7 @@ class TerminalPainter:
 
             if span.column < span.beyond:
 
-                fragment = text_plus[span.column : span.beyond]
+                fragment = line_plus[span.column : span.beyond]
 
                 styled += "" if lit else SGR_7
                 styled += fragment
@@ -3313,15 +3321,15 @@ class TerminalPainter:
 
         styled += SGR if lit else ""
 
-        return (styled, text_plus)
+        return (styled, line_plus)
 
-    def spread_spans(self, row, text, spans):
+    def spread_spans(self, row, line, spans):
         """Spread each Empty Span to cover one more Column beyond it"""
 
         columns = self.columns
         left_column = self.spot_left_column()
 
-        assert len(text) <= columns, (len(text), columns)
+        assert len(line) <= columns, (len(line), columns)
 
         # Look only at the Columns on Screen of This Row
 
@@ -3369,21 +3377,21 @@ class TerminalPainter:
 
                 row_spans[index] = spread_span
 
-        # Add one Space to spread the text beneath the Spans, if need be
+        # Add one Space to grow the Line, when Span runs past End of Line
 
-        len_text = len(text) if (not row_spans) else max(_.beyond for _ in row_spans)
+        len_line = len(line) if (not row_spans) else max(_.beyond for _ in row_spans)
 
-        assert len_text <= columns, (len_text, columns)
+        assert len_line <= columns, (len_line, columns)
 
-        text_plus = text
-        if len_text > len(text):
+        line_plus = line
+        if len_line > len(line):
 
-            text_plus = text + " "
-            assert len_text == len(text_plus), (row, len_text, len(text_plus))
+            line_plus = line + " "
+            assert len_line == len(line_plus), (row, len_line, len(line_plus))
 
         # Succeed
 
-        return (row_spans, text_plus)
+        return (row_spans, line_plus)
 
 
 class TerminalShadow:
@@ -3462,7 +3470,7 @@ class TerminalShadow:
         rows = self.rows
         terminal = self.terminal
 
-        blank_text = columns * " "
+        blank_line = columns * " "
         bottom_row = rows - 1
 
         # Write the rows
@@ -3477,7 +3485,7 @@ class TerminalShadow:
                 if row < bottom_row:
 
                     self._terminal_write_cup(row, column=0)
-                    terminal.write(blank_text)
+                    terminal.write(blank_line)
 
                     self._terminal_write_cup(row, column=0)
                     terminal.write(held_line.rstrip())
@@ -3485,7 +3493,7 @@ class TerminalShadow:
                 else:
 
                     self._terminal_write_cup(row, column=0)
-                    terminal.write(blank_text[:-1])
+                    terminal.write(blank_line[:-1])
 
                     self._terminal_write_cup(row, column=0)
                     terminal.write(held_line.rstrip())
@@ -3711,13 +3719,13 @@ class TerminalDriver:
     def _pull_stdin(self):
         """Pull a burst of Paste, else one slow single Keystroke, else empty at Eof"""
 
-        # Block to fetch one more byte
-        # (or fetch no bytes at end of input when Stdin is not Tty)
+        # Block to fetch one more Byte
+        # (or fetch no Bytes at end of input when Stdin is not Tty)
 
         stdin = os.read(self.terminal.fileno(), 1)
         assert stdin or not self.with_termios
 
-        # Call for more, while available, while line not closed
+        # Call for more, while available, while Line not closed
         # Trust no multibyte char encoding contains b"\r" or b"\n" (as per UTF-8)
 
         calls = 1
@@ -3895,9 +3903,13 @@ class KwArgsException(Exception):
 def compile_argdoc(epi, drop_help=None):
     """Construct the 'argparse.ArgumentParser' with Epilog but without Arguments"""
 
+    # Find the Doc of caller, even when not Main, and when:  __main__ is None
+
     f = inspect.currentframe()
     module = inspect.getmodule(f.f_back)
     module_doc = module.__doc__
+
+    # Pick the ArgParse Prog, Description, & Epilog out of the Main Arg Doc
 
     prog = module_doc.strip().splitlines()[0].split()[1]
 
@@ -3908,6 +3920,8 @@ def compile_argdoc(epi, drop_help=None):
 
     epilog_at = module_doc.index(epi)
     epilog = module_doc[epilog_at:]
+
+    # Start forming the ArgParse Parser
 
     parser = argparse.ArgumentParser(
         prog=prog,
@@ -3922,12 +3936,13 @@ def compile_argdoc(epi, drop_help=None):
 
 # deffed in many files  # missing from docs.python.org
 def exit_unless_doc_eq(parser):
-    """Exit nonzero, unless __main__.__doc__ equals "parser.format_help()" """
+    """Exit nonzero, unless __main__.__doc__ equals 'parser.format_help()'"""
 
-    # Name the Sourcefile of this Module
+    # Find the Doc and File of caller, even when not Main, and when:  __main__ is None
 
     f = inspect.currentframe()
     module = inspect.getmodule(f.f_back)
+
     module_doc = module.__doc__
     module_file = f.f_back.f_code.co_filename  # more available than 'module.__file__'
 
@@ -3976,7 +3991,7 @@ def exit_unless_doc_eq(parser):
 
     # Exit if significant differences, but print them first
 
-    if diff_lines:
+    if diff_lines:  # TODO: ugly contingent '.rstrip()'
 
         lines = list((_.rstrip() if _.endswith("\n") else _) for _ in diff_lines)
         stderr_print("\n".join(lines))
@@ -4004,7 +4019,7 @@ def module_file_hash():
 
 # deffed in many files  # missing from docs.python.org
 def module_file_path():
-    """Name the Sourcefile of this Module"""
+    """Find the Doc of caller, even when not Main, and when:  __main__ is None"""
 
     f = inspect.currentframe()
     module_file = f.f_back.f_code.co_filename  # more available than 'module.__file__'
@@ -4053,8 +4068,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
-
-# FIXME: talk of Lines and Closed Lines, not of Texts and Lines
 
 # FIXME: TerminalKeyboard <- funcs_by_chars, run/_before|_after/_prompt|_do/
 # FIXME: TerminalKeyboard is a delegate inside TerminalRunner
