@@ -133,24 +133,24 @@ def main(argv):
 
     # Visit each File
 
-    editor = TerminalVi(files=args.files)
+    skin = TerminalSkinVi(files=args.files)
 
     returncode = None
     try:
-        editor.run_editor()  # till SystemExit
+        skin.run_skin()  # till SystemExit
         assert False  # unreached
     except SystemExit as exc:
         returncode = exc.code
 
-        if (not returncode) and editor.file_written:
+        if (not returncode) and skin.file_written:
 
-            runner = editor.runner
+            runner = skin.runner
             iobytearray = runner.iobytearray
             os.write(sys.stdout.fileno(), iobytearray)
             sys.stdout.flush()
 
-        if editor.log:
-            stderr_print(editor.log)
+        if skin.log:
+            stderr_print(skin.log)
 
         # TODO: log keystrokes interpreted before exit, or dropped by exit
 
@@ -240,7 +240,7 @@ VI_BLANK_SET = set(" \t")
 VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # aka r"[A-Za-z0-9_]"
 
 
-class TerminalVi:
+class TerminalSkinVi:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim"""
 
     def __init__(self, files):
@@ -263,8 +263,8 @@ class TerminalVi:
         self.seeking_more = None  # remembering the Seeking Column into next Nudge
         self.seeking_column = None  # leap to a Column after changing Row
 
-    # FIXME: shuffle - do_next_vi_file, then run_editor
-    def run_editor(self):
+    # FIXME: shuffle - do_next_vi_file, then run_skin
+    def run_skin(self):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
 
         runner = TerminalRunner()
@@ -380,7 +380,7 @@ class TerminalVi:
         self.runner.editor_print(*args)
 
     #
-    # Layer thinly under the rest of TerminalVi
+    # Layer thinly under the rest of TerminalSkinVi
     #
 
     def check_index(self, truthy, **kwargs):
@@ -395,7 +395,7 @@ class TerminalVi:
         self.seeking_more = True
 
     #
-    # Define keys for pausing TerminalVi
+    # Define keys for pausing TerminalSkinVi
     #
 
     def do_c0_control_esc(self):  # Vim Esc
@@ -421,7 +421,7 @@ class TerminalVi:
         self.vi_print("Would you like to play a game? (y/n) ")
 
         vi_reply = self.format_vi_reply()
-        ex = TerminalEx(runner, vi_reply=vi_reply)
+        ex = TerminalSkinEx(runner, vi_reply=vi_reply)
 
         with_paint_cursor_func = runner.keyboard.paint_cursor_func
         runner.keyboard.paint_cursor_func = ex.paint_ex_cursor
@@ -450,7 +450,7 @@ class TerminalVi:
             self.continue_column_seek()
 
     #
-    # Define keys for entering, pausing, and exiting TerminalVi
+    # Define keys for entering, pausing, and exiting TerminalSkinVi
     #
 
     def do_flush_quit_vi(self):  # Vim ZZ  # Vim :wq!\r
@@ -465,8 +465,11 @@ class TerminalVi:
     def do_help_quit_vi(self):  # Vim ⌃C  # Vi Py Init
         """Suggest ZQ to quit Vi Py"""
 
-        version = module_file_version_zero()
+        runner = self.runner
+        if runner.finding_highlights:
+            runner.flag_reply_with_find()
 
+        version = module_file_version_zero()
         self.vi_print("Press ZQ to lose changes and quit Vi Py", version)
         # ⌃C Egg  # Vim rings a Bell for each extra ⌃C
 
@@ -522,6 +525,9 @@ class TerminalVi:
         """Take a Search Key from this Line, and then look ahead for it"""
 
         runner = self.runner
+        runner.flag_reply_with_find()
+
+        # Take up a new Search Key
 
         if not runner.doing_done:
             if self.slip_find_fetch_vi_this(slip=+1) is None:
@@ -529,17 +535,19 @@ class TerminalVi:
 
                 return
 
+        # Try the Search
+
         if runner.find_ahead_and_reply():
 
             runner.continue_do_loop()
-
-        runner.accent_reply_with_find()  # after last 'editor_print'
-        # FIXME:  make the choice of Reply Flags stick no matter when it happens
 
     def do_find_behind_vi_this(self):  # Vim #  # Vim £
         """Take a Search Key from this Line, and then look behind for it"""
 
         runner = self.runner
+        runner.flag_reply_with_find()
+
+        # Take up a new Search Key
 
         if not runner.doing_done:
             if self.slip_find_fetch_vi_this(slip=-1) is None:
@@ -547,11 +555,11 @@ class TerminalVi:
 
                 return
 
+        # Try the Search
+
         if runner.find_behind_and_reply():
 
             runner.continue_do_loop()
-
-        runner.accent_reply_with_find()  # after last 'editor_print'
 
     #
     # FIXME: shuffle:  def.*find_
@@ -561,18 +569,20 @@ class TerminalVi:
         """Take a Search Key as input, and then look ahead for it"""
 
         runner = self.runner
+        runner.flag_reply_with_find()
+
+        # Take up a new Search Key
 
         if not runner.doing_done:
-            runner.accent_reply_with_find()  # before 'read_vi_line'
             if self.find_read_vi_line(slip=+1) is None:
 
                 return
 
+        # Try the Search
+
         if runner.find_ahead_and_reply():  # TODO: extra far scroll <= zb H 23Up n
 
             runner.continue_do_loop()
-
-        runner.accent_reply_with_find()  # after last 'editor_print'
 
     def do_find_all_vi_line(self):  # Vim :g/
         """Across all the File, print each Line containing 1 or More Matches"""
@@ -585,9 +595,10 @@ class TerminalVi:
         str_last_line_number = "{:3} ".format(last_line_number)
         last_width = len(str_last_line_number)
 
+        runner.flag_reply_with_find()
+
         # Take Search Key as input
 
-        runner.accent_reply_with_find()  # before 'read_vi_line'
         if self.find_read_vi_line(slip=+1) is None:
 
             return
@@ -622,8 +633,6 @@ class TerminalVi:
 
         (runner.row, runner.column) = (found_row, found_column)
 
-        runner.accent_reply_with_find()  # after last 'editor_print'
-
         # TODO: highlight Matches in :g/ Lines
         # TODO: Vim :4g/ means search only line 4, not pick +-Nth match
 
@@ -631,9 +640,9 @@ class TerminalVi:
         """Take a Search Key as input, and then look behind for it"""
 
         runner = self.runner
+        runner.flag_reply_with_find()
 
         if not runner.doing_done:
-            runner.accent_reply_with_find()  # before 'read_vi_line'
             if self.find_read_vi_line(slip=-1) is None:
 
                 return
@@ -641,8 +650,6 @@ class TerminalVi:
         if runner.find_behind_and_reply():  # TODO: extra far scroll # <= zt L 23Down N
 
             runner.continue_do_loop()
-
-        runner.accent_reply_with_find()  # after last 'editor_print'
 
     #
     # FIXME: shuffle:  def.*find_
@@ -657,17 +664,21 @@ class TerminalVi:
         behind_and_reply = runner.find_behind_and_reply
         slip = runner.finding_slip
 
+        runner.flag_reply_with_find()
+
+        # Take up an old Search Key
+
         if runner.finding_line is None:
             self.vi_print("Press ? to enter a Search Key")
 
             return
 
+        # Try the Search
+
         func = behind_and_reply if (slip >= 0) else ahead_and_reply
         if func():
 
             runner.continue_do_loop()
-
-        runner.accent_reply_with_find()  # after last 'editor_print'
 
     def do_find_later(self):  # Vim n
         """Leap to later Search Key Match"""
@@ -678,17 +689,21 @@ class TerminalVi:
         behind_and_reply = runner.find_behind_and_reply
         slip = runner.finding_slip
 
+        runner.flag_reply_with_find()
+
+        # Take up an old Search Key
+
         if runner.finding_line is None:
             self.vi_print("Press / to enter a Search Key")
 
             return
 
+        # Try the Search
+
         func = ahead_and_reply if (slip >= 0) else behind_and_reply
         if func():
 
             runner.continue_do_loop()
-
-        runner.accent_reply_with_find()
 
     #
     # FIXME: shuffle:  def.*find_
@@ -803,8 +818,14 @@ class TerminalVi:
         # Cancel Search if accepting stale Search Key while no stale Search Key exists
 
         if not finding_line:
-            if (not runner.finding_line) or (finding_line is None):
+
+            if finding_line is None:
                 self.vi_print("Search cancelled")  # Vim ⌃C
+
+                return
+
+            if not runner.finding_line:
+                self.vi_print("Press ? or / to enter a Search Key")  # Vim ⌃C
 
                 return
 
@@ -827,7 +848,7 @@ class TerminalVi:
         runner = self.runner
 
         vi_reply = self.format_vi_reply()
-        ex = TerminalEx(runner, vi_reply=vi_reply)
+        ex = TerminalSkinEx(runner, vi_reply=vi_reply)
 
         line = ex.read_ex_line()
 
@@ -845,7 +866,9 @@ class TerminalVi:
         runner = self.runner
 
         runner.finding_highlights = not runner.finding_highlights
+
         if runner.finding_highlights:
+            runner.flag_reply_with_find()
             self.vi_print(":set hlsearch")
         else:
             self.vi_print(":nohlsearch")
@@ -2120,13 +2143,12 @@ class TerminalKeyboardVi:
 #
 
 
-class TerminalEx:
+class TerminalSkinEx:
     """Feed Keyboard into Line at Bottom of Screen of Scrolling Rows, a la Ex"""
 
     def __init__(self, runner, vi_reply):
 
         self.runner = runner
-        self.keyboard = TerminalKeyboardEx(terminal_ex=self, runner=runner)
         self.vi_reply = vi_reply
         self.ex_line = ""
 
@@ -2173,7 +2195,8 @@ class TerminalEx:
         """Edit an Input Line beneath the Scrolling Rows"""
 
         runner = self.runner
-        keyboard = self.keyboard
+
+        keyboard = TerminalKeyboardEx(terminal_ex=self, runner=runner)
 
         runner._enter_keyboard_()
         try:
@@ -2423,7 +2446,8 @@ class TerminalRunner:
         self.finding_regex = None  # search as Regex or search as Chars
         self.finding_slip = 0  # remember to Search again ahead or again behind
         self.finding_highlights = None  # highlight all spans on screen or no spans
-        # FIXME: self.finding = mutable namespace
+
+        # FIXME: self.~_ = mutable namespace ~ for self.finding_, argv_, doing_, etc
 
         #
 
@@ -2433,15 +2457,14 @@ class TerminalRunner:
         self.arg0 = None  # take all the Chords as Chars in a Row
         self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
         self.arg2 = None  # take the Suffix Bytes as one Encoded Char
-        # FIXME: self.argv = mutable namespace
 
         self.sending_bell = None  # ring the Terminal Bell as part of some Prompt's
         self.reply = TerminalReplyOut()  # declare an Empty Reply
-        # FIXME: self.replying = mutable namespace
 
         self.doing_more = None  # take the Arg1 as a Count of Repetition's
         self.doing_done = None  # count the Repetition's completed before now
-        # FIXME: self.doing = mutable namespace
+
+        self.flagging_more = None  # keep up some Flags in the Reply to a Nudge
 
     def _init_iobytearray_etc_(self, iobytearray):
         """Swap in a new File of Lines"""
@@ -2462,9 +2485,9 @@ class TerminalRunner:
         self.iobytespans = list()  # cache the spans in file
         self.reopen_iobytespans()
 
-    def _enter_keyboard_(self):
+    def _enter_keyboard_(self):  # FIXME: def _enter_editor_
 
-        keyboard_state = (
+        keyboard_state = (  # FIXME: def _editor_state_
             self.keyboard,
             self.nudge,
             self.arg0,
@@ -2474,6 +2497,7 @@ class TerminalRunner:
             self.reply,
             self.doing_more,
             self.doing_done,
+            self.flagging_more,
         )
 
         TerminalRunner.keyboard_stack.append(keyboard_state)
@@ -2494,6 +2518,7 @@ class TerminalRunner:
             self.reply,
             self.doing_more,
             self.doing_done,
+            self.flagging_more,
         ) = keyboard_state
 
     #
@@ -2518,6 +2543,8 @@ class TerminalRunner:
     def run_keyboard(self, keyboard):
         """Prompt, take input, react, repeat till quit"""
 
+        self.keyboard = keyboard
+
         terminal = self.painter
 
         # Repeat till SystemExit raised
@@ -2526,15 +2553,15 @@ class TerminalRunner:
 
         while True:
 
-            # Choose keyboard
-
-            self.keyboard = keyboard
-
             # Scroll and prompt
 
             self.scroll_cursor_into_screen()
 
             self.prompt_for_chords()
+
+            self.flagging_more = None
+            self.reply = TerminalReplyOut()
+            self.sending_bell = None
 
             # Take one Chord in, or next Chord, or cancel Chords to start again
 
@@ -2620,9 +2647,6 @@ class TerminalRunner:
         terminal = painter
 
         # Consume
-
-        self.reply = TerminalReplyOut()
-        self.sending_bell = None
 
         # Form
 
@@ -2843,16 +2867,21 @@ class TerminalRunner:
     def editor_print(self, *args):
         """Capture some Status now, to show with next Prompt"""
 
+        flagging_more = self.flagging_more
+        flags = flagging_more if flagging_more else None
+
         nudge = self.nudge
 
-        line = " ".join(str(_) for _ in args)
-        self.reply = TerminalReplyOut(nudge=nudge, message=line)
+        message = " ".join(str(_) for _ in args)
 
-    def accent_reply_with_find(self):
+        self.reply = TerminalReplyOut(flags=flags, nudge=nudge, message=message)
+
+    def flag_reply_with_find(self):
         """Add the Find Flags into the last Reply, before showing it"""
 
-        self.reply.flags = self.format_find_flags()  # FIXME after last 'editor.print'
-        self.finding_highlights = True
+        flags = self.format_find_flags()
+        self.reply.flags = flags
+        self.flagging_more = flags
 
     def format_find_flags(self):
         """Show Search Flags a la Bash Grep Switches"""
@@ -3056,15 +3085,13 @@ class TerminalRunner:
     def do_say_more(self):  # Vim ⌃G
         """Toggle between more and less Lag (vs Vim injects lots of Lag exactly once)"""
 
-        injecting_lag = self.injecting_lag
-        version = module_file_version_zero()
+        if self.finding_highlights:
+            self.flag_reply_with_find()
 
-        if injecting_lag:
+        if self.injecting_lag:
             self.editor_print("while :set _lag_")
         else:
             self.editor_print("while :set no_lag_")
-
-        self.reply.flags = version  # FIXME after last 'editor.print'
 
         # TODO: echo $(whoami)@$(hostname):$(pwd)/
 
@@ -3099,7 +3126,9 @@ class TerminalRunner:
 
         # Find the New Spans
 
+        self.finding_highlights = None
         if self.finding_line is not None:
+            self.finding_highlights = True
 
             pattern = self.finding_line
             if not self.finding_regex:
@@ -3132,9 +3161,7 @@ class TerminalRunner:
 
             return
 
-        # Sketch the Search
-
-        ex_flags = ""
+        self.finding_highlights = True
 
         # Find one or more, ahead, else after start
 
@@ -3142,8 +3169,8 @@ class TerminalRunner:
         here1 = (-1, -1)  # before start
         heres = (here0, here1)
 
-        how0 = "{}{}/{}  Found {} chars ahead"
-        how1 = "{}{}/{}  Found {} chars, not ahead, found instead after start"
+        how0 = "{}/{}  Found {} chars ahead"
+        how1 = "{}/{}  Found {} chars, not ahead, found instead after start"
         hows = (how0, how1)
 
         for (here, how) in zip(heres, hows):
@@ -3153,10 +3180,12 @@ class TerminalRunner:
 
                 if here < there:
 
+                    how_ = how
                     if there == here0:
-                        how = "{}{}/{}  Found {} chars, here and only here"
-                    self.editor_print(
-                        how.format(ex_flags, 1 + index, len(spans), len_chars)
+                        how_ = "{}/{}  Found {} chars, here and only here"
+
+                    self.editor_print(  # "{}/{}  Found ..."
+                        how_.format(1 + index, len(spans), len_chars)
                     )
 
                     (self.row, self.column) = there
@@ -3179,6 +3208,8 @@ class TerminalRunner:
 
             return
 
+        self.finding_highlights = True
+
         # Find one or more, behind, else before end
 
         here0 = (row, column)
@@ -3196,9 +3227,13 @@ class TerminalRunner:
 
                 if there < here:
 
+                    how_ = how
                     if there == here0:
-                        how = "{}/{}  Found {} chars, here and only here"
-                    self.editor_print(how.format(1 + index, len(spans), len_chars))
+                        how_ = "{}/{}  Found {} chars, here and only here"
+
+                    self.editor_print(  # "{}/{}  Found ..."
+                        how_.format(1 + index, len(spans), len_chars)
+                    )
 
                     (self.row, self.column) = there
 
@@ -4181,7 +4216,7 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
-# FIXME: TerminalEditor <- TerminalRunner
+# FIXME: Terminal Skin > Editor > Painter  <- Vi|Ex > Runner > Painter
 
 # FIXME: TerminalViCursor to slip & step
 
