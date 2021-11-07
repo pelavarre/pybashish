@@ -137,15 +137,14 @@ def main(argv):
 
     returncode = None
     try:
-        skin.run_skin()  # till SystemExit
+        skin.run_editor()  # till SystemExit
         assert False  # unreached
     except SystemExit as exc:
         returncode = exc.code
 
         if (not returncode) and skin.file_written:
 
-            runner = skin.runner
-            iobytearray = runner.iobytearray
+            iobytearray = skin.editor.iobytearray
             os.write(sys.stdout.fileno(), iobytearray)
             sys.stdout.flush()
 
@@ -253,7 +252,7 @@ class TerminalSkinVi:
 
         self.log = None  # capture Python Tracebacks
 
-        self.runner = None
+        self.editor = None
 
         self.slip_choice = None  # find Char in Row
         self.slip_after = None  # slip off by one Column after finding Char
@@ -263,36 +262,10 @@ class TerminalSkinVi:
         self.seeking_more = None  # remembering the Seeking Column into next Nudge
         self.seeking_column = None  # leap to a Column after changing Row
 
-    # FIXME: shuffle - do_next_vi_file, then run_skin
-    def run_skin(self):
-        """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
+    #
+    # Visit each of the Files
+    #
 
-        runner = TerminalRunner()
-        keyboard = TerminalKeyboardVi(terminal_vi=self, runner=runner)
-
-        self.runner = runner
-
-        self.do_next_vi_file()
-        self.do_help_quit_vi()  # start with a warmer welcome, not a cold Empty Nudge
-
-        try:
-
-            runner.run_terminal(keyboard)  # till SystemExit
-            assert False  # unreached
-
-        finally:
-
-            self.log = runner.traceback
-
-            if runner.iobytearray:
-                if not self.file_written:
-
-                    stderr_print(
-                        "vi.py: quit without write, "
-                        "like because ZQ, or :q!, or didn't read Stdin"
-                    )
-
-    # FIXME: shuffle - do_next_vi_file, then run_terminal
     def do_next_vi_file(self):
         """Visit the next File, else the first File"""
 
@@ -333,14 +306,14 @@ class TerminalSkinVi:
             if not sys.stdin.isatty():
                 path = "/dev/stdin"
 
-        self.reopen_path(path)
+        self.reopen_vi_path(path)
 
-    def reopen_path(self, path):
+    def reopen_vi_path(self, path):
         """Visit a chosen File"""
 
         self.file_path = path
 
-        runner = self.runner
+        editor = self.editor
 
         # Fetch Bytes of File
 
@@ -358,38 +331,66 @@ class TerminalSkinVi:
 
         # Swap in a new File of Lines
 
-        runner._init_iobytearray_etc_(iobytearray)
+        editor._init_iobytearray_etc_(iobytearray)
 
     #
-    # Layer thinly over TerminalRunner
+    # Layer thinly over TerminalEditor
     #
+
+    def run_editor(self):
+        """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
+
+        editor = TerminalEditor()
+        keyboard = TerminalKeyboardVi(terminal_vi=self, editor=editor)
+
+        self.editor = editor
+
+        self.do_next_vi_file()
+        self.do_help_quit_vi()  # start with a warmer welcome, not a cold Empty Nudge
+
+        try:
+
+            editor.run_terminal(keyboard)  # till SystemExit
+            assert False  # unreached
+
+        finally:
+
+            self.log = editor.traceback
+
+            if editor.iobytearray:
+                if not self.file_written:
+
+                    stderr_print(
+                        "vi.py: quit without write, "
+                        "like because ZQ, or :q!, or didn't read Stdin"
+                    )
 
     def get_vi_arg1(self, default=1):
         """Get the Int of the Prefix Digits before the Chords, else the Default Int"""
 
-        return self.runner.get_arg1(default=default)
+        return self.editor.get_arg1(default=default)
 
     def get_vi_arg2(self):
         """Get the Bytes of the input Suffix past the input Chords"""
 
-        return self.runner.get_arg2()
+        return self.editor.get_arg2()
 
     def vi_print(self, *args):
         """Capture some Status now, to show with next Prompt"""
 
-        self.runner.editor_print(*args)
+        self.editor.editor_print(*args)
 
     #
     # Layer thinly under the rest of TerminalSkinVi
     #
 
-    def check_index(self, truthy, **kwargs):
+    def check_vi_index(self, truthy, **kwargs):
         """Fail fast, else proceed"""
 
         if not truthy:
             raise IndexError()
 
-    def continue_column_seek(self):
+    def continue_vi_column_seek(self):
         """Ask to seek again, like to keep on choosing the last Column in each Row"""
 
         self.seeking_more = True
@@ -398,7 +399,7 @@ class TerminalSkinVi:
     # Define keys for pausing TerminalSkinVi
     #
 
-    def do_c0_control_esc(self):  # Vim Esc
+    def do_vi_c0_control_esc(self):  # Vim Esc
         """Cancel Digits Prefix, else suggest ZZ to quit Vi Py"""
 
         version = module_file_version_zero()
@@ -414,26 +415,26 @@ class TerminalSkinVi:
         """Accept Q v i Return, without ringing the Terminal bell"""
         # not Ex Mode from last century
 
-        runner = self.runner
+        editor = self.editor
 
-        # Ask a question  # FIXME: shuffle this code into a method of TerminalRunner
+        # Ask a question  # FIXME: shuffle this code into a method of TerminalEditor
 
         self.vi_print("Would you like to play a game? (y/n) ")
 
         vi_reply = self.format_vi_reply()
-        ex = TerminalSkinEx(runner, vi_reply=vi_reply)
+        ex = TerminalSkinEx(editor, vi_reply=vi_reply)
 
-        with_paint_cursor_func = runner.keyboard.paint_cursor_func
-        runner.keyboard.paint_cursor_func = ex.paint_ex_cursor
+        with_paint_cursor_func = editor.keyboard.paint_cursor_func
+        editor.keyboard.paint_cursor_func = ex.paint_ex_cursor
         try:
-            runner.prompt_for_chords()
+            editor.prompt_for_chords()
         finally:
-            runner.keyboard.paint_cursor_func = with_paint_cursor_func
+            editor.keyboard.paint_cursor_func = with_paint_cursor_func
 
         # Accept the answer
 
-        chord = runner.terminal_getch()
-        runner.nudge.suffix = chord
+        chord = editor.terminal_getch()
+        editor.nudge.suffix = chord
         if chord in (b"y", b"Y"):
             self.vi_print("Ok, now try to quit Vi Py")
         else:
@@ -442,12 +443,12 @@ class TerminalSkinVi:
     def do_vi_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
-        runner = self.runner
+        editor = self.editor
 
-        runner.do_sig_tstp()
+        editor.do_sig_tstp()
 
         if self.seeking_column is not None:
-            self.continue_column_seek()
+            self.continue_vi_column_seek()
 
     #
     # Define keys for entering, pausing, and exiting TerminalSkinVi
@@ -465,9 +466,9 @@ class TerminalSkinVi:
     def do_help_quit_vi(self):  # Vim ⌃C  # Vi Py Init
         """Suggest ZQ to quit Vi Py"""
 
-        runner = self.runner
-        if runner.finding_highlights:
-            runner.flag_reply_with_find()
+        editor = self.editor
+        if editor.finding_highlights:
+            editor.flag_reply_with_find()
 
         version = module_file_version_zero()
         self.vi_print("Press ZQ to lose changes and quit Vi Py", version)
@@ -485,9 +486,9 @@ class TerminalSkinVi:
         file_index = self.file_index
         file_path = self.file_path
         files = self.files
-        runner = self.runner
+        editor = self.editor
 
-        iobytearray = runner.iobytearray
+        iobytearray = editor.iobytearray
 
         if file_path == "/dev/stdin":
             if iobytearray:
@@ -505,9 +506,9 @@ class TerminalSkinVi:
         """Lose last changes and quit"""
 
         file_path = self.file_path
-        runner = self.runner
+        editor = self.editor
 
-        iobytearray = runner.iobytearray
+        iobytearray = editor.iobytearray
 
         returncode = None
         if file_path == "/dev/stdin":
@@ -524,12 +525,12 @@ class TerminalSkinVi:
     def do_find_ahead_vi_this(self):  # Vim *
         """Take a Search Key from this Line, and then look ahead for it"""
 
-        runner = self.runner
-        runner.flag_reply_with_find()
+        editor = self.editor
+        editor.flag_reply_with_find()
 
         # Take up a new Search Key
 
-        if not runner.doing_done:
+        if not editor.doing_done:
             if self.slip_find_fetch_vi_this(slip=+1) is None:
                 self.vi_print("Press * and # only when Not on a blank line")
 
@@ -537,19 +538,19 @@ class TerminalSkinVi:
 
         # Try the Search
 
-        if runner.find_ahead_and_reply():
+        if editor.find_ahead_and_reply():
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
     def do_find_behind_vi_this(self):  # Vim #  # Vim £
         """Take a Search Key from this Line, and then look behind for it"""
 
-        runner = self.runner
-        runner.flag_reply_with_find()
+        editor = self.editor
+        editor.flag_reply_with_find()
 
         # Take up a new Search Key
 
-        if not runner.doing_done:
+        if not editor.doing_done:
             if self.slip_find_fetch_vi_this(slip=-1) is None:
                 self.vi_print("Press # and £ and * only when Not on a blank line")
 
@@ -557,9 +558,9 @@ class TerminalSkinVi:
 
         # Try the Search
 
-        if runner.find_behind_and_reply():
+        if editor.find_behind_and_reply():
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
     #
     # FIXME: shuffle:  def.*find_
@@ -568,34 +569,34 @@ class TerminalSkinVi:
     def do_find_ahead_vi_line(self):  # Vim /
         """Take a Search Key as input, and then look ahead for it"""
 
-        runner = self.runner
-        runner.flag_reply_with_find()
+        editor = self.editor
+        editor.flag_reply_with_find()
 
         # Take up a new Search Key
 
-        if not runner.doing_done:
+        if not editor.doing_done:
             if self.find_read_vi_line(slip=+1) is None:
 
                 return
 
         # Try the Search
 
-        if runner.find_ahead_and_reply():  # TODO: extra far scroll <= zb H 23Up n
+        if editor.find_ahead_and_reply():  # TODO: extra far scroll <= zb H 23Up n
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
     def do_find_all_vi_line(self):  # Vim :g/
         """Across all the File, print each Line containing 1 or More Matches"""
 
-        runner = self.runner
-        painter = runner.painter
+        editor = self.editor
+        painter = editor.painter
         terminal = painter
 
-        last_line_number = 1 + len(runner.ended_lines)
+        last_line_number = 1 + len(editor.ended_lines)
         str_last_line_number = "{:3} ".format(last_line_number)
         last_width = len(str_last_line_number)
 
-        runner.flag_reply_with_find()
+        editor.flag_reply_with_find()
 
         # Take Search Key as input
 
@@ -605,33 +606,33 @@ class TerminalSkinVi:
 
         # Print Matches
 
-        (found_row, found_column) = (runner.row, runner.column)
+        (found_row, found_column) = (editor.row, editor.column)
 
-        if runner.find_ahead_and_reply():
+        if editor.find_ahead_and_reply():
 
-            runner.terminal_print("")
+            editor.terminal_print("")
 
             printed_row = None
-            for span in runner.iobytespans:
+            for span in editor.iobytespans:
 
                 (found_row, found_column, _) = span
 
                 line_number = 1 + found_row
                 str_line_number = ""  # TODO: merge with 'format_as_line_number'
-                if runner.showing_line_number:
+                if editor.showing_line_number:
                     str_line_number = "{:3} ".format(line_number).rjust(last_width)
 
-                line = runner.fetch_row_line(row=found_row)
+                line = editor.fetch_row_line(row=found_row)
 
                 if found_row != printed_row:
-                    runner.terminal_print(str_line_number + line)
+                    editor.terminal_print(str_line_number + line)
 
-            runner.terminal_print("Press Return to continue . . .")
-            _ = runner.terminal_getch()
+            editor.terminal_print("Press Return to continue . . .")
+            _ = editor.terminal_getch()
 
             terminal._reopen_terminal_()
 
-        (runner.row, runner.column) = (found_row, found_column)
+        (editor.row, editor.column) = (found_row, found_column)
 
         # TODO: highlight Matches in :g/ Lines
         # TODO: Vim :4g/ means search only line 4, not pick +-Nth match
@@ -639,36 +640,36 @@ class TerminalSkinVi:
     def do_find_behind_vi_line(self):  # Vim ?
         """Take a Search Key as input, and then look behind for it"""
 
-        runner = self.runner
-        runner.flag_reply_with_find()
+        editor = self.editor
+        editor.flag_reply_with_find()
 
-        if not runner.doing_done:
+        if not editor.doing_done:
             if self.find_read_vi_line(slip=-1) is None:
 
                 return
 
-        if runner.find_behind_and_reply():  # TODO: extra far scroll # <= zt L 23Down N
+        if editor.find_behind_and_reply():  # TODO: extra far scroll # <= zt L 23Down N
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
     #
     # FIXME: shuffle:  def.*find_
     #
 
-    def do_find_earlier(self):  # Vim N
+    def do_vi_find_earlier(self):  # Vim N
         """Leap to earlier Search Key Match"""
 
-        runner = self.runner
+        editor = self.editor
 
-        ahead_and_reply = runner.find_ahead_and_reply
-        behind_and_reply = runner.find_behind_and_reply
-        slip = runner.finding_slip
+        ahead_and_reply = editor.find_ahead_and_reply
+        behind_and_reply = editor.find_behind_and_reply
+        slip = editor.finding_slip
 
-        runner.flag_reply_with_find()
+        editor.flag_reply_with_find()
 
         # Take up an old Search Key
 
-        if runner.finding_line is None:
+        if editor.finding_line is None:
             self.vi_print("Press ? to enter a Search Key")
 
             return
@@ -678,22 +679,22 @@ class TerminalSkinVi:
         func = behind_and_reply if (slip >= 0) else ahead_and_reply
         if func():
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
-    def do_find_later(self):  # Vim n
+    def do_vi_find_later(self):  # Vim n
         """Leap to later Search Key Match"""
 
-        runner = self.runner
+        editor = self.editor
 
-        ahead_and_reply = runner.find_ahead_and_reply
-        behind_and_reply = runner.find_behind_and_reply
-        slip = runner.finding_slip
+        ahead_and_reply = editor.find_ahead_and_reply
+        behind_and_reply = editor.find_behind_and_reply
+        slip = editor.finding_slip
 
-        runner.flag_reply_with_find()
+        editor.flag_reply_with_find()
 
         # Take up an old Search Key
 
-        if runner.finding_line is None:
+        if editor.finding_line is None:
             self.vi_print("Press / to enter a Search Key")
 
             return
@@ -703,7 +704,7 @@ class TerminalSkinVi:
         func = ahead_and_reply if (slip >= 0) else behind_and_reply
         if func():
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
     #
     # FIXME: shuffle:  def.*find_
@@ -712,7 +713,7 @@ class TerminalSkinVi:
     def slip_find_fetch_vi_this(self, slip):
         """Take a Word from this Line and return Truthy, else don't"""
 
-        runner = self.runner
+        editor = self.editor
 
         # Take this Word
 
@@ -723,16 +724,16 @@ class TerminalSkinVi:
             # Make this Word into a Search Key for Words
 
             search_key = word  # partial Words and whole Words
-            if word and runner.finding_regex:
+            if word and editor.finding_regex:
                 search_key = r"\b" + re.escape(search_key) + r"\b"  # whole Words only
 
             # Search for the Key
 
-            runner.finding_line = search_key
-            runner.finding_slip = slip
+            editor.finding_line = search_key
+            editor.finding_slip = slip
 
-            assert runner.finding_line != ""
-            runner.reopen_iobytespans()
+            assert editor.finding_line != ""
+            editor.reopen_iobytespans()
 
             # Pass back Word found, but with no mention of more Match'es found or not
 
@@ -743,10 +744,10 @@ class TerminalSkinVi:
 
         # Setup
 
-        runner = self.runner
+        editor = self.editor
 
-        column = runner.column
-        columns = runner.count_columns_in_row()
+        column = editor.column
+        columns = editor.count_columns_in_row()
 
         def is_vi_symbolic(ch):
             return ch in VI_SYMBOLIC_SET
@@ -762,7 +763,7 @@ class TerminalSkinVi:
             # Look behind to first Char of Word
 
             while behind:
-                ch = runner.fetch_column_char(column=behind)
+                ch = editor.fetch_column_char(column=behind)
                 if not func(ch):
 
                     break
@@ -772,19 +773,19 @@ class TerminalSkinVi:
             # Look ahead to first Char of Word
 
             for start in range(behind, columns):
-                ch = runner.fetch_column_char(column=start)
+                ch = editor.fetch_column_char(column=start)
                 if func(ch):
 
                     # Slip ahead to Start of Word
 
-                    runner.column = start
+                    editor.column = start
 
                     # Collect one or more Chars of Word
 
                     word = ""
 
                     for end in range(start, columns):
-                        ch = runner.fetch_column_char(column=end)
+                        ch = editor.fetch_column_char(column=end)
                         if func(ch):
                             word += ch
                         else:
@@ -802,9 +803,9 @@ class TerminalSkinVi:
     def find_read_vi_line(self, slip):
         """Take a Search Key"""
 
-        runner = self.runner
+        editor = self.editor
 
-        assert runner.finding_line != ""
+        assert editor.finding_line != ""
 
         # Ask for fresh Search Key
 
@@ -824,31 +825,31 @@ class TerminalSkinVi:
 
                 return
 
-            if not runner.finding_line:
+            if not editor.finding_line:
                 self.vi_print("Press ? or / to enter a Search Key")  # Vim ⌃C
 
                 return
 
         # Take fresh Slip always, and take fresh Search Key if given
 
-        runner.finding_slip = slip
+        editor.finding_slip = slip
         if finding_line:
-            runner.finding_line = finding_line
+            editor.finding_line = finding_line
 
         # Pick out Matches
 
-        assert runner.finding_line != ""
-        runner.reopen_iobytespans()
+        assert editor.finding_line != ""
+        editor.reopen_iobytespans()
 
         return True
 
     def read_vi_line(self):
         """Take a Line of Input"""
 
-        runner = self.runner
+        editor = self.editor
 
         vi_reply = self.format_vi_reply()
-        ex = TerminalSkinEx(runner, vi_reply=vi_reply)
+        ex = TerminalSkinEx(editor, vi_reply=vi_reply)
 
         line = ex.read_ex_line()
 
@@ -857,18 +858,18 @@ class TerminalSkinVi:
     #
     # Flip switches
     # TODO: somehow soon stop commandeering the personal \ or Q Chord Sequences
-    # FIXME: shuffle down into TerminalRunner
+    # FIXME: shuffle down into TerminalEditor
     #
 
     def do_invhlsearch(self):  # Egg \Esc
         """Toggle highlighting matches"""
 
-        runner = self.runner
+        editor = self.editor
 
-        runner.finding_highlights = not runner.finding_highlights
+        editor.finding_highlights = not editor.finding_highlights
 
-        if runner.finding_highlights:
-            runner.flag_reply_with_find()
+        if editor.finding_highlights:
+            editor.flag_reply_with_find()
             self.vi_print(":set hlsearch")
         else:
             self.vi_print(":nohlsearch")
@@ -879,12 +880,12 @@ class TerminalSkinVi:
     def do_set_invignorecase(self):  # Egg \i
         """Search Upper/Lower Case or not"""
 
-        runner = self.runner
+        editor = self.editor
 
-        runner.finding_case = not runner.finding_case
-        runner.reopen_iobytespans()
+        editor.finding_case = not editor.finding_case
+        editor.reopen_iobytespans()
 
-        if runner.finding_case:
+        if editor.finding_case:
             self.vi_print(":set noignorecase")
         else:
             self.vi_print(":set ignorecase")
@@ -892,11 +893,11 @@ class TerminalSkinVi:
     def do_set_invnumber(self):  # Egg \n
         """Show Line Numbers or not"""
 
-        runner = self.runner
+        editor = self.editor
 
-        runner.showing_line_number = not runner.showing_line_number
+        editor.showing_line_number = not editor.showing_line_number
 
-        if runner.showing_line_number:
+        if editor.showing_line_number:
             self.vi_print(":set number")
         else:
             self.vi_print(":set nonumber")
@@ -904,12 +905,12 @@ class TerminalSkinVi:
     def do_set_invregex(self):  # Egg \F
         """Search as Regex or search as Chars"""
 
-        runner = self.runner
+        editor = self.editor
 
-        runner.finding_regex = not runner.finding_regex
-        runner.reopen_iobytespans()
+        editor.finding_regex = not editor.finding_regex
+        editor.reopen_iobytespans()
 
-        if runner.finding_regex:
+        if editor.finding_regex:
             self.vi_print(":set regex")  # kin to Vim default
         else:
             self.vi_print(":set noregex")  # doesn't exist in Vim
@@ -921,12 +922,12 @@ class TerminalSkinVi:
     def do_slip(self):  # Vim |  # Emacs goto-char
         """Leap to first Column, else to a chosen Column"""
 
-        runner = self.runner
+        editor = self.editor
 
-        last_column = runner.spot_last_column()
+        last_column = editor.spot_last_column()
         column = min(last_column, self.get_vi_arg1() - 1)
 
-        runner.column = column
+        editor.column = column
 
     def do_slip_dent(self):  # Vim ^
         """Leap to just past the Indent, but first Step Down if Arg"""
@@ -940,43 +941,43 @@ class TerminalSkinVi:
     def slip_dent(self):
         """Leap to the Column after the Indent"""
 
-        runner = self.runner
+        editor = self.editor
 
-        line = runner.fetch_row_line()
+        line = editor.fetch_row_line()
         lstripped = line.lstrip()
         column = len(line) - len(lstripped)
 
-        runner.column = column
+        editor.column = column
 
     def do_slip_first(self):  # Vim 0  # Emacs move-beginning-of-line
         """Leap to the first Column in Row"""
 
-        runner = self.runner
+        editor = self.editor
 
-        assert runner.arg1 is None  # require no Digits before Vi Py 0 runs here
+        assert editor.arg1 is None  # require no Digits before Vi Py 0 runs here
 
-        runner.column = 0
+        editor.column = 0
 
     def do_slip_left(self):  # Vim h, Left  # Emacs left-char, backward-char
         """Slip left one Column or more"""
 
-        runner = self.runner
+        editor = self.editor
 
-        self.check_index(runner.column)
+        self.check_vi_index(editor.column)
 
-        left = min(runner.column, self.get_vi_arg1())
-        runner.column -= left
+        left = min(editor.column, self.get_vi_arg1())
+        editor.column -= left
 
     def do_slip_right(self):  # Vim l, Right  #  emacs right-char, forward-char
         """Slip Right one Column or more"""
 
-        runner = self.runner
+        editor = self.editor
 
-        last_column = runner.spot_last_column()
-        self.check_index(runner.column < last_column)
+        last_column = editor.spot_last_column()
+        self.check_vi_index(editor.column < last_column)
 
-        right = min(last_column - runner.column, self.get_vi_arg1())
-        runner.column += right
+        right = min(last_column - editor.column, self.get_vi_arg1())
+        editor.column += right
 
     #
     # Step the Cursor across zero, one, or more Columns of the same Row
@@ -985,78 +986,80 @@ class TerminalSkinVi:
     def do_slip_ahead(self):  # Vim Space
         """Slip right, then down"""
 
-        runner = self.runner
-        last_column = runner.spot_last_column()
-        last_row = runner.spot_last_row()
+        editor = self.editor
+        last_column = editor.spot_last_column()
+        last_row = editor.spot_last_row()
 
-        if not runner.doing_done:
-            self.check_index((runner.column < last_column) or (runner.row < last_row))
+        if not editor.doing_done:
+            self.check_vi_index(
+                (editor.column < last_column) or (editor.row < last_row)
+            )
 
-        if runner.column < last_column:
-            runner.column += 1
+        if editor.column < last_column:
+            editor.column += 1
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
-        elif runner.row < last_row:
-            runner.column = 0
-            runner.row += 1
+        elif editor.row < last_row:
+            editor.column = 0
+            editor.row += 1
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
     def slip_ahead(self):
         """Slip right or down, and return 1, else return None at End of File"""
 
-        runner = self.runner
-        last_column = runner.spot_last_column()
-        last_row = runner.spot_last_row()
+        editor = self.editor
+        last_column = editor.spot_last_column()
+        last_row = editor.spot_last_row()
 
-        if runner.column < last_column:
-            runner.column += 1
+        if editor.column < last_column:
+            editor.column += 1
 
             return 1
 
-        elif runner.row < last_row:
-            runner.column = 0
-            runner.row += 1
+        elif editor.row < last_row:
+            editor.column = 0
+            editor.row += 1
 
             return 1
 
     def do_slip_behind(self):  # Vim Delete
         """Slip left, then up"""
 
-        runner = self.runner
+        editor = self.editor
 
-        if not runner.doing_done:
-            self.check_index(runner.row or runner.column)
+        if not editor.doing_done:
+            self.check_vi_index(editor.row or editor.column)
 
-        if runner.column:
-            runner.column -= 1
+        if editor.column:
+            editor.column -= 1
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
-        elif runner.row:
-            runner.row -= 1
-            row_last_column = runner.spot_last_column(row=runner.row)
-            runner.column = row_last_column
+        elif editor.row:
+            editor.row -= 1
+            row_last_column = editor.spot_last_column(row=editor.row)
+            editor.column = row_last_column
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
     def slip_behind(self):
         """Slip left or down, and return 1, else return None at Start of File"""
 
-        runner = self.runner
+        editor = self.editor
 
-        if runner.column:
-            runner.column -= 1
+        if editor.column:
+            editor.column -= 1
 
-            runner.continue_do_loop()
+            editor.continue_do_loop()
 
             return -1
 
-        elif runner.row:
-            runner.row -= 1
-            row_last_column = runner.spot_last_column(row=runner.row)
-            runner.column = row_last_column
+        elif editor.row:
+            editor.row -= 1
+            row_last_column = editor.spot_last_column(row=editor.row)
+            editor.column = row_last_column
 
             return -1
 
@@ -1067,13 +1070,13 @@ class TerminalSkinVi:
     def do_step(self):  # Vim G, 1G  # Emacs goto-line
         """Leap to last Row, else to a chosen Row"""
 
-        runner = self.runner
-        last_row = runner.spot_last_row()
+        editor = self.editor
+        last_row = editor.spot_last_row()
 
         row = min(last_row, self.get_vi_arg1() - 1)
-        row = last_row if (runner.arg1 is None) else row
+        row = last_row if (editor.arg1 is None) else row
 
-        runner.row = row
+        editor.row = row
         self.slip_dent()
 
     def do_step_down_dent(self):  # Vim +, Return
@@ -1085,13 +1088,13 @@ class TerminalSkinVi:
     def step_down(self):
         """Step down one Row or more"""
 
-        runner = self.runner
-        last_row = runner.spot_last_row()
+        editor = self.editor
+        last_row = editor.spot_last_row()
 
-        self.check_index(runner.row < last_row)
-        down = min(last_row - runner.row, self.get_vi_arg1())
+        self.check_vi_index(editor.row < last_row)
+        down = min(last_row - editor.row, self.get_vi_arg1())
 
-        runner.row += down
+        editor.row += down
 
     def do_step_down_minus_dent(self):  # Vim _
         """Leap to just past the Indent, but first Step Down if Arg"""
@@ -1104,28 +1107,28 @@ class TerminalSkinVi:
 
         down = self.get_vi_arg1() - 1
         if down:
-            self.runner.arg1 -= 1  # mutate
+            self.editor.arg1 -= 1  # mutate
             self.step_down()
 
     def do_step_max_low(self):  # Vim L
         """Leap to first Word of Bottom Row on Screen"""
 
-        runner = self.runner
-        runner.row = runner.spot_bottom_row()
+        editor = self.editor
+        editor.row = editor.spot_bottom_row()
         self.slip_dent()
 
     def do_step_max_high(self):  # Vim H
         """Leap to first Word of Top Row on Screen"""
 
-        runner = self.runner
-        runner.row = runner.top_row
+        editor = self.editor
+        editor.row = editor.top_row
         self.slip_dent()
 
     def do_step_to_middle(self):  # Vim M
         """Leap to first Word of Middle Row on Screen"""
 
-        runner = self.runner
-        runner.row = runner.spot_middle_row()
+        editor = self.editor
+        editor.row = editor.spot_middle_row()
         self.slip_dent()
 
     def do_step_up_dent(self):  # Vim -
@@ -1137,11 +1140,11 @@ class TerminalSkinVi:
     def step_up(self):
         """Step up one Row or more"""
 
-        runner = self.runner
-        self.check_index(runner.row)
-        up = min(runner.row, self.get_vi_arg1())
+        editor = self.editor
+        self.check_vi_index(editor.row)
+        up = min(editor.row, self.get_vi_arg1())
 
-        runner.row -= up
+        editor.row -= up
 
     #
     # Step the Cursor up and down between Rows, while holding on to the Column
@@ -1150,46 +1153,46 @@ class TerminalSkinVi:
     def do_slip_last_seek(self):  # Vim $  # Emacs move-end-of-line
         """Leap to the last Column in Row, and keep seeking last Columns"""
 
-        runner = self.runner
+        editor = self.editor
 
         self.seeking_column = True
         self.step_down_minus()
-        row_last_column = runner.spot_last_column(row=runner.row)
-        runner.column = row_last_column
+        row_last_column = editor.spot_last_column(row=editor.row)
+        editor.column = row_last_column
 
-        self.continue_column_seek()
+        self.continue_vi_column_seek()
 
     def do_step_down_seek(self):  # Vim j, ⌃J, ⌃N, Down  # Emacs next-line
         """Step down one Row or more, but seek the current Column"""
 
-        runner = self.runner
+        editor = self.editor
 
         if self.seeking_column is None:
-            self.seeking_column = runner.column
+            self.seeking_column = editor.column
 
         self.step_down()
 
-        runner.column = self.seek_column()
-        self.continue_column_seek()
+        editor.column = self.seek_vi_column()
+        self.continue_vi_column_seek()
 
     def do_step_up_seek(self):  # Vim k, ⌃P, Up  # Emacs previous-line
         """Step up a Row or more, but seek the current Column"""
 
-        runner = self.runner
+        editor = self.editor
 
         if self.seeking_column is None:
-            self.seeking_column = runner.column
+            self.seeking_column = editor.column
 
         self.step_up()
 
-        runner.column = self.seek_column()
-        self.continue_column_seek()
+        editor.column = self.seek_vi_column()
+        self.continue_vi_column_seek()
 
-    def seek_column(self, column=True):
+    def seek_vi_column(self, column=True):
         """Begin seeking a Column, if not begun already"""
 
-        runner = self.runner
-        last_column = runner.spot_last_column()
+        editor = self.editor
+        last_column = editor.spot_last_column()
 
         if self.seeking_column is True:
             sought_column = last_column
@@ -1219,23 +1222,23 @@ class TerminalSkinVi:
     def do_scroll_ahead_much(self):  # Vim ⌃F
         """Scroll ahead much"""
 
-        runner = self.runner
+        editor = self.editor
 
-        row = runner.row
-        top_row = runner.top_row
-        runner = self.runner
-        painter = runner.painter
+        row = editor.row
+        top_row = editor.top_row
+        editor = self.editor
+        painter = editor.painter
 
         assert painter.scrolling_rows >= 2
         rows_per_screen = painter.scrolling_rows - 2
 
-        bottom_row = runner.spot_bottom_row()
-        last_row = runner.spot_last_row()
+        bottom_row = editor.spot_bottom_row()
+        last_row = editor.spot_last_row()
 
         # Quit at last Row
 
         if top_row == last_row:
-            if not self.runner.doing_done:
+            if not self.editor.doing_done:
                 self.vi_print("Do you mean ⌃B")  # G⌃F⌃F Egg
 
             return
@@ -1254,35 +1257,35 @@ class TerminalSkinVi:
             top_row += rows_per_screen
             top_row = min(top_row, last_row)
 
-        runner.top_row = top_row
+        editor.top_row = top_row
 
         # Choose new Row and Column
 
         if row < top_row:
             row = top_row
 
-        runner.row = row
+        editor.row = row
 
         self.slip_dent()
 
-        runner.continue_do_loop()
+        editor.continue_do_loop()
 
     def do_scroll_behind_much(self):  # Vim ⌃B
         """Show the previous Screen of Rows"""
 
-        runner = self.runner
+        editor = self.editor
 
-        row = runner.row
-        top_row = runner.top_row
-        runner = self.runner
-        painter = runner.painter
+        row = editor.row
+        top_row = editor.top_row
+        editor = self.editor
+        painter = editor.painter
 
-        last_row = runner.spot_last_row()
+        last_row = editor.spot_last_row()
 
         # Quit at top Row
 
         if not top_row:
-            if not self.runner.doing_done:
+            if not self.editor.doing_done:
                 self.vi_print("Do you mean ⌃F")  # 1G⌃B Egg
 
             return
@@ -1303,17 +1306,17 @@ class TerminalSkinVi:
         else:
             top_row -= rows_per_screen
 
-        runner.top_row = top_row
+        editor.top_row = top_row
 
         # Choose new Row and Column
 
-        bottom_row = runner.spot_bottom_row()
+        bottom_row = editor.spot_bottom_row()
         if row > bottom_row:
-            runner.row = bottom_row
+            editor.row = bottom_row
 
         self.slip_dent()
 
-        runner.continue_do_loop()
+        editor.continue_do_loop()
 
     #
     # Scroll ahead or behind one Row of Screen
@@ -1322,18 +1325,18 @@ class TerminalSkinVi:
     def do_scroll_ahead_one(self):  # Vim ⌃E
         """Show the next Row of Screen"""
 
-        runner = self.runner
+        editor = self.editor
 
-        row = runner.row
-        top_row = runner.top_row
+        row = editor.row
+        top_row = editor.top_row
 
-        runner = self.runner
-        last_row = runner.spot_last_row()
+        editor = self.editor
+        last_row = editor.spot_last_row()
 
         # Quit at last Row
 
-        if runner.top_row == last_row:
-            if not runner.doing_done:
+        if editor.top_row == last_row:
+            if not editor.doing_done:
                 self.vi_print("Do you mean ⌃Y")  # G⌃F⌃E Egg
 
             return
@@ -1345,25 +1348,25 @@ class TerminalSkinVi:
             if row < top_row:
                 row = top_row
 
-        runner.top_row = top_row  # always different Top Row
+        editor.top_row = top_row  # always different Top Row
 
-        runner.row = row  # same or different Row
+        editor.row = row  # same or different Row
         self.slip_dent()  # same or different Column
 
-        runner.continue_do_loop()
+        editor.continue_do_loop()
 
     def do_scroll_behind_one(self):  # Vim ⌃Y
         """Show the previous Row of Screen"""
 
-        runner = self.runner
+        editor = self.editor
 
-        row = runner.row
-        top_row = runner.top_row
+        row = editor.row
+        top_row = editor.top_row
 
         # Quit at top Row
 
         if not top_row:
-            if not runner.doing_done:
+            if not editor.doing_done:
                 self.vi_print("Do you mean ⌃E")  # 1G⌃Y Egg
 
             return
@@ -1373,16 +1376,16 @@ class TerminalSkinVi:
         if top_row:
             top_row -= 1
 
-            bottom_row = runner.spot_bottom_row(top_row)
+            bottom_row = editor.spot_bottom_row(top_row)
             if row > bottom_row:
                 row = bottom_row
 
-        runner.top_row = top_row  # always different Top Row
+        editor.top_row = top_row  # always different Top Row
 
-        runner.row = row  # same or different Row
+        editor.row = row  # same or different Row
         self.slip_dent()  # same or different Column
 
-        runner.continue_do_loop()
+        editor.continue_do_loop()
 
     #
     # Scroll to move Cursor on Screen
@@ -1391,42 +1394,42 @@ class TerminalSkinVi:
     def do_scroll_till_top(self):  # Vim zt
         """Scroll up or down till Cursor Row lands in Top Row of Screen"""
 
-        runner = self.runner
-        row = self.get_vi_arg1(runner.row)
+        editor = self.editor
+        row = self.get_vi_arg1(editor.row)
 
-        runner.top_row = row
+        editor.top_row = row
 
     def do_scroll_till_middle(self):  # Vim zz  # not to be confused with Vim ZZ
         """Scroll up or down till Cursor Row lands in Middle Row of Screen"""
 
-        runner = self.runner
-        painter = runner.painter
+        editor = self.editor
+        painter = editor.painter
         scrolling_rows = painter.scrolling_rows
 
         assert scrolling_rows
 
-        row = self.get_vi_arg1(runner.row)
+        row = self.get_vi_arg1(editor.row)
 
         up = scrolling_rows // 2
         top_row = (row - up) if (row >= up) else 0
 
-        runner.top_row = top_row
+        editor.top_row = top_row
 
     def do_scroll_till_bottom(self):  # Vim zb
         """Scroll up or down till Cursor Row lands in Bottom Row of Screen"""
 
-        runner = self.runner
-        painter = runner.painter
+        editor = self.editor
+        painter = editor.painter
         scrolling_rows = painter.scrolling_rows
 
         assert scrolling_rows
 
-        row = self.get_vi_arg1(runner.row)
+        row = self.get_vi_arg1(editor.row)
 
         up = scrolling_rows - 1
         top_row = (row - up) if (row >= up) else 0
 
-        runner.top_row = top_row
+        editor.top_row = top_row
 
     #
     # Search ahead for an Empty Line (while ignoring Blank Lines)
@@ -1435,39 +1438,39 @@ class TerminalSkinVi:
     def do_paragraph_ahead(self):  # Vim {
         """Step down over Empty Lines, then over Non-Empty Lines"""
 
-        runner = self.runner
-        last_row = runner.spot_last_row()
+        editor = self.editor
+        last_row = editor.spot_last_row()
 
-        if runner.doing_done:
-            if (runner.row, runner.column) == (last_row, runner.spot_last_column()):
+        if editor.doing_done:
+            if (editor.row, editor.column) == (last_row, editor.spot_last_column()):
                 raise IndexError()
 
-        while (runner.row < last_row) and not runner.spot_last_column(row=runner.row):
-            runner.row += 1
-        while (runner.row < last_row) and runner.spot_last_column(row=runner.row):
-            runner.row += 1
+        while (editor.row < last_row) and not editor.spot_last_column(row=editor.row):
+            editor.row += 1
+        while (editor.row < last_row) and editor.spot_last_column(row=editor.row):
+            editor.row += 1
 
-        runner.column = runner.spot_last_column(row=runner.row)
+        editor.column = editor.spot_last_column(row=editor.row)
 
-        runner.continue_do_loop()
+        editor.continue_do_loop()
 
     def do_paragraph_behind(self):  # Vim }
         """Step up over Empty Lines, then over Non-Empty Lines"""
 
-        runner = self.runner
+        editor = self.editor
 
-        if runner.doing_done:
-            if (runner.row, runner.column) == (0, 0):
+        if editor.doing_done:
+            if (editor.row, editor.column) == (0, 0):
                 raise IndexError()
 
-        while runner.row and not runner.spot_last_column(row=runner.row):
-            runner.row -= 1
-        while runner.row and runner.spot_last_column(row=runner.row):
-            runner.row -= 1
+        while editor.row and not editor.spot_last_column(row=editor.row):
+            editor.row -= 1
+        while editor.row and editor.spot_last_column(row=editor.row):
+            editor.row -= 1
 
-        runner.column = 0
+        editor.column = 0
 
-        runner.continue_do_loop()
+        editor.continue_do_loop()
 
     #
     # Step across "Big" Words between Blanks, and "Lil" Words of Symbolic/Not Chars
@@ -1486,19 +1489,19 @@ class TerminalSkinVi:
     def do_word_end_ahead(self, *charsets):
         """Slip ahead to last Char of this else next Word"""
 
-        runner = self.runner
+        editor = self.editor
 
-        if not runner.doing_done:
-            self.check_index(runner.may_slip_ahead())
+        if not editor.doing_done:
+            self.check_vi_index(editor.may_slip_ahead())
 
         self.word_end_ahead(charsets)
 
-        runner.continue_do_loop()
+        editor.continue_do_loop()
 
     def word_end_ahead(self, charsets):
         """Slip ahead to last Char of this else next Word"""
 
-        runner = self.runner
+        editor = self.editor
 
         # Slip ahead at least once (unless at End of File)
 
@@ -1506,26 +1509,26 @@ class TerminalSkinVi:
 
         # Slip ahead across Blanks and Empty Lines, between Words, up to End of File
 
-        while not runner.charsets_find_column(charsets):
+        while not editor.charsets_find_column(charsets):
             if not self.slip_ahead():
 
                 break
 
         # Slip ahead across Chars of Word in Line
 
-        here = runner.charsets_find_column(charsets)
+        here = editor.charsets_find_column(charsets)
         if here:
-            while runner.charsets_find_column(charsets) == here:
-                row_last_column = runner.spot_last_column(row=runner.row)
-                if runner.column == row_last_column:
+            while editor.charsets_find_column(charsets) == here:
+                row_last_column = editor.spot_last_column(row=editor.row)
+                if editor.column == row_last_column:
 
                     return
 
                 ahead = self.slip_ahead()
-                assert ahead, (runner.column, runner.count_columns_in_row())
+                assert ahead, (editor.column, editor.count_columns_in_row())
 
             behind = self.slip_behind()  # backtrack
-            assert behind, (runner.column, runner.count_columns_in_row())
+            assert behind, (editor.column, editor.count_columns_in_row())
 
     def do_big_word_start_ahead(self):  # Vim W  # inverse of Vim B
         """Slip ahead to first Char of next Big Word"""
@@ -1540,31 +1543,31 @@ class TerminalSkinVi:
     def do_word_start_ahead(self, *charsets):
         """Slip ahead to first Char of next Word"""
 
-        runner = self.runner
+        editor = self.editor
 
-        if not runner.doing_done:
-            self.check_index(runner.may_slip_ahead())
+        if not editor.doing_done:
+            self.check_vi_index(editor.may_slip_ahead())
 
         self.word_start_ahead(charsets)
 
-        runner.continue_do_loop()
+        editor.continue_do_loop()
 
     def word_start_ahead(self, charsets):
         """Slip ahead to first Char of this else next Word"""
 
-        runner = self.runner
+        editor = self.editor
 
         # Slip ahead at least once (unless at End of File)
 
-        here = runner.charsets_find_column(charsets)
+        here = editor.charsets_find_column(charsets)
 
         _ = self.slip_ahead()
 
         # Slip ahead across more Chars of Word in Line
 
         if here:
-            while runner.charsets_find_column(charsets) == here:
-                if not runner.column:
+            while editor.charsets_find_column(charsets) == here:
+                if not editor.column:
 
                     break
 
@@ -1574,8 +1577,8 @@ class TerminalSkinVi:
 
         # Slip ahead across Blanks, but not across Empty Lines, nor End of File
 
-        while not runner.charsets_find_column(charsets):
-            if not runner.count_columns_in_row():
+        while not editor.charsets_find_column(charsets):
+            if not editor.count_columns_in_row():
 
                 break
 
@@ -1598,19 +1601,19 @@ class TerminalSkinVi:
     def do_word_start_behind(self, *charsets):
         """Slip behind to first Char of Word"""
 
-        runner = self.runner
+        editor = self.editor
 
-        if not runner.doing_done:
-            self.check_index(runner.may_slip_behind())
+        if not editor.doing_done:
+            self.check_vi_index(editor.may_slip_behind())
 
         self.word_start_behind(charsets)
 
-        runner.continue_do_loop()
+        editor.continue_do_loop()
 
     def word_start_behind(self, charsets):
         """Slip behind to first Char of this else next Word"""
 
-        runner = self.runner
+        editor = self.editor
 
         # Slip behind at least once (unless at Start of File)
 
@@ -1618,8 +1621,8 @@ class TerminalSkinVi:
 
         # Slip behind across Blanks, but not across Empty Lines, nor Start of File
 
-        while not runner.charsets_find_column(charsets):
-            if not runner.count_columns_in_row():
+        while not editor.charsets_find_column(charsets):
+            if not editor.count_columns_in_row():
 
                 break
 
@@ -1629,18 +1632,18 @@ class TerminalSkinVi:
 
         # Slip behind across Chars of Word, except stop at Start of Line
 
-        here = runner.charsets_find_column(charsets)
+        here = editor.charsets_find_column(charsets)
         if here:
-            while runner.charsets_find_column(charsets) == here:
-                if not runner.column:
+            while editor.charsets_find_column(charsets) == here:
+                if not editor.column:
 
                     return
 
                 behind = self.slip_behind()
-                assert behind, (runner.column, runner.count_columns_in_row())
+                assert behind, (editor.column, editor.count_columns_in_row())
 
             ahead = self.slip_ahead()  # backtrack
-            assert ahead, (runner.column, runner.count_columns_in_row())
+            assert ahead, (editor.column, editor.count_columns_in_row())
 
     #
     # Search ahead inside the Row for a single Char
@@ -1679,10 +1682,10 @@ class TerminalSkinVi:
     def slip_index(self):
         """Find Char to Right in row, once or more"""
 
-        runner = self.runner
+        editor = self.editor
 
-        last_column = runner.spot_last_column()
-        line = runner.fetch_row_line()
+        last_column = editor.spot_last_column()
+        line = editor.fetch_row_line()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -1691,11 +1694,11 @@ class TerminalSkinVi:
 
         # Index each
 
-        column = runner.column
+        column = editor.column
 
         for _ in range(count):
 
-            self.check_index(column < last_column)
+            self.check_vi_index(column < last_column)
             column += 1
 
             try:
@@ -1707,10 +1710,10 @@ class TerminalSkinVi:
         # Option to slip back one column
 
         if after:
-            self.check_index(column)
+            self.check_vi_index(column)
             column -= 1
 
-        runner.column = column
+        editor.column = column
 
     #
     # Search behind inside the Row for a single Char
@@ -1743,10 +1746,10 @@ class TerminalSkinVi:
     def slip_rindex(self):
         """Find Char to left in Row, once or more"""
 
-        runner = self.runner
+        editor = self.editor
 
-        last_column = runner.spot_last_column()
-        line = runner.fetch_row_line()
+        last_column = editor.spot_last_column()
+        line = editor.fetch_row_line()
 
         choice = self.slip_choice
         after = self.slip_after
@@ -1755,11 +1758,11 @@ class TerminalSkinVi:
 
         # R-Index each
 
-        column = runner.column
+        column = editor.column
 
         for _ in range(count):
 
-            self.check_index(column)
+            self.check_vi_index(column)
             column -= 1
 
             try:
@@ -1771,10 +1774,10 @@ class TerminalSkinVi:
 
         if after:
 
-            self.check_index(column < last_column)
+            self.check_vi_index(column < last_column)
             column += 1
 
-        runner.column = column
+        editor.column = column
 
     #
     # Repeat search inside the Row for a single Char
@@ -1783,7 +1786,7 @@ class TerminalSkinVi:
     def do_slip_choice_redo(self):  # Vim ;
         """Repeat the last 'slip_index' or 'slip_rindex' once or more"""
 
-        runner = self.runner
+        editor = self.editor
 
         if self.slip_choice is None:
             self.vi_print("Do you mean:  fx;")  # ; Egg
@@ -1797,31 +1800,31 @@ class TerminalSkinVi:
 
         else:
 
-            row_last_column = runner.spot_last_column(row=runner.row)
+            row_last_column = editor.spot_last_column(row=editor.row)
 
-            with_column = runner.column
+            with_column = editor.column
             try:
 
                 if after < 0:
-                    assert runner.column < row_last_column
-                    runner.column += 1
+                    assert editor.column < row_last_column
+                    editor.column += 1
                 elif after > 0:
-                    assert runner.column
-                    runner.column -= 1
+                    assert editor.column
+                    editor.column -= 1
 
                 self.slip_redo()
 
-                assert runner.column != with_column
+                assert editor.column != with_column
 
             except Exception:
-                runner.column = with_column
+                editor.column = with_column
 
                 raise
 
     def do_slip_choice_undo(self):  # Vim ,
         """Undo the last 'slip_index' or 'slip_rindex' once or more"""
 
-        runner = self.runner
+        editor = self.editor
 
         if self.slip_choice is None:
             self.vi_print("Do you mean:  Fx,")  # , Egg
@@ -1835,24 +1838,24 @@ class TerminalSkinVi:
 
         else:
 
-            row_last_column = runner.spot_last_column(row=runner.row)
+            row_last_column = editor.spot_last_column(row=editor.row)
 
-            with_column = runner.column
+            with_column = editor.column
             try:
 
                 if after < 0:
-                    assert runner.column
-                    runner.column -= 1
+                    assert editor.column
+                    editor.column -= 1
                 elif after > 0:
-                    assert runner.column < row_last_column
-                    runner.column += 1
+                    assert editor.column < row_last_column
+                    editor.column += 1
 
                 self.slip_undo()
 
-                assert runner.column != with_column
+                assert editor.column != with_column
 
             except Exception:
-                runner.column = with_column
+                editor.column = with_column
 
                 raise
 
@@ -1875,17 +1878,17 @@ class TerminalSkinVi:
         if not self.seeking_more:
             self.seeking_column = None
 
-    # FIXME: shuffle back down into TerminalRunner
+    # FIXME: shuffle back down into TerminalEditor
     def format_vi_reply(self):
         """Format a Status Line of Row:Column, Nudge, and Message"""
 
-        runner = self.runner
-        reply = runner.reply
+        editor = self.editor
+        reply = editor.reply
         nudge = reply.nudge
 
         # Format parts, a la Vim ':set showcmd' etc
 
-        str_pin = "{},{}".format(1 + self.runner.row, 1 + self.runner.column)
+        str_pin = "{},{}".format(1 + self.editor.row, 1 + self.editor.column)
 
         str_flags = str(reply.flags) if reply.flags else ""
 
@@ -1901,32 +1904,32 @@ class TerminalSkinVi:
 
         return vi_reply
 
-    # FIXME: shuffle back down into TerminalRunner
+    # FIXME: shuffle back down into TerminalEditor
     def paint_vi_cursor(self):
         """Place the Screen Cursor"""
 
-        runner = self.runner
-        painter = runner.painter
+        editor = self.editor
+        painter = editor.painter
         terminal = painter
 
-        terminal.row = runner.row - runner.top_row
-        terminal.column = runner.column
+        terminal.row = editor.row - editor.top_row
+        terminal.column = editor.column
 
 
 class TerminalKeyboardVi:
     """Map Keyboard Inputs to Code, for when feeling like Vi"""
 
-    def __init__(self, terminal_vi, runner):
+    def __init__(self, terminal_vi, editor):
 
         vi = terminal_vi
 
         self.vi = vi
-        self.runner = runner
+        self.editor = editor
 
         self.format_reply_func = vi.format_vi_reply
         self.paint_cursor_func = vi.paint_vi_cursor
         self.enter_do_func = vi.enter_do_vi
-        self.do_func = runner.do_raise_name_error
+        self.do_func = editor.do_raise_name_error
         self.exit_do_func = vi.exit_do_vi
 
         self.func_by_chords = dict()
@@ -1937,7 +1940,7 @@ class TerminalKeyboardVi:
     def _init_by_vi_chord_(self):
 
         vi = self.vi
-        runner = self.runner
+        editor = self.editor
 
         func_by_chords = self.func_by_chords
         suffixes_by_chords = self.suffixes_by_chords
@@ -1960,12 +1963,12 @@ class TerminalKeyboardVi:
         func_by_chords[b"\x04"] = vi.do_scroll_ahead_some  # EOT, ⌃D, 4
         func_by_chords[b"\x05"] = vi.do_scroll_ahead_one  # ENQ, ⌃E, 5
         func_by_chords[b"\x06"] = vi.do_scroll_ahead_much  # ACK, ⌃F, 6
-        func_by_chords[b"\x07"] = runner.do_say_more  # BEL, ⌃G, 7 \a
+        func_by_chords[b"\x07"] = editor.do_say_more  # BEL, ⌃G, 7 \a
         # func_by_chords[b"\x08"] = vi.do_c0_control_bs  # BS, ⌃H, 8 \b
         # func_by_chords[b"\x09"] = vi.do_c0_control_tab  # TAB, ⌃I, 9 \t
         func_by_chords[b"\x0A"] = vi.do_step_down_seek  # LF, ⌃J, 10 \n
         # func_by_chords[b"\x0B"] = vi.do_c0_control_vt  # VT, ⌃K, 11 \v
-        func_by_chords[b"\x0C"] = runner.do_redraw  # FF, ⌃L, 12 \f
+        func_by_chords[b"\x0C"] = editor.do_redraw  # FF, ⌃L, 12 \f
         func_by_chords[b"\x0D"] = vi.do_step_down_dent  # CR, ⌃M, 13 \r
         func_by_chords[b"\x0E"] = vi.do_step_down_seek  # SO, ⌃N, 14
         # func_by_chords[b"\x0F"] = vi.do_c0_control_si  # SI, ⌃O, 15
@@ -1981,7 +1984,7 @@ class TerminalKeyboardVi:
         func_by_chords[b"\x19"] = vi.do_scroll_behind_one  # EM, ⌃Y, 25
         func_by_chords[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
 
-        func_by_chords[b"\x1B"] = vi.do_c0_control_esc  # ESC, ⌃[, 27
+        func_by_chords[b"\x1B"] = vi.do_vi_c0_control_esc  # ESC, ⌃[, 27
         func_by_chords[b"\x1B[A"] = vi.do_step_up_seek  # ↑ Up Arrow
         func_by_chords[b"\x1B[B"] = vi.do_step_down_seek  # ↓ Down Arrow
         func_by_chords[b"\x1B[C"] = vi.do_slip_right  # → Right Arrow
@@ -2061,7 +2064,7 @@ class TerminalKeyboardVi:
         # func_by_chords[b"K"] = vi.do_lookup
         func_by_chords[b"L"] = vi.do_step_max_low
         func_by_chords[b"M"] = vi.do_step_to_middle
-        func_by_chords[b"N"] = vi.do_find_earlier
+        func_by_chords[b"N"] = vi.do_vi_find_earlier
         # func_by_chords[b"O"] = vi.do_slip_first_open
         # func_by_chords[b"P"] = vi.do_paste_behind
 
@@ -2110,7 +2113,7 @@ class TerminalKeyboardVi:
         func_by_chords[b"k"] = vi.do_step_up_seek
         func_by_chords[b"l"] = vi.do_slip_right
         # func_by_chords[b"m"] = vi, do_drop_pin
-        func_by_chords[b"n"] = vi.do_find_later
+        func_by_chords[b"n"] = vi.do_vi_find_later
         # func_by_chords[b"o"] = vi.do_slip_last_right_open
         # func_by_chords[b"p"] = vi.do_paste_ahead
         # func_by_chords[b"q"] = vi.do_record_input
@@ -2146,13 +2149,13 @@ class TerminalKeyboardVi:
 class TerminalSkinEx:
     """Feed Keyboard into Line at Bottom of Screen of Scrolling Rows, a la Ex"""
 
-    def __init__(self, runner, vi_reply):
+    def __init__(self, editor, vi_reply):
 
-        self.runner = runner
+        self.editor = editor
         self.vi_reply = vi_reply
         self.ex_line = ""
 
-    # FIXME: shuffle down into TerminalRunner, but keep the name
+    # FIXME: shuffle down into TerminalEditor, but keep the name
     def format_ex_reply(self):
         """Keep up the Vi Reply while working the Ex Keyboard, but add the Input Line"""
 
@@ -2163,12 +2166,12 @@ class TerminalSkinEx:
 
         return ex_reply
 
-    # FIXME: shuffle back down into TerminalRunner, but keep the name
+    # FIXME: shuffle back down into TerminalEditor, but keep the name
     def paint_ex_cursor(self):
         """Place the Screen Cursor"""
 
-        runner = self.runner
-        painter = runner.painter
+        editor = self.editor
+        painter = editor.painter
         terminal = painter
 
         ex_reply = self.format_ex_reply()
@@ -2194,15 +2197,15 @@ class TerminalSkinEx:
     def run_ex_keyboard(self):
         """Edit an Input Line beneath the Scrolling Rows"""
 
-        runner = self.runner
+        editor = self.editor
 
-        keyboard = TerminalKeyboardEx(terminal_ex=self, runner=runner)
+        keyboard = TerminalKeyboardEx(terminal_ex=self, editor=editor)
 
-        runner._enter_keyboard_()
+        editor._enter_keyboard_()
         try:
-            runner.run_keyboard(keyboard)
+            editor.run_keyboard(keyboard)
         finally:
-            runner._exit_keyboard_(*sys.exc_info())
+            editor._exit_keyboard_(*sys.exc_info())
 
         assert False  # unreached
 
@@ -2214,8 +2217,8 @@ class TerminalSkinEx:
     def do_append_char(self):
         """Append the Chords to the Input Line"""
 
-        runner = self.runner
-        chords = runner.get_arg0()
+        editor = self.editor
+        chords = editor.get_arg0()
 
         chars = chords.decode(errors="surrogateescape")
 
@@ -2229,7 +2232,7 @@ class TerminalSkinEx:
 
         raise NotImplementedError()
 
-        chars = self.runner.arg2
+        chars = self.editor.arg2
 
         self.ex_line += chars
 
@@ -2254,17 +2257,17 @@ class TerminalSkinEx:
 class TerminalKeyboardEx:
     """Map Keyboard Inputs to Code, for when feeling like ex"""
 
-    def __init__(self, terminal_ex, runner):
+    def __init__(self, terminal_ex, editor):
 
         ex = terminal_ex
 
         self.ex = ex
-        self.runner = runner
+        self.editor = editor
 
         self.format_reply_func = ex.format_ex_reply
         self.paint_cursor_func = ex.paint_ex_cursor
         self.enter_do_func = lambda: None
-        self.do_func = runner.do_raise_name_error
+        self.do_func = editor.do_raise_name_error
         self.exit_do_func = lambda: None
 
         self.func_by_chords = dict()
@@ -2276,7 +2279,7 @@ class TerminalKeyboardEx:
 
         ex = self.ex
         func_by_chords = self.func_by_chords
-        runner = self.runner
+        editor = self.editor
         suffixes_by_chords = self.suffixes_by_chords
 
         # Mark some sequences of keyboard input Chords as followed by one Suffix Chord
@@ -2286,10 +2289,10 @@ class TerminalKeyboardEx:
         # Map each sequence of keyboard input Chords to one Func
 
         for chords in sorted(C0_CONTROL_STDINS):
-            func_by_chords[chords] = runner.do_raise_name_error
+            func_by_chords[chords] = editor.do_raise_name_error
 
         func_by_chords[b"\x03"] = ex.do_quit_ex  # ETX, aka ⌃C, aka 3
-        func_by_chords[b"\x0D"] = runner.do_sys_exit  # CR, aka ⌃M, aka 13 \r
+        func_by_chords[b"\x0D"] = editor.do_sys_exit  # CR, aka ⌃M, aka 13 \r
         func_by_chords[b"\x15"] = ex.do_clear_chars  # NAK, aka ⌃U, aka 21
         func_by_chords[b"\x16"] = ex.do_append_suffix  # SYN, aka ⌃V, aka 22
 
@@ -2426,7 +2429,7 @@ class TerminalSpan(
         return spans
 
 
-class TerminalRunner:
+class TerminalEditor:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars"""
 
     keyboard_stack = list()
@@ -2500,13 +2503,13 @@ class TerminalRunner:
             self.flagging_more,
         )
 
-        TerminalRunner.keyboard_stack.append(keyboard_state)
+        TerminalEditor.keyboard_stack.append(keyboard_state)
 
     def _exit_keyboard_(self, exc_type, exc_value, traceback):
 
         _ = (exc_type, exc_value, traceback)
 
-        keyboard_state = TerminalRunner.keyboard_stack.pop()
+        keyboard_state = TerminalEditor.keyboard_stack.pop()
 
         (
             self.keyboard,
@@ -4215,8 +4218,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
-
-# FIXME: Terminal Skin > Editor > Painter  <- Vi|Ex > Runner > Painter
 
 # FIXME: TerminalViCursor to slip & step
 
