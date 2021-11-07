@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
 
 r"""
-usage: vi.py [-h] [--pwnme [BRANCH]] [--version] [FILE ...]
+usage: vi.py [-h] [+PLUS] [--pwnme [BRANCH]] [--version] [FILE ...]
 
 read files, accept zero or more edits, write files
 
 positional arguments:
-  FILE              a file to edit, such as '-' to mean stdin
+  FILE              a file to edit (default: '/dev/stdin')
 
 optional arguments:
   -h, --help        show this help message and exit
-  --pwnme [BRANCH]  download fresh Code to run in place of this Code (default: 'master')
+  +PLUS             next Ex command to run, just after loading first File
+  --pwnme [BRANCH]  update and run this Code, don't just run it
   --version         print a hash of this Code (its Md5Sum)
 
 quirks:
-  defaults to read Stdin, and writes Stdout at ZZ (but not at ZQ)
+  |vi.py works like |vi -
 
 keyboard tests:
   ZQ :q!⌃M :q⌃M :n!⌃M :n⌃M :w!⌃M :w⌃M ZZ :wq!⌃M :wq⌃M ⌃Zfg  => how to quit Vi Py
@@ -31,15 +32,14 @@ keyboard tests:
   Esc ⌃C 123Esc 123⌃C zZ /⌃G 3ZQ f⌃C 9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N  => eggs
   \F/$Return Qvi⌃My Qvi⌃Mn :n  => more eggs
 
-pipe demos:
+pipe tests:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
   cat bin/vi.py |bin/vi.py -  # demo multiple screens of chars
   cat bin/vi.py |bin/vi.py - |grep import  # demo ZQ vs ZZ
 
 how to get vi py:
   cd ~/Desktop/
-  R=pelavarre/pybashish/master
-  F=bin/vi.py
+  R=pelavarre/pybashish/master && F=bin/vi.py
   curl -sSO --location https://raw.githubusercontent.com/$R/$F
   ls -alF -drt vi.py
   python3 vi.py --pwnme +q  # 6 lines to start, but repeat just this 1 line to refresh
@@ -49,7 +49,6 @@ simplest demo:
   /egg
 """
 # we also don't mention ⌃D ⌃U till they stop raising NotImplementedError
-# FIXME: code up the +$EX_COMMAND arg
 
 
 import argparse
@@ -133,7 +132,7 @@ def main(argv):
 
     # Visit each File
 
-    skin = TerminalSkinVi(files=args.files)
+    skin = TerminalSkinVi(files=args.files, ex_commands=args.ex_commands)
 
     returncode = None
     try:
@@ -161,21 +160,33 @@ def main(argv):
 def parse_vi_argv(argv):
     """Convert a Vi Sys ArgV to an Args Namespace, or print some Help and quit"""
 
-    parser = compile_argdoc(epi="quirks")
+    parser = compile_argdoc(epi="quirks", drop_help=True)
 
     parser.add_argument(
         "files",
         metavar="FILE",
         nargs="*",
-        help="a file to edit, such as '-' to mean stdin",
+        help="a file to edit (default: '/dev/stdin')",
     )
 
     parser.add_argument(
-        "--pwnme",
+        "-h", "--help", action="count", help="show this help message and exit"
+    )
+
+    parser.add_argument(
+        "--plus",  # Vim Cli "+"
+        metavar="PLUS",
+        dest="ex_commands",
+        action="append",  # 'man vim' says <= 10 commands
+        help="next Ex command to run, just after loading first File",
+    )
+
+    parser.add_argument(
+        "--pwnme",  # Vim doesn't do software-update-in-place
         metavar="BRANCH",
         nargs="?",
         default=False,
-        help="download fresh Code to run in place of this Code (default: 'master')",
+        help="update and run this Code, don't just run it",
     )
 
     parser.add_argument(
@@ -186,7 +197,17 @@ def parse_vi_argv(argv):
 
     exit_unless_doc_eq(parser)
 
-    args = parser.parse_args(argv[1:])
+    argv_tail = list()
+    for arg in argv[1:]:
+        if not arg.startswith("+"):
+            argv_tail.append(arg)
+        else:
+            argv_tail.append("--plus=" + arg[len(":")])
+
+    args = parser.parse_args(argv_tail)
+    if args.help:
+        sys.stdout.write(parser_format_help(parser))
+        sys.exit()
 
     return args
 
@@ -236,15 +257,16 @@ def pwnme(branch):
 
 
 VI_BLANK_SET = set(" \t")
-VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # aka r"[A-Za-z0-9_]"
+VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # r"[A-Za-z0-9_]"
 
 
 class TerminalSkinVi:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim"""
 
-    def __init__(self, files):
+    def __init__(self, files, ex_commands):
 
-        self.files = files  # read zero or more files
+        self.files = files  # files to edit
+        self.ex_commands = ex_commands  # Ex commands to run after
 
         self.file_index = None
         self.file_path = None
@@ -367,13 +389,28 @@ class TerminalSkinVi:
     def run_editor(self):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
 
-        editor = TerminalEditor()
-        keyboard = TerminalKeyboardVi(terminal_vi=self, editor=editor)
+        ex_commands = self.ex_commands  # Vim starts with lines of '~/.vimrc
 
+        # Choose how to start up
+
+        chords = b""
+
+        chords += b":n\r"  # autoload the first file => do_next_vi_file
+
+        if ex_commands:
+            for ex_command in ex_commands:
+                chars = ":" + ex_command + "\r"
+                chords += chars.encode()
+
+        chords += b"\x03"  # welcome warmly with ETX, ⌃C, 3 => do_help_quit_vi
+
+        # Form stack
+
+        editor = TerminalEditor(chords=chords)
+        keyboard = TerminalKeyboardVi(terminal_vi=self, editor=editor)
         self.editor = editor
 
-        self.do_next_vi_file()
-        self.do_help_quit_vi()  # start with a warmer welcome, not a cold Empty Nudge
+        # Feed Keyboard into Screen, till SystemExit
 
         try:
 
@@ -426,6 +463,22 @@ class TerminalSkinVi:
     # Define Chords for pausing TerminalSkinVi
     #
 
+    def do_say_more(self):  # Vim ⌃G
+        """Reply once with more verbose details"""
+
+        editor = self.editor
+
+        if editor.finding_highlights:
+            editor.flag_reply_with_find()
+
+        joins = list()
+        joins.append(repr(self.file_path))
+        joins.append("more lag" if editor.injecting_lag else "less lag")
+
+        editor.editor_print("  ".join(joins))  # such as "'bin/vi.py'  less lag"
+
+        # TODO: echo $(whoami)@$(hostname):$(pwd)/
+
     def do_vi_c0_control_esc(self):  # Vim Esc
         """Cancel Digits Prefix, else suggest ZZ to quit Vi Py"""
 
@@ -445,7 +498,11 @@ class TerminalSkinVi:
 
         self.vi_ask("Would you like to play a game? (y/n)")
 
-        chord = editor.terminal_getch()
+        try:
+            chord = editor.terminal_getch()
+        except KeyboardInterrupt:
+            chord = b"\x03"  # ETX, ⌃C, 3
+
         editor.nudge.suffix = chord
 
         if chord in (b"y", b"Y"):
@@ -1958,7 +2015,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"\x04"] = vi.do_scroll_ahead_some  # EOT, ⌃D, 4
         func_by_chords[b"\x05"] = vi.do_scroll_ahead_one  # ENQ, ⌃E, 5
         func_by_chords[b"\x06"] = vi.do_scroll_ahead_much  # ACK, ⌃F, 6
-        func_by_chords[b"\x07"] = editor.do_say_more  # BEL, ⌃G, 7 \a
+        func_by_chords[b"\x07"] = vi.do_say_more  # BEL, ⌃G, 7 \a
         # func_by_chords[b"\x08"] = vi.do_c0_control_bs  # BS, ⌃H, 8 \b
         # func_by_chords[b"\x09"] = vi.do_c0_control_tab  # TAB, ⌃I, 9 \t
         func_by_chords[b"\x0A"] = vi.do_step_down_seek  # LF, ⌃J, 10 \n
@@ -2267,13 +2324,13 @@ class TerminalKeyboardEx(TerminalKeyboard):
 
         # Mutate the C0_CONTROL_STDINS definitions
 
-        func_by_chords[b"\x03"] = ex.do_quit_ex  # ETX, aka ⌃C, aka 3
-        func_by_chords[b"\x0D"] = editor.do_sys_exit  # CR, aka ⌃M, aka 13 \r
-        func_by_chords[b"\x15"] = ex.do_clear_chars  # NAK, aka ⌃U, aka 21
+        func_by_chords[b"\x03"] = ex.do_quit_ex  # ETX, ⌃C, 3
+        func_by_chords[b"\x0D"] = editor.do_sys_exit  # CR, ⌃M, 13 \r
+        func_by_chords[b"\x15"] = ex.do_clear_chars  # NAK, ⌃U, 21
 
-        self._init_suffix_func(b"\x16", func=ex.do_append_suffix)  # SYN, aka ⌃V, aka 22
+        self._init_suffix_func(b"\x16", func=ex.do_append_suffix)  # SYN, ⌃V, 22
 
-        func_by_chords[b"\x7F"] = ex.do_undo_append_char  # DEL, aka ⌃?, aka 127
+        func_by_chords[b"\x7F"] = ex.do_undo_append_char  # DEL, ⌃?, 127
 
         # Define the BASIC_LATIN_STDINS
 
@@ -2416,7 +2473,11 @@ class TerminalEditor:
 
     editor_skin_stack = list()
 
-    def __init__(self):
+    def __init__(self, chords):
+
+        self.chords_ahead = list(chords)
+
+        #
 
         self.traceback = None  # capture Python Tracebacks
 
@@ -2452,6 +2513,10 @@ class TerminalEditor:
         self.doing_done = None  # count the Repetition's completed before now
 
         self.flagging_more = None  # keep up some Flags in the Reply to a Nudge
+
+        #
+
+        self._init_iobytearray_etc_(iobytearray=b"")
 
     def _init_iobytearray_etc_(self, iobytearray):
         """Swap in a new File of Lines"""
@@ -2541,8 +2606,6 @@ class TerminalEditor:
 
         self.keyboard = keyboard
 
-        terminal = self.painter
-
         # Repeat till SystemExit raised
 
         self.nudge = TerminalNudgeIn()
@@ -2562,11 +2625,11 @@ class TerminalEditor:
             # Take one Chord in, or next Chord, or cancel Chords to start again
 
             try:
-                chord = terminal.getch()
+                chord = self.terminal_getch()
             except KeyboardInterrupt:
-                chord = b"\x03"  # ETX, aka ⌃C, aka 3
+                chord = b"\x03"  # ETX, ⌃C, 3
 
-                if self.nudge != TerminalNudgeIn():
+                if self.nudge != TerminalNudgeIn():  # if not meaning 'do_help_quit_vi'
                     self.nudge.epilog = chord
                     self.editor_print("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
 
@@ -2909,11 +2972,14 @@ class TerminalEditor:
     def terminal_getch(self):
         """Block till next keyboard input Chord"""
 
+        chords_ahead = self.chords_ahead
         terminal = self.painter
-        try:
-            chord = terminal.getch()
-        except KeyboardInterrupt:
-            chord = b"\x03"  # ETX, aka ⌃C, aka 3
+
+        if not chords_ahead:
+            chord = terminal.getch()  # may raise KeyboardInterrupt
+        else:
+            ord_chord = chords_ahead.pop(0)  # may be b"\x03" ETX, ⌃C, 3
+            chord = chr(ord_chord).encode()
 
         return chord
 
@@ -3079,19 +3145,6 @@ class TerminalEditor:
         else:
             self.editor_print(":set no_lag_")
 
-    def do_say_more(self):  # Vim ⌃G
-        """Toggle between more and less Lag (vs Vim injects lots of Lag exactly once)"""
-
-        if self.finding_highlights:
-            self.flag_reply_with_find()
-
-        if self.injecting_lag:
-            self.editor_print("while :set _lag_")
-        else:
-            self.editor_print("while :set no_lag_")
-
-        # TODO: echo $(whoami)@$(hostname):$(pwd)/
-
     def do_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
@@ -3113,7 +3166,7 @@ class TerminalEditor:
 
     # TODO: somehow soon stop commandeering the personal \ or Q Chord Sequences
 
-    def do_set_invhlsearch(self):  # Egg \Esc
+    def do_set_invhlsearch(self):  # \Esc Egg
         """Highlight Matches or not, but without rerunning Search"""
 
         self.finding_highlights = not self.finding_highlights
@@ -3127,7 +3180,7 @@ class TerminalEditor:
         # Vim lacks ':invhlsearch' and lacks ':hlsearch'
         # Vi Py \Esc means ':invhlsearch' not just the ':noh' .. ':nohlsearch'
 
-    def do_set_invignorecase(self):  # Egg \i
+    def do_set_invignorecase(self):  # \i Egg
         """Search Upper/Lower Case or not"""
 
         self.finding_case = not self.finding_case
@@ -3139,7 +3192,7 @@ class TerminalEditor:
         else:
             self.editor_print(":set ignorecase")
 
-    def do_set_invnumber(self):  # Egg \n
+    def do_set_invnumber(self):  # \n Egg
         """Show Line Numbers or not, but without rerunning Search"""
 
         self.showing_line_number = not self.showing_line_number
@@ -3149,7 +3202,7 @@ class TerminalEditor:
         else:
             self.editor_print(":set nonumber")
 
-    def do_set_invregex(self):  # Egg \F
+    def do_set_invregex(self):  # \F Egg
         """Search as Regex or search as Chars"""
 
         self.finding_regex = not self.finding_regex
@@ -3423,7 +3476,7 @@ class TerminalPainter:
 
         chord = self.terminal.getch()
 
-        if chord == b"\x03":
+        if chord == b"\x03":  # ETX, ⌃C, 3
             raise KeyboardInterrupt()
 
         return chord
@@ -4040,14 +4093,14 @@ def repr_vi_bytes(xxs):
         else:
             rep += " " + ch
 
-    rep = rep.replace("Esc [ A", "Up")  # aka ↑ \u2191 Upwards Arrow
-    rep = rep.replace("Esc [ B", "Down")  # aka ↓ \u2193 Downwards Arrow
-    rep = rep.replace("Esc [ C", "Right")  # aka → \u2192 Rightwards Arrow
-    rep = rep.replace("Esc [ D", "Left")  # aka ← \u2190 Leftwards Arrows
+    rep = rep.replace("Esc [ A", "Up")  # ↑ \u2191 Upwards Arrow
+    rep = rep.replace("Esc [ B", "Down")  # ↓ \u2193 Downwards Arrow
+    rep = rep.replace("Esc [ C", "Right")  # → \u2192 Rightwards Arrow
+    rep = rep.replace("Esc [ D", "Left")  # ← \u2190 Leftwards Arrows
 
     rep = rep.strip()
 
-    return rep  # such as '⌃L' at FF, aka ⌃L, aka 12, aka '\f'
+    return rep  # such as '⌃L' at FF, ⌃L, 12, '\f'
 
 
 #
@@ -4192,7 +4245,7 @@ def exit_unless_doc_eq(parser):
     with_columns = os.getenv("COLUMNS")
     os.environ["COLUMNS"] = str(89)  # Black promotes 89 columns per line
     try:
-        parser_doc = parser.format_help()
+        parser_doc = parser_format_help(parser)
     finally:
         if with_columns is None:
             os.environ.pop("COLUMNS")
@@ -4284,6 +4337,21 @@ def module_file_version_zero():
 
 
 # deffed in many files  # missing from docs.python.org
+def parser_format_help(parser):
+    """Patch around Python ArgParse misreading declarations of "+" optional args"""
+
+    doc = parser.format_help()
+
+    doc = doc.replace(" [--plus PLUS]", " [+PLUS]")
+    doc = doc.replace(
+        "  --plus PLUS  ",
+        "  +PLUS        ",
+    )
+
+    return doc
+
+
+# deffed in many files  # missing from docs.python.org
 def file_print(*args):  # later Python 3 accepts ', **kwargs' here
     """Save out the Str of an Object as a File"""
 
@@ -4325,6 +4393,11 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # FIXME: QZ to work as Z (not as ZQ)
 # FIXME: accept :noh\r and :set ignorecase and so on, but suggest \Esc \i etc
 # FIXME: accept :123\r, but suggest 123G etc
+_ = """
+ex tests:
+  ls |bin/vi.py +3 -  # start on chosen line
+  ls |bin/vi.py +/Makefile -  # start on found line
+"""
 
 
 # FIXME: somehow need two ⌃L after each Terminal Window Resize?  \ n \ n doesn't work?
