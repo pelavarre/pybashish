@@ -1969,6 +1969,14 @@ class TerminalSkinVi:
 class TerminalKeyboard:
     """Map Keyboard Inputs to Code"""
 
+    def _init_correcting_many_chords(self, chords, corrections):
+        """Map one sequence of keyboard input Chords to another"""
+
+        corrections_by_chords = self.corrections_by_chords
+
+        self._init_func_by_many_vi_chords(chords, func=None)
+        corrections_by_chords[chords] = corrections
+
     def _init_suffix_func(self, chords, func):
         """Map a sequence of keyboard input Chords that needs 1 Suffix Chord"""
 
@@ -2018,6 +2026,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self.do_func = editor.do_raise_name_error
         self.exit_do_func = vi.exit_do_vi
 
+        self.corrections_by_chords = dict()
         self.func_by_chords = dict()
         self.suffixes_by_chords = dict()
 
@@ -2093,6 +2102,8 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"0"] = vi.do_slip_first
         func_by_chords[b"1234567890"] = None
 
+        self._init_correcting_many_chords(b":/", corrections=b"/")
+        self._init_correcting_many_chords(b":?", corrections=b"?")
         self._init_func_by_many_vi_chords(b":g/", func=vi.do_find_all_vi_line)
         self._init_func_by_many_vi_chords(b":n\r", func=vi.do_might_next_vi_file)
         self._init_func_by_many_vi_chords(b":n!\r", func=vi.do_next_vi_file)
@@ -2143,7 +2154,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # func_by_chords[b"X"] = vi.do_cut_behind
         # func_by_chords[b"Y"] = vi.do_copy_row
 
-        # self._init_func_by_many_vi_chords(b"QZ", expansion=b"Z")
+        self._init_correcting_many_chords(b"QZ", corrections=b"Z")
         self._init_func_by_many_vi_chords(b"ZQ", func=vi.do_quit_vi)
         self._init_func_by_many_vi_chords(b"ZZ", func=vi.do_flush_quit_vi)
 
@@ -2330,6 +2341,7 @@ class TerminalKeyboardEx(TerminalKeyboard):
         self.do_func = editor.do_raise_name_error
         self.exit_do_func = lambda: None
 
+        self.corrections_by_chords = dict()
         self.func_by_chords = dict()
         self.suffixes_by_chords = dict()
 
@@ -2803,11 +2815,12 @@ class TerminalEditor:
         chords = self.nudge.chords
         keyboard = self.keyboard
 
+        corrections_by_chords = keyboard.corrections_by_chords
         func_by_chords = keyboard.func_by_chords
 
         assert self.nudge.suffix is None, (chords, chord)  # one Chord only
 
-        # Accept a Prefix of Digits
+        # Take more decimal Digits, while nothing but decimal Digits given
 
         if b"1234567890" in func_by_chords.keys():
             if not chords:
@@ -2817,12 +2830,14 @@ class TerminalEditor:
                     self.nudge.prefix = prefix_plus
                     self.editor_print()  # echo Prefix
 
-                    return None  # ask for more Prefix, else for main Chords
+                    # Ask for more Prefix, else for main Chords
+
+                    return None  # ask for more Prefix, or for other Chords
 
         self.arg1 = int(prefix) if prefix else None
         assert self.get_arg1() >= 1
 
-        # Call a Func chosen by Chords
+        # If not taking a Suffix now
 
         chords_plus = chord if (chords is None) else (chords + chord)
 
@@ -2833,16 +2848,29 @@ class TerminalEditor:
 
             self.arg0 = chords_plus
 
+            # If need more Chords
+
             default = keyboard.do_func
             func_plus = func_by_chords.get(chords_plus, default)
             if (not func_plus) or (chords_plus in keyboard.suffixes_by_chords):
 
-                return None  # ask for more Chords, or for Suffix
+                # Option to auto-correct the Chords
+
+                if chords_plus in corrections_by_chords.keys():
+                    self.nudge.chords = b""
+                    corrections = corrections_by_chords[chords_plus]
+                    self.chords_ahead = list(corrections) + self.chords_ahead
+                    self.editor_print("Corrected")
+
+                # Ask for more Chords, or for Suffix
+
+                return None
 
             self.arg2 = None
 
             # Call a Func with or without Prefix, and without Suffix
 
+            assert chords_plus not in corrections_by_chords.keys(), (chords, chord)
             assert func_plus is not None, (chords, chord)
 
             return func_plus
@@ -2859,6 +2887,7 @@ class TerminalEditor:
 
         # Call a Func with Suffix, but with or without Prefix
 
+        assert chords not in corrections_by_chords.keys()
         assert func is not None, (chords, chord)
 
         return func
@@ -4489,8 +4518,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # TODO: name errors for undefined keys inside Ex of / ? etc
 
 
-# FIXME: QZ to work as Z (not as ZQ)
-# FIXME: :/ to work as :
 # FIXME: :0 ... :9 to work as 0..9 but then G after Prefix
 # FIXME: accept more chords and DEL and ⌃U after : till \r
 # FIXME: accept :123\r, but suggest 123G etc
