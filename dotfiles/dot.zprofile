@@ -95,7 +95,6 @@ function --do-loudly () {
 }
 
 
-
 #
 # Configure Zsh (with "unsetopt" and "setopt" and so on)
 #
@@ -180,7 +179,7 @@ function --dotfiles-backup () {
     for F in $(--dotfiles-find); do
         --exec-echo-xe "cp -p ~/$F $dotfiles/dot$F"
     done
-    echo ": not backing up ~/.zprofile-zsecrets" >&2
+    echo ": not backing up ~/.zprofilesecrets" >&2
 }
 
 function --dotfiles-restore () {
@@ -189,12 +188,13 @@ function --dotfiles-restore () {
     for F in $(--dotfiles-find); do
         --exec-echo-xe "echo cp -p $dotfiles/dot$F ~/$F"
     done
-    touch ~/.zprofile-zsecrets
+    touch ~/.zprofilesecrets
 }
 
 
 #
 # Abbreviate command lines down to:  ?
+# mostly for pipe filters, but also 'm' for 'make', 'p' for 'popd', ...
 #
 
 
@@ -204,21 +204,29 @@ function a () {
     eval $shline
 }
 
-function b () { --exec-echo-xe pbpaste "$@"; }
 function c () { --exec-echo-xe pbcopy "$@"; }
 function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
 function h () { --exec-echo-xe head "$@"; }
-alias h='(--more-history; --history) | g'
+function hi () { local arg1=$1; shift; (--more-history; --history) | g "$arg1$@"; }
 function l () { --exec-echo-xe less -FIXR "$@"; }
 function m () { --exec-echo-xe make "$@"; }
 function n () { --exec-echo-xe cat -tvn "$@" "|expand"; }
-function p () { --exec-echo-xe popd "$@"; }
+function p () { --exec-echo-xe popd >/dev/null && --dir-p-tac; }
 function s () { --exec-echo-xe sort "$@"; }
 function t () { --exec-echo-xe tail "$@"; }
 function u () { --exec-echo-xe uniq "$@" "|expand"; }
-function v () { --exec-echo-xe vi - "$@"; }
+function v () { --exec-echo-xe pbpaste "$@"; }
 function w () { --exec-echo-xe wc -l "$@"; }
 function x () { --exec-echo-xe hexdump -C"$@"; }
+
+function --dir-p-tac () {
+    if [[ "$(uname)" == "Darwin" ]]; then
+        dirs -p |tail -r
+    else
+        # dirs -p |tac  # Linux 'tac' needs free space at shared '/tmp/' dir
+        dirs -p |cat -n |sort -nr |cut -d$'\t' -f2-
+    fi
+}
 
 
 #
@@ -527,7 +535,7 @@ alias -- -g=--git
 
 alias -- -ga='--exec-echo-xe git add'
 alias -- -gb='--exec-echo-xe git branch'
-alias -- -gc='--exec-echo-xe git commit'
+alias -- -gc=--git-commit
 alias -- -gf='--exec-echo-xe git fetch'
 alias -- -gd='--exec-echo-xe git diff'
 alias -- -gg='--exec-echo-xe git grep'
@@ -569,6 +577,7 @@ alias -- -gcaa='--exec-echo-xe git commit --all --amend'
 alias -- -gcaf=--git-commit-all-fixup
 alias -- -gcam='--exec-echo-xe git commit --all -m WIP-$(basename $(pwd))'
 alias -- -gcls='pwd && --exec-echo-xe-maybe sudo git clean -ffxdq'
+alias -- -gcpc='--exec-echo-xe git cherry-pick --continue'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
 alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
 alias -- -glq1='--exec-echo-xe git log -1 --no-decorate --oneline'
@@ -633,6 +642,15 @@ function --git-chdir () {
     --exec-echo-xe 'cd $(git rev-parse --show-toplevel) && cd ./'$@' && dirs -p |head -1'
 }
 
+function --git-commit () {
+    : :: 'Add and commit all tracked, else less simple, such as:  git commit .'
+    if [ $# = 0 ]; then
+        --exec-echo-xe git commit --all
+    else
+        --exec-echo-xe git commit "$@"
+    fi
+}
+
 function --git-commit-all-fixup () {
     : :: 'Add all tracked and commit fixup to Head, else to some Commit'
     if [ $# = 0 ]; then
@@ -659,7 +677,6 @@ function --git-diff-head () {
         --exec-echo-xe git diff HEAD~"$@"
     fi
 }
-
 
 function --git-log-decorate-oneline () {
     if [ $# = 0 ]; then
@@ -697,8 +714,10 @@ function --git-rebase-interactive () {
     : :: 'Rebase Interactive with Auto Squash of the last 19, else of the last N'
     if [ $# = 0 ]; then
         --exec-echo-xe git rebase -i --autosquash HEAD~19
-    else
+    elif [[ "$1" =~ ^[0-9_]+$ ]]; then
         --exec-echo-xe git rebase -i --autosquash "HEAD~$@"
+    else
+        --exec-echo-xe git rebase -i --autosquash "$@"
     fi
 }
 
@@ -861,9 +880,7 @@ alias -- --flake8='~/.venvs/pips/bin/flake8 --max-line-length=999 --max-complexi
 : --ignore=E203  # Black '[ : ]' rules over Flake8 E203 whitespace before ':'
 : --ignore=W503  # 2017 Pep 8 and Black over Flake8 W503 line break before binary op
 
-source ~/.zprofile-zsecrets
-echo $(dirs -p |head -1)/
-
+source ~/.zprofilesecrets
 
 #
 # Fall through more configuration script lines, & override some of them, or not

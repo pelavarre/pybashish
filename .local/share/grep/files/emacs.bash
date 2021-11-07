@@ -24,7 +24,7 @@ emacs -nw ~/.emacs
 # emacs  ⌥L ⌥U ⌥C ⌃U1⌃XRNI⌃XR+I⌃XRII  => lower, upper, title, increment
 # emacs  ⌃S ⌃R ⌥%  => find, replace
 #
-# emacs  ⌃X( ⌃X) ⌃XE  => record replay
+# emacs  ⌃X( ⌃X) ⌃XE  => record input, replay input
 # emacs  fixme  => vertical delete copy paste insert
 # emacs  ⌃X⇥ ⌃XRD  => dent/dedent
 # emacs  ⌃U1⌥|  => pipe bash, such as ⌥H⌃U1⌥| or ⌥<⌃@⌥>⌃U1⌥|
