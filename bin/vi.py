@@ -37,12 +37,14 @@ pipe tests:
   cat bin/vi.py |bin/vi.py -  # demo multiple screens of chars
   cat bin/vi.py |bin/vi.py - |grep import  # demo ZQ vs ZZ
 
-how to get vi py:
+how to get Vi Py:
   cd ~/Desktop/
   R=pelavarre/pybashish/master && F=bin/vi.py
   curl -sSO --location https://raw.githubusercontent.com/$R/$F
   ls -alF -drt vi.py
-  python3 vi.py --pwnme +q  # 6 lines to start, but repeat just this 1 line to refresh
+
+how to get Vi Py again:
+  python3 vi.py +q --pwnme
 
 simplest demo:
   python3 vi.py vi.py
@@ -53,6 +55,7 @@ simplest demo:
 
 import argparse
 import collections
+import datetime as dt
 import difflib
 import hashlib
 import inspect
@@ -60,12 +63,16 @@ import os
 import pdb
 import re
 import select
+import shlex
 import signal
 import string
+import subprocess
 import sys
 import termios
 import traceback
 import tty
+
+subprocess_run = subprocess.run  # evade Linters who freak over "shell=True"
 
 
 # Name some Terminal Output magic
@@ -123,6 +130,8 @@ X20_UPPER_MASK = 0x20
 
 def main(argv):
     """Run from the Command Line"""
+
+    main.since = dt.datetime.now()
 
     args = parse_vi_argv(argv)
     if args.pwnme is not False:
@@ -227,7 +236,14 @@ def print_version_and_exit():
 def pwnme(branch):
     """Download fresh Code to run in place of this stale Code"""
 
+    sys_argv = sys.argv
+
+    # Find present Self
+
     path = module_file_path()
+    from_relpath = os.path.relpath(path)
+
+    # Find future Self  # TODO: rename to branch "main" from branch "master"
 
     assert branch in (None, "master", "pelavarre-patch-1"), branch
     branch_ = "master" if (branch is None) else branch
@@ -236,17 +252,41 @@ def pwnme(branch):
         "https://raw.githubusercontent.com/" "pelavarre/pybashish/{}/" "bin/vi.py"
     ).format(branch_)
 
-    curl_shline = "curl -sS --location {link} >{path}".format(link=link, path=path)
+    to_relpath = from_relpath
 
-    chmod_shline = "chmod ugo+x {path}".format(path=path)
-    vi_py_shline = "{path} ... FIXME ...".format(path=path)
+    # Compose a Bash Script
 
-    stderr_print("FIXME: do for you, what is roughly")
-    shlines = (curl_shline, chmod_shline, vi_py_shline)
+    when = main.since
+    stamp = when.strftime("%m%djqd%H%M%S")
+    mv_shline = "mv -i {relpath} {relpath}~{stamp}".format(
+        relpath=from_relpath, stamp=stamp
+    )
+
+    curl_shline = "curl -sS --location {link} >{relpath}".format(
+        link=link, relpath=to_relpath
+    )
+
+    chmod_shline = "chmod ugo+x {relpath}".format(relpath=to_relpath)
+
+    argv = list()
+    argv.append("./" + to_relpath)
+    for arg in sys_argv[1:]:
+        if not arg.startswith("--pwnme"):
+            argv.append(arg)
+
+    vi_py_shline = shlex_join(argv)
+
+    shlines = (mv_shline, curl_shline, chmod_shline, vi_py_shline)
+
+    # Run the Bash Script, and exit with its process exit status returncode
+
     for shline in shlines:
         stderr_print("+ {}".format(shline))
-
-    raise NotImplementedError()
+        try:
+            _ = subprocess_run(shline, shell=True, check=True)
+        except subprocess.CalledProcessError as exc:
+            stderr_print("+ exit {}".format(exc.returncode))
+            sys.exit(exc.returncode)
 
     sys.exit()
 
@@ -4369,6 +4409,52 @@ def join_first_paragraph(doc):
     alt = chars + doc[index:]
 
     return alt
+
+
+# deffed in many files  # missing from Python till Oct/2019 Python 3.8
+def shlex_join(argv):
+    """Undo shlex.split"""
+
+    # Trust the library, if available
+
+    if hasattr(shlex, "join"):
+        shline = shlex.join(argv)
+        return shline
+
+    # Emulate the library roughly, because often good enough
+
+    shline = " ".join(shlex_quote(_) for _ in argv)
+    return shline
+
+
+# deffed in many files  # missing from Python till Oct/2019 Python 3.8
+def shlex_quote(arg):
+    """Mark up with quote marks and backslashes , but only as needed"""
+
+    # Trust the library, if available
+
+    if hasattr(shlex, "quote"):
+        quoted = shlex.quote(arg)
+        return quoted
+
+    # Emulate the library roughly, because often good enough
+
+    mostly_harmless = set(
+        "%+,-./"  # not: !"#$&'()*
+        + string.digits
+        + ":=@"  # not ;<>?
+        + string.ascii_uppercase
+        + "_"  # not [\]^
+        + string.ascii_lowercase
+        + ""  # not {|}~
+    )
+
+    likely_harmful = set(arg) - set(mostly_harmless)
+    if likely_harmful:
+        quoted = repr(arg)  # as if the Py rules agree with Sh rules
+        return quoted
+
+    return arg
 
 
 # deffed in many files  # missing from docs.python.org
