@@ -258,7 +258,7 @@ def pwnme(branch):
 
     when = main.since
     stamp = when.strftime("%m%djqd%H%M%S")
-    mv_shline = "mv -i {relpath} {relpath}~{stamp}".format(
+    mv_shline = "mv -i {relpath} {relpath}~{stamp}~".format(
         relpath=from_relpath, stamp=stamp
     )
 
