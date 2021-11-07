@@ -28,7 +28,7 @@ keyboard tests:
   \n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
   /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
   :g/... Delete ⌃U ⌃C Return  => enter a search key and print every line found
-  Esc ⌃C 123Esc 123⌃C 3ZQ f⌃C 9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N  => eggs
+  Esc ⌃C 123Esc 123⌃C zZ /⌃G 3ZQ f⌃C 9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N  => eggs
   \F/$Return Qvi⌃My Qvi⌃Mn  => more eggs
 
 pipe demos:
@@ -2263,7 +2263,7 @@ class TerminalKeyboardEx:
         # Map each sequence of keyboard input Chords to one Func
 
         for chords in sorted(C0_CONTROL_STDINS):
-            func_by_chords[chords] = (runner.do_raise_name_error,)
+            func_by_chords[chords] = runner.do_raise_name_error
 
         func_by_chords[b"\x03"] = ex.do_quit_ex  # ETX, aka ⌃C, aka 3
         func_by_chords[b"\x0D"] = runner.do_sys_exit  # CR, aka ⌃M, aka 13 \r
@@ -2598,15 +2598,22 @@ class TerminalRunner:
     def prompt_for_chords(self):
         """Write over the Rows of Chars on Screen"""
 
-        # Call back as early as practical
+        # 1st: Rewrite whole Screen slowly to override bugs in TerminalShadow
+
+        if not self.injecting_lag:
+            # time.sleep(0.3)  # compile-time option for a different kind of lag
+
+            if self.sending_bell:  # in reply to Bell signalling trouble
+                self.painter._reopen_terminal_()
+
+        # 2nd: Call back
 
         status = self.keyboard.format_reply_func()
         self.keyboard.paint_cursor_func()
 
-        # Enter
+        # 3rd: Walk through the steps of writing Screen, Cursor, and Bell
 
         ended_lines = self.ended_lines
-        injecting_lag = self.injecting_lag
         painter = self.painter
         sending_bell = self.sending_bell
 
@@ -2638,15 +2645,6 @@ class TerminalRunner:
         # Flush Screen, Cursor, and Bell
 
         terminal.flush()
-
-        # Rewrite whole Screen slowly as late as practical
-        # to override bugs in the TerminalShadow cache, if those bugs exist
-
-        if not injecting_lag:
-            # time.sleep(0.3)  # compile-time option for a different kind of lag
-
-            if sending_bell:  # in reply to Bell signalling trouble
-                terminal._reopen_terminal_()
 
     def spot_spans_on_screen(self):
         """Say where to highlight each Match of the Search Key on Screen"""
@@ -3062,9 +3060,9 @@ class TerminalRunner:
         version = module_file_version_zero()
 
         if injecting_lag:
-            self.editor_print("after :set _lag_")
+            self.editor_print("while :set _lag_")
         else:
-            self.editor_print("after :set no_lag_")
+            self.editor_print("while :set no_lag_")
 
         self.reply.flags = version  # FIXME after last 'editor.print'
 
@@ -4189,7 +4187,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # FIXME: don't scroll the : g / search off screen
 # FIXME: do count the lines not shown by : g / because they don't fit on screen
-# FIXME: do take : g / Return to mean repeat last Search
 
 # FIXME: QZ to work as Z
 
