@@ -2446,12 +2446,15 @@ class TerminalReplyOut(argparse.Namespace):
     # Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
 
+class TerminalPin(collections.namedtuple("TerminalPin", "row, column".split(", "))):
+    """Pair up a choice of Row and a choice of Column"""
+
+
 class TerminalSpan(
     collections.namedtuple("TerminalSpan", "row, column, beyond".split(", "))
 ):
     """Pick out the Columns of Rows covered by a Match of Chars"""
 
-    # TODO:  class TerminalPin - just the Row:Column pair
     # TODO:  class TerminalPinVi - to slip and step in the way of Vi
 
     @staticmethod
@@ -3967,19 +3970,48 @@ class TerminalShadow:
     def shadow_opaque_chars_as_line(self, chars):
         """Write Opaque Chars over Screen, & shadow Cursor as if one Line written"""
 
+        columns = self.columns
         held_lines = self.held_lines
         row = self.row
+        rows = self.rows
+
+        y = 1 + self.row
+        x = 1 + self.column
+
+        # Forward the Chars without interpreting them
+        # as if they overwrite zero or more Columns of this Row
 
         held_line = held_lines[row]
         assert held_line is None, held_line
 
         held_lines[row] = chars
 
-        if row < (self.rows - 1):
-            self.row += 1
+        if row < (rows - 1):
+            self.row = row + 1
             self.column = 0
 
-        # TODO: interpret Chars enough to check precisely 1 Line written
+        guessed_pin = TerminalPin(self.row, column=self.column)
+
+        # Check that these Chars overwrite zero or more Columns of this Row
+
+        escapist = TerminalEscapist(rows, columns=columns)
+
+        escapist.write(CUP_Y_X.format(y, x))
+
+        escapist.write(chars)
+
+        y_ = 1 + self.row
+        x_ = 1 + self.column
+        escapist.write(CUP_Y_X.format(y_, x_))  # FIXME
+        escapist.row = self.row  # FIXME
+        escapist.column = self.column  # FIXME
+
+        escapist_pin = escapist.pin
+
+        if row < (rows - 1):
+            assert guessed_pin == escapist_pin, (guessed_pin, escapist_pin)
+        else:
+            assert guessed_pin.row == escapist_pin.row, (guessed_pin, escapist_pin)
 
     def shadow_csi_chars(self, chars):
         """Interpret CSI Escape Sequences"""
@@ -4005,6 +4037,50 @@ class TerminalShadow:
         columns = self.columns
         rows = self.rows
 
+        # Interpret the CUP_Y_X or CUP_1_1 Escape Sequence
+
+        escapist = TerminalEscapist(rows, columns=columns)
+        (y, x) = escapist.yx_from_write_cup_chars(chars)
+
+        # Move the Shadow Cursor
+
+        self.row = y - 1
+        self.column = x - 1
+
+    # TODO: Add API to write Scroll CSI in place of rewriting Screen to Scroll
+    # TODO: Reduce writes to Chars needed, smaller than whole Lines needed
+
+
+class TerminalEscapist:
+    """Interpret writes of Chars including C0_CONTROL Chars, like a Terminal does"""
+
+    def __init__(self, rows, columns):
+
+        self.rows = rows
+        self.columns = columns
+
+        self.row = None
+        self.column = None
+
+    @property
+    def pin(self):
+        """Say where the Cursor is"""
+
+        pin_ = TerminalPin(self.row, column=self.column)
+
+        return pin_
+
+    def write(self, chars):
+        """Write a mix of C0_CONTROL Chars and other Chars"""
+
+        pass  # FIXME
+
+    def yx_from_write_cup_chars(self, chars):
+        """Interpret a CUP_Y_X or CUP_1_1 Escape Sequence"""
+
+        rows = self.rows
+        columns = self.columns
+
         # Pick Y and X out of this CUP_Y_X
 
         (y, x) = (1, 1)
@@ -4019,16 +4095,12 @@ class TerminalShadow:
 
         # Require simple
 
-        if not ((y >= 1) and (x >= 1)):
-            raise NotImplementedError(y, x)
+        if not (1 <= y <= rows):
+            raise NotImplementedError(y, x, rows, columns)
+        if not (1 <= x <= columns):
+            raise NotImplementedError(y, x, rows, columns)
 
-        # Move the Shadow Cursor
-
-        self.row = min(rows - 1, y - 1)
-        self.column = min(columns - 1, x - 1)
-
-    # TODO: Add API to write Scroll CSI in place of rewriting Screen to Scroll
-    # TODO: Reduce writes to Chars needed, smaller than whole Lines needed
+        return (y, x)
 
 
 class TerminalDriver:
@@ -4588,6 +4660,7 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- future improvements --
 
+# TODO: record and replay tests of:  cat bin/vi.py |vi.py - bin/vi.py
 
 # TODO: do echo the Search Key, and better than Vim does
 # TODO:   Vim echoes / ? keys till you press Return
