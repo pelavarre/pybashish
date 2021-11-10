@@ -87,8 +87,6 @@ SGR_N = "\x1B[{}m"  # Select Graphic Rendition
 SGR_7 = SGR_N.format(7)  # SGR > Reverse Video, Invert
 SGR = "\x1B[m"  # SGR > Reset, Normal, All Attributes Off
 
-CUP_Y_X_REGEX = r"^\x1B\[([0-9]+);([0-9]+)H$"
-
 DECSC = ESC + "7"  # DEC Save Cursor
 DECRC = ESC + "8"  # DEC Restore Cursor
 
@@ -100,6 +98,23 @@ RMCUP = ED_2 + _XTERM_MAIN_ + DECRC  # Reset-Mode Cursor-Positioning
 
 _CURSES_INITSCR_ = SMCUP + ED_2 + CUP_1_1
 _CURSES_ENDWIN_ = RMCUP
+
+
+# Specify how to split Terminal Output into magic and literals
+
+TERMINAL_WRITE_REGEX = r"".join(
+    [
+        r"(\x1B\[",  # Control Sequence Introducer (CSI)
+        r"(([0-9?]+)(;([0-9?]+))?)?",  # 0, 1, or 2 Decimal Int or Question Args
+        r"([A-Z_a-z]))",  # one Ascii Letter or Skid mark
+        r"|",
+        r"(\x1B.)",  # else one escaped Char
+        r"|",
+        r"(\r\n|[\x00-\x1F\x7F])",  # else one or a few C0_CONTROL Chars
+        r"|",
+        r"([^\x00-\x1F\x7F]+)",  # else literal Chars
+    ]
+)
 
 
 # Name some Terminal Input magic
@@ -3975,43 +3990,22 @@ class TerminalShadow:
         row = self.row
         rows = self.rows
 
-        y = 1 + self.row
-        x = 1 + self.column
-
-        # Forward the Chars without interpreting them
-        # as if they overwrite zero or more Columns of this Row
+        # Forward the Chars unchanged
 
         held_line = held_lines[row]
         assert held_line is None, held_line
 
         held_lines[row] = chars
 
-        if row < (rows - 1):
-            self.row = row + 1
-            self.column = 0
-
-        guessed_pin = TerminalPin(self.row, column=self.column)
-
-        # Check that these Chars overwrite zero or more Columns of this Row
+        # Move the Shadow Cursor
 
         escapist = TerminalEscapist(rows, columns=columns)
-
-        escapist.write(CUP_Y_X.format(y, x))
+        if (self.row, self.column) != (None, None):
+            escapist.write(CUP_Y_X.format(1 + self.row, 1 + self.column))
+        # FIXME: write all writes to one TerminalEscapist
 
         escapist.write(chars)
-
-        y_ = 1 + self.row
-        x_ = 1 + self.column
-        escapist.write(CUP_Y_X.format(y_, x_))  # FIXME
-        escapist.row = self.row  # FIXME
-        escapist.column = self.column  # FIXME
-
-        escapist_pin = escapist.pin
-
-        if row < (rows - 1):
-            assert guessed_pin == escapist_pin, (guessed_pin, escapist_pin)
-        else:
-            assert guessed_pin.row == escapist_pin.row, (guessed_pin, escapist_pin)
+        (self.row, self.column) = escapist.pin
 
     def shadow_csi_chars(self, chars):
         """Interpret CSI Escape Sequences"""
@@ -4040,12 +4034,13 @@ class TerminalShadow:
         # Interpret the CUP_Y_X or CUP_1_1 Escape Sequence
 
         escapist = TerminalEscapist(rows, columns=columns)
-        (y, x) = escapist.yx_from_write_cup_chars(chars)
+        escapist.write(chars)
+        (to_row, to_column) = escapist.pin
 
         # Move the Shadow Cursor
 
-        self.row = y - 1
-        self.column = x - 1
+        self.row = to_row
+        self.column = to_column
 
     # TODO: Add API to write Scroll CSI in place of rewriting Screen to Scroll
     # TODO: Reduce writes to Chars needed, smaller than whole Lines needed
@@ -4053,6 +4048,22 @@ class TerminalShadow:
 
 class TerminalEscapist:
     """Interpret writes of Chars including C0_CONTROL Chars, like a Terminal does"""
+
+    ALT_TERMINAL_WRITE_REGEX = r"".join(
+        [
+            r"(\x1B\[",  # Control Sequence Introducer (CSI)
+            r"(([0-9?]+)(;([0-9?]+))?)?",  # 0, 1, or 2 Decimal Int or Question Args
+            r"([A-Z_a-z]))",  # one Ascii Letter or Skid mark
+            r"|",
+            r"(\x1B.)",  # else one escaped Char
+            r"|",
+            r"(\r\n|[\x00-\x1F\x7F])",  # else one or a few C0_CONTROL Chars
+            r"|",
+            r"([^\x00-\x1F\x7F]+)",  # else literal Chars
+        ]
+    )
+
+    assert ALT_TERMINAL_WRITE_REGEX == TERMINAL_WRITE_REGEX
 
     def __init__(self, rows, columns):
 
@@ -4073,34 +4084,88 @@ class TerminalEscapist:
     def write(self, chars):
         """Write a mix of C0_CONTROL Chars and other Chars"""
 
-        pass  # FIXME
+        row = self.row  # mutable
+        column = self.column  # mutable
 
-    def yx_from_write_cup_chars(self, chars):
-        """Interpret a CUP_Y_X or CUP_1_1 Escape Sequence"""
+        for match in re.finditer(TERMINAL_WRITE_REGEX, string=chars):
+            (row, column) = self.find_cursor_after(match)
+
+        self.row = row
+        self.column = column
+
+    def find_cursor_after(self, match):
+        """Say where writing one Match of TERMINAL_WRITE_REGEX moves the Cursor"""
 
         rows = self.rows
         columns = self.columns
 
-        # Pick Y and X out of this CUP_Y_X
+        # Default to keep the Cursor unmoved
 
-        (y, x) = (1, 1)
-        if chars != CUP_1_1:
+        row = self.row  # mutable
+        column = self.column  # mutable
 
-            match = re.match(CUP_Y_X_REGEX, string=chars)
-            if not match:
-                raise NotImplementedError(repr(chars))
+        # Name Groups of the Match
 
-            y = int(match.group(1))
-            x = int(match.group(2))
+        m = match
+        order = m.string[m.start() : m.end()]
 
-        # Require simple
+        literals = m.group(9)
+        controls = m.group(8)
+        escape = m.group(7)
+        csi = m.group(1)
 
-        if not (1 <= y <= rows):
-            raise NotImplementedError(y, x, rows, columns)
-        if not (1 <= x <= columns):
-            raise NotImplementedError(y, x, rows, columns)
+        groups = (literals, controls, escape, csi)
+        assert sum(bool(_) for _ in groups) == 1, (order, groups)
 
-        return (y, x)
+        a = m.group(6)
+        x = m.group(5)
+        y = m.group(3)
+
+        assert bool(a or x or y) == bool(csi), (order, groups)
+
+        # Write Literals over Columns, slipping the Cursor right and down
+
+        if literals:
+            column += len(literals)
+            row += column // columns  # 'row == rows' after writing last Column
+            column = column % columns
+
+        # Interpret C0_CONTROL Chars
+
+        elif controls == "\a":
+            pass
+        elif controls == "\r\n":
+            row += 1
+            column = 0
+
+        # Interpret CSI Escape Sequences
+
+        elif csi == ED_2:
+            row = None
+            column = None
+        elif csi == CUP_1_1:
+            row = 0
+            column = 0
+        elif a == CUP_Y_X[-1]:
+            row = int(y) - 1  # raise TypeError/ ValueError for bad/missing Arg
+            column = int(x) - 1  # again, may raise TypeError/ ValueError
+
+        elif csi == SGR_7:
+            pass
+        elif csi == SGR:
+            pass
+
+        # Reject meaningless Orders
+
+        else:
+            raise NotImplementedError(repr(order))
+
+        assert 0 <= row < rows, (order,)
+        assert 0 <= column < columns, (order,)
+
+        # Succeed
+
+        return (row, column)
 
 
 class TerminalDriver:
@@ -4629,6 +4694,7 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # -- bugs --
 
 
+# FIXME: Vim :g/ :g? affirms or flips direction, doesn't force ahead/behind
 # FIXME: somehow need two ⌃L after each Terminal Window Resize?  \ n \ n doesn't work?
 # FIXME: ( workaround is quit and relaunch, or press enough pairs of ⌃L )
 
