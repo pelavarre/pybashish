@@ -3,7 +3,7 @@
 r"""
 usage: vi.py [-h] [+PLUS] [--pwnme [BRANCH]] [--version] [FILE ...]
 
-read files, accept zero or more edits, write files
+read files, accept zero edits, write files
 
 positional arguments:
   FILE              a file to edit (default: '/dev/stdin')
@@ -68,6 +68,7 @@ import string
 import subprocess
 import sys
 import termios
+import time
 import traceback
 import tty
 
@@ -100,21 +101,80 @@ _CURSES_INITSCR_ = SMCUP + ED_2 + CUP_1_1
 _CURSES_ENDWIN_ = RMCUP
 
 
-# Specify how to split Terminal Output into magic and literals
+# Parse some Terminal Output magic
 
-TERMINAL_WRITE_REGEX = r"".join(
-    [
-        r"(\x1B\[",  # Control Sequence Introducer (CSI)
-        r"(([0-9?]+)(;([0-9?]+))?)?",  # 0, 1, or 2 Decimal Int or Question Args
-        r"([A-Z_a-z]))",  # one Ascii Letter or Skid mark
-        r"|",
-        r"(\x1B.)",  # else one escaped Char
-        r"|",
-        r"(\r\n|[\x00-\x1F\x7F])",  # else one or a few C0_CONTROL Chars
-        r"|",
-        r"([^\x00-\x1F\x7F]+)",  # else literal Chars
-    ]
-)
+
+class TerminalOrder(argparse.Namespace):
+    """Split Terminal Output into magic and literals"""
+
+    TERMINAL_WRITE_REGEX = r"".join(
+        [
+            r"(\x1B\[",  # Control Sequence Introducer (CSI)
+            r"(([0-9?]+)(;([0-9?]+))?)?",  # 0, 1, or 2 Decimal Int or Question Args
+            r"([A-Z_a-z]))",  # one Ascii Letter or Skid mark
+            r"|",
+            r"(\x1B.)",  # else one escaped Char
+            r"|",
+            r"(\r\n|[\x00-\x1F\x7F])",  # else one or a few C0_CONTROL Chars
+            r"|",
+            r"([^\x00-\x1F\x7F]+)",  # else literal Chars
+        ]
+    )
+
+    def __init__(self, match):
+        """Parse one Terminal Order that matches TERMINAL_WRITE_REGEX"""
+
+        self.match = match
+
+        # Name Groups of the Match
+
+        m = match
+        self.chars = m.string[m.start() : m.end()]
+
+        self.literals = m.group(9)
+        self.controls = m.group(8)
+        self.escape_plus = m.group(7)
+        self.csi_plus = m.group(1)
+
+        groups = (self.literals, self.controls, self.escape_plus, self.csi_plus)
+        assert sum(bool(_) for _ in groups) == 1, (self.chars, groups)
+        assert self.chars in groups, (self.chars, groups)
+
+        self.a = m.group(6)
+        self.x = m.group(5)
+        self.y = m.group(3)
+
+        if not self.csi_plus:
+            assert self.a is self.x is self.y is None, (self.chars, groups)
+        else:
+            assert self.a, (self.chars, groups)
+
+        self.int_x = None
+        if self.x is not None:
+            try:
+                self.int_x = int(self.x)
+            except ValueError:
+                assert False, (self.chars, groups)
+
+        self.int_y = None
+        if self.y is not None:
+            try:
+                self.int_y = int(self.y)
+            except ValueError:
+                assert False, (self.chars, groups)
+
+    @staticmethod
+    def split_orders(chars):
+        """Write a mix of C0_CONTROL Chars and other Chars into the Shadow Cursor"""
+
+        regex = TerminalOrder.TERMINAL_WRITE_REGEX
+
+        orders = list()
+        for match in re.finditer(regex, string=chars):
+            order = TerminalOrder(match)
+            orders.append(order)
+
+        return orders
 
 
 # Name some Terminal Input magic
@@ -374,6 +434,7 @@ class TerminalSkinVi:
 
         if file_path == "/dev/stdin":
             if iobytearray:
+
                 raise NotImplementedError(
                     "Dev Stdin :n! - Do you mean ZZ, :wq, ZQ, or :q!"
                 )
@@ -545,7 +606,7 @@ class TerminalSkinVi:
         self.vi_ask("Would you like to play a game? (y/n)")
 
         try:
-            chord = editor.terminal_getch()
+            chord = editor.getch()
         except KeyboardInterrupt:
             chord = b"\x03"  # ETX, ⌃C, 3
 
@@ -648,6 +709,7 @@ class TerminalSkinVi:
 
         if file_path == "/dev/stdin":
             if iobytearray:
+
                 raise NotImplementedError(
                     "Dev Stdin :w! - Do you mean ZZ, :wq, ZQ, or :q!"
                 )
@@ -844,7 +906,7 @@ class TerminalSkinVi:
 
             editor.continue_do_loop()
 
-    def do_find_all_vi_line(self):  # Vim :g/  # Vi Py :g/, g/
+    def do_find_all_vi_line(self):  # Vim :g/   # Vim :g?  # Vi Py :g/, :g?, g/, g?
         """Across all the File, print each Line containing 1 or More Matches"""
 
         editor = self.editor
@@ -862,11 +924,11 @@ class TerminalSkinVi:
         before_status = self.format_vi_reply() + editor.finding_line
 
         if editor.find_ahead_and_reply():
-
             iobytespans = editor.iobytespans
             last_span = iobytespans[-1]
 
             editor.print_some_found_spans(before_status)
+
             self.vi_print(  # "{}/{} Found {} chars"
                 "{}/{} Found {} chars".format(
                     len(iobytespans),
@@ -1522,6 +1584,7 @@ class TerminalSkinVi:
 
         if editor.doing_done:
             if (editor.row, editor.column) == (last_row, editor.spot_last_column()):
+
                 raise IndexError()
 
         while (editor.row < last_row) and not editor.spot_last_column(row=editor.row):
@@ -1540,6 +1603,7 @@ class TerminalSkinVi:
 
         if editor.doing_done:
             if (editor.row, editor.column) == (0, 0):
+
                 raise IndexError()
 
         while editor.row and not editor.spot_last_column(row=editor.row):
@@ -1784,7 +1848,9 @@ class TerminalSkinVi:
             try:
                 right = line[column:].index(choice)
             except ValueError:
+
                 raise ValueError("substring {!r} not found ahead".format(choice))
+
             column += right
 
         # Option to slip back one column
@@ -1848,6 +1914,7 @@ class TerminalSkinVi:
             try:
                 column = line[: (column + 1)].rindex(choice)
             except ValueError:
+
                 raise ValueError("substring {!r} not found behind".format(choice))
 
         # Option to slip right one column
@@ -1988,10 +2055,10 @@ class TerminalSkinVi:
 
         editor = self.editor
         painter = editor.painter
-        terminal = painter
 
-        terminal.row = editor.row - editor.top_row
-        terminal.column = editor.column
+        row_ = editor.row - editor.top_row
+        column_ = editor.column
+        painter.write_cursor(row=row_, column=column_)
 
 
 class TerminalKeyboard:
@@ -2133,6 +2200,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_correcting_many_chords(b":/", corrections=b"/")
         self._init_correcting_many_chords(b":?", corrections=b"?")
 
+        # self._init_func_by_many_vi_chords(b":g?", func=vi.do_find_all_vi_line)
         self._init_func_by_many_vi_chords(b":g/", func=vi.do_find_all_vi_line)
         self._init_func_by_many_vi_chords(b":n\r", func=vi.do_might_next_vi_file)
         self._init_func_by_many_vi_chords(b":n!\r", func=vi.do_next_vi_file)
@@ -2212,7 +2280,8 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_suffix_func(b"f", func=vi.do_slip_index)
 
         self._init_correcting_many_chords(b"g/", corrections=b":g/")
-        # TODO: stop commandeering the personal g/ Chord Sequence
+        # self._init_correcting_many_chords(b"g?", corrections=b":g?")
+        # TODO: stop commandeering the personal g/ r? Chord Sequences
 
         # func_by_chords[b"g"]
         func_by_chords[b"h"] = vi.do_slip_left
@@ -2283,12 +2352,12 @@ class TerminalSkinEx:
 
         editor = self.editor
         painter = editor.painter
-        terminal = painter
 
         ex_reply = self.format_ex_reply()
 
-        terminal.row = painter.status_row
-        terminal.column = len(ex_reply)
+        row_ = painter.status_row
+        column_ = len(ex_reply)
+        painter.write_cursor(row=row_, column=column_)
 
     def read_ex_line(self):
         """Take an Input Line from beneath the Scrolling Rows"""
@@ -2461,6 +2530,7 @@ class TerminalReplyOut(argparse.Namespace):
     # Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
 
+# TODO: deploy TerminalPin
 class TerminalPin(collections.namedtuple("TerminalPin", "row, column".split(", "))):
     """Pair up a choice of Row and a choice of Column"""
 
@@ -2617,6 +2687,8 @@ class TerminalEditor:
     def run_terminal(self, keyboard):
         """Stack Skin's with Keyboard's on top of a Terminal I/O Stack"""
 
+        assert not self.injecting_lag
+
         stdio = sys.stderr
         with TerminalDriver(terminal=stdio) as driver:
             shadow = TerminalShadow(terminal=driver)
@@ -2628,6 +2700,20 @@ class TerminalEditor:
             self.stdio = stdio
 
             self.run_keyboard(keyboard)  # till SystemExit
+
+    def _reopen_terminal_(self):
+        """Clear the Caches of this Terminal, here and below, if cacheing here"""
+
+        injecting_lag = self.injecting_lag
+        painter = self.painter
+
+        if injecting_lag:
+            self.driver.lag = 0.001  # 0.001 seconds is 1ms
+            painter.terminal = self.driver
+        else:
+            self.driver.lag = None
+            painter.terminal = self.shadow
+            painter._reopen_terminal_()
 
     def run_keyboard(self, keyboard):
         """Read keyboard Input, eval it, print replies, till SystemExit"""
@@ -2702,7 +2788,7 @@ class TerminalEditor:
             # Take one Chord in, or next Chord, or cancel Chords to start again
 
             try:
-                chord = self.terminal_getch()
+                chord = self.getch()
             except KeyboardInterrupt:
                 chord = b"\x03"  # ETX, ⌃C, 3
 
@@ -2773,18 +2859,16 @@ class TerminalEditor:
 
         if top_row:
             if not (0 <= top_row < len(self.ended_lines)):
+
                 raise KwArgsException(before=top_row, after=self.top_row)
 
     def prompt_for_chords(self):
         """Write over the Rows of Chars on Screen"""
 
-        # 1st: Rewrite whole Screen slowly to override bugs in TerminalShadow
+        # 1st: Option to ewrite whole Screen slowly
 
-        if not self.injecting_lag:
-            # time.sleep(0.3)  # compile-time option for a different kind of lag
-
-            if self.sending_bell:  # in reply to Bell signalling trouble
-                self.painter._reopen_terminal_()
+        if self.sending_bell and not self.injecting_lag:
+            self._reopen_terminal_()  # for bell
 
         # 2nd: Call back
 
@@ -2796,10 +2880,6 @@ class TerminalEditor:
         ended_lines = self.ended_lines
         painter = self.painter
         sending_bell = self.sending_bell
-
-        terminal = painter
-
-        # Consume
 
         # Form
 
@@ -2821,7 +2901,7 @@ class TerminalEditor:
 
         # Flush Screen, Cursor, and Bell
 
-        terminal.flush()
+        painter.flush()
 
     def spot_spans_on_screen(self):
         """Say where to highlight each Match of the Search Key on Screen"""
@@ -2949,6 +3029,7 @@ class TerminalEditor:
                 if self.doing_less:
                     arg1 = self.get_arg1(default=None)
                     if arg1 is not None:
+
                         raise NotImplementedError("Repeat Count {}".format(arg1))
 
             # Stop calls on Exception
@@ -3002,6 +3083,7 @@ class TerminalEditor:
 
         after = (row, column)
         if before != after:
+
             raise KwArgsException(before=before, after=after)
 
     #
@@ -3083,20 +3165,14 @@ class TerminalEditor:
 
         self.sending_bell = True
 
-    def terminal_print(self, *args, end="\r\n"):
-        """Scroll up and write Line"""
-
-        line = " ".join(str(_) for _ in args)
-        self.driver.write(line + end)
-
-    def terminal_getch(self):
+    def getch(self):
         """Block till next keyboard input Chord"""
 
         chords_ahead = self.chords_ahead
-        terminal = self.painter
+        painter = self.painter
 
         if not chords_ahead:
-            chord = terminal.getch()  # may raise KeyboardInterrupt
+            chord = painter.getch()  # may raise KeyboardInterrupt
         else:
             ord_chord = chords_ahead.pop(0)  # may be b"\x03" ETX, ⌃C, 3
             chord = chr(ord_chord).encode()
@@ -3126,6 +3202,7 @@ class TerminalEditor:
         row = self.row
 
         if row >= len(ended_lines):
+
             raise IndexError(row)
 
         ended_line = ended_lines[row]
@@ -3208,6 +3285,7 @@ class TerminalEditor:
         ended_lines = self.ended_lines
 
         if row_ >= len(ended_lines):
+
             raise IndexError(row)
 
         ended_line = ended_lines[row_]
@@ -3239,41 +3317,35 @@ class TerminalEditor:
 
         echo_bytes = self.nudge.join_echo_bytes()  # similar or same as 'self.arg0'
 
-        escapes = ""
-        for xx in echo_bytes:
-            escapes += r"\x{:02X}".format(xx)
+        byte_escapes = ""
+        for byte_int in echo_bytes:
+            byte_escapes += r"\x{:02X}".format(byte_int)
 
-        arg = "b'{}'".format(escapes)
+        arg = "b'{}'".format(byte_escapes)
+
         raise NameError(arg)
 
     def do_redraw(self):  # Vim ⌃L
         """Toggle between more and less Lag (vs Vim injects lots of Lag exactly once)"""
 
-        painter = self.painter
+        self.injecting_lag = not self.injecting_lag
 
-        injecting_lag = not self.injecting_lag
-        if injecting_lag:
-            painter.terminal = self.driver
-        else:
-            painter.terminal = self.shadow
-            painter._reopen_terminal_()
-
-        self.injecting_lag = injecting_lag
-
-        if injecting_lag:
+        if self.injecting_lag:
             self.editor_print(":set _lag_")
         else:
             self.editor_print(":set no_lag_")
 
+        self._reopen_terminal_()  # for redraw
+
     def do_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
-        terminal = self.painter
+        painter = self.painter
 
         exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()'
-        terminal.__exit__(*exc_info)
+        painter.__exit__(*exc_info)
         os.kill(os.getpid(), signal.SIGTSTP)
-        terminal.__enter__()
+        painter.__enter__()
 
     def do_sys_exit(self):  # Ex Return
         """Stop taking more Keyboard Input"""
@@ -3372,15 +3444,13 @@ class TerminalEditor:
         iobytespans = self.iobytespans
         painter = self.painter
 
-        terminal = painter
-
         last_line_number = 1 + len(self.ended_lines)
         str_last_line_number = "{:3} ".format(last_line_number)
         last_width = len(str_last_line_number)
 
         # Scroll up the Status Line
 
-        self.terminal_print("")
+        painter.terminal_print("")
 
         # Visit each Span
 
@@ -3402,20 +3472,33 @@ class TerminalEditor:
             if found_row != printed_row:
                 printed_row = found_row
 
-                self.terminal_print(str_line_number + line)  # may wrap multiple rows
+                painter.terminal_print(str_line_number + line)  # may wrap rows
+
+        # Leap to the last Span
 
         (self.row, self.column) = (found_row, found_column)
 
-        # Track experimental Code for echoing Search
+        # Recover the Status Line destroyed by scrolling inside of 'terminal_print'
 
-        if False:  # FIXME: this only works when :g/ finds a screen or more of hits
+        erased_line = painter.columns * " "
 
-            self.driver.write(CUP_1_1)
-            self.driver.write(before_status.ljust(painter.columns))
+        if painter.terminal == self.shadow:  # FIXME vs ⌃L :set _lag_
+            if self.shadow.scroll > painter.scrolling_rows:
+                with_row = self.shadow.row
+                with_column = self.shadow.column
 
-            y = 1 + self.painter.status_row
-            x = 1
-            self.driver.write(CUP_Y_X.format(y, x))
+                assert with_row == painter.status_row
+                assert with_column == 0
+
+                painter.terminal_write(CUP_1_1)
+                painter.terminal_write(erased_line)
+
+                painter.terminal_write(CUP_1_1)
+                painter.terminal_write(before_status[: (painter.columns - 1)])
+
+                y = 1 + with_row
+                x = 1 + with_column
+                painter.terminal_write(CUP_Y_X.format(y, x))
 
         # Prompt for next keyboard input Chord, and block till it arrives
 
@@ -3426,11 +3509,11 @@ class TerminalEditor:
         )
         after_status = self.keyboard.format_reply_func()
 
-        self.terminal_print(after_status, end=" ")
+        painter.terminal_print(after_status, end=" ")
         self.driver.flush()
-        _ = self.terminal_getch()
+        _ = self.getch()
 
-        terminal._reopen_terminal_()
+        self._reopen_terminal_()  # after printing on screen
 
         # TODO: highlight Matches in :g/ Lines
 
@@ -3569,7 +3652,7 @@ class TerminalPainter:
         self.last_line_number = 1  # number all Rows as wide as the Last Row of File
         self.painting_line_number = None  # number the Scrolling Rows visibly, or not
 
-        self._reopen_terminal_()  # start sized to fit the initial Screen
+        self._reopen_terminal_()
 
     def __enter__(self):
         """Connect Keyboard and switch Screen to XTerm Alt Screen"""
@@ -3615,22 +3698,57 @@ class TerminalPainter:
         """Block to return next Keyboard Input, else raise KeyboardInterrupt"""
 
         chord = self.terminal.getch()
-
         if chord == b"\x03":  # ETX, ⌃C, 3
+
             raise KeyboardInterrupt()
 
         return chord
 
-    def write_screen(self, ended_lines, spans, status):
-        """Write over the Rows of Chars on Screen"""
+    def terminal_print(self, *args, end="\r\n"):
+        """Bypass the cache here:  Write line, slip to next, and scroll up if need be"""
 
-        terminal = self.terminal
+        line = " ".join(str(_) for _ in args)
+        self.terminal_write(line + end)
+
+    def terminal_write(self, chars):
+        """Bypass the cache here:  Write the Chars immediately, precisely as given"""
+
+        self.terminal.write(chars)
+
+    def write_cursor(self, row, column):
+        """Merely place the Cursor as told"""
+
+        self.row = row
+        self.column = column
+
+    def read_cursor(self):
+        """Place the Cursor as told, but round down to Bottom Row, Rightmost Column"""
 
         column = self.column
         columns = self.columns
-        left_column = self.spot_left_column()
         row = self.row
+        rows = self.rows
         scrolling_rows = self.scrolling_rows
+
+        scrolling_columns = columns
+        if row < scrolling_rows:
+            left_column = self.spot_left_column()
+            scrolling_columns = columns - left_column
+
+        row_ = min(rows - 1, row)
+        column_ = min(scrolling_columns - 1, column)
+
+        return (row_, column_)
+
+    def write_screen(self, ended_lines, spans, status):
+        """Write over the Rows of Chars on Screen"""
+        terminal = self.terminal
+
+        columns = self.columns
+        left_column = self.spot_left_column()
+        scrolling_rows = self.scrolling_rows
+
+        (row_, column_) = self.read_cursor()
 
         # Fill the Screen with Lines of "~" past the last Line of File
 
@@ -3670,10 +3788,10 @@ class TerminalPainter:
 
         # Place the cursor
 
-        cursor_left_column = left_column if (row < scrolling_rows) else 0
+        cursor_left_column = left_column if (row_ < scrolling_rows) else 0
 
-        y = 1 + row
-        x = 1 + cursor_left_column + column
+        y = 1 + row_
+        x = 1 + cursor_left_column + column_
         terminal.write(CUP_Y_X.format(y, x))
 
     def write_bell(self):
@@ -3838,12 +3956,14 @@ class TerminalShadow:
         self.rows = None
         self.columns = None
 
-        self.held_lines = list()
-        self.ringing_bell = None
         self.row = None
         self.column = None
+        self.ringing_bell = None
 
         self.flushed_lines = list()
+        self.held_lines = list()
+
+        self.scroll = None
 
     def __enter__(self):
         """Connect Keyboard and switch Screen to XTerm Alt Screen"""
@@ -3857,42 +3977,41 @@ class TerminalShadow:
         self.terminal.__exit__(exc_type, exc_value, traceback)  # positional args
 
     def _reopen_terminal_(self):
-        """Clear the Caches layered over this Terminal, here and below"""
+        """Clear the Caches of this Terminal, here and below"""
 
-        # Update the Ask here
+        # Count Rows x Columns below
 
         terminal = self.terminal
-
-        held_lines = self.held_lines
-        flushed_lines = self.flushed_lines
-
         fd = terminal.fileno()
         terminal_size = os.get_terminal_size(fd)
-
         (columns, rows) = (terminal_size.columns, terminal_size.lines)
+
+        # Size this Terminal to match the Terminal Below
+
         assert rows >= 1
         assert columns >= 1
         self.rows = rows
         self.columns = columns
 
-        # Clear the Caches here
-
-        held_lines[::] = rows * [None]
-        self.ringing_bell = None
-        self.row = None
-        self.column = None
-
-        flushed_lines[::] = rows * [None]
-
-        # Clear the Caches below
+        # Clear the Terminal Caches below
 
         terminal.write(ED_2)
         terminal.write(CUP_1_1)
         terminal.flush()
 
+        # Clear the Terminal Cache here
+
+        self.flushed_lines[::] = rows * [None]
+        self.ringing_bell = None
+
+        self.write(ED_2)
+        self.write(CUP_1_1)
+
+        self.scroll = 0
+
         return terminal_size
 
-        # TODO: deal with $LINES, $COLUMNS, fallback,
+        # TODO: deal with $LINES, $COLUMNS, and fallback,
         # TODO: like 'shutil.get_terminal_size' would
 
     def flush(self):
@@ -3904,55 +4023,68 @@ class TerminalShadow:
         rows = self.rows
         terminal = self.terminal
 
-        blank_line = columns * " "
+        erased_line = columns * " "
         bottom_row = rows - 1
 
-        # Write the rows
+        # Visit each row, top down
+
+        assert len(held_lines) == rows, (len(held_lines), rows)  # flush after ED_2
 
         terminal.write(CUP_1_1)
 
-        assert len(held_lines) == rows, (len(held_lines), rows)
         for (row, held_line) in enumerate(held_lines):
-            flushed_line = flushed_lines[row]
+            flushable_line = "\r\n" if (held_line is None) else held_line
 
-            if flushed_line != held_line:  # write Rows who changed since last Flush
+            # If row written differently
+
+            flushed_line = flushed_lines[row]
+            if flushed_line != flushable_line:
                 if row < bottom_row:
 
-                    self._terminal_write_cup(row, column=0)
-                    terminal.write(blank_line)
+                    # Write a Scrolling Row above the Bottom Row
 
-                    self._terminal_write_cup(row, column=0)
-                    terminal.write(held_line.rstrip())
+                    self.terminal_write_cup(row, column=0)
+                    terminal.write(erased_line)
+
+                    self.terminal_write_cup(row, column=0)
+                    terminal.write(flushable_line.rstrip())
 
                 else:
 
-                    self._terminal_write_cup(row, column=0)
-                    terminal.write(blank_line[:-1])
+                    # Write the Bottom Row, but without closing it
+                    # and without writing its Last Column
 
-                    self._terminal_write_cup(row, column=0)
-                    terminal.write(held_line.rstrip())
+                    self.terminal_write_cup(row, column=0)
+                    terminal.write(erased_line[:-1])
 
-                flushed_lines[row] = held_line
+                    self.terminal_write_cup(row, column=0)
+                    terminal.write(flushable_line.rstrip())
+
+                # Remember this Write, as if all Columns written
+
+                flushed_lines[row] = flushable_line
+
+        # Clear the Terminal Cache of Lines to write
 
         held_lines[::] = list()
 
-        # Place the cursor
+        # Place the Terminal Cursor below
 
-        self._terminal_write_cup(self.row, column=self.column)
+        self.terminal_write_cup(self.row, column=self.column)
 
-        # Ring the bell
+        # Ring the Terminal Bell below
 
         if self.ringing_bell:
             terminal.write("\a")
 
         self.ringing_bell = None
 
-        # Flush the writes
+        # Flush the Terminal Writes below
 
         terminal.flush()
 
-    def _terminal_write_cup(self, row, column):
-        """Position the Terminal Cursor, but without telling the Shadow"""
+    def terminal_write_cup(self, row, column):
+        """Position the Terminal Cursor below, without telling this Shadow"""
 
         terminal = self.terminal
 
@@ -3961,211 +4093,184 @@ class TerminalShadow:
         terminal.write(CUP_Y_X.format(y, x))
 
     def getch(self):
-        """Block till the keyboard input Digit or Chord"""
+        """Block till next keyboard input Chord"""
 
         return self.terminal.getch()
 
     def write(self, chars):
-        """Compare with Chars at Cursor, write Diffs now, move Cursor soon"""
-
-        if chars == "\a":
-            self.shadow_control_bell()
-        elif chars.count(CSI) >= 2:
-            self.shadow_opaque_chars_as_line(chars)
-        elif chars.startswith(CSI):
-            self.shadow_csi_chars(chars)
-        else:
-            self.shadow_opaque_chars_as_line(chars)
-
-    def shadow_control_bell(self):
-        """Ring the Terminal Bell at next Flush"""
-
-        self.ringing_bell = True
-
-    def shadow_opaque_chars_as_line(self, chars):
-        """Write Opaque Chars over Screen, & shadow Cursor as if one Line written"""
-
-        columns = self.columns
-        held_lines = self.held_lines
-        row = self.row
-        rows = self.rows
-
-        # Forward the Chars unchanged
-
-        held_line = held_lines[row]
-        assert held_line is None, held_line
-
-        held_lines[row] = chars
-
-        # Move the Shadow Cursor
-
-        escapist = TerminalEscapist(rows, columns=columns)
-        if (self.row, self.column) != (None, None):
-            escapist.write(CUP_Y_X.format(1 + self.row, 1 + self.column))
-        # FIXME: write all writes to one TerminalEscapist
-
-        escapist.write(chars)
-        (self.row, self.column) = escapist.pin
-
-    def shadow_csi_chars(self, chars):
-        """Interpret CSI Escape Sequences"""
-
-        if chars == ED_2:
-            self.shadow_csi_clear_screen()
-        elif chars.endswith("H"):
-            self.shadow_csi_cursor_position(chars)
-        else:
-            raise NotImplementedError(repr(chars))
-
-    def shadow_csi_clear_screen(self):
-        """Write Spaces over Chars of Screen"""
+        """Write into the Shadow now, write the Terminal Below at next Flush"""
 
         held_lines = self.held_lines
-        rows = self.rows
-
-        held_lines[::] = rows * [None]
-
-    def shadow_csi_cursor_position(self, chars):
-        """Leap to chosen Row and Column of Screen"""
-
+        column = self.column
         columns = self.columns
         rows = self.rows
+        terminal = self.terminal
 
-        # Interpret the CUP_Y_X or CUP_1_1 Escape Sequence
+        row_ = self.row
 
-        escapist = TerminalEscapist(rows, columns=columns)
-        escapist.write(chars)
-        (to_row, to_column) = escapist.pin
+        # Flush through the Write of anything but ED_2 after Flush before ED_2
+        # TODO: Shadow Literals written after ED_2 to Flush at GetCh
 
-        # Move the Shadow Cursor
+        orders = TerminalOrder.split_orders(chars)
 
-        self.row = to_row
-        self.column = to_column
+        writing_ed_2 = False
+        if len(orders) == 1:
+            order = orders[-1]
+            if order.csi_plus == ED_2:
+                writing_ed_2 = True
 
-    # TODO: Add API to write Scroll CSI in place of rewriting Screen to Scroll
-    # TODO: Reduce writes to Chars needed, smaller than whole Lines needed
+        if not held_lines and not writing_ed_2:
+            terminal.write(chars)
+            terminal.flush()
 
+        # Hold the Write of one or more Literals from Erase Display to Flush
 
-class TerminalEscapist:
-    """Interpret writes of Chars including C0_CONTROL Chars, like a Terminal does"""
+        if held_lines:
 
-    ALT_TERMINAL_WRITE_REGEX = r"".join(
-        [
-            r"(\x1B\[",  # Control Sequence Introducer (CSI)
-            r"(([0-9?]+)(;([0-9?]+))?)?",  # 0, 1, or 2 Decimal Int or Question Args
-            r"([A-Z_a-z]))",  # one Ascii Letter or Skid mark
-            r"|",
-            r"(\x1B.)",  # else one escaped Char
-            r"|",
-            r"(\r\n|[\x00-\x1F\x7F])",  # else one or a few C0_CONTROL Chars
-            r"|",
-            r"([^\x00-\x1F\x7F]+)",  # else literal Chars
-        ]
-    )
+            if column == columns:
 
-    assert ALT_TERMINAL_WRITE_REGEX == TERMINAL_WRITE_REGEX
+                order_chars = ""
+                (row_, column_) = self.find_step_ahead()
+                self.write_cursor(order_chars, row=row_, column=column_)
 
-    def __init__(self, rows, columns):
+            if any(_.literals for _ in orders):
 
-        self.rows = rows
-        self.columns = columns
+                assert len(held_lines) == rows, (len(held_lines), row_)
+                assert row_ < len(held_lines), (row_, chars)
 
-        self.row = None
-        self.column = None
+                held_line = held_lines[row_]
+                assert held_line is None, (row_, held_line, chars)
 
-    @property
-    def pin(self):
-        """Say where the Cursor is"""
+                held_lines[row_] = chars
 
-        pin_ = TerminalPin(self.row, column=self.column)
+        # Write each separate Order, and take even the last Order as complete
 
-        return pin_
+        for order in orders:
+            self.write_one_order(order)
 
-    def write(self, chars):
-        """Write a mix of C0_CONTROL Chars and other Chars"""
+    def write_one_order(self, order):
+        """Write one TerminalOrder into the Shadow Cursor"""
 
-        row = self.row  # mutable
-        column = self.column  # mutable
-
-        for match in re.finditer(TERMINAL_WRITE_REGEX, string=chars):
-            (row, column) = self.find_cursor_after(match)
-
-        self.row = row
-        self.column = column
-
-    def find_cursor_after(self, match):
-        """Say where writing one Match of TERMINAL_WRITE_REGEX moves the Cursor"""
-
+        held_lines = self.held_lines
         rows = self.rows
         columns = self.columns
 
-        # Default to keep the Cursor unmoved
+        row_ = self.row
+        column_ = self.column
 
-        row = self.row  # mutable
-        column = self.column  # mutable
+        # Interpret CR LF as closing this Row and beginning the next
 
-        # Name Groups of the Match
+        if (order.controls == "\r\n") or (column_ == columns):
+            (row_, column_) = self.find_step_ahead()
 
-        m = match
-        order = m.string[m.start() : m.end()]
-
-        literals = m.group(9)
-        controls = m.group(8)
-        escape = m.group(7)
-        csi = m.group(1)
-
-        groups = (literals, controls, escape, csi)
-        assert sum(bool(_) for _ in groups) == 1, (order, groups)
-
-        a = m.group(6)
-        x = m.group(5)
-        y = m.group(3)
-
-        assert bool(a or x or y) == bool(csi), (order, groups)
+            assert 0 <= row_ < rows, (row_, rows, order.chars)
+            assert 0 <= column_ < columns, (column_, columns, order.chars)
 
         # Write Literals over Columns, slipping the Cursor right and down
 
-        if literals:
-            column += len(literals)
-            row += column // columns  # 'row == rows' after writing last Column
-            column = column % columns
+        if order.literals:
+            (row_, column_) = self.find_slip_ahead(slips=len(order.literals))
+
+            assert 0 <= row_ < rows, (row_, rows, order.chars)
+            assert 0 <= column_ <= columns, (column_, columns, order.chars)
+            # TODO: think more into persisting just past Last Column
 
         # Interpret C0_CONTROL Chars
 
-        elif controls == "\a":
+        elif order.controls == "\a":
+            self.ringing_bell = True
+        elif order.controls == "\r\n":
             pass
-        elif controls == "\r\n":
-            row += 1
-            column = 0
 
         # Interpret CSI Escape Sequences
 
-        elif csi == ED_2:
-            row = None
-            column = None
-        elif csi == CUP_1_1:
-            row = 0
-            column = 0
-        elif a == CUP_Y_X[-1]:
-            row = int(y) - 1  # raise TypeError/ ValueError for bad/missing Arg
-            column = int(x) - 1  # again, may raise TypeError/ ValueError
+        elif order.csi_plus == ED_2:
+            held_lines[::] = rows * [None]
+            row_ = None
+            column_ = None
+        elif order.csi_plus == CUP_1_1:
+            row_ = 0
+            column_ = 0
+        elif order.a == CUP_Y_X[-1]:
+            row_ = int(order.int_y) - 1
+            column_ = int(order.int_x) - 1
 
-        elif csi == SGR_7:
+            assert 0 <= row_ < rows, (row_, rows, order.chars)
+            assert 0 <= column_ < columns, (column_, columns, order.chars)
+
+        elif order.csi_plus == SGR_7:
             pass
-        elif csi == SGR:
+        elif order.csi_plus == SGR:
             pass
 
         # Reject meaningless Orders
 
         else:
-            raise NotImplementedError(repr(order))
 
-        assert 0 <= row < rows, (order,)
-        assert 0 <= column < columns, (order,)
+            raise NotImplementedError(order.chars)
 
-        # Succeed
+        # Move the Shadow Cursor
 
-        return (row, column)
+        self.write_cursor(order.chars, row=row_, column=column_)
+
+    def write_cursor(self, order_chars, row, column):
+        """Place the Shadow Cursor, but never out of bounds"""
+
+        columns = self.columns
+        rows = self.rows
+
+        if row is not None:
+            assert 0 <= row < rows, (order_chars, row, rows)
+
+        if column is not None:  # TODO: think more into persisting just past Last Column
+            assert 0 <= column <= columns, (order_chars, column, columns)
+
+        # Move the Shadow Cursor
+
+        self.row = row
+        self.column = column
+
+    def find_slip_ahead(self, slips):
+        """Scroll up the Rows when given an Order before or up to the Lower Right"""
+
+        rows = self.rows
+        columns = self.columns
+
+        # Scroll as needed to slip ahead,
+        # but accept landing one Column past the Lower Right
+
+        row_ = self.row
+        column_ = self.column
+
+        column_ += slips
+
+        while column_ > columns:
+            column_ -= columns
+            if row_ < (rows - 1):
+                row_ += 1
+            else:
+                self.scroll += 1
+
+        return (row_, column_)
+
+    def find_step_ahead(self):
+        """Scroll up the Rows when given an Order past the Lower Right"""
+
+        rows = self.rows
+
+        column_ = self.column
+        row_ = self.row
+
+        column_ = 0
+        if row_ < rows - 1:
+            row_ += 1
+        else:
+            self.scroll += 1
+
+        return (row_, column_)
+
+    # TODO: Add API to write Scroll CSI in place of rewriting Screen to Scroll
+    # TODO: Reduce writes to Chars needed, smaller than whole Lines needed
 
 
 class TerminalDriver:
@@ -4190,6 +4295,8 @@ class TerminalDriver:
         self.terminal_fileno = None
         self.with_termios = None
         self.inputs = None
+
+        self.lag = None
 
     def __enter__(self):
         """Connect Keyboard and switch Screen to XTerm Alt Screen"""
@@ -4317,6 +4424,9 @@ class TerminalDriver:
         """Compare with Chars at Cursor, write Diffs now, move Cursor soon"""
 
         self.terminal.write(chars)
+
+        if self.lag:
+            time.sleep(self.lag)
 
 
 def repr_vi_bytes(xxs):
@@ -4695,6 +4805,8 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 
 # FIXME: Vim :g/ :g? affirms or flips direction, doesn't force ahead/behind
+# FIXME: Vim :g? g? no longer just :g/ g/
+# FIXME: Vim \n somehow doesn't disrupt the 'continue_vi_column_seek' of $
 # FIXME: somehow need two ⌃L after each Terminal Window Resize?  \ n \ n doesn't work?
 # FIXME: ( workaround is quit and relaunch, or press enough pairs of ⌃L )
 
