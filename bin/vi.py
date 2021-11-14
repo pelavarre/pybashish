@@ -28,7 +28,7 @@ keyboard tests:
   ⌃L ⌃G  => toggle lag, say if lag is toggled, show version
   \n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
   /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
-  :g/... Delete ⌃U ⌃C Return  => enter a search key and print every line found
+  :g/... Delete ⌃U ⌃C Return :g?...  => enter a search key and print lines found
   Esc ⌃C 123Esc 123⌃C zZ /⌃G 3ZQ f⌃C 9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N  => Easter eggs
   \n99zz \F/$Return 9⌃G Qvi⌃My Qvi⌃Mn :n  => more Easter eggs
 
@@ -122,7 +122,7 @@ class TerminalOrder(argparse.Namespace):
     )
 
     def __init__(self, match):
-        """Parse one Terminal Order that matches TERMINAL_WRITE_REGEX"""
+        """Parse one whole Terminal Order, found as Re Match of TERMINAL_WRITE_REGEX"""
 
         self.match = match
 
@@ -130,6 +130,8 @@ class TerminalOrder(argparse.Namespace):
 
         m = match
         self.chars = m.string[m.start() : m.end()]
+
+        assert len(m.groups()) == 9
 
         self.literals = m.group(9)
         self.controls = m.group(8)
@@ -149,12 +151,16 @@ class TerminalOrder(argparse.Namespace):
         else:
             assert self.a, (self.chars, groups)
 
+        # Raise ValueError if CSI Order carries an X or Y that is not Decimal Int
+
+        rep = repr(self.chars)
+
         self.int_x = None
         if self.x is not None:
             try:
                 self.int_x = int(self.x)
             except ValueError:
-                assert False, (self.chars, groups)
+                raise ValueError(rep)  # such as _XTERM_ALT_ or _XTERM_MAIN_
 
         self.int_y = None
         if self.y is not None:
@@ -163,18 +169,30 @@ class TerminalOrder(argparse.Namespace):
             except ValueError:
                 assert False, (self.chars, groups)
 
-    @staticmethod
-    def split_orders(chars):
-        """Write a mix of C0_CONTROL Chars and other Chars into the Shadow Cursor"""
+        # Raise ValueError if CSI Order started and not ended
+
+        if self.escape_plus and self.escape_plus.endswith(CSI):  # "\x1B["
+            assert self.escape_plus == CSI  # as per TERMINAL_WRITE_REGEX
+            raise ValueError(rep)  # incomplete CSI TerminalOrder
+
+        if self.controls and self.controls.endswith(ESC):  # "\x1B"
+            raise ValueError(rep)  # incomplete CSI TerminalOrder
+
+
+class TerminalWriter(argparse.Namespace):
+    """Split a mix of C0_CONTROL and other Chars into complete TerminalOrder's"""
+
+    def __init__(self, chars):
 
         regex = TerminalOrder.TERMINAL_WRITE_REGEX
 
         orders = list()
         for match in re.finditer(regex, string=chars):
             order = TerminalOrder(match)
+
             orders.append(order)
 
-        return orders
+        self.orders = orders
 
 
 # Name some Terminal Input magic
@@ -913,9 +931,9 @@ class TerminalSkinVi:
 
         editor.flag_reply_with_find()
 
-        # Take Search Key as input
+        # Take Search Key as input, but leave Search Slip unchanged
 
-        if self.find_read_vi_line(slip=+1) is None:
+        if self.find_read_vi_line(slip=0) is None:
 
             return
 
@@ -959,7 +977,8 @@ class TerminalSkinVi:
 
         editor = self.editor
 
-        assert editor.finding_line != ""
+        assert editor.finding_line != ""  # may be None, but never Empty
+        slip_ = slip if slip else editor.finding_slip
 
         # Ask for fresh Search Key
 
@@ -986,7 +1005,8 @@ class TerminalSkinVi:
 
         # Take fresh Slip always, and take fresh Search Key if given
 
-        editor.finding_slip = slip
+        editor.finding_slip = slip_
+
         if finding_line:
             editor.finding_line = finding_line
 
@@ -2200,7 +2220,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_correcting_many_chords(b":/", corrections=b"/")
         self._init_correcting_many_chords(b":?", corrections=b"?")
 
-        # self._init_func_by_many_vi_chords(b":g?", func=vi.do_find_all_vi_line)
+        self._init_func_by_many_vi_chords(b":g?", func=vi.do_find_all_vi_line)
         self._init_func_by_many_vi_chords(b":g/", func=vi.do_find_all_vi_line)
         self._init_func_by_many_vi_chords(b":n\r", func=vi.do_might_next_vi_file)
         self._init_func_by_many_vi_chords(b":n!\r", func=vi.do_next_vi_file)
@@ -2280,8 +2300,8 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_suffix_func(b"f", func=vi.do_slip_index)
 
         self._init_correcting_many_chords(b"g/", corrections=b":g/")
-        # self._init_correcting_many_chords(b"g?", corrections=b":g?")
-        # TODO: stop commandeering the personal g/ r? Chord Sequences
+        self._init_correcting_many_chords(b"g?", corrections=b":g?")
+        # TODO: stop commandeering the personal g/ g? Chord Sequences
 
         # func_by_chords[b"g"]
         func_by_chords[b"h"] = vi.do_slip_left
@@ -3540,7 +3560,7 @@ class TerminalEditor:
         heres = (here0, here1)
 
         how0 = "{}/{}  Found {} chars ahead"
-        how1 = "{}/{}  Found {} chars, not ahead, found instead after start"
+        how1 = "{}/{}  Found {} chars after start, because not found ahead"
         hows = (how0, how1)
 
         for (here, how) in zip(heres, hows):
@@ -3587,7 +3607,7 @@ class TerminalEditor:
         heres = (here0, here1)
 
         how0 = "{}/{}  Found {} chars behind"
-        how1 = "{}/{}  Found {} chars, not behind, found instead before end"
+        how1 = "{}/{}  Found {} chars before end, because not found behind"
         hows = (how0, how1)
 
         for (here, how) in zip(heres, hows):
@@ -4111,7 +4131,8 @@ class TerminalShadow:
         # Flush through the Write of anything but ED_2 after Flush before ED_2
         # TODO: Shadow Literals written after ED_2 to Flush at GetCh
 
-        orders = TerminalOrder.split_orders(chars)
+        writer = TerminalWriter(chars)
+        orders = writer.orders
 
         writing_ed_2 = False
         if len(orders) == 1:
@@ -4473,7 +4494,8 @@ def repr_vi_bytes(xxs):
 
 
 #
-# Track how to configure Vim to feel like Vi Py
+# Track how to configure Vim to feel like Vi Py,
+# especially after backing up or removing your history at:  -rw------- ~/.viminfo
 #
 
 _VIMRC_ = r"""
@@ -4804,9 +4826,7 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # -- bugs --
 
 
-# FIXME: Vim :g/ :g? affirms or flips direction, doesn't force ahead/behind
-# FIXME: Vim :g? g? no longer just :g/ g/
-# FIXME: Vim \n somehow doesn't disrupt the 'continue_vi_column_seek' of $
+# FIXME: Vim \ n somehow doesn't disrupt the 'continue_vi_column_seek' of $
 # FIXME: somehow need two ⌃L after each Terminal Window Resize?  \ n \ n doesn't work?
 # FIXME: ( workaround is quit and relaunch, or press enough pairs of ⌃L )
 
