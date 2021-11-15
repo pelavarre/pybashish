@@ -30,7 +30,7 @@ keyboard tests:
   /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
   :g/... Delete ⌃U ⌃C Return :g?...  => enter a search key and print lines found
   Esc ⌃C 123Esc 123⌃C zZ /⌃G 3ZQ f⌃C 9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N  => Easter eggs
-  \n99zz \F/$Return 9⌃G Qvi⌃My Qvi⌃Mn :n  => more Easter eggs
+  \n99zz \F*/Up \F/$Return 9⌃G Qvi⌃My Qvi⌃Mn :n  => more Easter eggs
 
 pipe tests:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
@@ -795,6 +795,9 @@ class TerminalSkinVi:
 
             editor.continue_do_loop()
 
+        # Vi Py echoes the * Search Key at /Up and at :g/, but not as Status
+        # Vim echoes the * Search Key as Status, unless not found ahead
+
     def do_find_behind_vi_this(self):  # Vim #  # Vim £
         """Take a Search Key from this Line, and then look behind for it"""
 
@@ -814,6 +817,9 @@ class TerminalSkinVi:
         if editor.find_behind_and_reply():
 
             editor.continue_do_loop()
+
+        # Vi Py echoes the # Search Key at ?Up and at :g?, but not as Status
+        # Vim echoes the # Search Key as Status, unless not found ahead
 
     def slip_find_fetch_vi_this(self, slip):
         """Take a Word from this Line and return Truthy, else don't"""
@@ -924,6 +930,9 @@ class TerminalSkinVi:
 
             editor.continue_do_loop()
 
+        # Vi Py echoes the / Search Key at /Up and at :g/, but not as Status
+        # Vim echoes the / Search Key as Status, unless not found ahead
+
     def do_find_all_vi_line(self):  # Vim :g/   # Vim :g?  # Vi Py :g/, :g?, g/, g?
         """Across all the File, print each Line containing 1 or More Matches"""
 
@@ -954,6 +963,9 @@ class TerminalSkinVi:
                     last_span.beyond - last_span.column,
                 )
             )
+
+        # Vi Py echoes the ? Search Key at ?Up and at :g?, but not as Status
+        # Vim echoes the ? Search Key as Status, unless not found ahead
 
         # TODO: Vim :4g/ means search only line 4, not pick +-Nth match
 
@@ -998,8 +1010,8 @@ class TerminalSkinVi:
 
                 return
 
-            if not editor.finding_line:
-                self.vi_print("Press ? or / to enter a Search Key")  # Vim ⌃C
+            if not editor.finding_line:  # Vim Return
+                self.vi_print("Press one of / ? * # to enter a Search Key")
 
                 return
 
@@ -1047,7 +1059,7 @@ class TerminalSkinVi:
         # Take up an old Search Key
 
         if editor.finding_line is None:
-            self.vi_print("Press ? to enter a Search Key")
+            self.vi_print("Press ? or # to enter a Search Key")
 
             return
 
@@ -1072,7 +1084,7 @@ class TerminalSkinVi:
         # Take up an old Search Key
 
         if editor.finding_line is None:
-            self.vi_print("Press / to enter a Search Key")
+            self.vi_print("Press / or * to enter a Search Key")
 
             return
 
@@ -1126,7 +1138,7 @@ class TerminalSkinVi:
 
         editor.column = 0
 
-    def do_slip_left(self):  # Vim h, Left  # Emacs left-char, backward-char
+    def do_slip_left(self):  # Vim h, ← Left Arrow  # Emacs left-char, backward-char
         """Slip left one Column or more"""
 
         editor = self.editor
@@ -1136,7 +1148,7 @@ class TerminalSkinVi:
         left = min(editor.column, self.get_vi_arg1())
         editor.column -= left
 
-    def do_slip_right(self):  # Vim l, Right  #  emacs right-char, forward-char
+    def do_slip_right(self):  # Vim l, → Right Arrow  #  emacs right-char, forward-char
         """Slip Right one Column or more"""
 
         editor = self.editor
@@ -1330,7 +1342,7 @@ class TerminalSkinVi:
 
         self.continue_vi_column_seek()
 
-    def do_step_down_seek(self):  # Vim j, ⌃J, ⌃N, Down  # Emacs next-line
+    def do_step_down_seek(self):  # Vim j, ⌃J, ⌃N, ↓ Down Arrow  # Emacs next-line
         """Step down one Row or more, but seek the current Column"""
 
         editor = self.editor
@@ -1343,7 +1355,7 @@ class TerminalSkinVi:
         editor.column = self.seek_vi_column()
         self.continue_vi_column_seek()
 
-    def do_step_up_seek(self):  # Vim k, ⌃P, Up  # Emacs previous-line
+    def do_step_up_seek(self):  # Vim k, ⌃P, ↑ Up Arrow  # Emacs previous-line
         """Step up a Row or more, but seek the current Column"""
 
         editor = self.editor
@@ -2171,7 +2183,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"\x0D"] = vi.do_step_down_dent  # CR, ⌃M, 13 \r
         func_by_chords[b"\x0E"] = vi.do_step_down_seek  # SO, ⌃N, 14
         # func_by_chords[b"\x0F"] = vi.do_c0_control_si  # SI, ⌃O, 15
-        func_by_chords[b"\x10"] = vi.do_step_up_seek  # dle, ⌃P, 16
+        func_by_chords[b"\x10"] = vi.do_step_up_seek  # DLE, ⌃P, 16
         # func_by_chords[b"\x11"] = vi.do_c0_control_dc1  # DC1, XON, ⌃Q, 17
         # func_by_chords[b"\x12"] = vi.do_c0_control_dc2  # DC2, ⌃R, 18
         # func_by_chords[b"\x13"] = vi.do_c0_control_dc3  # DC3, XOFF, ⌃S, 19
@@ -2442,10 +2454,28 @@ class TerminalSkinEx:
             sys.exit()
 
     def do_quit_ex(self):  # Vim Ex ⌃C
+        """Lose all input and quit"""
 
         self.ex_line = None
 
         sys.exit()
+
+    def do_copy_down(self):  # Vim Ex ⌃P, ↑ Up Arrow
+        """Recall last input line"""
+
+        editor = self.editor
+        ex_line = self.ex_line
+
+        editor_finding_line = editor.finding_line
+        if ex_line is not None:
+            if editor_finding_line is not None:
+                if editor_finding_line.startswith(ex_line):
+
+                    self.ex_line = editor_finding_line
+
+                    return
+
+        raise ValueError("substring not found")
 
 
 class TerminalKeyboardEx(TerminalKeyboard):
@@ -2486,9 +2516,12 @@ class TerminalKeyboardEx(TerminalKeyboard):
 
         func_by_chords[b"\x03"] = ex.do_quit_ex  # ETX, ⌃C, 3
         func_by_chords[b"\x0D"] = editor.do_sys_exit  # CR, ⌃M, 13 \r
+        func_by_chords[b"\x10"] = ex.do_copy_down  # DLE, ⌃P, 16
         func_by_chords[b"\x15"] = ex.do_clear_chars  # NAK, ⌃U, 21
 
         self._init_suffix_func(b"\x16", func=ex.do_append_suffix)  # SYN, ⌃V, 22
+
+        func_by_chords[b"\x1B[A"] = ex.do_copy_down  # ↑ Up Arrow
 
         func_by_chords[b"\x7F"] = ex.do_undo_append_char  # DEL, ⌃?, 127
 
@@ -3470,7 +3503,7 @@ class TerminalEditor:
 
         # Scroll up the Status Line
 
-        painter.terminal_print("")
+        painter.terminal_print("\r" + before_status)
 
         # Visit each Span
 
@@ -3502,7 +3535,7 @@ class TerminalEditor:
 
         erased_line = painter.columns * " "
 
-        if painter.terminal == self.shadow:  # FIXME vs ⌃L :set _lag_
+        if painter.terminal == self.shadow:
             if self.shadow.scroll > painter.scrolling_rows:
                 with_row = self.shadow.row
                 with_column = self.shadow.column
@@ -4150,9 +4183,8 @@ class TerminalShadow:
 
             if column == columns:
 
-                order_chars = ""
                 (row_, column_) = self.find_step_ahead()
-                self.write_cursor(order_chars, row=row_, column=column_)
+                self.write_cursor(row=row_, column=column_)
 
             if any(_.literals for _ in orders):
 
@@ -4164,87 +4196,112 @@ class TerminalShadow:
 
                 held_lines[row_] = chars
 
-        # Write each separate Order, and take even the last Order as complete
+        # Write the Orders into the Shadow Cursor
+
+        self.write_some_orders(orders)
+
+    def write_some_orders(self, orders):
+        """Write the Orders into the Shadow Cursor"""
+
+        columns = self.columns
 
         for order in orders:
-            self.write_one_order(order)
 
-    def write_one_order(self, order):
-        """Write one TerminalOrder into the Shadow Cursor"""
+            # Accept CR LF beyond the last Column, but nothing else
+
+            if self.column == columns:
+                self.write_beyond_row_order()
+                if order.controls == "\r\n":
+
+                    continue
+
+            # Write whichever kind of order
+
+            if order.csi_plus:
+                self.write_csi_plus_order(order)
+            elif order.escape_plus:
+                self.write_escape_plus_order(order)
+            elif order.controls:
+                self.write_controls_order(order)
+            elif order.literals:
+                self.write_literals_order(order)
+            else:
+                assert False, order  # unreached
+
+    def write_beyond_row_order(self):
+        """Wrap into next Row, to accept Write past Last Column"""
+
+        (row, column) = self.find_step_ahead()
+
+        self.write_cursor(row, column=column)
+
+    def write_csi_plus_order(self, order):
+        """Write one CSI Order into the Shadow Cursor"""
 
         held_lines = self.held_lines
         rows = self.rows
-        columns = self.columns
 
-        row_ = self.row
-        column_ = self.column
-
-        # Interpret CR LF as closing this Row and beginning the next
-
-        if (order.controls == "\r\n") or (column_ == columns):
-            (row_, column_) = self.find_step_ahead()
-
-            assert 0 <= row_ < rows, (row_, rows, order.chars)
-            assert 0 <= column_ < columns, (column_, columns, order.chars)
-
-        # Write Literals over Columns, slipping the Cursor right and down
-
-        if order.literals:
-            (row_, column_) = self.find_slip_ahead(slips=len(order.literals))
-
-            assert 0 <= row_ < rows, (row_, rows, order.chars)
-            assert 0 <= column_ <= columns, (column_, columns, order.chars)
-            # TODO: think more into persisting just past Last Column
-
-        # Interpret C0_CONTROL Chars
-
-        elif order.controls == "\a":
-            self.ringing_bell = True
-        elif order.controls == "\r\n":
-            pass
-
-        # Interpret CSI Escape Sequences
-
-        elif order.csi_plus == ED_2:
+        if order.csi_plus == ED_2:
             held_lines[::] = rows * [None]
-            row_ = None
-            column_ = None
-        elif order.csi_plus == CUP_1_1:
-            row_ = 0
-            column_ = 0
-        elif order.a == CUP_Y_X[-1]:
-            row_ = int(order.int_y) - 1
-            column_ = int(order.int_x) - 1
+            self.write_cursor(row=None, column=None)
 
-            assert 0 <= row_ < rows, (row_, rows, order.chars)
-            assert 0 <= column_ < columns, (column_, columns, order.chars)
+        elif order.csi_plus == CUP_1_1:
+            self.write_cursor(row=0, column=0)
+
+        elif order.a == CUP_Y_X[-1]:  # may move the Cursor past Last Column
+            self.write_cursor(row=(order.int_y - 1), column=(order.int_x - 1))
 
         elif order.csi_plus == SGR_7:
             pass
+
         elif order.csi_plus == SGR:
             pass
 
-        # Reject meaningless Orders
-
         else:
-
             raise NotImplementedError(order.chars)
 
-        # Move the Shadow Cursor
+    def write_escape_plus_order(self, order):
+        """Write one Escape Order into the Shadow Cursor"""
 
-        self.write_cursor(order.chars, row=row_, column=column_)
+        raise NotImplementedError(order.chars)
 
-    def write_cursor(self, order_chars, row, column):
+    def write_controls_order(self, order):
+        """Write one Controls Order into the Shadow Cursor"""
+
+        row = self.row
+
+        if order.controls == "\a":
+            self.ringing_bell = True
+
+        elif order.controls == "\r":
+            self.write_cursor(row, column=0)
+
+        elif order.controls == "\r\n":  # "\r\n" past last Column don't come here
+            self.write_beyond_row_order()
+
+        else:
+            raise NotImplementedError(order.chars)
+
+    def write_literals_order(self, order):
+        """Write one Literals Order into the Shadow Cursor"""
+
+        (row, column) = self.find_slip_ahead(slips=len(order.literals))
+
+        self.write_cursor(row, column=column)
+
+    def write_cursor(self, row, column):
         """Place the Shadow Cursor, but never out of bounds"""
 
         columns = self.columns
         rows = self.rows
 
-        if row is not None:
-            assert 0 <= row < rows, (order_chars, row, rows)
+        # Assert Row:Column on Screen, or just past the Last Column of a Row
 
-        if column is not None:  # TODO: think more into persisting just past Last Column
-            assert 0 <= column <= columns, (order_chars, column, columns)
+        if row is not None:
+            assert 0 <= row < rows, (row, rows)
+
+        if column is not None:
+            assert 0 <= column <= columns, (column, columns)
 
         # Move the Shadow Cursor
 
@@ -4823,12 +4880,13 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # TODO: search the Sourcelines above here a la :g/FIXME
 # TODO: search the Sourcelines above here a la :g/TODO\|FIXME
 
+
 # -- bugs --
 
+# FIXME: don't flash the screen at:  python3 vi.py +q --pwnme=pelavarre-patch-1
 
-# FIXME: Vim \ n somehow doesn't disrupt the 'continue_vi_column_seek' of $
-# FIXME: somehow need two ⌃L after each Terminal Window Resize?  \ n \ n doesn't work?
-# FIXME: ( workaround is quit and relaunch, or press enough pairs of ⌃L )
+# TODO: somehow need two ⌃L after each Terminal Window Resize?  \ n \ n doesn't work?
+# TODO: ( workaround is quit and relaunch, or press enough pairs of ⌃L )
 
 
 # -- future inventions --
@@ -4860,14 +4918,12 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # TODO: record and replay tests of:  cat bin/vi.py |vi.py - bin/vi.py
 
-# TODO: do echo the Search Key, and better than Vim does
-# TODO:   Vim echoes / ? keys till you press Return
-# TODO:   Vim echoes / ? keys if you come back and / Up or ? Up
-# TODO:   Vim echoes * keys only when found ahead, # keys only when found behind
-# TODO:   Vim never echoes n N :g/ keys
-# TODO:   Vi Py today discloses :g/ Search Keys when less than 1 Screen of Matches
+# TODO: Vim :g/ :g? jumps to first word of line, not to last hit
+# TODO: recover :g/ Status when ⌃L has given us :set _lag_ of >1 Screen of Hits
 
 # TODO: name errors for undefined keys inside Ex of / ? etc
+
+# TODO: Vim \ n somehow doesn't disrupt the 'continue_vi_column_seek' of $
 
 # TODO: :0 ... :9 to work as 0..9 but then G after Prefix
 # TODO: accept more chords and DEL and ⌃U after : till \r
