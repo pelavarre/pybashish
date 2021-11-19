@@ -2414,7 +2414,7 @@ class TerminalSkinEx:
         keyboard = TerminalKeyboardEx(terminal_ex=self, editor=editor)
         try:
             editor.run_keyboard(keyboard)
-        except:
+        except Exception:
             editor.doing_traceback = editor.traceback
             raise
         assert False  # unreached
