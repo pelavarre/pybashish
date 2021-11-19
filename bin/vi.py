@@ -2412,7 +2412,11 @@ class TerminalSkinEx:
         editor = self.editor
 
         keyboard = TerminalKeyboardEx(terminal_ex=self, editor=editor)
-        editor.run_keyboard(keyboard)
+        try:
+            editor.run_keyboard(keyboard)
+        except:
+            editor.doing_traceback = editor.traceback
+            raise
         assert False  # unreached
 
     def do_clear_chars(self):  # Vim Ex ⌃U
@@ -2709,6 +2713,7 @@ class TerminalEditor:
         self.doing_less = None  # reject the Arg1 when not explicitly accepted
         self.doing_more = None  # take the Arg1 as a Count of Repetition's
         self.doing_done = None  # count the Repetition's completed before now
+        self.doing_traceback = None  # retain a Python Traceback till after more Chords
 
         self.flagging_more = None  # keep up some Flags in the Reply to a Nudge
 
@@ -3077,7 +3082,8 @@ class TerminalEditor:
 
                 func()
                 self.keep_cursor_on_file()
-                self.traceback = None
+                self.traceback = self.doing_traceback
+                self.doing_traceback = None
 
                 if self.doing_less:
                     arg1 = self.get_arg1(default=None)
