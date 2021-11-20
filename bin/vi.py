@@ -593,12 +593,19 @@ class TerminalSkinVi:
 
         editor = self.editor
 
+        injecting_lag = editor.injecting_lag
+
+        str_lag = None
+        if injecting_lag is not None:
+            str_lag = "{}s lag".format(injecting_lag)
+
         if editor.finding_highlights:
             editor.flag_reply_with_find()
 
         joins = list()
         joins.append(repr(self.file_path))
-        joins.append("more lag" if editor.injecting_lag else "less lag")
+        if str_lag:
+            joins.append(str_lag)
 
         editor.editor_print("  ".join(joins))  # such as "'bin/vi.py'  less lag"
 
@@ -2687,8 +2694,10 @@ class TerminalEditor:
         self.driver = None
         self.stdio = None
 
+        self.terminal_size = None  # detect changes in Terminal Column:Lines
+
         self.showing_line_number = None  # show Line Numbers or not
-        self.injecting_lag = None  # inject extra Lag or not
+        self.injecting_lag = None  # inject None or 0s or more Lag
 
         self.finding_case = None  # ignore Upper/Lower Case in Searching or not
         self.finding_line = None  # remember the Search Key
@@ -2742,13 +2751,31 @@ class TerminalEditor:
     # Stack Skin's with Keyboard's on top of a Terminal I/O Stack
     #
 
+    def _reopen_terminal_(self):
+        """Clear the Caches of this Terminal, here and below, if cacheing here"""
+
+        injecting_lag = self.injecting_lag
+        painter = self.painter
+
+        if injecting_lag is not None:
+            self.driver.lag = injecting_lag
+            painter.terminal = self.driver
+        else:
+            self.driver.lag = None
+            painter.terminal = self.shadow
+
+        size = painter._reopen_terminal_()
+        self.terminal_size = size
+
+        return size
+
     def run_terminal(self, keyboard):
         """Stack Skin's with Keyboard's on top of a Terminal I/O Stack"""
 
-        assert not self.injecting_lag
+        assert self.injecting_lag is None
 
         stdio = sys.stderr
-        with TerminalDriver(terminal=stdio) as driver:
+        with TerminalDriver(stdio=stdio) as driver:
             shadow = TerminalShadow(terminal=driver)
             painter = TerminalPainter(terminal=shadow)
 
@@ -2758,20 +2785,6 @@ class TerminalEditor:
             self.stdio = stdio
 
             self.run_keyboard(keyboard)  # till SystemExit
-
-    def _reopen_terminal_(self):
-        """Clear the Caches of this Terminal, here and below, if cacheing here"""
-
-        injecting_lag = self.injecting_lag
-        painter = self.painter
-
-        if injecting_lag:
-            self.driver.lag = 0.001  # 0.001 seconds is 1ms
-            painter.terminal = self.driver
-        else:
-            self.driver.lag = None
-            painter.terminal = self.shadow
-            painter._reopen_terminal_()
 
     def run_keyboard(self, keyboard):
         """Read keyboard Input, eval it, print replies, till SystemExit"""
@@ -2923,10 +2936,12 @@ class TerminalEditor:
     def prompt_for_chords(self):
         """Write over the Rows of Chars on Screen"""
 
-        # 1st: Option to ewrite whole Screen slowly
+        # 1st: Option to rewrite whole Screen slowly
 
-        if self.sending_bell and not self.injecting_lag:
+        if (self.injecting_lag is None) and self.sending_bell:
             self._reopen_terminal_()  # for bell
+        elif self.driver.get_terminal_size() != self.terminal_size:
+            self._reopen_terminal_()  # for resize
 
         # 2nd: Call back
 
@@ -3103,7 +3118,6 @@ class TerminalEditor:
                 self.send_bell()
 
                 self.traceback = traceback.format_exc()
-                # file_print(self.traceback)  # compile-time option to log every Exc
 
                 break
 
@@ -3387,12 +3401,16 @@ class TerminalEditor:
     def do_redraw(self):  # Vim ⌃L
         """Toggle between more and less Lag (vs Vim injects lots of Lag exactly once)"""
 
-        self.injecting_lag = not self.injecting_lag
+        lag_plus = self.get_arg1(default=None)
+        lag = None if (lag_plus is None) else ((lag_plus - 1) / 1e6)
+        lag = 0 if (lag == 0) else lag  # echo 0 as '0', not as '0.0'
 
-        if self.injecting_lag:
-            self.editor_print(":set _lag_")
-        else:
+        self.injecting_lag = lag
+
+        if lag is None:
             self.editor_print(":set no_lag_")
+        else:
+            self.editor_print(":set _lag_={}".format(lag))
 
         self._reopen_terminal_()  # for redraw
 
@@ -3737,9 +3755,9 @@ class TerminalPainter:
 
         terminal = self.terminal
 
-        terminal_size = terminal._reopen_terminal_()  # a la os.get_terminal_size(fd)
+        size = terminal._reopen_terminal_()  # a la os._reopen_terminal_(fd)
 
-        (columns, rows) = (terminal_size.columns, terminal_size.lines)
+        (columns, rows) = (size.columns, size.lines)
         assert rows >= 1
         assert columns >= 1
         self.rows = rows
@@ -3747,6 +3765,8 @@ class TerminalPainter:
 
         self.scrolling_rows = rows - 1  # reserve last 1 line for Status
         self.status_row = self.scrolling_rows
+
+        return size
 
     def flush(self):
         """Stop waiting for more Writes from above"""
@@ -4041,9 +4061,8 @@ class TerminalShadow:
         # Count Rows x Columns below
 
         terminal = self.terminal
-        fd = terminal.fileno()
-        terminal_size = os.get_terminal_size(fd)
-        (columns, rows) = (terminal_size.columns, terminal_size.lines)
+        size = terminal._reopen_terminal_()
+        (columns, rows) = (size.columns, size.lines)
 
         # Size this Terminal to match the Terminal Below
 
@@ -4068,7 +4087,7 @@ class TerminalShadow:
 
         self.scroll = 0
 
-        return terminal_size
+        return size
 
         # TODO: deal with $LINES, $COLUMNS, and fallback,
         # TODO: like 'shutil.get_terminal_size' would
@@ -4154,7 +4173,8 @@ class TerminalShadow:
     def getch(self):
         """Block till next keyboard input Chord"""
 
-        return self.terminal.getch()
+        chord = self.terminal.getch()
+        return chord
 
     def write(self, chars):
         """Write into the Shadow now, write the Terminal Below at next Flush"""
@@ -4372,11 +4392,11 @@ class TerminalDriver:
     Compare Bash 'vim' and 'less -FIXR'
     """
 
-    def __init__(self, terminal):
+    def __init__(self, stdio):
 
-        self.terminal = terminal
+        self.stdio = stdio
 
-        self.terminal_fileno = None
+        self.fd = self.stdio.fileno()
         self.with_termios = None
         self.inputs = None
 
@@ -4385,18 +4405,17 @@ class TerminalDriver:
     def __enter__(self):
         """Connect Keyboard and switch Screen to XTerm Alt Screen"""
 
-        self.terminal.flush()
+        fd = self.fd
 
-        if self.terminal.isatty():
+        self.stdio.flush()
 
-            terminal_fileno = self.terminal.fileno()
-            self.with_termios = termios.tcgetattr(terminal_fileno)
-            tty.setraw(terminal_fileno, when=termios.TCSADRAIN)  # not TCSAFLUSH
+        if self.stdio.isatty():
 
-            self.terminal.write(_CURSES_INITSCR_)
-            self.terminal.flush()
+            self.with_termios = termios.tcgetattr(fd)
+            tty.setraw(fd, when=termios.TCSADRAIN)  # not TCSAFLUSH
 
-            self.terminal_fileno = terminal_fileno
+            self.stdio.write(_CURSES_INITSCR_)
+            self.stdio.flush()
 
         return self
 
@@ -4405,26 +4424,36 @@ class TerminalDriver:
 
         _ = (exc_type, exc_value, traceback)
 
-        self.terminal.flush()
+        self.stdio.flush()
 
         if self.with_termios:
 
-            self.terminal.write(_CURSES_ENDWIN_)
-            self.terminal.flush()
+            self.stdio.write(_CURSES_ENDWIN_)
+            self.stdio.flush()
 
+            fd = self.fd
             when = termios.TCSADRAIN
             attributes = self.with_termios
-            termios.tcsetattr(self.terminal_fileno, when, attributes)
+            termios.tcsetattr(fd, when, attributes)
 
-    def fileno(self):
-        """Authorize bypass of Terminal Driver"""
+    def _reopen_terminal_(self):
+        """Do nothing much, when running TerminalDriver in place of TerminalShadow"""
 
-        return self.terminal.fileno()
+        size = os.get_terminal_size(self.fd)
+        return size
+
+        # TODO: resolve the clash between no 'flush' here while named as 'reopen'
+
+    def get_terminal_size(self):
+        """Get a (Columns, Lines) Terminal Size, a la 'os.get_terminal_size'"""
+
+        size = os.get_terminal_size(self.fd)
+        return size
 
     def flush(self):
         """Stop waiting for more Writes from above"""
 
-        self.terminal.flush()
+        self.stdio.flush()
 
     def getch(self):
         """Block to fetch next Char of Paste, next Keystroke, or empty Eof"""
@@ -4466,7 +4495,7 @@ class TerminalDriver:
         # Block to fetch one more Byte
         # (or fetch no Bytes at end of input when Stdin is not Tty)
 
-        stdin = os.read(self.terminal.fileno(), 1)
+        stdin = os.read(self.stdio.fileno(), 1)
         assert stdin or not self.with_termios
 
         # Call for more, while available, while Line not closed
@@ -4479,7 +4508,7 @@ class TerminalDriver:
                 if not self.kbhit():
                     break
 
-            more = os.read(self.terminal.fileno(), 1)
+            more = os.read(self.stdio.fileno(), 1)
             if not more:
                 assert not self.with_termios
                 break
@@ -4494,7 +4523,7 @@ class TerminalDriver:
     def kbhit(self):
         """Wait till next Keystroke, or next burst of Paste pasted"""
 
-        rlist = [self.terminal]
+        rlist = [self.stdio]
         wlist = list()
         xlist = list()
         timeout = 0
@@ -4507,7 +4536,7 @@ class TerminalDriver:
     def write(self, chars):
         """Compare with Chars at Cursor, write Diffs now, move Cursor soon"""
 
-        self.terminal.write(chars)
+        self.stdio.write(chars)
 
         if self.lag:
             time.sleep(self.lag)
@@ -4890,9 +4919,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # -- bugs --
 
 # FIXME: don't flash the screen at:  python3 vi.py +q --pwnme=pelavarre-patch-1
-
-# TODO: somehow need two ⌃L after each Terminal Window Resize?  \ n \ n doesn't work?
-# TODO: ( workaround is quit and relaunch, or press enough pairs of ⌃L )
 
 
 # -- future inventions --
