@@ -25,12 +25,12 @@ keyboard tests:
   j k G 1G H L M - + _ ⌃J ⌃N ⌃P  => leap to row, leap to line
   1234567890 Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll rows
-  ⌃L ⌃G  => toggle lag, say if lag is toggled, show version
-  \n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
+  ⌃L 501⌃L ⌃G  => clear lag, inject lag, measure lag and show version
+  1n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
   /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
   :g/... Delete ⌃U ⌃C Return :g?...  => enter a search key and print lines found
   Esc ⌃C 123Esc 123⌃C zZ /⌃G 3ZQ f⌃C 9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N  => Easter eggs
-  \n99zz \F*/Up \F/$Return 9⌃G Qvi⌃My Qvi⌃Mn :n  => more Easter eggs
+  2G9k *1234n \n99zz \F*/Up \F/$Return 9⌃G Qvi⌃My :vi⌃M :n  => more Easter eggs
 
 pipe tests:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
@@ -91,8 +91,8 @@ SGR = "\x1B[m"  # SGR > Reset, Normal, All Attributes Off
 DECSC = ESC + "7"  # DEC Save Cursor
 DECRC = ESC + "8"  # DEC Restore Cursor
 
-_XTERM_ALT_ = "\x1B[?1049h"
-_XTERM_MAIN_ = "\x1B[?1049l"
+_XTERM_ALT_ = "\x1B[?1049h"  # show Alt Screen
+_XTERM_MAIN_ = "\x1B[?1049l"  # show Main Screen
 
 SMCUP = DECSC + _XTERM_ALT_  # Set-Mode Cursor-Positioning
 RMCUP = ED_2 + _XTERM_MAIN_ + DECRC  # Reset-Mode Cursor-Positioning
@@ -227,29 +227,29 @@ def main(argv):
 
     args = parse_vi_argv(argv)
     if args.pwnme is not False:
-        pwnme(branch=args.pwnme)
+        do_args_pwnme(branch=args.pwnme)
     if args.version:
-        print_version_and_exit()
+        do_args_version()
 
     # Visit each File
 
-    skin = TerminalSkinVi(files=args.files, ex_commands=args.ex_commands)
+    vi = TerminalSkinVi(files=args.files, plusses=args.plusses)
 
     returncode = None
     try:
-        skin.run_editor()  # till SystemExit
+        vi.run_vi_terminal()  # like till SystemExit
         assert False  # unreached
     except SystemExit as exc:
         returncode = exc.code
 
-        if (not returncode) and skin.file_written:
+        if (not returncode) and vi.file_writing_stdout:
 
-            iobytearray = skin.editor.iobytearray
+            iobytearray = vi.editor.iobytearray
             os.write(sys.stdout.fileno(), iobytearray)
             sys.stdout.flush()
 
-        if skin.log:
-            stderr_print(skin.log)
+        if vi.vi_traceback:
+            stderr_print(vi.vi_traceback)
 
         # TODO: log keystrokes interpreted before exit, or dropped by exit
 
@@ -277,7 +277,7 @@ def parse_vi_argv(argv):
     parser.add_argument(
         "--plus",  # Vim Cli "+"
         metavar="PLUS",
-        dest="ex_commands",
+        dest="plusses",
         action="append",  # 'man vim' says <= 10 commands
         help="next Ex command to run, just after loading first File",
     )
@@ -313,7 +313,7 @@ def parse_vi_argv(argv):
     return args
 
 
-def print_version_and_exit():
+def do_args_version():
     """Print a hash of this Code (its Md5Sum) and exit"""
 
     version = module_file_version_zero()
@@ -325,7 +325,7 @@ def print_version_and_exit():
     sys.exit()
 
 
-def pwnme(branch):
+def do_args_pwnme(branch):
     """Download fresh Code to run in place of this stale Code"""
 
     sys_argv = sys.argv
@@ -395,16 +395,16 @@ VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # r"[A-Za-z0-
 class TerminalSkinVi:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim"""
 
-    def __init__(self, files, ex_commands):
+    def __init__(self, files, plusses):
 
         self.files = files  # files to edit
-        self.ex_commands = ex_commands  # Ex commands to run after
+        self.plusses = plusses  # Ex commands to run after
 
         self.file_index = None
         self.file_path = None
-        self.file_written = None
+        self.file_writing_stdout = None
 
-        self.log = None  # capture Python Tracebacks
+        self.vi_traceback = None  # capture Python Tracebacks
 
         self.editor = None
 
@@ -511,23 +511,23 @@ class TerminalSkinVi:
     # Layer thinly over TerminalEditor
     #
 
-    def run_editor(self):
+    def run_vi_terminal(self):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
 
-        ex_commands = self.ex_commands  # Vim starts with lines of '~/.vimrc
+        plusses = self.plusses  # Vim starts with lines of '~/.vimrc
 
         # Choose how to start up
 
         chords = b""
-
         chords += b":n\r"  # autoload the first file => do_next_vi_file
 
-        if ex_commands:
-            for ex_command in ex_commands:
-                chars = ":" + ex_command + "\r"
+        if plusses:
+            for plus in plusses:
+                chars = ":" + plus + "\r"
                 chords += chars.encode()
 
-        chords += b"\x03"  # welcome warmly with ETX, ⌃C, 3 => do_help_quit_vi
+        chords += b":vi\r"  # go with XTerm Alt Screen & Keyboard  => do_resume_editor
+        chords += b"\x03"  # welcome warmly with ETX, ⌃C, 3  => do_help_quit_vi
 
         # Form stack
 
@@ -535,19 +535,19 @@ class TerminalSkinVi:
         keyboard = TerminalKeyboardVi(terminal_vi=self, editor=editor)
         self.editor = editor
 
-        # Feed Keyboard into Screen, till SystemExit
+        # Feed Keyboard into Screen, like till SystemExit
 
         try:
 
-            editor.run_terminal(keyboard)  # till SystemExit
+            editor.run_terminal_with_keyboard(keyboard)  # like till SystemExit
             assert False  # unreached
 
         finally:
 
-            self.log = editor.traceback
+            self.vi_traceback = editor.traceback
 
             if editor.iobytearray:
-                if not self.file_written:
+                if not self.file_writing_stdout:
 
                     stderr_print(  # "vi.py: quit without write, ...
                         "vi.py: quit without write, "
@@ -600,7 +600,7 @@ class TerminalSkinVi:
             str_lag = "{}s lag".format(injecting_lag)
 
         if editor.finding_highlights:
-            editor.flag_reply_with_find()
+            editor.reply_with_finding()
 
         joins = list()
         joins.append(repr(self.file_path))
@@ -631,7 +631,7 @@ class TerminalSkinVi:
         self.vi_ask("Would you like to play a game? (y/n)")
 
         try:
-            chord = editor.getch()
+            chord = editor.take_editor_chord()
         except KeyboardInterrupt:
             chord = b"\x03"  # ETX, ⌃C, 3
 
@@ -651,15 +651,9 @@ class TerminalSkinVi:
         message += " "  # place the cursor after a Space after the Message
         self.vi_print(message)  # 'def vi_ask' asking a question
 
-        vi_reply = self.format_vi_reply()
+        vi_reply = self.format_vi_status(self.editor.reply)
         ex = TerminalSkinEx(editor, vi_reply=vi_reply)
-
-        with_paint_cursor_func = editor.keyboard.paint_cursor_func
-        editor.keyboard.paint_cursor_func = ex.paint_ex_cursor
-        try:
-            editor.prompt_for_chords()
-        finally:
-            editor.keyboard.paint_cursor_func = with_paint_cursor_func
+        ex.flush_ex_status()
 
     def do_vi_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
@@ -679,7 +673,7 @@ class TerminalSkinVi:
         """Save last changes and quit"""
 
         if self.file_path == "/dev/stdin":
-            self.file_written = True
+            self.file_writing_stdout = True
 
         returncode = self.get_vi_arg1(default=None)
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
@@ -689,7 +683,7 @@ class TerminalSkinVi:
 
         editor = self.editor
         if editor.finding_highlights:
-            editor.flag_reply_with_find()
+            editor.reply_with_finding()
 
         version = module_file_version_zero()
         self.vi_print("Press ZQ to lose changes and quit Vi Py", version)
@@ -711,7 +705,7 @@ class TerminalSkinVi:
         self.do_flush_quit_vi()
         assert False  # unreached
 
-    def do_might_flush_vi(self):  # Vim :w\r
+    def do_might_flush_vi_io(self):  # Vim :w\r
         """Halt if difficult to write, else write"""
 
         file_path = self.file_path
@@ -726,7 +720,7 @@ class TerminalSkinVi:
 
         return True
 
-    def do_flush_vi(self):  # Vim :w!\r
+    def do_flush_vi_io(self):  # Vim :w!\r
         """Mutate the File"""
 
         file_path = self.file_path
@@ -786,7 +780,7 @@ class TerminalSkinVi:
         """Take a Search Key from this Line, and then look ahead for it"""
 
         editor = self.editor
-        editor.flag_reply_with_find()
+        editor.reply_with_finding()
 
         # Take up a new Search Key
 
@@ -809,7 +803,7 @@ class TerminalSkinVi:
         """Take a Search Key from this Line, and then look behind for it"""
 
         editor = self.editor
-        editor.flag_reply_with_find()
+        editor.reply_with_finding()
 
         # Take up a new Search Key
 
@@ -922,7 +916,7 @@ class TerminalSkinVi:
         """Take a Search Key as input, and then look ahead for it"""
 
         editor = self.editor
-        editor.flag_reply_with_find()
+        editor.reply_with_finding()
 
         # Take up a new Search Key
 
@@ -945,7 +939,7 @@ class TerminalSkinVi:
 
         editor = self.editor
 
-        editor.flag_reply_with_find()
+        editor.reply_with_finding()
 
         # Take Search Key as input, but leave Search Slip unchanged
 
@@ -955,9 +949,10 @@ class TerminalSkinVi:
 
         # Print Matches
 
-        before_status = self.format_vi_reply() + editor.finding_line
+        before_status = self.format_vi_status(editor.reply) + editor.finding_line
 
         if editor.find_ahead_and_reply():
+
             iobytespans = editor.iobytespans
             last_span = iobytespans[-1]
 
@@ -980,7 +975,7 @@ class TerminalSkinVi:
         """Take a Search Key as input, and then look behind for it"""
 
         editor = self.editor
-        editor.flag_reply_with_find()
+        editor.reply_with_finding()
 
         if not editor.doing_done:
             if self.find_read_vi_line(slip=-1) is None:
@@ -1041,9 +1036,8 @@ class TerminalSkinVi:
 
         editor = self.editor
 
-        vi_reply = self.format_vi_reply()
+        vi_reply = self.format_vi_status(self.editor.reply)
         ex = TerminalSkinEx(editor, vi_reply=vi_reply)
-
         line = ex.read_ex_line()
 
         return line
@@ -1061,7 +1055,7 @@ class TerminalSkinVi:
         behind_and_reply = editor.find_behind_and_reply
         slip = editor.finding_slip
 
-        editor.flag_reply_with_find()
+        editor.reply_with_finding()
 
         # Take up an old Search Key
 
@@ -1086,7 +1080,7 @@ class TerminalSkinVi:
         behind_and_reply = editor.find_behind_and_reply
         slip = editor.finding_slip
 
-        editor.flag_reply_with_find()
+        editor.reply_with_finding()
 
         # Take up an old Search Key
 
@@ -1174,13 +1168,12 @@ class TerminalSkinVi:
         """Slip right, then down"""
 
         editor = self.editor
+
         last_column = editor.spot_last_column()
         last_row = editor.spot_last_row()
 
         if not editor.doing_done:
-            self.check_vi_index(
-                (editor.column < last_column) or (editor.row < last_row)
-            )
+            self.check_vi_index(editor.spot_pin() < editor.spot_last_pin())
 
         if editor.column < last_column:
             editor.column += 1
@@ -1193,10 +1186,11 @@ class TerminalSkinVi:
 
             editor.continue_do_loop()
 
-    def slip_ahead(self):
+    def slip_ahead_one(self):
         """Slip right or down, and return 1, else return None at End of File"""
 
         editor = self.editor
+
         last_column = editor.spot_last_column()
         last_row = editor.spot_last_row()
 
@@ -1217,7 +1211,7 @@ class TerminalSkinVi:
         editor = self.editor
 
         if not editor.doing_done:
-            self.check_vi_index(editor.row or editor.column)
+            self.check_vi_index(editor.spot_first_pin() < editor.spot_pin())
 
         if editor.column:
             editor.column -= 1
@@ -1231,15 +1225,13 @@ class TerminalSkinVi:
 
             editor.continue_do_loop()
 
-    def slip_behind(self):
+    def slip_behind_one(self):
         """Slip left or down, and return 1, else return None at Start of File"""
 
         editor = self.editor
 
         if editor.column:
             editor.column -= 1
-
-            editor.continue_do_loop()
 
             return -1
 
@@ -1269,10 +1261,10 @@ class TerminalSkinVi:
     def do_step_down_dent(self):  # Vim +, Return
         """Step down a Row or more, but land just past the Indent"""
 
-        self.step_down()
+        self.step_down_repeatedly()
         self.slip_dent()
 
-    def step_down(self):
+    def step_down_repeatedly(self):
         """Step down one Row or more"""
 
         editor = self.editor
@@ -1295,7 +1287,7 @@ class TerminalSkinVi:
         down = self.get_vi_arg1() - 1
         if down:
             self.editor.arg1 -= 1  # mutate
-            self.step_down()
+            self.step_down_repeatedly()
 
     def do_step_max_low(self):  # Vim L
         """Leap to first Word of Bottom Row on Screen"""
@@ -1321,10 +1313,10 @@ class TerminalSkinVi:
     def do_step_up_dent(self):  # Vim -
         """Step up a Row or more, but land just past the Indent"""
 
-        self.step_up()
+        self.step_up_repeatedly()
         self.slip_dent()
 
-    def step_up(self):
+    def step_up_repeatedly(self):
         """Step up one Row or more"""
 
         editor = self.editor
@@ -1357,7 +1349,7 @@ class TerminalSkinVi:
         if self.seeking_column is None:
             self.seeking_column = editor.column
 
-        self.step_down()
+        self.step_down_repeatedly()
 
         editor.column = self.seek_vi_column()
         self.continue_vi_column_seek()
@@ -1370,7 +1362,7 @@ class TerminalSkinVi:
         if self.seeking_column is None:
             self.seeking_column = editor.column
 
-        self.step_up()
+        self.step_up_repeatedly()
 
         editor.column = self.seek_vi_column()
         self.continue_vi_column_seek()
@@ -1379,8 +1371,8 @@ class TerminalSkinVi:
         """Begin seeking a Column, if not begun already"""
 
         editor = self.editor
-        last_column = editor.spot_last_column()
 
+        last_column = editor.spot_last_column()
         if self.seeking_column is True:
             sought_column = last_column
         else:
@@ -1619,19 +1611,23 @@ class TerminalSkinVi:
         """Step down over Empty Lines, then over Non-Empty Lines"""
 
         editor = self.editor
-        last_row = editor.spot_last_row()
 
         if editor.doing_done:
-            if (editor.row, editor.column) == (last_row, editor.spot_last_column()):
+            if editor.spot_pin() >= editor.spot_last_pin():
 
                 raise IndexError()
 
-        while (editor.row < last_row) and not editor.spot_last_column(row=editor.row):
-            editor.row += 1
-        while (editor.row < last_row) and editor.spot_last_column(row=editor.row):
+        while not editor.count_columns_in_row():
+            if editor.spot_pin() >= editor.spot_last_pin():
+                break
             editor.row += 1
 
-        editor.column = editor.spot_last_column(row=editor.row)
+        while editor.count_columns_in_row():
+            if editor.spot_pin() >= editor.spot_last_pin():
+                break
+            editor.row += 1
+
+        editor.column = 0
 
         editor.continue_do_loop()
 
@@ -1641,13 +1637,18 @@ class TerminalSkinVi:
         editor = self.editor
 
         if editor.doing_done:
-            if (editor.row, editor.column) == (0, 0):
+            if editor.spot_pin() <= editor.spot_first_pin():
 
                 raise IndexError()
 
-        while editor.row and not editor.spot_last_column(row=editor.row):
+        while not editor.count_columns_in_row():
+            if editor.spot_pin() <= editor.spot_first_pin():
+                break
             editor.row -= 1
-        while editor.row and editor.spot_last_column(row=editor.row):
+
+        while editor.count_columns_in_row():
+            if editor.spot_pin() <= editor.spot_first_pin():
+                break
             editor.row -= 1
 
         editor.column = 0
@@ -1674,7 +1675,7 @@ class TerminalSkinVi:
         editor = self.editor
 
         if not editor.doing_done:
-            self.check_vi_index(editor.may_slip_ahead())
+            self.check_vi_index(editor.spot_pin() < editor.spot_last_pin())
 
         self.word_end_ahead(charsets)
 
@@ -1687,12 +1688,12 @@ class TerminalSkinVi:
 
         # Slip ahead at least once (unless at End of File)
 
-        self.slip_ahead()
+        self.slip_ahead_one()
 
         # Slip ahead across Blanks and Empty Lines, between Words, up to End of File
 
         while not editor.charsets_find_column(charsets):
-            if not self.slip_ahead():
+            if not self.slip_ahead_one():
 
                 break
 
@@ -1706,10 +1707,10 @@ class TerminalSkinVi:
 
                     return
 
-                ahead = self.slip_ahead()
+                ahead = self.slip_ahead_one()
                 assert ahead, (editor.column, editor.count_columns_in_row())
 
-            behind = self.slip_behind()  # backtrack
+            behind = self.slip_behind_one()  # backtrack
             assert behind, (editor.column, editor.count_columns_in_row())
 
     def do_big_word_start_ahead(self):  # Vim W  # inverse of Vim B
@@ -1728,7 +1729,7 @@ class TerminalSkinVi:
         editor = self.editor
 
         if not editor.doing_done:
-            self.check_vi_index(editor.may_slip_ahead())
+            self.check_vi_index(editor.spot_pin() < editor.spot_last_pin())
 
         self.word_start_ahead(charsets)
 
@@ -1743,7 +1744,7 @@ class TerminalSkinVi:
 
         here = editor.charsets_find_column(charsets)
 
-        _ = self.slip_ahead()
+        _ = self.slip_ahead_one()
 
         # Slip ahead across more Chars of Word in Line
 
@@ -1753,7 +1754,7 @@ class TerminalSkinVi:
 
                     break
 
-                if not self.slip_ahead():
+                if not self.slip_ahead_one():
 
                     break
 
@@ -1764,7 +1765,7 @@ class TerminalSkinVi:
 
                 break
 
-            if not self.slip_ahead():
+            if not self.slip_ahead_one():
 
                 break
 
@@ -1787,7 +1788,7 @@ class TerminalSkinVi:
         editor = self.editor
 
         if not editor.doing_done:
-            self.check_vi_index(editor.may_slip_behind())
+            self.check_vi_index(editor.spot_pin() < editor.spot_last_pin())
 
         self.word_start_behind(charsets)
 
@@ -1800,7 +1801,7 @@ class TerminalSkinVi:
 
         # Slip behind at least once (unless at Start of File)
 
-        _ = self.slip_behind()
+        _ = self.slip_behind_one()
 
         # Slip behind across Blanks, but not across Empty Lines, nor Start of File
 
@@ -1809,7 +1810,7 @@ class TerminalSkinVi:
 
                 break
 
-            if not self.slip_behind():
+            if not self.slip_behind_one():
 
                 break
 
@@ -1822,10 +1823,10 @@ class TerminalSkinVi:
 
                     return
 
-                behind = self.slip_behind()
+                behind = self.slip_behind_one()
                 assert behind, (editor.column, editor.count_columns_in_row())
 
-            ahead = self.slip_ahead()  # backtrack
+            ahead = self.slip_ahead_one()  # backtrack
             assert ahead, (editor.column, editor.count_columns_in_row())
 
     #
@@ -2064,40 +2065,38 @@ class TerminalSkinVi:
         if not self.seeking_more:
             self.seeking_column = None
 
-    def format_vi_reply(self):
+    def format_vi_status(self, reply):
         """Format a Status Line of Row:Column, Nudge, and Message"""
-
-        editor = self.editor
-        reply = editor.reply
-        nudge = reply.nudge
 
         # Format parts, a la Vim ':set showcmd' etc
 
-        str_pin = "{},{}".format(1 + self.editor.row, 1 + self.editor.column)
+        pin_chars = "{},{}".format(1 + self.editor.row, 1 + self.editor.column)
 
-        str_flags = str(reply.flags) if reply.flags else ""
+        flags_chars = str(reply.flags) if reply.flags else ""
 
-        echo_bytes = b"" if (nudge is None) else nudge.join_echo_bytes()
-        str_echo = format(repr_vi_bytes(echo_bytes)) if echo_bytes else ""
+        nudge_bytes = b"" if (reply.nudge is None) else reply.nudge.join_bytes()
+        nudge_chars = format(repr_vi_nudge_bytes(nudge_bytes)) if nudge_bytes else ""
 
-        str_message = str(reply.message) if reply.message else ""
+        message_chars = str(reply.message) if reply.message else ""
+
+        bell_chars = "?" if reply.bell else ""
 
         # Join parts
 
-        replies = (str_pin, str_flags, str_echo, str_message)
-        vi_reply = "  ".join(_ for _ in replies if _)
+        replies = (pin_chars, flags_chars, nudge_chars, message_chars, bell_chars)
+        vi_status = "  ".join(_ for _ in replies if _)
 
-        return vi_reply
+        return vi_status
 
-    def paint_vi_cursor(self):
-        """Place the Screen Cursor"""
+    def place_vi_cursor(self):
+        """Place the Cursor"""
 
         editor = self.editor
-        painter = editor.painter
 
-        row_ = editor.row - editor.top_row
-        column_ = editor.column
-        painter.write_cursor(row=row_, column=column_)
+        row = editor.row - editor.top_row
+        column = editor.column
+
+        return TerminalPin(row, column=column)
 
 
 class TerminalKeyboard:
@@ -2154,8 +2153,8 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self.editor = editor
         assert vi.editor in (None, editor), (vi, vi.editor, editor)
 
-        self.format_reply_func = vi.format_vi_reply
-        self.paint_cursor_func = vi.paint_vi_cursor
+        self.format_status_func = vi.format_vi_status
+        self.place_cursor_func = vi.place_vi_cursor
         self.enter_do_func = vi.enter_do_vi
         self.do_func = editor.do_raise_name_error
         self.exit_do_func = vi.exit_do_vi
@@ -2234,7 +2233,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"/"] = vi.do_find_ahead_vi_line
 
         func_by_chords[b"0"] = vi.do_slip_first
-        func_by_chords[b"1234567890"] = None  # TODO: say this more elegantly
+        func_by_chords[b"1234567890"] = None  # FIXME: say this more elegantly
 
         self._init_correcting_many_chords(b":/", corrections=b"/")
         self._init_correcting_many_chords(b":?", corrections=b"?")
@@ -2246,8 +2245,9 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func_by_many_vi_chords(b":noh\r", func=editor.do_set_invhlsearch)
         self._init_func_by_many_vi_chords(b":q\r", func=vi.do_might_quit_vi)
         self._init_func_by_many_vi_chords(b":q!\r", func=vi.do_quit_vi)
-        self._init_func_by_many_vi_chords(b":w\r", func=vi.do_might_flush_vi)
-        self._init_func_by_many_vi_chords(b":w!\r", func=vi.do_flush_vi)
+        self._init_func_by_many_vi_chords(b":vi\r", func=editor.do_resume_editor)
+        self._init_func_by_many_vi_chords(b":w\r", func=vi.do_might_flush_vi_io)
+        self._init_func_by_many_vi_chords(b":w!\r", func=vi.do_flush_vi_io)
         self._init_func_by_many_vi_chords(b":wq\r", func=vi.do_might_flush_quit_vi)
         self._init_func_by_many_vi_chords(b":wq!\r", func=vi.do_flush_quit_vi)
 
@@ -2374,29 +2374,8 @@ class TerminalSkinEx:
 
         self.editor = editor
         self.vi_reply = vi_reply
-        self.ex_line = ""
 
-    def format_ex_reply(self):
-        """Keep up the Vi Reply while working the Ex Keyboard, but add the Input Line"""
-
-        vi_reply = self.vi_reply
-        ex_line = self.ex_line
-
-        ex_reply = vi_reply + ex_line
-
-        return ex_reply
-
-    def paint_ex_cursor(self):
-        """Place the Screen Cursor"""
-
-        editor = self.editor
-        painter = editor.painter
-
-        ex_reply = self.format_ex_reply()
-
-        row_ = painter.status_row
-        column_ = len(ex_reply)
-        painter.write_cursor(row=row_, column=column_)
+        self.ex_line = None
 
     def read_ex_line(self):
         """Take an Input Line from beneath the Scrolling Rows"""
@@ -2404,27 +2383,60 @@ class TerminalSkinEx:
         self.ex_line = ""
 
         try:
-            self.run_ex_keyboard()
+            self.run_ex_terminal()
             assert False  # unreached
         except SystemExit:
-            pass
+            line = self.ex_line
 
-        line = self.ex_line
+            return line
 
-        return line
-
-    def run_ex_keyboard(self):
+    def run_ex_terminal(self):
         """Edit an Input Line beneath the Scrolling Rows"""
 
         editor = self.editor
 
         keyboard = TerminalKeyboardEx(terminal_ex=self, editor=editor)
         try:
-            editor.run_keyboard(keyboard)
+
+            editor.run_skin_with_keyboard(keyboard)
+            assert False  # unreached
+
         except Exception:
+
             editor.doing_traceback = editor.traceback
+
             raise
-        assert False  # unreached
+
+    def flush_ex_status(self):
+        """Paint Status and Cursor now"""
+
+        editor = self.editor
+        keyboard = editor.keyboard
+
+        editor.flush_editor(keyboard)
+
+    def format_ex_status(self, reply):
+        """Keep up the Vi Reply while working the Ex Keyboard, but add the Input Line"""
+
+        ex_line = self.ex_line
+        vi_reply = self.vi_reply
+
+        ex_reply = vi_reply + ex_line
+
+        return ex_reply
+
+    def place_ex_cursor(self):
+        """Place the Cursor"""
+
+        editor = self.editor
+        painter = editor.painter
+
+        ex_reply = self.format_ex_status(editor.reply)
+
+        row = painter.status_row
+        column = len(ex_reply)
+
+        return TerminalPin(row, column=column)
 
     def do_clear_chars(self):  # Vim Ex ⌃U
         """Undo all the Append Chars, if any Not undone already"""
@@ -2500,8 +2512,8 @@ class TerminalKeyboardEx(TerminalKeyboard):
         self.editor = editor
         assert ex.editor in (None, editor), (ex, ex.editor, editor)
 
-        self.format_reply_func = ex.format_ex_reply
-        self.paint_cursor_func = ex.paint_ex_cursor
+        self.format_status_func = ex.format_ex_status
+        self.place_cursor_func = ex.place_ex_cursor
         self.enter_do_func = lambda: None
         self.do_func = editor.do_raise_name_error
         self.exit_do_func = lambda: None
@@ -2565,7 +2577,7 @@ class TerminalNudgeIn(argparse.Namespace):
         self.suffix = suffix  # such as b"x" of b"fx" to Find Char "x" in Vi
         self.epilog = epilog  # such as b"⌃C" of b"f⌃C" to cancel b"f"
 
-    def join_echo_bytes(self):
+    def join_bytes(self):
         """Echo all the Chords of this one Input, in order"""
 
         echo = b""
@@ -2585,26 +2597,26 @@ class TerminalNudgeIn(argparse.Namespace):
 class TerminalReplyOut(argparse.Namespace):
     """Give the parts of a Reply to Input, apart from the main Output"""
 
-    def __init__(self, flags=None, nudge=None, message=None):
+    def __init__(self, flags=None, nudge=None, message=None, bell=None):
 
         self.flags = flags  # such as "-Fin" Grep-Like Search
         self.nudge = nudge  # keep up a trace of the last input that got us here
         self.message = message  # say more
+        self.bell = bell  # ring bell
 
     # Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
 
-# TODO: deploy TerminalPin
 class TerminalPin(collections.namedtuple("TerminalPin", "row, column".split(", "))):
     """Pair up a choice of Row and a choice of Column"""
+
+    # TODO:  class TerminalPinVi - to slip and step in the way of Vi
 
 
 class TerminalSpan(
     collections.namedtuple("TerminalSpan", "row, column, beyond".split(", "))
 ):
     """Pick out the Columns of Rows covered by a Match of Chars"""
-
-    # TODO:  class TerminalPinVi - to slip and step in the way of Vi
 
     @staticmethod
     def find_spans(matches):
@@ -2683,16 +2695,16 @@ class TerminalEditor:
 
     def __init__(self, chords):
 
-        self.chords_ahead = list(chords)
+        self.chord_ints_ahead = list(chords)
 
         #
 
         self.traceback = None  # capture Python Tracebacks
 
-        self.painter = None  # layer over a Terminal I/O Stack
-        self.shadow = None
-        self.driver = None
-        self.stdio = None
+        self.stdio = sys.stderr  # layer over a Terminal I/O Stack
+        self.driver = TerminalDriver(stdio=self.stdio)
+        self.shadow = TerminalShadow(terminal=self.driver)
+        self.painter = TerminalPainter(terminal=self.shadow)
 
         self.terminal_size = None  # detect changes in Terminal Column:Lines
 
@@ -2716,15 +2728,12 @@ class TerminalEditor:
         self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
         self.arg2 = None  # take the Suffix Bytes as one Encoded Char
 
-        self.sending_bell = None  # ring the Terminal Bell as part of some Prompt's
         self.reply = TerminalReplyOut()  # declare an Empty Reply
 
         self.doing_less = None  # reject the Arg1 when not explicitly accepted
         self.doing_more = None  # take the Arg1 as a Count of Repetition's
         self.doing_done = None  # count the Repetition's completed before now
         self.doing_traceback = None  # retain a Python Traceback till after more Chords
-
-        self.flagging_more = None  # keep up some Flags in the Reply to a Nudge
 
         #
 
@@ -2739,8 +2748,8 @@ class TerminalEditor:
         ended_lines = chars.splitlines(keepends=True)
         self.ended_lines = ended_lines  # Ended Lines of Chars decoded from Bytes
 
-        self.row = 0  # point the Screen Cursor to a Row of File
-        self.column = 0  # point the Screen Cursor to a Column of File
+        self.row = 0  # point the Cursor to a Row of File
+        self.column = 0  # point the Cursor to a Column of File
 
         self.top_row = 0  # scroll through more Lines than fit on Screen
 
@@ -2757,6 +2766,9 @@ class TerminalEditor:
         injecting_lag = self.injecting_lag
         painter = self.painter
 
+        if not painter.rows:
+            return
+
         if injecting_lag is not None:
             self.driver.lag = injecting_lag
             painter.terminal = self.driver
@@ -2769,29 +2781,23 @@ class TerminalEditor:
 
         return size
 
-    def run_terminal(self, keyboard):
-        """Stack Skin's with Keyboard's on top of a Terminal I/O Stack"""
+    def run_terminal_with_keyboard(self, keyboard):
+        """Prompt, take nudge, give reply, repeat till quit"""
 
         assert self.injecting_lag is None
 
-        stdio = sys.stderr
-        with TerminalDriver(stdio=stdio) as driver:
-            shadow = TerminalShadow(terminal=driver)
-            painter = TerminalPainter(terminal=shadow)
+        # self.painter.__enter__()  # no, enter lazily, via 'do_resume_editor'
+        try:
+            self.run_skin_with_keyboard(keyboard)  # like till SystemExit
+        finally:
+            self.painter.__exit__(*sys.exc_info())
 
-            self.painter = painter
-            self.shadow = shadow
-            self.driver = driver
-            self.stdio = stdio
-
-            self.run_keyboard(keyboard)  # till SystemExit
-
-    def run_keyboard(self, keyboard):
-        """Read keyboard Input, eval it, print replies, till SystemExit"""
+    def run_skin_with_keyboard(self, keyboard):
+        """Prompt, take nudge, give reply, repeat till quit"""
 
         self._enter_skin_()
         try:
-            self._try_run_keyboard_(keyboard)
+            self.run_keyboard(keyboard)  # like till SystemExit
         finally:
             self._exit_skin_(*sys.exc_info())
 
@@ -2804,12 +2810,10 @@ class TerminalEditor:
             self.arg0,
             self.arg1,
             self.arg2,
-            self.sending_bell,
             self.reply,
             self.doing_less,
             self.doing_more,
             self.doing_done,
-            self.flagging_more,
         )
 
         TerminalEditor.editor_skin_stack.append(editor_skin)
@@ -2827,20 +2831,18 @@ class TerminalEditor:
             self.arg0,
             self.arg1,
             self.arg2,
-            self.sending_bell,
             self.reply,
             self.doing_less,
             self.doing_more,
             self.doing_done,
-            self.flagging_more,
         ) = editor_skin
 
-    def _try_run_keyboard_(self, keyboard):
-        """Prompt, take input, react, repeat till quit"""
+    def run_keyboard(self, keyboard):
+        """Prompt, take nudge, give reply, repeat till quit"""
 
         self.keyboard = keyboard
 
-        # Repeat till SystemExit raised
+        # Repeat like till SystemExit raised
 
         self.nudge = TerminalNudgeIn()
 
@@ -2848,28 +2850,31 @@ class TerminalEditor:
 
             # Scroll and prompt
 
-            self.scroll_cursor_into_screen()
+            if self.painter.rows:
+                self.scroll_cursor_into_screen()
+                self.flush_editor(self.keyboard)
 
-            self.prompt_for_chords()
-
-            self.flagging_more = None
             self.reply = TerminalReplyOut()
-            self.sending_bell = None
 
             # Take one Chord in, or next Chord, or cancel Chords to start again
 
             try:
-                chord = self.getch()
+                chord = self.take_editor_chord()
             except KeyboardInterrupt:
                 chord = b"\x03"  # ETX, ⌃C, 3
 
+                # FIXME: make this over into a default choice of func
                 if self.nudge != TerminalNudgeIn():  # if not meaning 'do_help_quit_vi'
                     self.nudge.epilog = chord
+                    self.reply_with_nudge()
+
                     self.editor_print("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
 
                     self.nudge = TerminalNudgeIn()
 
                     continue
+
+            self.reply_with_nudge()
 
             func = self.choose_func(chord)
             if func is None:
@@ -2880,11 +2885,16 @@ class TerminalEditor:
 
             keyboard.enter_do_func()
             try:
-                self.call_func(func)  # reply to one whole Nudge
+                self.call_do_func(func)  # reply to one whole Nudge
             finally:
                 keyboard.exit_do_func()
 
             self.nudge = TerminalNudgeIn()  # consume the whole Nudge
+
+    def do_resume_editor(self):
+        """Set up XTerm Alt Screen & Keyboard, till 'self.painter.__exit__'"""
+
+        self.painter.__enter__()
 
     def scroll_cursor_into_screen(self):
         """Scroll to place Cursor on Screen"""
@@ -2933,48 +2943,45 @@ class TerminalEditor:
 
                 raise KwArgsException(before=top_row, after=self.top_row)
 
-    def prompt_for_chords(self):
-        """Write over the Rows of Chars on Screen"""
+    def flush_editor(self, keyboard):
+        """Paint Screen, Cursor, and Bell now"""
+
+        ended_lines = self.ended_lines
+        painter = self.painter
+        reply = self.reply
 
         # 1st: Option to rewrite whole Screen slowly
 
-        if (self.injecting_lag is None) and self.sending_bell:
+        if (self.injecting_lag is None) and reply.bell:
             self._reopen_terminal_()  # for bell
         elif self.driver.get_terminal_size() != self.terminal_size:
             self._reopen_terminal_()  # for resize
 
-        # 2nd: Call back
+        # 2nd: Call back to format Status and place Cursor
 
-        status = self.keyboard.format_reply_func()
-        self.keyboard.paint_cursor_func()
+        status = keyboard.format_status_func(reply)
+        cursor = keyboard.place_cursor_func()
 
-        # 3rd: Walk through the steps of writing Screen, Cursor, and Bell
-
-        ended_lines = self.ended_lines
-        painter = self.painter
-        sending_bell = self.sending_bell
-
-        # Form
-
-        screen_lines = ended_lines[self.top_row :][: painter.scrolling_rows]
-        screen_spans = self.spot_spans_on_screen()
-
-        # Write Screen, Cursor, and Bell
+        # Paint Screen, Cursor, and Bell
 
         painter.top_line_number = 1 + self.top_row
         painter.last_line_number = 1 + len(ended_lines)
         painter.painting_line_number = self.showing_line_number
 
-        painter.write_screen(
-            ended_lines=screen_lines, spans=screen_spans, status=status
-        )
+        screen_lines = ended_lines[self.top_row :][: painter.scrolling_rows]
+        screen_spans = self.spot_spans_on_screen()
 
-        if sending_bell:
-            painter.write_bell()
+        painter.paint_screen(
+            ended_lines=screen_lines,
+            spans=screen_spans,
+            status=status,
+            cursor=cursor,
+            bell=reply.bell,
+        )
 
         # Flush Screen, Cursor, and Bell
 
-        painter.flush()
+        painter.flush_painter()
 
     def spot_spans_on_screen(self):
         """Say where to highlight each Match of the Search Key on Screen"""
@@ -3049,8 +3056,9 @@ class TerminalEditor:
 
                 if chords_plus in corrections_by_chords.keys():
                     self.nudge.chords = b""
-                    corrections = corrections_by_chords[chords_plus]
-                    self.chords_ahead = list(corrections) + self.chords_ahead
+                    corrected_chords = corrections_by_chords[chords_plus]
+                    corrected_ints = list(corrected_chords)
+                    self.chord_ints_ahead = corrected_ints + self.chord_ints_ahead
                     self.editor_print("Corrected")
 
                 # Ask for more Chords, or for Suffix
@@ -3083,14 +3091,14 @@ class TerminalEditor:
 
         return func
 
-    def call_func(self, func):
+    def call_do_func(self, func):
         """Call the Func once or more, in reply to one Terminal Nudge In"""
 
         # Start calling
 
         self.doing_done = 0
+        self.doing_less = True
         while True:
-            self.doing_less = True
             self.doing_more = None
 
             try:
@@ -3115,7 +3123,7 @@ class TerminalEditor:
 
                 line = "{}: {}".format(name, str_exc) if str_exc else name
                 self.editor_print(line)  # "{exc_type}: {str_exc}"
-                self.send_bell()
+                self.reply_with_bell()
 
                 self.traceback = traceback.format_exc()
 
@@ -3134,15 +3142,14 @@ class TerminalEditor:
     def keep_cursor_on_file(self):
         """Fail faster, like when some Bug shoves the Cursor off of Buffer of File"""
 
+        pin = self.spot_pin()
         row = self.row
         column = self.column
 
         rows = self.count_rows_in_file()
-        columns = 0 if (not rows) else self.count_columns_in_row()
+        columns = self.count_columns_in_row()
 
         # Keep the choice of Row and Column on File
-
-        before = (row, column)
 
         if not ((0 <= row < rows) or (row == rows == 0)):
             row = 0
@@ -3154,10 +3161,9 @@ class TerminalEditor:
 
         # After fixing the choice, assert the Row and Column always were on File
 
-        after = (row, column)
-        if before != after:
+        if self.spot_pin() != pin:
 
-            raise KwArgsException(before=before, after=after)
+            raise KwArgsException(before=pin, after=self.spot_pin())
 
     #
     # Take the Args as given, or substitute a Default Arg Value
@@ -3192,63 +3198,57 @@ class TerminalEditor:
     def continue_do_loop(self):
         """Ask to run again, like to run for a total of 'self.arg1' times"""
 
+        assert self.doing_more is None, self.doing_more
+
         self.doing_less = False
         self.doing_more = True
 
     #
-    # Send and tweak replies
+    # Keep hold of the one Reply to send out, & take input keyboard Chords in
     #
 
     def editor_print(self, *args):
         """Capture some Status now, to show with next Prompt"""
 
-        flagging_more = self.flagging_more
-        flags = flagging_more if flagging_more else None
-
-        nudge = self.nudge
-
         message = " ".join(str(_) for _ in args)
+        self.reply.message = message
 
-        self.reply = TerminalReplyOut(flags=flags, nudge=nudge, message=message)
-
-    def flag_reply_with_find(self):
-        """Add the Find Flags into the last Reply, before showing it"""
-
-        flags = self.format_find_flags()
-        self.reply.flags = flags
-        self.flagging_more = flags
-
-    def format_find_flags(self):
+    def reply_with_finding(self):
         """Show Search Flags a la Bash Grep Switches"""
 
-        flags = ""
+        letters = ""
         if not self.finding_regex:
-            flags += "F"
+            letters += "F"
         if not self.finding_case:
-            flags += "i"
+            letters += "i"
         if self.showing_line_number:
-            flags += "n"
+            letters += "n"
 
-        str_flags = "-{}".format(flags) if flags else ""
+        flags = "-{}".format(letters) if letters else ""
 
-        return str_flags
+        self.reply.flags = flags
 
-    def send_bell(self):
+    def reply_with_nudge(self):
+        """Capture the Nudge In to echo, as part of the next Reply Out"""
+
+        self.reply.nudge = self.nudge
+
+    def reply_with_bell(self):
         """Ring the Terminal Bell as part of the next Prompt"""
 
-        self.sending_bell = True
+        self.reply.bell = True
 
-    def getch(self):
-        """Block till next keyboard input Chord"""
+    def take_editor_chord(self):
+        """Block Self till next keyboard input Chord"""
 
-        chords_ahead = self.chords_ahead
+        chord_ints_ahead = self.chord_ints_ahead
         painter = self.painter
 
-        if not chords_ahead:
-            chord = painter.getch()  # may raise KeyboardInterrupt
+        if not chord_ints_ahead:
+            chord = painter.take_painter_chord()  # may raise KeyboardInterrupt
         else:
-            ord_chord = chords_ahead.pop(0)  # may be b"\x03" ETX, ⌃C, 3
-            chord = chr(ord_chord).encode()
+            chord_int = chord_ints_ahead.pop(0)  # may be b"\x03" ETX, ⌃C, 3
+            chord = chr(chord_int).encode()
 
         return chord
 
@@ -3273,6 +3273,10 @@ class TerminalEditor:
 
         ended_lines = self.ended_lines
         row = self.row
+
+        if not ended_lines:
+
+            return 0
 
         if row >= len(ended_lines):
 
@@ -3314,21 +3318,6 @@ class TerminalEditor:
 
         return line
 
-    def may_slip_ahead(self):
-        """Return None at End of File, else return 1"""
-
-        last_row = self.spot_last_row()
-        last_column = self.spot_last_column()
-
-        if (self.row, self.column) != (last_row, last_column):
-            return 1
-
-    def may_slip_behind(self):
-        """Return None at Start of File, else return 1"""
-
-        if (self.row, self.column) != (0, 0):
-            return 1
-
     def spot_bottom_row(self, top_row=None):
         """Find the Bottom Row of File on Screen"""
 
@@ -3342,6 +3331,29 @@ class TerminalEditor:
         bottom_row = min(bottom_row, last_row)
 
         return bottom_row
+
+    def spot_first_pin(self):
+        """Point to the First Char of File, else to Row:Column (0, 0)"""
+
+        first_pin = TerminalPin(0, column=0)
+
+        return first_pin
+
+    def spot_pin(self):
+        """Point to the Char of File beneath the Cursor of File"""
+
+        pin = TerminalPin(self.row, column=self.column)
+
+        return pin
+
+    def spot_last_pin(self):
+        """Point to the last Char of File, else to Row:Column (0, 0)"""
+
+        last_row = self.spot_last_row()
+        last_column = self.spot_last_column()
+        last_pin = TerminalPin(last_row, column=last_column)
+
+        return last_pin
 
     def spot_last_row(self):
         """Find the last Row in File, else Row Zero when no Rows in File"""
@@ -3388,13 +3400,15 @@ class TerminalEditor:
     def do_raise_name_error(self):  # Vim Zz  # Vim zZ  # etc
         """Reply to meaningless Keyboard Input"""
 
-        echo_bytes = self.nudge.join_echo_bytes()  # similar or same as 'self.arg0'
+        nudge = self.nudge
 
-        byte_escapes = ""
-        for byte_int in echo_bytes:
-            byte_escapes += r"\x{:02X}".format(byte_int)
+        nudge_bytes = nudge.join_bytes()  # often same as 'self.arg0'
 
-        arg = "b'{}'".format(byte_escapes)
+        nudge_escapes = ""
+        for nudge_byte_int in nudge_bytes:
+            nudge_escapes += r"\x{:02X}".format(nudge_byte_int)
+
+        arg = "b'{}'".format(nudge_escapes)
 
         raise NameError(arg)
 
@@ -3419,7 +3433,7 @@ class TerminalEditor:
 
         painter = self.painter
 
-        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()'
+        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
         painter.__exit__(*exc_info)
         os.kill(os.getpid(), signal.SIGTSTP)
         painter.__enter__()
@@ -3439,7 +3453,7 @@ class TerminalEditor:
         self.finding_highlights = not self.finding_highlights
 
         if self.finding_highlights:
-            self.flag_reply_with_find()
+            self.reply_with_finding()
             self.editor_print(":set hlsearch")
         else:
             self.editor_print(":nohlsearch")
@@ -3516,12 +3530,16 @@ class TerminalEditor:
 
     def print_some_found_spans(self, before_status):
         """Print as many of the Found Spans as fit on screen"""
-        # Vim prints more through a Less-like Paginator
 
+        ended_lines = self.ended_lines
         iobytespans = self.iobytespans
+        keyboard = self.keyboard
         painter = self.painter
+        reply = self.reply
+        shadow = self.shadow
+        showing_line_number = self.showing_line_number
 
-        last_line_number = 1 + len(self.ended_lines)
+        last_line_number = 1 + len(ended_lines)
         str_last_line_number = "{:3} ".format(last_line_number)
         last_width = len(str_last_line_number)
 
@@ -3532,14 +3550,14 @@ class TerminalEditor:
         # Visit each Span
 
         printed_row = None
-        assert self.iobytespans
-        for span in self.iobytespans:
+        assert iobytespans
+        for span in iobytespans:
 
             (found_row, found_column, _) = span
 
             line_number = 1 + found_row
             str_line_number = ""  # TODO: merge with 'format_as_line_number'
-            if self.showing_line_number:
+            if showing_line_number:
                 str_line_number = "{:3} ".format(line_number).rjust(last_width)
 
             line = self.fetch_row_line(row=found_row)
@@ -3559,10 +3577,10 @@ class TerminalEditor:
 
         erased_line = painter.columns * " "
 
-        if painter.terminal == self.shadow:
-            if self.shadow.scroll > painter.scrolling_rows:
-                with_row = self.shadow.row
-                with_column = self.shadow.column
+        if painter.terminal == shadow:
+            if shadow.scroll > painter.scrolling_rows:
+                with_row = shadow.row
+                with_column = shadow.column
 
                 assert with_row == painter.status_row
                 assert with_column == 0
@@ -3584,15 +3602,17 @@ class TerminalEditor:
                 len(iobytespans), len(iobytespans)
             )
         )
-        after_status = self.keyboard.format_reply_func()
+
+        after_status = keyboard.format_status_func(reply)
 
         painter.terminal_print(after_status, end=" ")
         self.driver.flush()
-        _ = self.getch()
+        _ = self.take_editor_chord()
 
         self._reopen_terminal_()  # after printing on screen
 
         # TODO: highlight Matches in :g/ Lines
+        # TODO: Vim prints more through a Less-like Paginator
 
     def find_ahead_and_reply(self):
         """Find the Search Key ahead, else after start, else fail silently"""
@@ -3668,7 +3688,8 @@ class TerminalEditor:
         hows = (how0, how1)
 
         for (here, how) in zip(heres, hows):
-            for (index, span) in enumerate(reversed(spans)):
+            for (reverse_index, span) in enumerate(reversed(spans)):
+                index = len(spans) - 1 - reverse_index
                 len_chars = span.beyond - span.column
                 there = self.spot_row_column_near_span(span)
 
@@ -3722,33 +3743,27 @@ class TerminalPainter:
         self.columns = None  # count Columns per Row
         self.scrolling_rows = None  # divide the Screen into Scrolling Rows and Status
 
-        self.row = 0  # point the Screen Cursor to a Row of File
-        self.column = 0  # point the Screen Cursor to a Column of File
-
         self.top_line_number = 1  # number the Scrolling Rows down from First of Screen
         self.last_line_number = 1  # number all Rows as wide as the Last Row of File
         self.painting_line_number = None  # number the Scrolling Rows visibly, or not
 
-        self._reopen_terminal_()
+        # TODO: all = None in TerminalPainter.__init__
 
     def __enter__(self):
         """Connect Keyboard and switch Screen to XTerm Alt Screen"""
 
-        self.terminal.__enter__()
-        self._reopen_terminal_()
+        if self.rows is None:
+            self.terminal.__enter__()
+            self._reopen_terminal_()
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
-        self.terminal.__exit__(exc_type, exc_value, traceback)  # positional args
+        if self.rows is not None:
+            self.rows = None
+            self.columns = None  # TODO: think into how much TerminalPainter to wipe
 
-    def pdb_set_trace(self):
-        """Visit Pdb, if Stdin is Tty, else raise 'bdb.BdbQuit'"""
-
-        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
-        self.__exit__(*exc_info)
-        pdb.set_trace()
-        self.__enter__()
+            self.terminal.__exit__(exc_type, exc_value, traceback)  # positional args
 
     def _reopen_terminal_(self):
         """Clear the Caches of this Terminal, here and below"""
@@ -3758,8 +3773,8 @@ class TerminalPainter:
         size = terminal._reopen_terminal_()  # a la os._reopen_terminal_(fd)
 
         (columns, rows) = (size.columns, size.lines)
-        assert rows >= 1
-        assert columns >= 1
+        assert rows
+        assert columns
         self.rows = rows
         self.columns = columns
 
@@ -3768,12 +3783,12 @@ class TerminalPainter:
 
         return size
 
-    def flush(self):
+    def flush_painter(self):
         """Stop waiting for more Writes from above"""
 
         self.terminal.flush()
 
-    def getch(self):
+    def take_painter_chord(self):
         """Block to return next Keyboard Input, else raise KeyboardInterrupt"""
 
         chord = self.terminal.getch()
@@ -3794,40 +3809,14 @@ class TerminalPainter:
 
         self.terminal.write(chars)
 
-    def write_cursor(self, row, column):
-        """Merely place the Cursor as told"""
-
-        self.row = row
-        self.column = column
-
-    def read_cursor(self):
-        """Place the Cursor as told, but round down to Bottom Row, Rightmost Column"""
-
-        column = self.column
-        columns = self.columns
-        row = self.row
-        rows = self.rows
-        scrolling_rows = self.scrolling_rows
-
-        scrolling_columns = columns
-        if row < scrolling_rows:
-            left_column = self.spot_left_column()
-            scrolling_columns = columns - left_column
-
-        row_ = min(rows - 1, row)
-        column_ = min(scrolling_columns - 1, column)
-
-        return (row_, column_)
-
-    def write_screen(self, ended_lines, spans, status):
+    def paint_screen(self, ended_lines, spans, status, cursor, bell):
         """Write over the Rows of Chars on Screen"""
-        terminal = self.terminal
+
+        (row, column) = self.spot_cursor(cursor.row, column=cursor.column)
 
         columns = self.columns
-        left_column = self.spot_left_column()
         scrolling_rows = self.scrolling_rows
-
-        (row_, column_) = self.read_cursor()
+        terminal = self.terminal
 
         # Fill the Screen with Lines of "~" past the last Line of File
 
@@ -3867,16 +3856,31 @@ class TerminalPainter:
 
         # Place the cursor
 
-        cursor_left_column = left_column if (row_ < scrolling_rows) else 0
-
-        y = 1 + row_
-        x = 1 + cursor_left_column + column_
+        y = 1 + row
+        x = 1 + column
         terminal.write(CUP_Y_X.format(y, x))
 
-    def write_bell(self):
-        """Ring the Terminal bell"""
+        # Ring the bell
 
-        self.terminal.write("\a")
+        if bell:
+            terminal.write("\a")
+
+    def spot_cursor(self, row, column):
+        """Choose a Row:Column to stand for a Row:Column on or off Screen"""
+
+        columns = self.columns
+        scrolling_rows = self.scrolling_rows
+        rows = self.rows
+
+        assert rows
+        assert columns
+
+        found_row = min(rows - 1, row)
+
+        left_column = self.spot_left_column() if (row < scrolling_rows) else 0
+        found_column = min(columns - 1, left_column + column)
+
+        return (found_row, found_column)
 
     def spot_left_column(self):
         """Find the leftmost Column occupied by the Chars of the Scrolling Lines"""
@@ -4032,28 +4036,35 @@ class TerminalShadow:
 
         self.terminal = terminal
 
-        self.rows = None
-        self.columns = None
+        self.rows = None  # count Rows on Screen
+        self.columns = None  # count Columns per Row
 
-        self.row = None
-        self.column = None
-        self.ringing_bell = None
+        self.row = None  # place the Cursor in a Row of Screen, at next Flush
+        self.column = None  # place the Cursor in a Column of Screen, at next Flush
+        self.writing_bell_order = None  # ring the Bell, at next Flush
 
-        self.flushed_lines = list()
-        self.held_lines = list()
+        self.flushed_lines = list()  # don't rewrite unchanged Lines, after first Flush
+        self.held_lines = list()  # collect Lines to rewrite at next Flush
 
-        self.scroll = None
+        self.scroll = None  # count Terminal Lines scrolled by Writes
+
+        # TODO: all = None in TerminalShadow.__init__
 
     def __enter__(self):
         """Connect Keyboard and switch Screen to XTerm Alt Screen"""
 
-        self.terminal.__enter__()
-        self._reopen_terminal_()
+        if self.rows is None:
+            self.terminal.__enter__()
+            self._reopen_terminal_()
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
-        self.terminal.__exit__(exc_type, exc_value, traceback)  # positional args
+        if self.rows is not None:
+            self.rows = None
+            self.columns = None  # TODO: think into how much TerminalShadow to wipe
+
+            self.terminal.__exit__(exc_type, exc_value, traceback)  # positional args
 
     def _reopen_terminal_(self):
         """Clear the Caches of this Terminal, here and below"""
@@ -4080,7 +4091,7 @@ class TerminalShadow:
         # Clear the Terminal Cache here
 
         self.flushed_lines[::] = rows * [None]
-        self.ringing_bell = None
+        self.writing_bell_order = None
 
         self.write(ED_2)
         self.write(CUP_1_1)
@@ -4121,10 +4132,10 @@ class TerminalShadow:
 
                     # Write a Scrolling Row above the Bottom Row
 
-                    self.terminal_write_cup(row, column=0)
+                    self.terminal_write_cursor_order(row, column=0)
                     terminal.write(erased_line)
 
-                    self.terminal_write_cup(row, column=0)
+                    self.terminal_write_cursor_order(row, column=0)
                     terminal.write(flushable_line.rstrip())
 
                 else:
@@ -4132,10 +4143,10 @@ class TerminalShadow:
                     # Write the Bottom Row, but without closing it
                     # and without writing its Last Column
 
-                    self.terminal_write_cup(row, column=0)
+                    self.terminal_write_cursor_order(row, column=0)
                     terminal.write(erased_line[:-1])
 
-                    self.terminal_write_cup(row, column=0)
+                    self.terminal_write_cursor_order(row, column=0)
                     terminal.write(flushable_line.rstrip())
 
                 # Remember this Write, as if all Columns written
@@ -4148,20 +4159,20 @@ class TerminalShadow:
 
         # Place the Terminal Cursor below
 
-        self.terminal_write_cup(self.row, column=self.column)
+        self.terminal_write_cursor_order(self.row, column=self.column)
 
         # Ring the Terminal Bell below
 
-        if self.ringing_bell:
+        if self.writing_bell_order:
             terminal.write("\a")
 
-        self.ringing_bell = None
+        self.writing_bell_order = None
 
         # Flush the Terminal Writes below
 
         terminal.flush()
 
-    def terminal_write_cup(self, row, column):
+    def terminal_write_cursor_order(self, row, column):
         """Position the Terminal Cursor below, without telling this Shadow"""
 
         terminal = self.terminal
@@ -4210,7 +4221,7 @@ class TerminalShadow:
             if column == columns:
 
                 (row_, column_) = self.find_step_ahead()
-                self.write_cursor(row=row_, column=column_)
+                self.write_cursor_order(row=row_, column=column_)
 
             if any(_.literals for _ in orders):
 
@@ -4259,7 +4270,7 @@ class TerminalShadow:
 
         (row, column) = self.find_step_ahead()
 
-        self.write_cursor(row, column=column)
+        self.write_cursor_order(row, column=column)
 
     def write_csi_plus_order(self, order):
         """Write one CSI Order into the Shadow Cursor"""
@@ -4269,13 +4280,13 @@ class TerminalShadow:
 
         if order.csi_plus == ED_2:
             held_lines[::] = rows * [None]
-            self.write_cursor(row=None, column=None)
+            self.write_cursor_order(row=None, column=None)
 
         elif order.csi_plus == CUP_1_1:
-            self.write_cursor(row=0, column=0)
+            self.write_cursor_order(row=0, column=0)
 
         elif order.a == CUP_Y_X[-1]:  # may move the Cursor past Last Column
-            self.write_cursor(row=(order.int_y - 1), column=(order.int_x - 1))
+            self.write_cursor_order(row=(order.int_y - 1), column=(order.int_x - 1))
 
         elif order.csi_plus == SGR_7:
             pass
@@ -4297,10 +4308,10 @@ class TerminalShadow:
         row = self.row
 
         if order.controls == "\a":
-            self.ringing_bell = True
+            self.writing_bell_order = True
 
         elif order.controls == "\r":
-            self.write_cursor(row, column=0)
+            self.write_cursor_order(row, column=0)
 
         elif order.controls == "\r\n":  # "\r\n" past last Column don't come here
             self.write_beyond_row_order()
@@ -4313,9 +4324,9 @@ class TerminalShadow:
 
         (row, column) = self.find_slip_ahead(slips=len(order.literals))
 
-        self.write_cursor(row, column=column)
+        self.write_cursor_order(row, column=column)
 
-    def write_cursor(self, row, column):
+    def write_cursor_order(self, row, column):
         """Place the Shadow Cursor, but never out of bounds"""
 
         columns = self.columns
@@ -4403,7 +4414,7 @@ class TerminalDriver:
         self.lag = None
 
     def __enter__(self):
-        """Connect Keyboard and switch Screen to XTerm Alt Screen"""
+        """Switch Screen to XTerm Alt Screen and take single Chords from Keyboard"""
 
         fd = self.fd
 
@@ -4426,14 +4437,15 @@ class TerminalDriver:
 
         self.stdio.flush()
 
-        if self.with_termios:
+        attributes = self.with_termios
+        if attributes:
+            self.with_termios = None
 
             self.stdio.write(_CURSES_ENDWIN_)
             self.stdio.flush()
 
             fd = self.fd
             when = termios.TCSADRAIN
-            attributes = self.with_termios
             termios.tcsetattr(fd, when, attributes)
 
     def _reopen_terminal_(self):
@@ -4444,16 +4456,36 @@ class TerminalDriver:
 
         # TODO: resolve the clash between no 'flush' here while named as 'reopen'
 
+    def flush(self):
+        """Stop waiting for more Writes from above"""
+
+        self.stdio.flush()
+
     def get_terminal_size(self):
         """Get a (Columns, Lines) Terminal Size, a la 'os.get_terminal_size'"""
 
         size = os.get_terminal_size(self.fd)
         return size
 
-    def flush(self):
-        """Stop waiting for more Writes from above"""
+    def pdb_set_trace(self):
+        """Visit Pdb, if Stdin is Tty, else raise 'bdb.BdbQuit'"""
 
-        self.stdio.flush()
+        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
+        self.__exit__(*exc_info)
+        pdb.set_trace()
+        self.__enter__()
+
+    def kbhit(self, timeout):  # FIXME: set polling rate for Terminal Size change
+        """Wait till next Keystroke, or next burst of Paste pasted"""
+
+        rlist = [self.stdio]
+        wlist = list()
+        xlist = list()
+        selected = select.select(rlist, wlist, xlist, timeout)
+        (rlist_, wlist_, xlist_) = selected
+
+        if rlist_ == rlist:
+            return True
 
     def getch(self):
         """Block to fetch next Char of Paste, next Keystroke, or empty Eof"""
@@ -4505,7 +4537,7 @@ class TerminalDriver:
         while stdin and (b"\r" not in stdin) and (b"\n" not in stdin):
 
             if self.with_termios:
-                if not self.kbhit():
+                if not self.kbhit(timeout=0):
                     break
 
             more = os.read(self.stdio.fileno(), 1)
@@ -4520,19 +4552,6 @@ class TerminalDriver:
 
         return stdin
 
-    def kbhit(self):
-        """Wait till next Keystroke, or next burst of Paste pasted"""
-
-        rlist = [self.stdio]
-        wlist = list()
-        xlist = list()
-        timeout = 0
-        selected = select.select(rlist, wlist, xlist, timeout)
-        (rlist_, wlist_, xlist_) = selected
-
-        if rlist_ == rlist:
-            return True
-
     def write(self, chars):
         """Compare with Chars at Cursor, write Diffs now, move Cursor soon"""
 
@@ -4542,37 +4561,40 @@ class TerminalDriver:
             time.sleep(self.lag)
 
 
-def repr_vi_bytes(xxs):
+def repr_vi_nudge_bytes(iobytes):
     """Echo keyboard input without asking people to memorise b'\a\b\t\n\v\f\r'"""
 
     rep = ""
-    for ch in xxs.decode(errors="surrogateescape"):
-        ord_ch = ord(ch)
+    for iobyte_int in iobytes:
+        ch = chr(iobyte_int)
+        iobyte = ch.encode()
 
-        if ord_ch == 9:
+        if iobyte_int == 9:
             # rep += " ⇥"  # ⇥ \u21E5 Rightward Arrows to Bar
             rep += " Tab"
-        elif ord_ch == 13:
+        elif iobyte_int == 13:
             # rep += " ⏎"  # ⏎ \u23CE Return Symbol
             rep += " Return"
-        elif ord_ch == 27:
+        elif iobyte_int == 27:
             # rep += " ⎋"  # ⎋ \u238B Broken Circle With Northwest Arrow
+            # rep += " Escape"
             rep += " Esc"
-        elif ord_ch == 127:
+        elif iobyte_int == 127:
             # rep += " ⌫"  # ⌫ \u232B Erase To The Left
             rep += " Delete"
+
         elif ch == " ":
             # rep += " ␢"  # ␢ \u2422 Blank Symbol
             # rep += " ␣"  # ␣ \u2423 Open Box
             rep += " Space"
 
-        elif ch.encode() in C0_CONTROL_STDINS:  # ord_ch in 0x00..0x1F,0x7F
-            rep += " ⌃" + chr(ord_ch ^ 0x40)
+        elif iobyte in C0_CONTROL_STDINS:  # iobyte_int in 0x00..0x1F,0x7F
+            rep += " ⌃" + chr(iobyte_int ^ 0x40)
 
-        elif (ch in "0123456789") and rep and (rep[-1] in "0123456789"):
+        elif rep and (rep[-1] in "0123456789") and (ch in "0123456789"):
             rep += ch  # no Space between Digits in Prefix or Chords or Suffix
 
-        else:
+        else:  # default to echo each Chord as one Space and one Glyph
             rep += " " + ch
 
     rep = rep.replace("Esc [ A", "Up")  # ↑ \u2191 Upwards Arrow
@@ -4918,7 +4940,9 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- bugs --
 
-# FIXME: don't flash the screen at:  python3 vi.py +q --pwnme=pelavarre-patch-1
+# FIXME:  ⌃C to interrupt some such repetition as 1234*
+
+# TODO:  find more bugs
 
 
 # -- future inventions --
@@ -4947,6 +4971,8 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 
 # -- future improvements --
+
+# TODO: :! for :!pwd and :!hostname and so on
 
 # TODO: record and replay tests of:  cat bin/vi.py |vi.py - bin/vi.py
 
