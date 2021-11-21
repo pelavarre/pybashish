@@ -17,7 +17,7 @@ optional arguments:
 quirks:
   |vi.py works like |vi -
 
-keyboard tests:
+keyboard cheat sheet:
   ZQ :q!⌃M :q⌃M :n!⌃M :n⌃M :w!⌃M :w⌃M ZZ :wq!⌃M :wq⌃M ⌃Zfg  => how to quit Vi Py
   ⌃C Up Down Right Left Space Delete Return  => natural enough
   0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
@@ -29,8 +29,11 @@ keyboard tests:
   1n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
   /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
   :g/... Delete ⌃U ⌃C Return :g?...  => enter a search key and print lines found
-  Esc ⌃C 123Esc 123⌃C zZ /⌃G 3ZQ f⌃C 9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N  => Easter eggs
-  2G9k *1234n \n99zz \F*/Up \F/$Return 9⌃G Qvi⌃My :vi⌃M :n  => more Easter eggs
+
+keyboard easter eggs:
+  9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz
+  Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*123456n⌃C w*:g/⌃C
+  Qvi⌃My \Fw*/Up \F/$Return 9⌃G :vi⌃M :n
 
 pipe tests:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
@@ -160,6 +163,7 @@ class TerminalOrder(argparse.Namespace):
             try:
                 self.int_x = int(self.x)
             except ValueError:
+
                 raise ValueError(rep)  # such as _XTERM_ALT_ or _XTERM_MAIN_
 
         self.int_y = None
@@ -173,9 +177,11 @@ class TerminalOrder(argparse.Namespace):
 
         if self.escape_plus and self.escape_plus.endswith(CSI):  # "\x1B["
             assert self.escape_plus == CSI  # as per TERMINAL_WRITE_REGEX
+
             raise ValueError(rep)  # incomplete CSI TerminalOrder
 
         if self.controls and self.controls.endswith(ESC):  # "\x1B"
+
             raise ValueError(rep)  # incomplete CSI TerminalOrder
 
 
@@ -226,10 +232,14 @@ def main(argv):
     main.since = dt.datetime.now()
 
     args = parse_vi_argv(argv)
+
     if args.pwnme is not False:
         do_args_pwnme(branch=args.pwnme)
+        sys.exit()
+
     if args.version:
         do_args_version()
+        sys.exit()
 
     # Visit each File
 
@@ -322,8 +332,6 @@ def do_args_version():
 
     print("Vi Py {} hash {} ({})".format(version, str_short_hash, str_hash))
 
-    sys.exit()
-
 
 def do_args_pwnme(branch):
     """Download fresh Code to run in place of this stale Code"""
@@ -347,6 +355,7 @@ def do_args_pwnme(branch):
     to_relpath = from_relpath
 
     # Compose a Bash Script
+    # to back up Self, replace Self, mark Self as executable, call new Self twice
 
     when = main.since
     stamp = when.strftime("%m%djqd%H%M%S")
@@ -366,11 +375,14 @@ def do_args_pwnme(branch):
         if not arg.startswith("--pwnme"):
             argv.append(arg)
 
-    vi_py_shline = shlex_join(argv)
+    vi_py_shline_0 = shlex_join([argv[0], "--version"])
+    vi_py_shline_1 = shlex_join(argv)
 
-    shlines = (mv_shline, curl_shline, chmod_shline, vi_py_shline)
+    shlines = (mv_shline, curl_shline, chmod_shline, vi_py_shline_0, vi_py_shline_1)
 
     # Run the Bash Script, and exit with its process exit status returncode
+
+    do_args_version()  # print the Version From, before download & run of the new Self
 
     for shline in shlines:
         stderr_print("+ {}".format(shline))
@@ -379,8 +391,6 @@ def do_args_pwnme(branch):
         except subprocess.CalledProcessError as exc:
             stderr_print("+ exit {}".format(exc.returncode))
             sys.exit(exc.returncode)
-
-    sys.exit()
 
 
 #
@@ -429,7 +439,7 @@ class TerminalSkinVi:
         if file_path == "/dev/stdin":
             if iobytearray:
                 n = str(len(iobytearray))
-                self.vi_print(n + " chars at Dev Stdin - Do you mean :n!")
+                self.vi_print(n + " chars at Dev Stdin - Do you mean :n!")  # :n Egg
 
                 return
 
@@ -567,7 +577,7 @@ class TerminalSkinVi:
     def vi_print(self, *args):
         """Capture some Status now, to show with next Prompt"""
 
-        self.editor.editor_print(*args)
+        self.editor.editor_print(*args)  # 'def vi_print' calling
 
     #
     # Layer thinly under the rest of TerminalSkinVi
@@ -577,6 +587,7 @@ class TerminalSkinVi:
         """Fail fast, else proceed"""
 
         if not truthy:
+
             raise IndexError()
 
     def continue_vi_column_seek(self):
@@ -620,8 +631,8 @@ class TerminalSkinVi:
         if arg1 is not None:
             self.vi_print("Escaped")  # 123 Esc Egg, etc
         else:
-            self.vi_print("Press ZZ to save changes and quit Vi Py", version)
-            # Esc Egg  # Vim rings a Bell for each extra Esc
+            self.vi_print("Press ZZ to save changes and quit Vi Py", version)  # Esc Egg
+            # Vim rings a Bell for each extra Esc
 
     def do_continue_vi(self):  # Vim Q v i Return  # Vim b"Qvi\r"  # not Ex mode
         """Accept Q v i Return, without ringing the Terminal bell"""
@@ -638,9 +649,9 @@ class TerminalSkinVi:
         editor.nudge.suffix = chord
 
         if chord in (b"y", b"Y"):
-            self.vi_print("Ok, now try to quit Vi Py")
+            self.vi_print("Ok, now try to quit Vi Py")  # Qvi⌃My Egg
         else:
-            self.vi_print("Ok")
+            self.vi_print("Ok")  # Qvi⌃Mn Egg
 
     def vi_ask(self, *args):
         """Ask a question, but don't wait for its answer"""
@@ -649,7 +660,7 @@ class TerminalSkinVi:
 
         message = " ".join(str(_) for _ in args)
         message += " "  # place the cursor after a Space after the Message
-        self.vi_print(message)  # 'def vi_ask' asking a question
+        self.vi_print(message)  # 'def vi_ask' calling
 
         vi_reply = self.format_vi_status(self.editor.reply)
         ex = TerminalSkinEx(editor, vi_reply=vi_reply)
@@ -686,8 +697,8 @@ class TerminalSkinVi:
             editor.reply_with_finding()
 
         version = module_file_version_zero()
-        self.vi_print("Press ZQ to lose changes and quit Vi Py", version)
-        # ⌃C Egg  # Vim rings a Bell for each extra ⌃C
+        self.vi_print("Press ZQ to lose changes and quit Vi Py", version)  # ⌃C Egg
+        # Vim rings a Bell for each extra ⌃C
 
     def do_might_flush_quit_vi(self):  # Vim :wq\r
         """Halt if more files, else try might quit"""
@@ -698,7 +709,7 @@ class TerminalSkinVi:
         more_files = files[file_index:][1:]
         if more_files:
             self.vi_print("{} more files - Do you mean :wq!".format(len(more_files)))
-            # Vim raises this IndexError only once, til next ':w' write
+            # :wq Egg  # Vim raises this IndexError only once, til next ':w' write
 
             return
 
@@ -714,7 +725,7 @@ class TerminalSkinVi:
         if file_path == "/dev/stdin":
             if iobytearray:
                 n = str(len(iobytearray))
-                self.vi_print(n + " chars at Dev Stdin - Do you mean :w!")
+                self.vi_print(n + " chars at Dev Stdin - Do you mean :w!")  # :w Egg
 
                 return
 
@@ -745,13 +756,14 @@ class TerminalSkinVi:
             if iobytearray:
                 n = str(len(iobytearray))  # TODO: "{:_}".format(122213) in later Python
                 self.vi_print(n + " chars at Dev Stdin - Do you mean ZZ, :q!, ZQ")
+                # :q Egg
 
                 return
 
         more_files = files[file_index:][1:]
         if more_files:
             self.vi_print("{} more files - Do you mean :n".format(len(more_files)))
-            # Vim raises this IndexError only once, til next ':w' write
+            # :q Egg  # Vim raises this IndexError only once, til next ':w' write
 
             return
 
@@ -786,7 +798,7 @@ class TerminalSkinVi:
 
         if not editor.doing_done:
             if self.slip_find_fetch_vi_this(slip=+1) is None:
-                self.vi_print("Press * and # only when Not on a blank line")
+                self.vi_print("Press * and # only when Not on a blank line")  # * Egg
 
                 return
 
@@ -810,6 +822,7 @@ class TerminalSkinVi:
         if not editor.doing_done:
             if self.slip_find_fetch_vi_this(slip=-1) is None:
                 self.vi_print("Press # and £ and * only when Not on a blank line")
+                # £, # Eggs
 
                 return
 
@@ -861,22 +874,22 @@ class TerminalSkinVi:
         column = editor.column
         columns = editor.count_columns_in_row()
 
-        def is_vi_symbolic(ch):
+        def in_vi_symbolic(ch):
             return ch in VI_SYMBOLIC_SET
 
-        def is_not_vi_blank(ch):
+        def not_in_vi_blank(ch):
             return ch not in VI_BLANK_SET
 
         # Take a Symbolic word, else a Non-Blank word
 
         behind = column
-        for func in (is_vi_symbolic, is_not_vi_blank):
+        for in_vi_word_func in (in_vi_symbolic, not_in_vi_blank):
 
             # Look behind to first Char of Word
 
             while behind:
                 ch = editor.fetch_column_char(column=behind)
-                if not func(ch):
+                if not in_vi_word_func(ch):
 
                     break
 
@@ -886,7 +899,7 @@ class TerminalSkinVi:
 
             for start in range(behind, columns):
                 ch = editor.fetch_column_char(column=start)
-                if func(ch):
+                if in_vi_word_func(ch):
 
                     # Slip ahead to Start of Word
 
@@ -898,7 +911,7 @@ class TerminalSkinVi:
 
                     for end in range(start, columns):
                         ch = editor.fetch_column_char(column=end)
-                        if func(ch):
+                        if in_vi_word_func(ch):
                             word += ch
                         else:
 
@@ -958,7 +971,7 @@ class TerminalSkinVi:
 
             editor.print_some_found_spans(before_status)
 
-            self.vi_print(  # "{}/{} Found {} chars"
+            self.vi_print(  # "{}/{} Found {} chars"  # :g/, :g?, g/, g? Eggs
                 "{}/{} Found {} chars".format(
                     len(iobytespans),
                     len(iobytespans),
@@ -997,23 +1010,19 @@ class TerminalSkinVi:
         # Ask for fresh Search Key
 
         finding_line = None
-        try:
-            finding_line = self.read_vi_line()
-        except Exception:
-
-            raise
+        finding_line = self.read_vi_line()
 
         # Cancel Search if accepting stale Search Key while no stale Search Key exists
 
         if not finding_line:
 
             if finding_line is None:
-                self.vi_print("Search cancelled")  # Vim ⌃C
+                self.vi_print("Search cancelled")  # /⌃C, ?⌃C Eggs
 
                 return
 
             if not editor.finding_line:  # Vim Return
-                self.vi_print("Press one of / ? * # to enter a Search Key")
+                self.vi_print("Press one of / ? * # to enter a Search Key")  # n Egg
 
                 return
 
@@ -1060,14 +1069,14 @@ class TerminalSkinVi:
         # Take up an old Search Key
 
         if editor.finding_line is None:
-            self.vi_print("Press ? or # to enter a Search Key")
+            self.vi_print("Press ? or # to enter a Search Key")  # N Egg
 
             return
 
         # Try the Search
 
-        func = behind_and_reply if (slip >= 0) else ahead_and_reply
-        if func():
+        and_earlier_func = behind_and_reply if (slip >= 0) else ahead_and_reply
+        if and_earlier_func():
 
             editor.continue_do_loop()
 
@@ -1085,14 +1094,14 @@ class TerminalSkinVi:
         # Take up an old Search Key
 
         if editor.finding_line is None:
-            self.vi_print("Press / or * to enter a Search Key")
+            self.vi_print("Press / or * to enter a Search Key")  # n Egg
 
             return
 
         # Try the Search
 
-        func = ahead_and_reply if (slip >= 0) else behind_and_reply
-        if func():
+        and_later_func = ahead_and_reply if (slip >= 0) else behind_and_reply
+        if and_later_func():
 
             editor.continue_do_loop()
 
@@ -2107,15 +2116,15 @@ class TerminalKeyboard:
 
         corrections_by_chords = self.corrections_by_chords
 
-        self._init_func_by_many_vi_chords(chords, func=None)
+        self._init_func_by_many_chords(chords, func=None)
         corrections_by_chords[chords] = corrections
 
     def _init_suffix_func(self, chords, func):
         """Map a sequence of keyboard input Chords that needs 1 Suffix Chord"""
 
-        self._init_func_by_many_vi_chords(chords, func=func, suffixes=1)
+        self._init_func_by_many_chords(chords, func=func, suffixes=1)
 
-    def _init_func_by_many_vi_chords(self, chords, func, suffixes=None):
+    def _init_func_by_many_chords(self, chords, func, suffixes=None):
         """Map a sequence of keyboard input Chords"""
 
         func_by_chords = self.func_by_chords
@@ -2156,7 +2165,6 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
         self.enter_do_func = vi.enter_do_vi
-        self.do_func = editor.do_raise_name_error
         self.exit_do_func = vi.exit_do_vi
 
         self.corrections_by_chords = dict()
@@ -2238,18 +2246,18 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_correcting_many_chords(b":/", corrections=b"/")
         self._init_correcting_many_chords(b":?", corrections=b"?")
 
-        self._init_func_by_many_vi_chords(b":g?", func=vi.do_find_all_vi_line)
-        self._init_func_by_many_vi_chords(b":g/", func=vi.do_find_all_vi_line)
-        self._init_func_by_many_vi_chords(b":n\r", func=vi.do_might_next_vi_file)
-        self._init_func_by_many_vi_chords(b":n!\r", func=vi.do_next_vi_file)
-        self._init_func_by_many_vi_chords(b":noh\r", func=editor.do_set_invhlsearch)
-        self._init_func_by_many_vi_chords(b":q\r", func=vi.do_might_quit_vi)
-        self._init_func_by_many_vi_chords(b":q!\r", func=vi.do_quit_vi)
-        self._init_func_by_many_vi_chords(b":vi\r", func=editor.do_resume_editor)
-        self._init_func_by_many_vi_chords(b":w\r", func=vi.do_might_flush_vi_io)
-        self._init_func_by_many_vi_chords(b":w!\r", func=vi.do_flush_vi_io)
-        self._init_func_by_many_vi_chords(b":wq\r", func=vi.do_might_flush_quit_vi)
-        self._init_func_by_many_vi_chords(b":wq!\r", func=vi.do_flush_quit_vi)
+        self._init_func_by_many_chords(b":g?", func=vi.do_find_all_vi_line)
+        self._init_func_by_many_chords(b":g/", func=vi.do_find_all_vi_line)
+        self._init_func_by_many_chords(b":n\r", func=vi.do_might_next_vi_file)
+        self._init_func_by_many_chords(b":n!\r", func=vi.do_next_vi_file)
+        self._init_func_by_many_chords(b":noh\r", func=editor.do_set_invhlsearch)
+        self._init_func_by_many_chords(b":q\r", func=vi.do_might_quit_vi)
+        self._init_func_by_many_chords(b":q!\r", func=vi.do_quit_vi)
+        self._init_func_by_many_chords(b":vi\r", func=editor.do_resume_editor)
+        self._init_func_by_many_chords(b":w\r", func=vi.do_might_flush_vi_io)
+        self._init_func_by_many_chords(b":w!\r", func=vi.do_flush_vi_io)
+        self._init_func_by_many_chords(b":wq\r", func=vi.do_might_flush_quit_vi)
+        self._init_func_by_many_chords(b":wq!\r", func=vi.do_flush_quit_vi)
 
         func_by_chords[b";"] = vi.do_slip_choice_redo
         # func_by_chords[b"<"]  # TODO: dedent
@@ -2277,7 +2285,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # func_by_chords[b"O"] = vi.do_slip_first_open
         # func_by_chords[b"P"] = vi.do_paste_behind
 
-        self._init_func_by_many_vi_chords(b"Qvi\r", func=vi.do_continue_vi)
+        self._init_func_by_many_chords(b"Qvi\r", func=vi.do_continue_vi)
 
         # func_by_chords[b"R"] = vi.do_open_overwrite
         # func_by_chords[b"S"] = vi.do_slip_first_chop_open
@@ -2293,15 +2301,15 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_correcting_many_chords(b"QZ", corrections=b"Z")
         # TODO: stop commandeering the personal QZ Chord Sequence
 
-        self._init_func_by_many_vi_chords(b"ZQ", func=vi.do_quit_vi)
-        self._init_func_by_many_vi_chords(b"ZZ", func=vi.do_flush_quit_vi)
+        self._init_func_by_many_chords(b"ZQ", func=vi.do_quit_vi)
+        self._init_func_by_many_chords(b"ZZ", func=vi.do_flush_quit_vi)
 
         # func_by_chords[b"["]  # TODO: b"["
 
-        self._init_func_by_many_vi_chords(b"\\\x1B", func=editor.do_set_invhlsearch)
-        self._init_func_by_many_vi_chords(b"\\F", func=editor.do_set_invregex)
-        self._init_func_by_many_vi_chords(b"\\i", func=editor.do_set_invignorecase)
-        self._init_func_by_many_vi_chords(b"\\n", func=editor.do_set_invnumber)
+        self._init_func_by_many_chords(b"\\\x1B", func=editor.do_set_invhlsearch)
+        self._init_func_by_many_chords(b"\\F", func=editor.do_set_invregex)
+        self._init_func_by_many_chords(b"\\i", func=editor.do_set_invignorecase)
+        self._init_func_by_many_chords(b"\\n", func=editor.do_set_invnumber)
 
         # TODO: stop commandeering the personal \Esc \F \i \n Chord Sequences
 
@@ -2348,9 +2356,9 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # func_by_chords[b"x"] = vi.do_cut_ahead
         # func_by_chords[b"y"] = vi.do_copy_after
 
-        self._init_func_by_many_vi_chords(b"zb", func=vi.do_scroll_till_bottom)
-        self._init_func_by_many_vi_chords(b"zt", func=vi.do_scroll_till_top)
-        self._init_func_by_many_vi_chords(b"zz", func=vi.do_scroll_till_middle)
+        self._init_func_by_many_chords(b"zb", func=vi.do_scroll_till_bottom)
+        self._init_func_by_many_chords(b"zt", func=vi.do_scroll_till_top)
+        self._init_func_by_many_chords(b"zz", func=vi.do_scroll_till_middle)
 
         func_by_chords[b"{"] = vi.do_paragraph_behind
         func_by_chords[b"|"] = vi.do_slip
@@ -2380,6 +2388,8 @@ class TerminalSkinEx:
     def read_ex_line(self):
         """Take an Input Line from beneath the Scrolling Rows"""
 
+        editor = self.editor
+
         self.ex_line = ""
 
         try:
@@ -2387,6 +2397,8 @@ class TerminalSkinEx:
             assert False  # unreached
         except SystemExit:
             line = self.ex_line
+
+            editor.doing_traceback = editor.traceback
 
             return line
 
@@ -2515,7 +2527,6 @@ class TerminalKeyboardEx(TerminalKeyboard):
         self.format_status_func = ex.format_ex_status
         self.place_cursor_func = ex.place_ex_cursor
         self.enter_do_func = lambda: None
-        self.do_func = editor.do_raise_name_error
         self.exit_do_func = lambda: None
 
         self.corrections_by_chords = dict()
@@ -2855,6 +2866,7 @@ class TerminalEditor:
                 self.flush_editor(self.keyboard)
 
             self.reply = TerminalReplyOut()
+            self.reply_with_nudge()
 
             # Take one Chord in, or next Chord, or cancel Chords to start again
 
@@ -2863,21 +2875,8 @@ class TerminalEditor:
             except KeyboardInterrupt:
                 chord = b"\x03"  # ETX, ⌃C, 3
 
-                # FIXME: make this over into a default choice of func
-                if self.nudge != TerminalNudgeIn():  # if not meaning 'do_help_quit_vi'
-                    self.nudge.epilog = chord
-                    self.reply_with_nudge()
-
-                    self.editor_print("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
-
-                    self.nudge = TerminalNudgeIn()
-
-                    continue
-
-            self.reply_with_nudge()
-
-            func = self.choose_func(chord)
-            if func is None:
+            chords_func = self.choose_chords_func(chord)
+            if chords_func is None:
 
                 continue
 
@@ -2885,7 +2884,27 @@ class TerminalEditor:
 
             keyboard.enter_do_func()
             try:
-                self.call_do_func(func)  # reply to one whole Nudge
+
+                self.call_chords_func(chords_func)  # reply to one whole Nudge
+
+            except KeyboardInterrupt:  # Egg of *123456n⌃, etc
+
+                self.editor_print("Interrupted")
+                self.reply_with_bell()
+
+                self.traceback = traceback.format_exc()
+
+            except Exception as exc:  # Egg of NotImplementedError, etc
+
+                name = type(exc).__name__
+                str_exc = str(exc)
+                line = "{}: {}".format(name, str_exc) if str_exc else name
+
+                self.editor_print(line)  # "{exc_type}: {str_exc}"
+                self.reply_with_bell()
+
+                self.traceback = traceback.format_exc()
+
             finally:
                 keyboard.exit_do_func()
 
@@ -3006,7 +3025,7 @@ class TerminalEditor:
 
         return screen_spans
 
-    def choose_func(self, chord):
+    def choose_chords_func(self, chord):
         """Accept one Keyboard Input into Prefix, into main Chords, or as Suffix"""
 
         prefix = self.nudge.prefix
@@ -3035,12 +3054,21 @@ class TerminalEditor:
         self.arg1 = int(prefix) if prefix else None
         assert self.get_arg1() >= 1
 
-        # If not taking a Suffix now
+        # At KeyboardInterrupt, cancel these keyboard input Chords and start over
 
         chords_plus = chord if (chords is None) else (chords + chord)
 
-        func = func_by_chords.get(chords)
-        if not (func and (chords in keyboard.suffixes_by_chords)):
+        if prefix or chords:
+            if chord == b"\x03":  # ETX, ⌃C, 3
+                self.nudge.chords = chords_plus
+                self.editor_print("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
+
+                return lambda: self.get_arg1()
+
+        # If not taking a Suffix now
+
+        chords_func = func_by_chords.get(chords)
+        if not (chords_func and (chords in keyboard.suffixes_by_chords)):
             self.nudge.chords = chords_plus
             self.editor_print()  # echo Prefix + Chords
 
@@ -3048,9 +3076,10 @@ class TerminalEditor:
 
             # If need more Chords
 
-            default = keyboard.do_func
-            func_plus = func_by_chords.get(chords_plus, default)
-            if (not func_plus) or (chords_plus in keyboard.suffixes_by_chords):
+            default_func = self.do_raise_name_error
+
+            chords_plus_func = func_by_chords.get(chords_plus, default_func)
+            if (not chords_plus_func) or (chords_plus in keyboard.suffixes_by_chords):
 
                 # Option to auto-correct the Chords
 
@@ -3070,9 +3099,9 @@ class TerminalEditor:
             # Call a Func with or without Prefix, and without Suffix
 
             assert chords_plus not in corrections_by_chords.keys(), (chords, chord)
-            assert func_plus is not None, (chords, chord)
+            assert chords_plus_func is not None, (chords, chord)
 
-            return func_plus
+            return chords_plus_func
 
         assert self.arg0 == chords, (chords, chord, self.arg0)
 
@@ -3087,11 +3116,11 @@ class TerminalEditor:
         # Call a Func with Suffix, but with or without Prefix
 
         assert chords not in corrections_by_chords.keys()
-        assert func is not None, (chords, chord)
+        assert chords_func is not None, (chords, chord)
 
-        return func
+        return chords_func
 
-    def call_do_func(self, func):
+    def call_chords_func(self, chords_func):
         """Call the Func once or more, in reply to one Terminal Nudge In"""
 
         # Start calling
@@ -3101,39 +3130,47 @@ class TerminalEditor:
         while True:
             self.doing_more = None
 
+            # Call the Func, for the first time or again
+            # Forget any Python Traceback older than the Func after the Func exits
+
             try:
 
-                func()
-                self.keep_cursor_on_file()
+                try:
+                    chords_func()
+                    pin = self.spot_pin()
+                finally:
+                    self.keep_cursor_on_file()
+
+            except Exception:  # don't catch SystemExit, KeyboardInterrupt
                 self.traceback = self.doing_traceback
                 self.doing_traceback = None
 
-                if self.doing_less:
-                    arg1 = self.get_arg1(default=None)
-                    if arg1 is not None:
+                raise
 
-                        raise NotImplementedError("Repeat Count {}".format(arg1))
+            self.traceback = self.doing_traceback
+            self.doing_traceback = None
 
-            # Stop calls on Exception
+            # Notice when Cursor slips off File, fix it, and blame the Func
 
-            except Exception as exc:  # Egg of NotImplementedError, etc
+            if self.spot_pin() != pin:
 
-                name = type(exc).__name__
-                str_exc = str(exc)
+                raise KwArgsException(before=pin, after=self.spot_pin())
 
-                line = "{}: {}".format(name, str_exc) if str_exc else name
-                self.editor_print(line)  # "{exc_type}: {str_exc}"
-                self.reply_with_bell()
+            # Notice when Repeat Count given but Not taken, and blame the Func
 
-                self.traceback = traceback.format_exc()
+            if self.doing_less:
+                arg1 = self.get_arg1(default=None)
+                if arg1 is not None:
 
-                break
+                    raise NotImplementedError("Repeat Count {}".format(arg1))
 
             # Let the Func take the Arg as a Count of Repetitions, but don't force it
 
             if self.doing_more:
                 self.doing_done += 1
                 if self.doing_done < self.get_arg1():
+
+                    _ = self.peek_editor_chord()  # raise KeyboardInterrupt at ⌃C
 
                     continue
 
@@ -3142,7 +3179,6 @@ class TerminalEditor:
     def keep_cursor_on_file(self):
         """Fail faster, like when some Bug shoves the Cursor off of Buffer of File"""
 
-        pin = self.spot_pin()
         row = self.row
         column = self.column
 
@@ -3158,12 +3194,6 @@ class TerminalEditor:
 
         self.row = row
         self.column = column
-
-        # After fixing the choice, assert the Row and Column always were on File
-
-        if self.spot_pin() != pin:
-
-            raise KwArgsException(before=pin, after=self.spot_pin())
 
     #
     # Take the Args as given, or substitute a Default Arg Value
@@ -3238,17 +3268,70 @@ class TerminalEditor:
 
         self.reply.bell = True
 
-    def take_editor_chord(self):
-        """Block Self till next keyboard input Chord"""
+    def peek_editor_chord(self):
+        """Reveal the next keyboard input Chord, or raise KeyboardInterrupt at ⌃"""
 
         chord_ints_ahead = self.chord_ints_ahead
         painter = self.painter
 
-        if not chord_ints_ahead:
-            chord = painter.take_painter_chord()  # may raise KeyboardInterrupt
-        else:
-            chord_int = chord_ints_ahead.pop(0)  # may be b"\x03" ETX, ⌃C, 3
+        # Return a copy of the first deferred Chord
+
+        if chord_ints_ahead:
+
+            chord_int = chord_ints_ahead[0]  # copy, do Not consume
             chord = chr(chord_int).encode()
+
+            if chord == b"\x03":  # ETX, ⌃C, 3
+                raise KeyboardInterrupt()
+
+            return chord
+
+        # Give up now, if no input available
+
+        if not self.driver.kbhit(timeout=0):
+
+            return None
+
+        # Consume the Chord and raise KeyboardInterrupt, if it is ETX, ⌃C, 3
+
+        chord = painter.take_painter_chord()
+        if chord == b"\x03":  # ETX, ⌃C, 3
+
+            raise KeyboardInterrupt()
+
+        # Else defer this first keyboard input Chord for later, but return a copy now
+
+        chord_int = ord(chord)
+        chord_ints_ahead.insert(0, chord_int)
+
+        return chord
+
+    def take_editor_chord(self):
+        """Block Self till next keyboard input Chord, or raise KeyboardInterrupt"""
+
+        chord_ints_ahead = self.chord_ints_ahead
+        painter = self.painter
+
+        # Consume one deferred Chord and return it
+
+        if chord_ints_ahead:
+
+            chord_int = chord_ints_ahead.pop(0)  # consume, do Not copy
+            chord = chr(chord_int).encode()
+
+            if chord == b"\x03":  # ETX, ⌃C, 3
+
+                raise KeyboardInterrupt()
+
+            return chord
+
+        # Else block to take and return the next keyboard input Chord
+
+        chord = painter.take_painter_chord()
+
+        if chord == b"\x03":  # ETX, ⌃C, 3
+
+            raise KeyboardInterrupt()
 
         return chord
 
@@ -3789,13 +3872,9 @@ class TerminalPainter:
         self.terminal.flush()
 
     def take_painter_chord(self):
-        """Block to return next Keyboard Input, else raise KeyboardInterrupt"""
+        """Block till TerminalDriver 'kbhit', to return next Keyboard Input"""
 
         chord = self.terminal.getch()
-        if chord == b"\x03":  # ETX, ⌃C, 3
-
-            raise KeyboardInterrupt()
-
         return chord
 
     def terminal_print(self, *args, end="\r\n"):
@@ -4295,6 +4374,7 @@ class TerminalShadow:
             pass
 
         else:
+
             raise NotImplementedError(order.chars)
 
     def write_escape_plus_order(self, order):
@@ -4317,6 +4397,7 @@ class TerminalShadow:
             self.write_beyond_row_order()
 
         else:
+
             raise NotImplementedError(order.chars)
 
     def write_literals_order(self, order):
@@ -4940,7 +5021,8 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- bugs --
 
-# FIXME:  ⌃C to interrupt some such repetition as 1234*
+# FIXME:  solve the Egg at w*g/⌃Z
+# FIXME:  say more of files not found to read
 
 # TODO:  find more bugs
 
