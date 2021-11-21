@@ -111,9 +111,9 @@ _CURSES_ENDWIN_ = RMCUP
 _LIT_OPEN_ = SGR_N.format(7)  # Reverse Video, Invert, overriden by default Cursor
 _LIT_CLOSE_ = SGR
 
-_VIEW_CURSOR_ = DECSCUSR_N.format(2)  # Steady Block  # Mac Terminal default
-_REPLACE_CURSOR_ = DECSCUSR_N.format(4)  # Steady Underline
-_INSERT_CURSOR_ = DECSCUSR_N.format(6)  # Steady Bar
+_VIEW_CURSOR_STYLE_ = DECSCUSR_N.format(2)  # Steady Block  # Mac Terminal default
+_REPLACE_CURSOR_STYLE_ = DECSCUSR_N.format(4)  # Steady Underline
+_INSERT_CURSOR_STYLE_ = DECSCUSR_N.format(6)  # Steady Bar
 
 
 # Parse some Terminal Output magic
@@ -126,7 +126,7 @@ class TerminalOrder(argparse.Namespace):
         [
             r"(\x1B\[",  # Control Sequence Introducer (CSI)
             r"(([0-9?]+)(;([0-9?]+))?)?",  # 0, 1, or 2 Decimal Int or Question Args
-            r"([A-Z_a-z]))",  # one Ascii Letter or Skid mark
+            r"([^A-Z_a-z]*[A-Z_a-z]))",  # any Chars, then Ascii Letter
             r"|",
             r"(\x1B.)",  # else one escaped Char
             r"|",
@@ -632,10 +632,12 @@ class TerminalSkinVi:
 
         editor.editor_print("  ".join(joins))  # such as "'bin/vi.py'  less lag"
 
-        # FIXME: 1⌃G to show Dir of File Path
+        # TODO: 1⌃G to show Dir of File Path
 
     def do_vi_c0_control_esc(self):  # Vim Esc
         """Cancel Digits Prefix, else suggest ZZ to quit Vi Py"""
+
+        editor = self.editor
 
         version = module_file_version_zero()
 
@@ -645,6 +647,8 @@ class TerminalSkinVi:
         else:
             self.vi_print("Press ZZ to save changes and quit Vi Py", version)  # Esc Egg
             # Vim rings a Bell for each extra Esc
+
+            editor.write_cursor_style(_VIEW_CURSOR_STYLE_)
 
     def do_continue_vi(self):  # Vim Q v i Return  # Vim b"Qvi\r"  # not Ex mode
         """Accept Q v i Return, without ringing the Terminal bell"""
@@ -2119,6 +2123,26 @@ class TerminalSkinVi:
 
         return TerminalPin(row, column=column)
 
+    #
+    # Switch Keyboards
+    #
+
+    def do_open_insert(self):  # Vim i
+        """Start inserting chars"""
+
+        editor = self.editor
+
+        self.vi_print("Type chars to insert, press Esc when done")
+        editor.write_cursor_style(_INSERT_CURSOR_STYLE_)
+
+    def do_open_overwrite(self):  # Vim R
+        """Start replacing chars"""
+
+        editor = self.editor
+
+        self.vi_print("Type chars to replace, press Esc when done")
+        editor.write_cursor_style(_REPLACE_CURSOR_STYLE_)
+
 
 class TerminalKeyboard:
     """Map Keyboard Inputs to Code"""
@@ -2301,8 +2325,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         self._init_func_by_many_chords(b"Qvi\r", func=vi.do_continue_vi)
 
-        # func_by_chords[b"R"] = vi.do_open_overwrite
-        # func_by_chords[b"R"] = editor.do_poke_xterm
+        func_by_chords[b"R"] = vi.do_open_overwrite
         # func_by_chords[b"S"] = vi.do_slip_first_chop_open
 
         self._init_suffix_func(b"T", func=vi.do_slip_rindex_plus)
@@ -2347,7 +2370,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         # func_by_chords[b"g"]
         func_by_chords[b"h"] = vi.do_slip_left
-        # func_by_chords[b"i"] = vi.do_open
+        func_by_chords[b"i"] = vi.do_open_insert
         func_by_chords[b"j"] = vi.do_step_down_seek
         func_by_chords[b"k"] = vi.do_step_up_seek
         func_by_chords[b"l"] = vi.do_slip_right
@@ -2488,7 +2511,7 @@ class TerminalSkinEx:
 
         chars = self.editor.arg2
 
-        raise NotImplementedError(repr(chars))
+        raise NotImplementedError("⌃V", repr(chars))
 
         self.ex_line += chars
 
@@ -2917,6 +2940,7 @@ class TerminalEditor:
 
                 self.editor_print("Interrupted")
                 self.reply_with_bell()  # Vim more often replies with Bell
+                # self.chord_ints_ahead = list()
 
                 self.traceback = traceback.format_exc()
 
@@ -2928,6 +2952,7 @@ class TerminalEditor:
 
                 self.editor_print(line)  # "{exc_type}: {str_exc}"
                 self.reply_with_bell()  # Vim more often replies with Bell
+                # self.chord_ints_ahead = list()
 
                 self.traceback = traceback.format_exc()
 
@@ -3026,37 +3051,10 @@ class TerminalEditor:
 
         painter.flush_painter()
 
-    def do_poke_xterm(self):
-        """Poke bits into the Terminal"""
+    def write_cursor_style(self, style):
+        """Reshape the Terminal Cursor on Screen"""
 
-        if False:
-
-            arg1 = self.get_arg1(default=None)
-
-            if arg1 is None:
-                self.editor_print(":set no_decscusr_")
-            else:
-                self.editor_print(":set _decscusr_={}".format(arg1))
-
-            chars = DECSCUSR if (arg1 is None) else DECSCUSR_N.format(arg1)
-            sys.stderr.write(chars)
-            sys.stderr.flush()
-
-        else:
-
-            last_sgr = TerminalPainter.SGR_LIT
-            last_sgr = None if (last_sgr is None) else int(last_sgr[len(CSI) :][:-1])
-
-            next_sgr = 1 if (last_sgr is None) else (last_sgr + 1)
-            chosen_sgr = self.get_arg1(default=next_sgr)
-            encoded_sgr = None if (chosen_sgr == 7) else SGR_N.format(chosen_sgr)
-
-            if chosen_sgr == 7:
-                self.editor_print(":set no_sgr_")
-            else:
-                self.editor_print(":set _sgr_={}".format(chosen_sgr))
-
-            TerminalPainter.SGR_LIT = encoded_sgr
+        self.painter.terminal_write(style)
 
     def spot_spans_on_screen(self):
         """Say where to highlight each Match of the Search Key on Screen"""
@@ -3896,8 +3894,6 @@ class TerminalEditor:
 class TerminalPainter:
     """Paint a Screen of Rows of Chars"""
 
-    SGR_LIT = None
-
     def __init__(self, terminal):
 
         self.terminal = terminal  # layer over a TerminalShadow
@@ -3971,7 +3967,7 @@ class TerminalPainter:
     def paint_screen(self, ended_lines, spans, status, cursor, bell):
         """Write over the Rows of Chars on Screen"""
 
-        (row, column) = self.spot_cursor(cursor.row, column=cursor.column)
+        (row, column) = self.spot_nearby_cursor(cursor.row, column=cursor.column)
 
         columns = self.columns
         scrolling_rows = self.scrolling_rows
@@ -4026,7 +4022,7 @@ class TerminalPainter:
         if bell:
             terminal.write("\a")
 
-    def spot_cursor(self, row, column):
+    def spot_nearby_cursor(self, row, column):
         """Choose a Row:Column to stand for a Row:Column on or off Screen"""
 
         columns = self.columns
@@ -4069,13 +4065,6 @@ class TerminalPainter:
     def style_line(self, row, line, cursor, spans):
         """Inject kinds of SGR so as to style the Chars of a Row"""
 
-        # Choose a Terminal Order to open and close highlights of text
-
-        sgr_close = _LIT_CLOSE_
-
-        sgr_open = TerminalPainter.SGR_LIT
-        sgr_open = _LIT_OPEN_ if (sgr_open is None) else sgr_open
-
         # Work only inside this Row
 
         (spans0, line_plus) = self.spread_spans(row, line=line, spans=spans)
@@ -4107,33 +4096,33 @@ class TerminalPainter:
         styled = ""
         for span in spans2:
 
-            # Write the Chars before this Span, as default SGR
+            # Write the Chars before this Span, as Highlight never opened or as closed
 
             if visited < span.column:
 
                 fragment = line_plus[visited : span.column]
 
-                styled += sgr_close if opened else ""
+                styled += _LIT_CLOSE_ if opened else ""
                 styled += fragment
 
                 opened = False
                 visited = span.column
 
-            # Write the Chars of this Span, marked by SGR_N
+            # Write the Chars of this Span, as Highlight opened
 
             if span.column < span.beyond:
 
                 fragment = line_plus[span.column : span.beyond]
 
-                styled += "" if opened else sgr_open
+                styled += "" if opened else _LIT_OPEN_
                 styled += fragment
 
                 opened = True
                 visited = span.beyond
 
-        # Add a last SGR to close the last SGR_N, if need be
+        # Close the last opened Highlight, if it exists
 
-        styled += sgr_close if opened else ""
+        styled += _LIT_CLOSE_ if opened else ""
 
         return (styled, line_plus)
 
@@ -4220,7 +4209,7 @@ class TerminalShadow:
 
         self.row = None  # place the Cursor in a Row of Screen, at next Flush
         self.column = None  # place the Cursor in a Column of Screen, at next Flush
-        self.writing_bell_order = None  # ring the Bell, at next Flush
+        self.writing_bell_chars = None  # ring the Bell, at next Flush
 
         self.flushed_lines = list()  # don't rewrite unchanged Lines, after first Flush
         self.held_lines = list()  # collect Lines to rewrite at next Flush
@@ -4270,7 +4259,8 @@ class TerminalShadow:
         # Clear the Terminal Cache here
 
         self.flushed_lines[::] = rows * [None]
-        self.writing_bell_order = None
+        self.writing_cursor_style_chars = None
+        self.writing_bell_chars = None
 
         self.write(ED_2)
         self.write(CUP_1_1)
@@ -4290,6 +4280,8 @@ class TerminalShadow:
         held_lines = self.held_lines
         rows = self.rows
         terminal = self.terminal
+        writing_bell_chars = self.writing_bell_chars
+        writing_cursor_style_chars = self.writing_cursor_style_chars
 
         erased_line = columns * " "
         bottom_row = rows - 1
@@ -4336,16 +4328,21 @@ class TerminalShadow:
 
         held_lines[::] = list()
 
-        # Place the Terminal Cursor below
+        # Place the Terminal Cursor, and sometimes change its shape
 
         self.terminal_write_cursor_order(self.row, column=self.column)
 
+        if writing_cursor_style_chars:
+            self.writing_cursor_style_chars = None
+
+            terminal.write(writing_cursor_style_chars)
+
         # Ring the Terminal Bell below
 
-        if self.writing_bell_order:
-            terminal.write("\a")
+        if writing_bell_chars:
+            self.writing_bell_chars = None
 
-        self.writing_bell_order = None
+            terminal.write(writing_bell_chars)
 
         # Flush the Terminal Writes below
 
@@ -4468,16 +4465,33 @@ class TerminalShadow:
             self.write_cursor_order(row=(order.int_y - 1), column=(order.int_x - 1))
 
         elif order.a == SGR_N[-1] == "m":
-            pass  # TODO: learn to shadow SGR_7, more than its Cursor movement
+
+            if order.x is None:
+                if order.int_y in (None, 7):
+
+                    return  # TODO: learn to shadow SGR_N, more than its Cursor movement
+
+            raise NotImplementedError(order)
+
+        elif order.a == DECSCUSR_N[-2:] == " q":
+
+            if order.x is None:
+                if order.int_y in (2, 4, 6):
+
+                    self.writing_cursor_style_chars = DECSCUSR_N.format(order.int_y)
+
+                    return
+
+            raise NotImplementedError(order)
 
         else:
 
-            raise NotImplementedError(order.chars)
+            raise NotImplementedError(order)
 
     def write_escape_plus_order(self, order):
         """Write one Escape Order into the Shadow Cursor"""
 
-        raise NotImplementedError(order.chars)
+        raise NotImplementedError(order)
 
     def write_controls_order(self, order):
         """Write one Controls Order into the Shadow Cursor"""
@@ -4485,7 +4499,7 @@ class TerminalShadow:
         row = self.row
 
         if order.controls == "\a":
-            self.writing_bell_order = True
+            self.writing_bell_chars = "\a"
 
         elif order.controls == "\r":
             self.write_cursor_order(row, column=0)
@@ -4495,7 +4509,7 @@ class TerminalShadow:
 
         else:
 
-            raise NotImplementedError(order.chars)
+            raise NotImplementedError(order)
 
     def write_literals_order(self, order):
         """Write one Literals Order into the Shadow Cursor"""
