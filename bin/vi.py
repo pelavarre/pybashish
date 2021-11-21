@@ -25,14 +25,14 @@ keyboard cheat sheet:
   j k G 1G H L M - + _ ⌃J ⌃N ⌃P  => leap to row, leap to line
   1234567890 Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll rows
-  ⌃L 501⌃L ⌃G  => clear lag, inject lag, measure lag and show version
+  ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
   1n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
   /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
   :g/... Delete ⌃U ⌃C Return :g?...  => enter a search key and print lines found
 
 keyboard easter eggs:
   9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz
-  Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*123456n⌃C w*:g/⌃C
+  Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*123456n⌃C w*:g/⌃M⌃C g?⌃Z
   Qvi⌃My \Fw*/Up \F/$Return 9⌃G :vi⌃M :n
 
 pipe tests:
@@ -2167,6 +2167,9 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self.enter_do_func = vi.enter_do_vi
         self.exit_do_func = vi.exit_do_vi
 
+        self.prefix_chords = b"123456789"
+        self.more_prefix_chords = b"1234567890"
+
         self.corrections_by_chords = dict()
         self.func_by_chords = dict()
         self.suffixes_by_chords = dict()
@@ -2241,7 +2244,6 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"/"] = vi.do_find_ahead_vi_line
 
         func_by_chords[b"0"] = vi.do_slip_first
-        func_by_chords[b"1234567890"] = None  # FIXME: say this more elegantly
 
         self._init_correcting_many_chords(b":/", corrections=b"/")
         self._init_correcting_many_chords(b":?", corrections=b"?")
@@ -2425,7 +2427,7 @@ class TerminalSkinEx:
         editor = self.editor
         keyboard = editor.keyboard
 
-        editor.flush_editor(keyboard)
+        editor.flush_editor(keyboard, reply=self.reply)  # for 'flush_ex_status'
 
     def format_ex_status(self, reply):
         """Keep up the Vi Reply while working the Ex Keyboard, but add the Input Line"""
@@ -2529,6 +2531,9 @@ class TerminalKeyboardEx(TerminalKeyboard):
         self.enter_do_func = lambda: None
         self.exit_do_func = lambda: None
 
+        self.prefix_chords = b""
+        self.more_prefix_chords = b""
+
         self.corrections_by_chords = dict()
         self.func_by_chords = dict()
         self.suffixes_by_chords = dict()
@@ -2551,6 +2556,7 @@ class TerminalKeyboardEx(TerminalKeyboard):
         func_by_chords[b"\x03"] = ex.do_quit_ex  # ETX, ⌃C, 3
         func_by_chords[b"\x0D"] = editor.do_sys_exit  # CR, ⌃M, 13 \r
         func_by_chords[b"\x10"] = ex.do_copy_down  # DLE, ⌃P, 16
+        func_by_chords[b"\x1A"] = editor.do_sig_tstp  # SUB, ⌃Z, 26
         func_by_chords[b"\x15"] = ex.do_clear_chars  # NAK, ⌃U, 21
 
         self._init_suffix_func(b"\x16", func=ex.do_append_suffix)  # SYN, ⌃V, 22
@@ -2792,6 +2798,15 @@ class TerminalEditor:
 
         return size
 
+    def _keep_busy_(self, reply):
+        """Work while waiting for input"""
+
+        if self.terminal_size is not None:
+            if self.driver.get_terminal_size() != self.terminal_size:
+
+                self._reopen_terminal_()  # for resize
+                self.flush_editor(self.keyboard, reply=reply)  # for resize
+
     def run_terminal_with_keyboard(self, keyboard):
         """Prompt, take nudge, give reply, repeat till quit"""
 
@@ -2863,10 +2878,8 @@ class TerminalEditor:
 
             if self.painter.rows:
                 self.scroll_cursor_into_screen()
-                self.flush_editor(self.keyboard)
-
-            self.reply = TerminalReplyOut()
-            self.reply_with_nudge()
+                self.flush_editor(self.keyboard, reply=self.reply)  # for 'run_keyboard'
+                self.reply.bell = False  # ring the Bell only inside the first Flush
 
             # Take one Chord in, or next Chord, or cancel Chords to start again
 
@@ -2890,7 +2903,7 @@ class TerminalEditor:
             except KeyboardInterrupt:  # Egg of *123456n⌃, etc
 
                 self.editor_print("Interrupted")
-                self.reply_with_bell()
+                self.reply_with_bell()  # Vim more often replies with Bell
 
                 self.traceback = traceback.format_exc()
 
@@ -2901,7 +2914,7 @@ class TerminalEditor:
                 line = "{}: {}".format(name, str_exc) if str_exc else name
 
                 self.editor_print(line)  # "{exc_type}: {str_exc}"
-                self.reply_with_bell()
+                self.reply_with_bell()  # Vim more often replies with Bell
 
                 self.traceback = traceback.format_exc()
 
@@ -2914,6 +2927,7 @@ class TerminalEditor:
         """Set up XTerm Alt Screen & Keyboard, till 'self.painter.__exit__'"""
 
         self.painter.__enter__()
+        self._reopen_terminal_()
 
     def scroll_cursor_into_screen(self):
         """Scroll to place Cursor on Screen"""
@@ -2962,19 +2976,16 @@ class TerminalEditor:
 
                 raise KwArgsException(before=top_row, after=self.top_row)
 
-    def flush_editor(self, keyboard):
+    def flush_editor(self, keyboard, reply):
         """Paint Screen, Cursor, and Bell now"""
 
         ended_lines = self.ended_lines
         painter = self.painter
-        reply = self.reply
 
         # 1st: Option to rewrite whole Screen slowly
 
         if (self.injecting_lag is None) and reply.bell:
             self._reopen_terminal_()  # for bell
-        elif self.driver.get_terminal_size() != self.terminal_size:
-            self._reopen_terminal_()  # for resize
 
         # 2nd: Call back to format Status and place Cursor
 
@@ -3032,6 +3043,8 @@ class TerminalEditor:
         chords = self.nudge.chords
         keyboard = self.keyboard
 
+        prefix_chords = keyboard.prefix_chords
+        more_prefix_chords = keyboard.more_prefix_chords
         corrections_by_chords = keyboard.corrections_by_chords
         func_by_chords = keyboard.func_by_chords
 
@@ -3039,17 +3052,16 @@ class TerminalEditor:
 
         # Take more decimal Digits, while nothing but decimal Digits given
 
-        if b"1234567890" in func_by_chords.keys():
-            if not chords:
-                if (chord in b"123456789") or (prefix and (chord == b"0")):
+        if not chords:
+            if (chord in prefix_chords) or (prefix and chord in more_prefix_chords):
 
-                    prefix_plus = chord if (prefix is None) else (prefix + chord)
-                    self.nudge.prefix = prefix_plus
-                    self.editor_print()  # echo Prefix
+                prefix_plus = chord if (prefix is None) else (prefix + chord)
+                self.nudge.prefix = prefix_plus
+                self.editor_print()  # echo Prefix
 
-                    # Ask for more Prefix, else for main Chords
+                # Ask for more Prefix, else for main Chords
 
-                    return None  # ask for more Prefix, or for other Chords
+                return None  # ask for more Prefix, or for other Chords
 
         self.arg1 = int(prefix) if prefix else None
         assert self.get_arg1() >= 1
@@ -3294,6 +3306,9 @@ class TerminalEditor:
 
         # Consume the Chord and raise KeyboardInterrupt, if it is ETX, ⌃C, 3
 
+        if self.injecting_lag is None:
+            self._keep_busy_(reply=self.reply)  # give away 1 Time Slice for this Chord
+
         chord = painter.take_painter_chord()
         if chord == b"\x03":  # ETX, ⌃C, 3
 
@@ -3312,6 +3327,13 @@ class TerminalEditor:
         chord_ints_ahead = self.chord_ints_ahead
         painter = self.painter
 
+        # Consume the Reply
+
+        reply_before_chord = self.reply
+
+        self.reply = TerminalReplyOut()
+        self.reply_with_nudge()
+
         # Consume one deferred Chord and return it
 
         if chord_ints_ahead:
@@ -3325,7 +3347,14 @@ class TerminalEditor:
 
             return chord
 
-        # Else block to take and return the next keyboard input Chord
+        # Block to take and return the next keyboard input Chord,
+        # except do give away >=1 Time Slices per Chord
+
+        if self.injecting_lag is None:
+            while True:
+                self._keep_busy_(reply=reply_before_chord)
+                if self.driver.kbhit(timeout=0.250):
+                    break
 
         chord = painter.take_painter_chord()
 
@@ -3680,8 +3709,8 @@ class TerminalEditor:
 
         # Prompt for next keyboard input Chord, and block till it arrives
 
-        self.editor_print(  # "{}/{} Press Return to continue . . .
-            "{}/{} Press Return to continue . . .".format(
+        self.editor_print(  # "{}/{} Press Return or ⌃C to continue . . .
+            "{}/{} Press Return or ⌃C to continue . . .".format(
                 len(iobytespans), len(iobytespans)
             )
         )
@@ -3690,9 +3719,13 @@ class TerminalEditor:
 
         painter.terminal_print(after_status, end=" ")
         self.driver.flush()
-        _ = self.take_editor_chord()
 
-        self._reopen_terminal_()  # after printing on screen
+        try:
+            _ = self.take_editor_chord()
+        except KeyboardInterrupt:
+            pass  # take ⌃C as Return here
+
+        self._reopen_terminal_()  # after 'painter.terminal_print'
 
         # TODO: highlight Matches in :g/ Lines
         # TODO: Vim prints more through a Less-like Paginator
@@ -4368,10 +4401,10 @@ class TerminalShadow:
             self.write_cursor_order(row=(order.int_y - 1), column=(order.int_x - 1))
 
         elif order.csi_plus == SGR_7:
-            pass
+            pass  # TODO: learn to shadow SGR_7, more than its Cursor movement
 
         elif order.csi_plus == SGR:
-            pass
+            pass  # TODO: learn to shadow SGR, more than its Cursor movement
 
         else:
 
@@ -4556,7 +4589,7 @@ class TerminalDriver:
         pdb.set_trace()
         self.__enter__()
 
-    def kbhit(self, timeout):  # FIXME: set polling rate for Terminal Size change
+    def kbhit(self, timeout):
         """Wait till next Keystroke, or next burst of Paste pasted"""
 
         rlist = [self.stdio]
@@ -5021,7 +5054,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- bugs --
 
-# FIXME:  solve the Egg at w*g/⌃Z
 # FIXME:  say more of files not found to read
 
 # TODO:  find more bugs
