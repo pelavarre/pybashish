@@ -87,8 +87,10 @@ ED_2 = "\x1B[2J"  # Erase in Display (ED)  # 2 = Whole Screen
 CUP_Y_X = "\x1B[{};{}H"  # Cursor Position (CUP)
 CUP_1_1 = "\x1B[H"  # Cursor Position (CUP)  # (1, 1) = Upper Left
 
+DECSCUSR_N = "\x1B[{} q"  # Set Cursor Style
+DECSCUSR = "\x1B[ q"  # Clear Cursor Style (but doc'ed poorly)
+
 SGR_N = "\x1B[{}m"  # Select Graphic Rendition
-SGR_7 = SGR_N.format(7)  # SGR > Reverse Video, Invert
 SGR = "\x1B[m"  # SGR > Reset, Normal, All Attributes Off
 
 DECSC = ESC + "7"  # DEC Save Cursor
@@ -100,8 +102,18 @@ _XTERM_MAIN_ = "\x1B[?1049l"  # show Main Screen
 SMCUP = DECSC + _XTERM_ALT_  # Set-Mode Cursor-Positioning
 RMCUP = ED_2 + _XTERM_MAIN_ + DECRC  # Reset-Mode Cursor-Positioning
 
+
+# Configure some Terminal Output magic
+
 _CURSES_INITSCR_ = SMCUP + ED_2 + CUP_1_1
 _CURSES_ENDWIN_ = RMCUP
+
+_LIT_OPEN_ = SGR_N.format(7)  # Reverse Video, Invert, overriden by default Cursor
+_LIT_CLOSE_ = SGR
+
+_VIEW_CURSOR_ = DECSCUSR_N.format(2)  # Steady Block  # Mac Terminal default
+_REPLACE_CURSOR_ = DECSCUSR_N.format(4)  # Steady Underline
+_INSERT_CURSOR_ = DECSCUSR_N.format(6)  # Steady Bar
 
 
 # Parse some Terminal Output magic
@@ -620,7 +632,7 @@ class TerminalSkinVi:
 
         editor.editor_print("  ".join(joins))  # such as "'bin/vi.py'  less lag"
 
-        # TODO: echo $(whoami)@$(hostname):$(pwd)/
+        # FIXME: 1⌃G to show Dir of File Path
 
     def do_vi_c0_control_esc(self):  # Vim Esc
         """Cancel Digits Prefix, else suggest ZZ to quit Vi Py"""
@@ -2290,6 +2302,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func_by_many_chords(b"Qvi\r", func=vi.do_continue_vi)
 
         # func_by_chords[b"R"] = vi.do_open_overwrite
+        # func_by_chords[b"R"] = editor.do_poke_xterm
         # func_by_chords[b"S"] = vi.do_slip_first_chop_open
 
         self._init_suffix_func(b"T", func=vi.do_slip_rindex_plus)
@@ -3012,6 +3025,38 @@ class TerminalEditor:
         # Flush Screen, Cursor, and Bell
 
         painter.flush_painter()
+
+    def do_poke_xterm(self):
+        """Poke bits into the Terminal"""
+
+        if False:
+
+            arg1 = self.get_arg1(default=None)
+
+            if arg1 is None:
+                self.editor_print(":set no_decscusr_")
+            else:
+                self.editor_print(":set _decscusr_={}".format(arg1))
+
+            chars = DECSCUSR if (arg1 is None) else DECSCUSR_N.format(arg1)
+            sys.stderr.write(chars)
+            sys.stderr.flush()
+
+        else:
+
+            last_sgr = TerminalPainter.SGR_LIT
+            last_sgr = None if (last_sgr is None) else int(last_sgr[len(CSI) :][:-1])
+
+            next_sgr = 1 if (last_sgr is None) else (last_sgr + 1)
+            chosen_sgr = self.get_arg1(default=next_sgr)
+            encoded_sgr = None if (chosen_sgr == 7) else SGR_N.format(chosen_sgr)
+
+            if chosen_sgr == 7:
+                self.editor_print(":set no_sgr_")
+            else:
+                self.editor_print(":set _sgr_={}".format(chosen_sgr))
+
+            TerminalPainter.SGR_LIT = encoded_sgr
 
     def spot_spans_on_screen(self):
         """Say where to highlight each Match of the Search Key on Screen"""
@@ -3851,6 +3896,8 @@ class TerminalEditor:
 class TerminalPainter:
     """Paint a Screen of Rows of Chars"""
 
+    SGR_LIT = None
+
     def __init__(self, terminal):
 
         self.terminal = terminal  # layer over a TerminalShadow
@@ -3952,7 +3999,9 @@ class TerminalPainter:
         terminal.write(CUP_1_1)
 
         for (index, line) in enumerate(lines):
-            (styled, line_plus) = self.style_line(index, line=line, spans=spans)
+            (styled, line_plus) = self.style_line(
+                index, line=line, cursor=cursor, spans=spans
+            )
             if len(line_plus) < columns:
                 terminal.write(styled + "\r\n")
             else:
@@ -4017,28 +4066,46 @@ class TerminalPainter:
 
         return formatted
 
-    def style_line(self, row, line, spans):
-        """Inject SGR_7 and SGR to style the Chars of a Row"""
+    def style_line(self, row, line, cursor, spans):
+        """Inject kinds of SGR so as to style the Chars of a Row"""
+
+        # Choose a Terminal Order to open and close highlights of text
+
+        sgr_close = _LIT_CLOSE_
+
+        sgr_open = TerminalPainter.SGR_LIT
+        sgr_open = _LIT_OPEN_ if (sgr_open is None) else sgr_open
 
         # Work only inside this Row
 
-        (row_spans, line_plus) = self.spread_spans(row, line=line, spans=spans)
+        (spans0, line_plus) = self.spread_spans(row, line=line, spans=spans)
 
-        # Add one Empty Span beyond the end, to place all Chars between Spans
+        # Add a one Char Span at the Cursor
+
+        spans1 = list(spans0)
+        if False:
+            if row == cursor.row:
+                cursor_span = TerminalSpan(
+                    row=cursor.row, column=cursor.column, beyond=(cursor.column + 1)
+                )
+                spans1.append(cursor_span)
+                spans1.sort()
+
+        # Add one Empty Span beyond the end
 
         beyond = len(line_plus)
         empty_beyond_span = TerminalSpan(row, column=beyond, beyond=beyond)
 
-        row_spans_plus = list(row_spans)
-        row_spans_plus.append(empty_beyond_span)
+        spans2 = list(spans1)
+        spans2.append(empty_beyond_span)
 
         # Visit the Chars between each pair of Spans, and the Chars of the Spans
 
         visited = 0
-        lit = False
+        opened = False
 
         styled = ""
-        for span in row_spans_plus:
+        for span in spans2:
 
             # Write the Chars before this Span, as default SGR
 
@@ -4046,27 +4113,27 @@ class TerminalPainter:
 
                 fragment = line_plus[visited : span.column]
 
-                styled += SGR if lit else ""
+                styled += sgr_close if opened else ""
                 styled += fragment
 
-                lit = False
+                opened = False
                 visited = span.column
 
-            # Write the Chars of this Span, as SGR_7
+            # Write the Chars of this Span, marked by SGR_N
 
             if span.column < span.beyond:
 
                 fragment = line_plus[span.column : span.beyond]
 
-                styled += "" if lit else SGR_7
+                styled += "" if opened else sgr_open
                 styled += fragment
 
-                lit = True
+                opened = True
                 visited = span.beyond
 
-        # Add a last SGR to close the last SGR_7, if need be
+        # Add a last SGR to close the last SGR_N, if need be
 
-        styled += SGR if lit else ""
+        styled += sgr_close if opened else ""
 
         return (styled, line_plus)
 
@@ -4397,14 +4464,11 @@ class TerminalShadow:
         elif order.csi_plus == CUP_1_1:
             self.write_cursor_order(row=0, column=0)
 
-        elif order.a == CUP_Y_X[-1]:  # may move the Cursor past Last Column
+        elif order.a == CUP_Y_X[-1] == "H":  # may move the Cursor past Last Column
             self.write_cursor_order(row=(order.int_y - 1), column=(order.int_x - 1))
 
-        elif order.csi_plus == SGR_7:
+        elif order.a == SGR_N[-1] == "m":
             pass  # TODO: learn to shadow SGR_7, more than its Cursor movement
-
-        elif order.csi_plus == SGR:
-            pass  # TODO: learn to shadow SGR, more than its Cursor movement
 
         else:
 
@@ -5043,6 +5107,36 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
+# Cite some Terminal Doc's and Git-track experience of Terminal Output magic
+#
+#       https://en.wikipedia.org/wiki/ANSI_escape_code
+#           SGR (Select Graphic Rendition) parameters
+#
+#               "m"     Reset, Normal
+#               "1m"    Bold, Increased Intensity
+#               "2m"    Faint, Decreased Intensity, Dim  <-- Replace
+#               "3m"    Italic
+#               "4m"    Underline
+#               "5m"    Slow Blink
+#               "6m"    Rapid Blink  # ignored by Mac Terminal
+#               "7m"    Reverse Video, Invert  # overriden by default Cursor
+#               "8m"    Conceal, Hide
+#               "9m"    Crossed-out, Strike  # ignored by Mac Terminal
+#
+#       https://invisible-island.net/xterm/ctlseqs/ctlseqs.html
+#           CSI Pm m  Character Attributes (SGR)
+#           CSI Ps SP q  Set Cursor Style (DECSCUSR), VT520
+#
+#               " q"    Reset, Normal (but doc'ed poorly)
+#               "1 q"   Blinking Block (like after Screen still for 2s)
+#               "2 q"   Steady Block (same as default of Mac Terminal)
+#               "3 q"   Blinking Underline
+#               "4 q"   Steady Underline
+#               "5 q"   Blinking Bar
+#               "6 q"   Steady Bar
+#
+
+
 #
 # Track ideas of future work
 #
@@ -5061,6 +5155,8 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- future inventions --
 
+# TODO: code show mode as 2q Block Normal, 4q Underline Replace, 6q Bar Insert
+# TODO: something akin to Vim :set cursorline, :set nocursorline
 
 # TODO: QR to draw with a Logo Turtle till QR,
 # TODO: infinite Spaces per Row, rstrip at exit, moving relative not absolute
@@ -5086,7 +5182,7 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- future improvements --
 
-# TODO: :! for :!pwd and :!hostname and so on
+# TODO: :! for like :!echo $(whoami)@$(hostname):$(pwd)/
 
 # TODO: record and replay tests of:  cat bin/vi.py |vi.py - bin/vi.py
 
