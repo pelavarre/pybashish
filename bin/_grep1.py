@@ -1119,6 +1119,8 @@ FILES_CHARS = r"""
 
 """
 
+# FIXME: mention how to shut off profiles:  ssh -F /dev/null, emacs, vim, bash, zsh, etc
+
 
 if __name__ == "__main__":
     with BrokenPipeErrorSink():
