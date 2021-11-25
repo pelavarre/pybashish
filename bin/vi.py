@@ -18,7 +18,7 @@ quirks:
   defaults to read from pipe when piped, so in place of '|vi -' you can say:  |vi.py
 
 keyboard cheat sheet:
-  ZQ :q!⌃M :q⌃M :n!⌃M :n⌃M :w!⌃M :w⌃M ZZ :wq!⌃M :wq⌃M ⌃Zfg  => how to quit Vi Py
+  ZQ ZZ ⌃Zfg  :q!⌃M :q⌃M :n!⌃M :n⌃M :w!⌃M :w⌃M :wq!⌃M :wq⌃M  => how to quit Vi Py
   ⌃C Up Down Right Left Space Delete Return  => natural enough
   0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
   b e w B E W { }  => leap across small word, large word, paragraph
@@ -26,13 +26,13 @@ keyboard cheat sheet:
   1234567890 Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll rows
   ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
-  1n \i \F \Esc  => toggle show line numbers, search case, search regex, show matches
+  \n \i \F Esc ⌃G  => toggle show line numbers, search case, search regex, show matches
   /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
   :g/... Delete ⌃U ⌃C Return :g?...  => enter a search key and print lines found
 
 keyboard easter eggs:
   9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz
-  Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*123456n⌃C w*:g/⌃M⌃C g?⌃Z
+  Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*Esc w*⌃C w*123456n⌃C w*:g/⌃M⌃C g/⌃Z
   Qvi⌃My \Fw*/Up \F/$Return 9⌃G :vi⌃M :n
 
 pipe tests:
@@ -297,7 +297,7 @@ def parse_vi_argv(argv):
     )
 
     parser.add_argument(
-        "--plus",  # Vim Cli "+"
+        "--plus",  # Vim "+"
         metavar="PLUS",
         dest="plusses",
         action="append",  # 'man vim' says <= 10 commands
@@ -488,7 +488,7 @@ class TerminalSkinVi:
             next_file_index = file_index + 1
             next_file = files[next_file_index]
         else:
-            self.do_quit_vi()  # Vim chokes here, because no next File
+            self.do_quit_vi()  # Vim doesn't quit, Vim chokes over no next file
             assert False  # unreached
 
         self.file_index = next_file_index
@@ -536,7 +536,7 @@ class TerminalSkinVi:
     def run_vi_terminal(self):
         """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
 
-        plusses = self.plusses  # Vim starts with lines of '~/.vimrc
+        plusses = self.plusses  # Vim starts with lines of '~/.vimrc'
 
         # Choose how to start up
 
@@ -566,7 +566,7 @@ class TerminalSkinVi:
 
         finally:
 
-            self.vi_traceback = editor.skin.traceback
+            self.vi_traceback = editor.skin.traceback  # /⌃G⌃CZQ Egg
 
             if editor.iobytearray:
                 if not self.file_writing_stdout:
@@ -618,19 +618,23 @@ class TerminalSkinVi:
 
         injecting_lag = editor.injecting_lag
 
+        if editor.finding_line:
+            editor.finding_highlights = True
+            editor.reply_with_finding()
+
         str_lag = None
         if injecting_lag is not None:
             str_lag = "{}s lag".format(injecting_lag)
-
-        if editor.finding_highlights:
-            editor.reply_with_finding()
 
         joins = list()
         joins.append(repr(self.file_path))
         if str_lag:
             joins.append(str_lag)
 
-        editor.editor_print("  ".join(joins))  # such as "'bin/vi.py'  less lag"
+        more_status = "  ".join(joins)
+        editor.editor_print(more_status)  # such as "'bin/vi.py'  less lag"
+
+        # Vim ⌃G doesn't turn Search highlights back on
 
         # TODO: 1⌃G to show Dir of File Path
 
@@ -643,12 +647,14 @@ class TerminalSkinVi:
 
         arg1 = self.get_vi_arg1(default=None)
         if arg1 is not None:
-            self.vi_print("Escaped")  # 123 Esc Egg, etc
+            self.vi_print("Escaped Repeat Count")  # 123 Esc Egg, etc
+        elif editor.finding_highlights:
+            self.vi_print("Escaped Search")  # *Esc Egg
+            editor.finding_highlights = None  # Vim leaves highlights up
         else:
             self.vi_print("Press ZZ to save changes and quit Vi Py", version)  # Esc Egg
-            # Vim rings a Bell for each extra Esc
 
-            editor.write_cursor_style(_VIEW_CURSOR_STYLE_)
+        # Vim rings a Bell for each extra Esc
 
     def do_continue_vi(self):  # Vim Q v i Return  # Vim b"Qvi\r"  # not Ex mode
         """Accept Q v i Return, without ringing the Terminal bell"""
@@ -709,11 +715,16 @@ class TerminalSkinVi:
         """Suggest ZQ to quit Vi Py"""
 
         editor = self.editor
-        if editor.finding_highlights:
-            editor.reply_with_finding()
+        assert editor.skin.arg1 is None  # ⌃C cancels before 'call_chords_func'
 
         version = module_file_version_zero()
-        self.vi_print("Press ZQ to lose changes and quit Vi Py", version)  # ⌃C Egg
+
+        if editor.finding_highlights:
+            self.vi_print("Cancelled Search")  # *⌃C Egg
+            editor.finding_highlights = None  # Vim leaves highlights up
+        else:
+            self.vi_print("Press ZQ to save changes and quit Vi Py", version)  # ⌃C Egg
+
         # Vim rings a Bell for each extra ⌃C
 
     def do_might_flush_quit_vi(self):  # Vim :wq\r
@@ -824,8 +835,8 @@ class TerminalSkinVi:
 
             editor.continue_do_loop()
 
-        # Vi Py echoes the * Search Key at /Up and at :g/, but not as Status
-        # Vim echoes the * Search Key as Status, unless not found ahead
+        # Vim echoes the * Search Key as Status, unless not found ahead on same screen
+        # Vi Py echoes the * Search Key as Status, at /Up, at :g/Up, etc
 
     def do_find_behind_vi_this(self):  # Vim #  # Vim £
         """Take a Search Key from this Line, and then look behind for it"""
@@ -848,8 +859,8 @@ class TerminalSkinVi:
 
             editor.continue_do_loop()
 
-        # Vi Py echoes the # Search Key at ?Up and at :g?, but not as Status
-        # Vim echoes the # Search Key as Status, unless not found ahead
+        # Vim echoes the # Search Key as Status, unless not found behind on same screen
+        # Vi Py echoes the # Search Key as Status, at ?Up, at :g?Up, etc
 
     def slip_find_fetch_vi_this(self, slip):
         """Take a Word from this Line and return Truthy, else don't"""
@@ -960,14 +971,13 @@ class TerminalSkinVi:
 
             editor.continue_do_loop()
 
-        # Vi Py echoes the / Search Key at /Up and at :g/, but not as Status
         # Vim echoes the / Search Key as Status, unless not found ahead
+        # Vi Py echoes the / Search Key as Status, at /Up, at :g/Up, etc
 
     def do_find_all_vi_line(self):  # Vim :g/   # Vim :g?  # Vi Py :g/, :g?, g/, g?
         """Across all the File, print each Line containing 1 or More Matches"""
 
         editor = self.editor
-
         editor.reply_with_finding()
 
         # Take Search Key as input, but leave Search Slip unchanged
@@ -995,8 +1005,8 @@ class TerminalSkinVi:
                 )
             )
 
-        # Vi Py echoes the ? Search Key at ?Up and at :g?, but not as Status
-        # Vim echoes the ? Search Key as Status, unless not found ahead
+        # Vim echoes the ? Search Key as Status, unless not found behind
+        # Vi Py echoes the ? Search Key as Status, at ?Up, at :g?Up, etc
 
         # TODO: Vim :4g/ means search only line 4, not pick +-Nth match
 
@@ -2300,7 +2310,6 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func_by_many_chords(b":g/", func=vi.do_find_all_vi_line)
         self._init_func_by_many_chords(b":n\r", func=vi.do_might_next_vi_file)
         self._init_func_by_many_chords(b":n!\r", func=vi.do_next_vi_file)
-        self._init_func_by_many_chords(b":noh\r", func=editor.do_set_invhlsearch)
         self._init_func_by_many_chords(b":q\r", func=vi.do_might_quit_vi)
         self._init_func_by_many_chords(b":q!\r", func=vi.do_quit_vi)
         self._init_func_by_many_chords(b":vi\r", func=editor.do_resume_editor)
@@ -2356,7 +2365,6 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         # func_by_chords[b"["]  # TODO: b"["
 
-        self._init_func_by_many_chords(b"\\\x1B", func=editor.do_set_invhlsearch)
         self._init_func_by_many_chords(b"\\F", func=editor.do_set_invregex)
         self._init_func_by_many_chords(b"\\i", func=editor.do_set_invignorecase)
         self._init_func_by_many_chords(b"\\n", func=editor.do_set_invnumber)
@@ -2777,7 +2785,7 @@ class TerminalEditor:
         self.finding_line = None  # remember the Search Key
         self.finding_regex = None  # search as Regex or search as Chars
         self.finding_slip = 0  # remember to Search again ahead or again behind
-        self.finding_highlights = None  # highlight all spans on screen or no spans
+        self.finding_highlights = None  # show Searching as Highlights, or don't
 
         self._init_iobytearray_etc_(iobytearray=b"")
 
@@ -2896,10 +2904,10 @@ class TerminalEditor:
 
                 self.call_chords_func(chords_func)  # reply to one whole Nudge
 
-            except KeyboardInterrupt:  # Egg of *123456n⌃, etc
+            except KeyboardInterrupt:  # Egg of *123456n⌃C, etc
 
                 self.editor_print("Interrupted")
-                self.reply_with_bell()  # Vim more often replies with Bell
+                self.reply_with_bell()
                 # self.skin.chord_ints_ahead = list()
 
                 self.skin.traceback = traceback.format_exc()
@@ -2911,7 +2919,7 @@ class TerminalEditor:
                 line = "{}: {}".format(name, str_exc) if str_exc else name
 
                 self.editor_print(line)  # "{exc_type}: {str_exc}"
-                self.reply_with_bell()  # Vim more often replies with Bell
+                self.reply_with_bell()
                 # self.skin.chord_ints_ahead = list()
 
                 self.skin.traceback = traceback.format_exc()
@@ -2920,6 +2928,8 @@ class TerminalEditor:
                 keyboard.exit_do_func()
 
             self.skin.nudge = TerminalNudgeIn()  # consume the whole Nudge
+
+            # Vim replies with Bell more often
 
     def do_resume_editor(self):
         """Set up XTerm Alt Screen & Keyboard, till 'self.painter.__exit__'"""
@@ -3077,7 +3087,7 @@ class TerminalEditor:
         if prefix or chords:
             if chord == b"\x03":  # ETX, ⌃C, 3
                 self.skin.nudge.chords = chords_plus
-                self.editor_print("Cancelled")  # 123⌃C Egg, f⌃C Egg, etc
+                self.editor_print("Cancelled input")  # 123⌃C Egg, f⌃C Egg, etc
 
                 return lambda: self.get_arg1()
 
@@ -3563,20 +3573,6 @@ class TerminalEditor:
     # Find Spans of Chars
     #
 
-    def do_set_invhlsearch(self):  # \Esc Egg
-        """Highlight Matches or not, but without rerunning Search"""
-
-        self.finding_highlights = not self.finding_highlights
-
-        if self.finding_highlights:
-            self.reply_with_finding()
-            self.editor_print(":set hlsearch")
-        else:
-            self.editor_print(":nohlsearch")
-
-        # Vim lacks ':invhlsearch' and lacks ':hlsearch'
-        # Vi Py \Esc means ':invhlsearch' not just the ':noh' .. ':nohlsearch'
-
     def do_set_invignorecase(self):  # \i Egg
         """Search Upper/Lower Case or not"""
 
@@ -3741,10 +3737,12 @@ class TerminalEditor:
         row = self.row
         column = self.column
 
+        rep_line = self.format_finding_line()
+
         # Find none
 
         if not spans:
-            self.editor_print("No chars found: not ahead and not after start")
+            self.editor_print("No chars found as:  {}".format(rep_line))
 
             return
 
@@ -3756,8 +3754,8 @@ class TerminalEditor:
         here1 = (-1, -1)  # before start
         heres = (here0, here1)
 
-        how0 = "{}/{}  Found {} chars ahead"
-        how1 = "{}/{}  Found {} chars after start, because not found ahead"
+        how0 = "{}/{}  Found {} chars ahead as:  {}"
+        how1 = "{}/{}  Found {} chars after start, none found ahead, as:  {}"
         hows = (how0, how1)
 
         for (here, how) in zip(heres, hows):
@@ -3769,10 +3767,10 @@ class TerminalEditor:
 
                     how_ = how
                     if there == here0:
-                        how_ = "{}/{}  Found {} chars, here and only here"
+                        how_ = "{}/{}  Found {} chars, only here, as {}"
 
                     self.editor_print(  # "{}/{}  Found ...
-                        how_.format(1 + index, len(spans), len_chars)
+                        how_.format(1 + index, len(spans), len_chars, rep_line)
                     )
 
                     (self.row, self.column) = there
@@ -3788,10 +3786,12 @@ class TerminalEditor:
         row = self.row
         column = self.column
 
+        rep_line = self.format_finding_line()
+
         # Find none
 
         if not spans:
-            self.editor_print("No chars found: not behind and not before end")
+            self.editor_print("No chars found as: {}".format(rep_line))
 
             return
 
@@ -3803,8 +3803,8 @@ class TerminalEditor:
         here1 = (self.spot_last_row() + 1, 0)  # after end
         heres = (here0, here1)
 
-        how0 = "{}/{}  Found {} chars behind"
-        how1 = "{}/{}  Found {} chars before end, because not found behind"
+        how0 = "{}/{}  Found {} chars behind as:  {}"
+        how1 = "{}/{}  Found {} chars before end, none found behind, as:  {}"
         hows = (how0, how1)
 
         for (here, how) in zip(heres, hows):
@@ -3817,10 +3817,10 @@ class TerminalEditor:
 
                     how_ = how
                     if there == here0:
-                        how_ = "{}/{}  Found {} chars, here and only here"
+                        how_ = "{}/{}  Found {} chars, only here, as:  {}"
 
                     self.editor_print(  # "{}/{}  Found ...
-                        how_.format(1 + index, len(spans), len_chars)
+                        how_.format(1 + index, len(spans), len_chars, rep_line)
                     )
 
                     (self.row, self.column) = there
@@ -3828,6 +3828,20 @@ class TerminalEditor:
                     return True
 
         assert False, spans  # unreached
+
+    def format_finding_line(self):
+        """Echo the Search Key"""
+
+        line = self.finding_line
+
+        if self.finding_regex:
+            rep_line = "r'{}'".format(line)
+        elif self.finding_case:
+            rep_line = repr(line)
+        else:
+            rep_line = line
+
+        return rep_line
 
     def spot_row_column_near_span(self, span):
         """Find the Row:Column in File nearest to a Span"""
