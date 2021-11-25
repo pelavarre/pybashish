@@ -996,16 +996,16 @@ FILES_CHARS = r"""
     #
 
     #
-    # vim  0 ^ $ fx h l tx Fx Tx ; , |  => leap to column
+    # vim  0 ^ $ fx tx Fx Tx ; , | h l  => leap to column
     # vim  b e w B E W ( ) { }  => leap across small word, large word, sentence, paragraph
-    # vim  j k G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P  => leap to row, leap to line
+    # vim  G 1G H L M - + _ ⌃J ⌃M ⌃N ⌃P j k  => leap to row, leap to line
     # vim  %  => leap to match balance pair
     #
     # vim  dx dd x D X p yx yy P Y J  => cut, copy, paste, join
-    # vim  a cx i o s Esc A C O S  => enter/ exit insert mode
-    # vim  R Esc  => enter/ exit overlay mode
+    # vim  a cx i o s A C I O S ⌃O Esc ⌃C  => enter/ suspend-resume/ exit insert mode
+    # vim  rx R ⌃O Esc ⌃C  => enter/ suspend-resume/ exit overlay mode
     #
-    # vim  . 1234567890 u ⌃R ⌃O ⌃I  => do again, repeat, undo, redo, revisit
+    # vim  . 1234567890 u ⌃R ⌃O ⌃I  => do again, undo, repeat, revisit, undo-revisit
     # vim  ~ ⌃G ⌃L ⌃A ⌃X  => toggle case, say where, redraw, increment, decrement
     # vim  * / ? n N / .  => this, ahead, behind, next, previous, do again
     #

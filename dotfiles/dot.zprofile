@@ -205,6 +205,7 @@ function a () {
 }
 
 function c () { --exec-echo-xe pbcopy "$@"; }
+function e () { --exec-echo-xe expand "$@"; }
 function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
 function h () { --exec-echo-xe head "$@"; }
 function hi () { local arg1=$1; shift; (--more-history; --history) | g "$arg1$@"; }
@@ -673,8 +674,10 @@ function --git-diff-head () {
     : :: 'Commit Diff since before Head, else since some Commit'
     if [ $# = 0 ]; then
         --exec-echo-xe git diff HEAD~1
-    else
+    elif [[ "$1" =~ ^[0-9_]+$ ]]; then
         --exec-echo-xe git diff HEAD~"$@"
+    else
+        --exec-echo-xe git diff HEAD~1 "$@"
     fi
 }
 
@@ -713,7 +716,7 @@ function --git-push-origin-head-maybe () {  # for '-gpoh'
 function --git-rebase-interactive () {
     : :: 'Rebase Interactive with Auto Squash of the last 19, else of the last N'
     if [ $# = 0 ]; then
-        --exec-echo-xe git rebase -i --autosquash HEAD~19
+        --exec-echo-xe git rebase -i --autosquash @{upstream}
     elif [[ "$1" =~ ^[0-9_]+$ ]]; then
         --exec-echo-xe git rebase -i --autosquash "HEAD~$@"
     else

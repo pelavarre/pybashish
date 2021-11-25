@@ -53,3 +53,6 @@ for name in sorted(name_by_index.values()):
     shutil.copy2(NAME, dst=next_name)
 
     index += 1
+
+
+# copied from:  git clone https://github.com/pelavarre/pybashish.git
