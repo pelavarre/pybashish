@@ -426,6 +426,12 @@ class TerminalPin(collections.namedtuple("TerminalPin", "row, column".split(", "
     # TODO:  class TerminalPinVi - to slip and step in the way of Vi
 
 
+class TerminalPinPlus(
+    collections.namedtuple("TerminalPinPlus", "row, column, obj".split(", "))
+):
+    """Add one more Thing to pairing up a choice of Row and a choice of Column"""
+
+
 class TerminalSkinVi:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim"""
 
@@ -621,6 +627,9 @@ class TerminalSkinVi:
         """Ask to seek again, like to keep on choosing the last Column in each Row"""
 
         self.seeking_more = True
+
+        # FIXME: encode the Seeking More idea as Editor Column at Columns
+        # FIXME: like so that i⌃O$ does append, not insert just before last
 
     #
     # Define Chords for pausing TerminalSkinVi
@@ -2222,6 +2231,9 @@ class TerminalSkinVi:
 
         self.do_take_inserts()
 
+        if editor.column:
+            editor.column -= 1
+
     def do_slip_last_split_take_inserts(self):  # Vim o
         """Insert an empty Line after this Line, and take Input Chords into it"""
 
@@ -2266,7 +2278,6 @@ class TerminalSkinVi:
         # Take many keyboard Input Chords
 
         self.vi_print("Type chars to insert, press Esc when done")
-        editor.write_cursor_style(_INSERT_CURSOR_STYLE_)
 
         keyboard = TerminalKeyboardViInsert(vi=self)
         try:
@@ -2274,8 +2285,6 @@ class TerminalSkinVi:
             assert False  # unreached
         except SystemExit:
             editor.skin.doing_traceback = editor.skin.traceback
-
-        editor.write_cursor_style(_VIEW_CURSOR_STYLE_)
 
         # Keep Cursor in Columns of Line
 
@@ -2300,7 +2309,6 @@ class TerminalSkinVi:
         # Take many keyboard Input Chords
 
         self.vi_print("Type chars to replace, press Esc when done")
-        editor.write_cursor_style(_REPLACE_CURSOR_STYLE_)
 
         keyboard = TerminalKeyboardViReplace(vi=self)
         try:
@@ -2309,11 +2317,37 @@ class TerminalSkinVi:
         except SystemExit:
             editor.skin.doing_traceback = editor.skin.traceback
 
-        editor.write_cursor_style(_VIEW_CURSOR_STYLE_)
-
         # Count Rows or Columns replaced
 
-        self.vi_print("{} replaced".format(self.format_touch_count()))
+        self.vi_print("{} overlaid".format(self.format_touch_count()))
+
+    def do_run_one_nudge(self):  # Vim ⌃O after Vim A I O R a i o etc
+        """Take one Terminal Nudge In, as if Not inserting or replacing Chars"""
+
+        editor = self.editor
+
+        assert not editor.skin.arg1
+
+        # Keep Cursor in Columns of Line
+
+        columns = editor.count_columns_in_row()
+        if columns:
+            if editor.column >= columns:
+                editor.column -= 1
+
+        # Suspend, run, resume
+
+        keyboard = TerminalKeyboardVi(vi=self)
+        keyboard.hello_line = "Give one command"
+        keyboard.continue_do_func = editor.do_sys_exit
+
+        try:
+            editor.run_skin_with_keyboard(keyboard)  # TerminalKeyboardVi
+            assert False  # unreached
+        except SystemExit:
+            editor.skin.doing_traceback = editor.skin.traceback  # FIXME: test this
+
+        editor.skin.reply = keyboard.skin.reply  # FIXME: ugly
 
     def do_insert_one_char(self):
         """Insert one char"""
@@ -2326,6 +2360,8 @@ class TerminalSkinVi:
 
         self.insert_some_chars(chars=fresh_chars)  # insert as inserting itself
 
+        self.vi_print("inserted")
+
         # FIXME: cancel Insert Repeat Count if moved away while inserting?
 
     def do_replace_with_choice(self):  # Vim r
@@ -2333,6 +2369,8 @@ class TerminalSkinVi:
 
         choice = self.get_vi_arg2()
         self.replace_some_chars(chars=choice)
+
+        self.vi_print("{} overlaid".format(self.format_touch_count()))
 
         self.editor.continue_do_loop()
 
@@ -2346,6 +2384,8 @@ class TerminalSkinVi:
         fresh_chars = fresh_bytes.decode()
 
         self.replace_some_chars(chars=fresh_chars)
+
+        self.vi_print("overlaid")
 
     def replace_some_chars(self, chars):
         """Replace some Chars inside a Line, or an empty Line"""
@@ -2430,7 +2470,7 @@ class TerminalSkinVi:
         editor = self.editor
         pin = editor.spot_pin()
 
-        self.touches.append((pin, chars))  # FIXME: declare TerminalPinWithChar
+        self.touches.append(TerminalPinPlus(row=pin.row, column=pin.column, obj=chars))
 
     def format_touch_count(self):
         """Describe the list of Touched Pins"""
@@ -2441,8 +2481,8 @@ class TerminalSkinVi:
             rep = "0 chars"
         else:
 
-            line_touches = list(_ for _ in touches if _[-1] == "\r")
-            char_touches = list(_ for _ in touches if _[-1] != "\r")
+            line_touches = list(_ for _ in touches if _.obj == "\r")
+            char_touches = list(_ for _ in touches if _.obj != "\r")
 
             assert line_touches or char_touches
 
@@ -2451,7 +2491,7 @@ class TerminalSkinVi:
             elif not char_touches:
                 rep = "{} lines".format(len(touches))
             else:
-                char_rows = len(set(_[0].row for _ in char_touches))
+                char_rows = len(set(_.row for _ in char_touches))
                 if char_rows == 1:
                     rep = "{} chars in 1 line".format(len(char_touches))
                 else:
@@ -2467,10 +2507,13 @@ class TerminalKeyboard:
 
     def __init__(self):
 
-        self.enter_skin_func = lambda: None
+        self.cursor_style = None
+        self.hello_line = None
+
         self.format_status_func = lambda: None
         self.place_cursor_func = lambda: None
         self.enter_do_func = lambda: None
+        self.continue_do_func = lambda: None
         self.exit_do_func = lambda: None
 
         self.prefix_chords = b""
@@ -2529,6 +2572,8 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         self.vi = vi
         self.editor = vi.editor
+
+        self.cursor_style = _VIEW_CURSOR_STYLE_
 
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
@@ -2747,12 +2792,13 @@ class TerminalKeyboardViInsert(TerminalKeyboard):
 
         super().__init__()
 
+        self.cursor_style = _INSERT_CURSOR_STYLE_
+
         self.vi = vi
         self.editor = vi.editor
 
-        hello = "Press Esc to quit, else type chars to insert"
+        self.hello_line = "Press Esc to quit, else type chars to insert"
 
-        self.enter_skin_func = lambda: vi.vi_print(hello)
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
 
@@ -2773,6 +2819,7 @@ class TerminalKeyboardViInsert(TerminalKeyboard):
 
         func_by_chords[b"\x03"] = editor.do_sys_exit  # ETX, ⌃C, 3
         func_by_chords[b"\x0D"] = vi.do_insert_one_char  # CR, ⌃M, 13 \r
+        func_by_chords[b"\x0F"] = vi.do_run_one_nudge  # SI, ⌃O, 15
         func_by_chords[b"\x1A"] = editor.do_sig_tstp  # SUB, ⌃Z, 26
         func_by_chords[b"\x1B"] = editor.do_sys_exit  # ESC, ⌃[, 27
 
@@ -2786,7 +2833,6 @@ class TerminalKeyboardViInsert(TerminalKeyboard):
         self._init_correcting_many_chords("£".encode(), corrections=b"#")
 
         # FIXME: choose which Controls to allow through I mode
-        # FIXME: ⌃O suspend-resume of I mode
 
 
 #
@@ -2801,12 +2847,13 @@ class TerminalKeyboardViReplace(TerminalKeyboard):
 
         super().__init__()
 
+        self.cursor_style = _REPLACE_CURSOR_STYLE_
+
         self.vi = vi
         self.editor = vi.editor
 
-        hello = "Press Esc to quit, else type replacement chars" ""
+        self.hello_line = "Press Esc to quit, else type replacement chars" ""
 
-        self.enter_skin_func = lambda: vi.vi_print(hello)
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
 
@@ -2827,6 +2874,7 @@ class TerminalKeyboardViReplace(TerminalKeyboard):
 
         func_by_chords[b"\x03"] = editor.do_sys_exit  # ETX, ⌃C, 3
         func_by_chords[b"\x0D"] = vi.do_replace_one_char  # CR, ⌃M, 13 \r
+        func_by_chords[b"\x0F"] = vi.do_run_one_nudge  # SI, ⌃O, 15
         func_by_chords[b"\x1A"] = editor.do_sig_tstp  # SUB, ⌃Z, 26
         func_by_chords[b"\x1B"] = editor.do_sys_exit  # ESC, ⌃[, 27
 
@@ -2840,7 +2888,6 @@ class TerminalKeyboardViReplace(TerminalKeyboard):
         self._init_correcting_many_chords("£".encode(), corrections=b"#")
 
         # FIXME: choose which Controls to allow through R mode
-        # FIXME: ⌃O suspend-resume of R mode
 
         # FIXME: mix together TerminalKeyboardViInsert/ TerminalKeyboardViReplace
 
@@ -2981,6 +3028,8 @@ class TerminalKeyboardEx(TerminalKeyboard):
 
         super().__init__()
 
+        self.cursor_style = _VIEW_CURSOR_STYLE_
+
         self.ex = ex
         self.editor = ex.editor
 
@@ -3034,7 +3083,7 @@ class TerminalKeyboardEx(TerminalKeyboard):
 
 
 class TerminalNudgeIn(argparse.Namespace):
-    """Take the Keyboard Chords of one Input"""
+    """Collect the parts of one Nudge In"""
 
     def __init__(self, prefix=None, chords=None, suffix=None, epilog=None):
 
@@ -3061,7 +3110,7 @@ class TerminalNudgeIn(argparse.Namespace):
 
 
 class TerminalReplyOut(argparse.Namespace):
-    """Give the parts of a Reply to Input, apart from the main Output"""
+    """Collect the parts of one Reply Out"""
 
     def __init__(self, flags=None, nudge=None, message=None, bell=None):
 
@@ -3266,16 +3315,35 @@ class TerminalEditor:
     def run_skin_with_keyboard(self, keyboard):
         """Prompt, take nudge, give reply, repeat till quit"""
 
+        painter = self.painter
         skin = self.skin
 
         chords = skin.chord_ints_ahead  # TODO: works, but clashes types
+        cursor_style = skin.keyboard.cursor_style if skin.keyboard else None
+        hello_line = skin.keyboard.hello_line if skin.keyboard else None
+
         self.skin = TerminalSkin(chords)
 
+        if skin.keyboard:
+            if cursor_style != keyboard.cursor_style:
+                painter.terminal_write(keyboard.cursor_style)
+
         try:
-            keyboard.enter_skin_func()
+            if keyboard.hello_line:
+                self.editor_print(keyboard.hello_line)
             self.run_keyboard(keyboard)  # like till SystemExit
         finally:
             skin.traceback = self.skin.traceback
+
+            if skin.keyboard:
+                if cursor_style != keyboard.cursor_style:
+                    painter.terminal_write(cursor_style)
+
+            if hello_line:
+                self.editor_print(hello_line)
+
+            keyboard.skin = self.skin  # FIXME: ugly
+
             self.skin = skin
 
     def run_keyboard(self, keyboard):
@@ -3312,6 +3380,7 @@ class TerminalEditor:
             try:
 
                 self.call_chords_func(chords_func)  # reply to one whole Nudge
+                keyboard.continue_do_func()
 
             except KeyboardInterrupt:  # Egg of *123456n⌃C, etc
 
@@ -3320,6 +3389,8 @@ class TerminalEditor:
                 # self.skin.chord_ints_ahead = list()
 
                 self.skin.traceback = traceback.format_exc()
+
+                keyboard.continue_do_func()
 
             except Exception as exc:  # Egg of NotImplementedError, etc
 
@@ -3332,6 +3403,8 @@ class TerminalEditor:
                 # self.skin.chord_ints_ahead = list()
 
                 self.skin.traceback = traceback.format_exc()
+
+                keyboard.continue_do_func()
 
             finally:
                 keyboard.exit_do_func()
@@ -3431,11 +3504,6 @@ class TerminalEditor:
         # Flush Screen, Cursor, and Bell
 
         painter.flush_painter()
-
-    def write_cursor_style(self, style):
-        """Reshape the Terminal Cursor on Screen"""
-
-        self.painter.terminal_write(style)
 
     def spot_spans_on_screen(self):
         """Say where to highlight each Match of the Search Key on Screen"""
@@ -3591,7 +3659,7 @@ class TerminalEditor:
 
             if self.spot_pin() != pin:
 
-                raise KwArgsException(before=pin, after=self.spot_pin())
+                raise KwArgsException(before=tuple(pin), after=tuple(self.spot_pin()))
 
             # Notice when Repeat Count given but Not taken, and blame the Func
 
@@ -5589,6 +5657,8 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 
 # -- bugs --
+
+# FIXME: ⌃O for Search Key input, not just Insert/ Replace input
 
 # FIXME:  say more of files not found to read
 
