@@ -16,6 +16,7 @@ optional arguments:
 
 quirks:
   defaults to read from pipe when piped, so in place of '|vi -' you can say:  |vi.py
+  doesn't save your changes, as yet
 
 keyboard cheat sheet:
   ZQ ZZ ⌃Zfg  :q!⌃M :q⌃M :n!⌃M :n⌃M :w!⌃M :w⌃M :wq!⌃M :wq⌃M  => how to quit Vi Py
@@ -34,6 +35,9 @@ keyboard easter eggs:
   9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz
   Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*Esc w*⌃C w*123456n⌃C w*:g/⌃M⌃C g/⌃Z
   Qvi⌃My \Fw*/Up \F/$Return 9⌃G :vi⌃M :n
+
+replace and insert modes:
+  a i rx o A I O R ⌃O Esc ⌃C  => enter/ suspend-resume/ exit insert mode
 
 pipe tests:
   ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
@@ -416,6 +420,12 @@ VI_BLANK_SET = set(" \t")
 VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # r"[A-Za-z0-9_]"
 
 
+class TerminalPin(collections.namedtuple("TerminalPin", "row, column".split(", "))):
+    """Pair up a choice of Row and a choice of Column"""
+
+    # TODO:  class TerminalPinVi - to slip and step in the way of Vi
+
+
 class TerminalSkinVi:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim"""
 
@@ -439,6 +449,8 @@ class TerminalSkinVi:
 
         self.seeking_more = None  # remembering the Seeking Column into next Nudge
         self.seeking_column = None  # leap to a Column after changing Row
+
+        self.touches = list()
 
     #
     # Visit each of the Files
@@ -564,7 +576,7 @@ class TerminalSkinVi:
 
         try:
 
-            editor.run_terminal_with_keyboard(keyboard)  # like till SystemExit
+            editor.run_terminal_with_keyboard(keyboard)  # TerminalKeyboardVi
             assert False  # unreached
 
         finally:
@@ -2084,6 +2096,10 @@ class TerminalSkinVi:
     def exit_do_vi(self):
         """Run after each Vi Func chosen by Chords"""
 
+        # Count Touches per Vi Func chosen by Chords
+
+        self.touches = []
+
         # Remember the last Seeking Column across Funcs that ask for it
 
         if not self.seeking_more:
@@ -2123,6 +2139,116 @@ class TerminalSkinVi:
         return TerminalPin(row, column=column)
 
     #
+    # Variations on Switch Keyboards
+    #
+
+    def do_slip_beyond_last_take_inserts(self):  # Vim A
+        """Take Input Chords after the Last Char of this Line"""
+
+        editor = self.editor
+        columns = editor.count_columns_in_row()
+
+        # Raise NotImplementedError: Repeat Count  # TODO: till coded
+
+        if editor.skin.arg1:
+
+            return  # return to raise NotImplementedError: Repeat Count
+
+        # Insert beyond Last Column
+
+        if not columns:
+            editor.column = 0
+        else:
+            editor.column = columns
+
+        self.do_take_inserts()
+
+    def do_slip_dent_take_inserts(self):  # Vim I
+        """Take Input Chords after the Dent of the Line"""
+
+        editor = self.editor
+
+        # Raise NotImplementedError: Repeat Count  # TODO: till coded
+
+        if editor.skin.arg1:
+
+            return  # return to raise NotImplementedError: Repeat Count
+
+        # Insert beyond Dent
+
+        self.slip_dent()
+
+        self.do_take_inserts()
+
+    def do_slip_first_split_take_inserts(self):  # Vim O
+        """Insert an empty Line before this Line, and take Input Chords into it"""
+
+        editor = self.editor
+
+        # Raise NotImplementedError: Repeat Count  # TODO: till coded
+
+        if editor.skin.arg1:
+
+            return  # return to raise NotImplementedError: Repeat Count
+
+        # Insert an empty Line before this Line, but land in front of it
+
+        editor.column = 0
+        self.insert_some_chars("\r")  # insert an empty Line before Cursor Line
+        editor.row -= 1
+
+        # Take Input Chords into the new empty Line
+
+        self.do_take_inserts()
+
+    def do_slip_take_inserts(self):  # Vim a
+        """Take Input Chords after the Char Beneath the Cursor"""
+
+        editor = self.editor
+
+        column = editor.column
+        columns = editor.count_columns_in_row()
+
+        # Raise NotImplementedError: Repeat Count  # TODO: till coded
+
+        if editor.skin.arg1:
+
+            return  # return to raise NotImplementedError: Repeat Count
+
+        # Insert beyond this Char
+
+        if column <= columns:
+            editor.column = column + 1
+
+        self.do_take_inserts()
+
+    def do_slip_last_split_take_inserts(self):  # Vim o
+        """Insert an empty Line after this Line, and take Input Chords into it"""
+
+        editor = self.editor
+        ended_lines = editor.ended_lines
+
+        # Raise NotImplementedError: Repeat Count  # TODO: till coded
+
+        if editor.skin.arg1:
+
+            return  # return to raise NotImplementedError: Repeat Count
+
+        # Insert an empty Line after this Line, but land in front of it
+
+        if ended_lines:
+            editor.row += 1
+        editor.column = 0
+
+        self.insert_some_chars("\r")  # insert an empty Line after Cursor Line
+
+        editor.row -= 1
+
+        # Take Input Chords into the new empty Line
+
+        self.do_take_inserts()
+
+    #
     # Switch Keyboards
     #
 
@@ -2131,51 +2257,36 @@ class TerminalSkinVi:
 
         editor = self.editor
 
-        count = self.get_vi_arg1()
+        # Raise NotImplementedError: Repeat Count  # TODO: till coded
+
+        if editor.skin.arg1:
+
+            return  # return to raise NotImplementedError: Repeat Count
+
+        # Take many keyboard Input Chords
 
         self.vi_print("Type chars to insert, press Esc when done")
         editor.write_cursor_style(_INSERT_CURSOR_STYLE_)
 
         keyboard = TerminalKeyboardViInsert(vi=self)
         try:
-            editor.run_skin_with_keyboard(keyboard)
+            editor.run_skin_with_keyboard(keyboard)  # TerminalKeyboardViInsert
             assert False  # unreached
         except SystemExit:
             editor.skin.doing_traceback = editor.skin.traceback
 
         editor.write_cursor_style(_VIEW_CURSOR_STYLE_)
 
-        self.vi_print("{} chars inserted".format(count * 0))
+        # Keep Cursor in Columns of Line
 
-        # FIXME: Vim a i o A I O, not just Vim i
+        columns = editor.count_columns_in_row()
+        if columns:
+            if editor.column >= columns:
+                editor.column -= 1
 
-    def do_insert_char(self):
-        """Insert one char"""
+        # Count Rows or Columns inserted
 
-        editor = self.editor
-
-        fresh_bytes = editor.skin.arg0
-
-        stale_chars = editor.fetch_column_char(default=_EOL_)
-        fresh_chars = fresh_bytes.decode()
-
-        if fresh_chars == "\r":
-            editor.editor_print("Could add line before this line")
-            self.slip_ahead_one()
-        elif stale_chars == "\n":
-            editor.editor_print("Could add {!r}".format(fresh_chars))
-            self.slip_ahead_one()
-        else:
-            editor.editor_print(
-                "Could place {!r} before {!r}".format(fresh_chars, stale_chars)
-            )
-            self.slip_ahead_one()
-
-        self.slip_ahead_one()
-
-        # FIXME: ok actually do insert the chars
-
-        # FIXME: cancel Insert Repeat Count if moved away while inserting?
+        self.vi_print("{} inserted".format(self.format_touch_count()))
 
     def do_take_replacements(self):  # Vim R
         """Take many keyboard Input Chords as meaning replace Chars, till Esc"""
@@ -2186,44 +2297,169 @@ class TerminalSkinVi:
 
             return  # return to raise NotImplementedError: Repeat Count
 
+        # Take many keyboard Input Chords
+
         self.vi_print("Type chars to replace, press Esc when done")
         editor.write_cursor_style(_REPLACE_CURSOR_STYLE_)
 
         keyboard = TerminalKeyboardViReplace(vi=self)
         try:
-            editor.run_skin_with_keyboard(keyboard)
+            editor.run_skin_with_keyboard(keyboard)  # TerminalKeyboardViReplace
             assert False  # unreached
         except SystemExit:
             editor.skin.doing_traceback = editor.skin.traceback
 
         editor.write_cursor_style(_VIEW_CURSOR_STYLE_)
 
-        self.vi_print("{} chars replaced".format(0))
+        # Count Rows or Columns replaced
 
-    def do_overwrite_char(self):
+        self.vi_print("{} replaced".format(self.format_touch_count()))
+
+    def do_insert_one_char(self):
+        """Insert one char"""
+
+        editor = self.editor
+
+        assert not editor.skin.arg1
+        fresh_bytes = editor.skin.arg0
+        fresh_chars = fresh_bytes.decode()
+
+        self.insert_some_chars(chars=fresh_chars)  # insert as inserting itself
+
+        # FIXME: cancel Insert Repeat Count if moved away while inserting?
+
+    def do_replace_with_choice(self):  # Vim r
+        """Replace one char with Input Suffix Char"""
+
+        choice = self.get_vi_arg2()
+        self.replace_some_chars(chars=choice)
+
+        self.editor.continue_do_loop()
+
+    def do_replace_one_char(self):
         """Replace one char"""
 
         editor = self.editor
 
+        assert not editor.skin.arg1
         fresh_bytes = editor.skin.arg0
-
-        stale_chars = editor.fetch_column_char(default=_EOL_)
         fresh_chars = fresh_bytes.decode()
 
-        if fresh_chars == "\r":
-            editor.editor_print("Could add line after this line")
-            self.slip_ahead_one()
-        elif stale_chars == "\n":
-            editor.editor_print("Could add {!r}".format(fresh_chars))
-            self.slip_ahead_one()
-        else:
-            editor.editor_print(
-                "Could replace {!r} with {!r}".format(stale_chars, fresh_chars)
-            )
-            self.slip_ahead_one()
+        self.replace_some_chars(chars=fresh_chars)
 
-        # FIXME: ok actually do replace the chars
-        # FIXME: Vim r
+    def replace_some_chars(self, chars):
+        """Replace some Chars inside a Line, or an empty Line"""
+
+        editor = self.editor
+
+        ended_lines = editor.ended_lines
+        column = editor.column
+        row = editor.row
+
+        ended_line = editor.ended_lines[row] if editor.ended_lines else _EOL_
+        columns = len(ended_line.splitlines()[0])
+
+        (head, ended_tail) = (ended_line[:column], ended_line[column:])
+
+        # Fall back to insert the Fresh Char, if there is no Stale Char to delete
+
+        if (column >= columns) or (chars == "\r"):
+
+            self.insert_some_chars(chars=chars)  # insert as fallen back from replacing
+
+        # Count this Touch
+
+        else:
+
+            self.count_touch(chars)
+
+            # Delete one Char to insert one Char
+
+            column_plus = column + 1
+            ended_lines[row] = head + chars + ended_tail[1:]
+
+            editor.column = column_plus
+
+    def insert_some_chars(self, chars):
+        """Insert some Chars inside a Line, or an empty Line"""
+
+        assert (chars == "\r") or (chars.splitlines()[0] == chars)  # TODO: less ugly?
+
+        editor = self.editor
+
+        ended_lines = editor.ended_lines
+        column = editor.column
+        row = editor.row
+
+        ended_line = editor.ended_lines[row] if editor.ended_lines else _EOL_
+        columns = len(ended_line.splitlines()[0])
+        line_end = ended_line[columns:]
+
+        (head, ended_tail) = (ended_line[:column], ended_line[column:])
+        ended_head = head + line_end
+
+        # Count this Touch
+
+        self.count_touch(chars)
+
+        # Split the Line at the Cursor, and slip the Cursor into the new Line
+
+        if chars == "\r":
+
+            ended_lines[row] = ended_head
+
+            row_plus = row + 1
+            ended_lines.insert(row_plus, ended_tail)
+
+            editor.row = row_plus
+            editor.column = 0
+
+        # Split the Line at the Cursor, insert Fresh Chars, and rejoin the Line
+
+        else:
+
+            if not ended_lines:
+                ended_lines[:] = [""]
+
+            ended_lines[row] = head + chars + ended_tail
+            editor.column = column + 1
+
+    def count_touch(self, chars):
+        """Remember inserting or replacing one Char, or inserting one Line, here"""
+
+        editor = self.editor
+        pin = editor.spot_pin()
+
+        self.touches.append((pin, chars))  # FIXME: declare TerminalPinWithChar
+
+    def format_touch_count(self):
+        """Describe the list of Touched Pins"""
+
+        touches = self.touches
+
+        if not touches:
+            rep = "0 chars"
+        else:
+
+            line_touches = list(_ for _ in touches if _[-1] == "\r")
+            char_touches = list(_ for _ in touches if _[-1] != "\r")
+
+            assert line_touches or char_touches
+
+            if not line_touches:
+                rep = "{} chars".format(len(touches))
+            elif not char_touches:
+                rep = "{} lines".format(len(touches))
+            else:
+                char_rows = len(set(_[0].row for _ in char_touches))
+                if char_rows == 1:
+                    rep = "{} chars in 1 line".format(len(char_touches))
+                else:
+                    rep = "{} chars across {} lines".format(
+                        len(char_touches), char_rows
+                    )
+
+        return rep
 
 
 class TerminalKeyboard:
@@ -2231,6 +2467,7 @@ class TerminalKeyboard:
 
     def __init__(self):
 
+        self.enter_skin_func = lambda: None
         self.format_status_func = lambda: None
         self.place_cursor_func = lambda: None
         self.enter_do_func = lambda: None
@@ -2394,7 +2631,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"?"] = vi.do_find_behind_vi_line
         # func_by_chords[b"@"] = vi.do_replay_input
 
-        # func_by_chords[b"A"] = vi.do_slip_last_right_open
+        func_by_chords[b"A"] = vi.do_slip_beyond_last_take_inserts
         func_by_chords[b"B"] = vi.do_big_word_start_behind
         # func_by_chords[b"C"] = vi.do_chop_open
         # func_by_chords[b"D"] = vi.do_chop
@@ -2404,13 +2641,13 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         func_by_chords[b"G"] = vi.do_step
         func_by_chords[b"H"] = vi.do_step_max_high
-        # func_by_chords[b"I"] = vi.do_slip_dent_open
+        func_by_chords[b"I"] = vi.do_slip_dent_take_inserts
         # func_by_chords[b"J"] = vi.do_slip_last_join_right
         # func_by_chords[b"K"] = vi.do_lookup
         func_by_chords[b"L"] = vi.do_step_max_low
         func_by_chords[b"M"] = vi.do_step_to_middle
         func_by_chords[b"N"] = vi.do_vi_find_earlier
-        # func_by_chords[b"O"] = vi.do_slip_first_open
+        func_by_chords[b"O"] = vi.do_slip_first_split_take_inserts
         # func_by_chords[b"P"] = vi.do_paste_behind
 
         self._init_func_by_many_chords(b"Qvi\r", func=vi.do_continue_vi)
@@ -2445,7 +2682,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"_"] = vi.do_step_down_minus_dent
         # func_by_chords[b"`"]  # TODO: close to b"'"
 
-        # func_by_chords[b"a"] = vi.do_slip_right_open
+        func_by_chords[b"a"] = vi.do_slip_take_inserts
         func_by_chords[b"b"] = vi.do_lil_word_start_behind
         # func_by_chords[b"c"] = vi.do_chop_after_open
         # func_by_chords[b"d"] = vi.do_chop_after
@@ -2467,11 +2704,12 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # self._init_suffix_func(b"m", func=vi.do_drop_pin)
 
         func_by_chords[b"n"] = vi.do_vi_find_later
-        # func_by_chords[b"o"] = vi.do_slip_last_right_open
+        func_by_chords[b"o"] = vi.do_slip_last_split_take_inserts
+
         # func_by_chords[b"p"] = vi.do_paste_ahead
         # func_by_chords[b"q"] = vi.do_record_input
 
-        # self._init_suffix_func(b"r", func=vi.do_replace_char)
+        self._init_suffix_func(b"r", func=vi.do_replace_with_choice)
 
         # func_by_chords[b"s"] = vi.do_cut_behind_open
 
@@ -2512,6 +2750,9 @@ class TerminalKeyboardViInsert(TerminalKeyboard):
         self.vi = vi
         self.editor = vi.editor
 
+        hello = "Press Esc to quit, else type chars to insert"
+
+        self.enter_skin_func = lambda: vi.vi_print(hello)
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
 
@@ -2531,14 +2772,14 @@ class TerminalKeyboardViInsert(TerminalKeyboard):
         # Mutate the C0_CONTROL_STDINS definitions
 
         func_by_chords[b"\x03"] = editor.do_sys_exit  # ETX, ⌃C, 3
-        func_by_chords[b"\x0D"] = vi.do_insert_char  # CR, ⌃M, 13 \r
+        func_by_chords[b"\x0D"] = vi.do_insert_one_char  # CR, ⌃M, 13 \r
         func_by_chords[b"\x1A"] = editor.do_sig_tstp  # SUB, ⌃Z, 26
         func_by_chords[b"\x1B"] = editor.do_sys_exit  # ESC, ⌃[, 27
 
         # Define the BASIC_LATIN_STDINS
 
         for chords in BASIC_LATIN_STDINS:
-            func_by_chords[chords] = vi.do_insert_char
+            func_by_chords[chords] = vi.do_insert_one_char
 
         # Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
 
@@ -2563,6 +2804,9 @@ class TerminalKeyboardViReplace(TerminalKeyboard):
         self.vi = vi
         self.editor = vi.editor
 
+        hello = "Press Esc to quit, else type replacement chars" ""
+
+        self.enter_skin_func = lambda: vi.vi_print(hello)
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
 
@@ -2582,14 +2826,14 @@ class TerminalKeyboardViReplace(TerminalKeyboard):
         # Mutate the C0_CONTROL_STDINS definitions
 
         func_by_chords[b"\x03"] = editor.do_sys_exit  # ETX, ⌃C, 3
-        func_by_chords[b"\x0D"] = vi.do_overwrite_char  # CR, ⌃M, 13 \r
+        func_by_chords[b"\x0D"] = vi.do_replace_one_char  # CR, ⌃M, 13 \r
         func_by_chords[b"\x1A"] = editor.do_sig_tstp  # SUB, ⌃Z, 26
         func_by_chords[b"\x1B"] = editor.do_sys_exit  # ESC, ⌃[, 27
 
         # Define the BASIC_LATIN_STDINS
 
         for chords in BASIC_LATIN_STDINS:
-            func_by_chords[chords] = vi.do_overwrite_char
+            func_by_chords[chords] = vi.do_replace_one_char
 
         # Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
 
@@ -2597,6 +2841,8 @@ class TerminalKeyboardViReplace(TerminalKeyboard):
 
         # FIXME: choose which Controls to allow through R mode
         # FIXME: ⌃O suspend-resume of R mode
+
+        # FIXME: mix together TerminalKeyboardViInsert/ TerminalKeyboardViReplace
 
 
 #
@@ -2623,7 +2869,7 @@ class TerminalSkinEx:
 
         keyboard = TerminalKeyboardEx(ex=self)
         try:
-            editor.run_skin_with_keyboard(keyboard)
+            editor.run_skin_with_keyboard(keyboard)  # TerminalKeyboardEx
             assert False  # unreached
         except SystemExit:
             line = self.ex_line
@@ -2827,12 +3073,6 @@ class TerminalReplyOut(argparse.Namespace):
     # Jun/2018 Python 3.7 can say '._defaults=(None, None),'
 
 
-class TerminalPin(collections.namedtuple("TerminalPin", "row, column".split(", "))):
-    """Pair up a choice of Row and a choice of Column"""
-
-    # TODO:  class TerminalPinVi - to slip and step in the way of Vi
-
-
 class TerminalSpan(
     collections.namedtuple("TerminalSpan", "row, column, beyond".split(", "))
 ):
@@ -3032,6 +3272,7 @@ class TerminalEditor:
         self.skin = TerminalSkin(chords)
 
         try:
+            keyboard.enter_skin_func()
             self.run_keyboard(keyboard)  # like till SystemExit
         finally:
             skin.traceback = self.skin.traceback
@@ -3382,10 +3623,11 @@ class TerminalEditor:
         columns = self.count_columns_in_row()
 
         # Keep the choice of Row and Column on File
+        # Also accept the Column just past the last Char as close enough to on File
 
         if not ((0 <= row < rows) or (row == rows == 0)):
             row = 0
-        if not ((0 <= column < columns) or (column == columns == 0)):
+        if not ((0 <= column <= columns) or (column == columns == 0)):
             column = 0
 
         self.row = row
@@ -3609,10 +3851,21 @@ class TerminalEditor:
 
         row_ = self.row if (row is None) else row
 
-        ended_line = self.ended_lines[row_]
+        ended_line = self.ended_lines[row_] if self.ended_lines else _EOL_
         line = ended_line.splitlines()[0]
 
         return line
+
+    def fetch_row_line_end(self, row=None):
+        """Get the Line Ending of the Row beneath Cursor"""
+
+        row_ = self.row if (row is None) else row
+
+        ended_line = self.ended_lines[row_] if self.ended_lines else _EOL_
+        line = ended_line.splitlines()[0]
+        line_end = ended_line[len(line) :]
+
+        return line_end
 
     def spot_bottom_row(self, top_row=None):
         """Find the Bottom Row of File on Screen"""
@@ -4072,6 +4325,14 @@ class TerminalPainter:
         self.status_row = self.scrolling_rows
 
         return size
+
+    def pdb_set_trace(self):
+        """Visit Pdb, if Stdin is Tty, else raise 'bdb.BdbQuit'"""
+
+        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
+        self.__exit__(*exc_info)
+        pdb.set_trace()
+        self.__enter__()
 
     def flush_painter(self):
         """Stop waiting for more Writes from above"""
@@ -4833,14 +5094,6 @@ class TerminalDriver:
 
         size = os.get_terminal_size(self.fd)
         return size
-
-    def pdb_set_trace(self):
-        """Visit Pdb, if Stdin is Tty, else raise 'bdb.BdbQuit'"""
-
-        exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
-        self.__exit__(*exc_info)
-        pdb.set_trace()
-        self.__enter__()
 
     def kbhit(self, timeout):
         """Wait till next Keystroke, or next burst of Paste pasted"""
