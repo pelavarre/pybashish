@@ -19,7 +19,7 @@ quirks:
   doesn't save your changes, as yet
 
 keyboard cheat sheet:
-  ZQ ZZ ⌃Zfg  :q!⌃M :q⌃M :n!⌃M :n⌃M :w!⌃M :w⌃M :wq!⌃M :wq⌃M  => how to quit Vi Py
+  ZQ ZZ ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wq!⌃M  => how to quit Vi Py
   ⌃C Up Down Right Left Space Delete Return  => natural enough
   0 ^ $ fx tx Fx Tx ; , | h l  => leap to column
   b e w B E W { }  => leap across small word, large word, paragraph
@@ -27,35 +27,29 @@ keyboard cheat sheet:
   1234567890 Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll rows
   ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
-  \n \i \F Esc ⌃G  => toggle show line numbers, search case, search regex, show matches
-  /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => enter a search key, find later/ earlier
-  :g/... Delete ⌃U ⌃C Return :g?...  => enter a search key and print lines found
+  \n \i \F Esc ⌃G  => toggle line numbers, search case/ regex, show hits
+  /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => start search, next, previous
+  :g/... Delete ⌃U ⌃C Return :g?...  => give search key and print lines found
+  a i rx o A I O R ⌃O Esc ⌃C  => enter/ suspend-resume/ exit insert/ replace
 
 keyboard easter eggs:
   9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz
   Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*Esc w*⌃C w*123456n⌃C w*:g/⌃M⌃C g/⌃Z
   Qvi⌃My REsc \Fw*/Up \F/$Return 9⌃G :vi⌃M :n
 
-replace and insert modes:
-  a i rx o A I O R ⌃O Esc ⌃C  => enter/ suspend-resume/ exit insert mode
-
-pipe tests:
-  ls |bin/vi.py -  # press ZQ to quit Vi Py without saving last changes
-  cat bin/vi.py |bin/vi.py -  # demo multiple screens of chars
-  cat bin/vi.py |bin/vi.py - |grep import  # demo ZQ vs ZZ
+pipe tests of ZQ vs ZZ:
+  ls |bin/vi.py -
+  cat bin/vi.py |bin/vi.py
+  cat bin/vi.py |bin/vi.py |grep import
 
 how to get Vi Py:
-  cd ~/Desktop/
-  R=pelavarre/pybashish/master && F=bin/vi.py
-  curl -sSO --location https://raw.githubusercontent.com/$R/$F
-  ls -alF -drt vi.py
+  R=pelavarre/pybashish/master/bin/vi.py
+  curl -sSO --location https://raw.githubusercontent.com/$R
+  python3 vi?py vi?py
+  /egg
 
 how to get Vi Py again:
-  python3 vi.py +q --pwnme
-
-simplest demo:
-  python3 vi.py vi.py
-  /egg
+  python3 vi?py +q --pwnme
 """
 
 # Vi Py also takes the \u0008 ⌃H BS \b chord in place of the \u007F ⌃? DEL chord
@@ -2307,8 +2301,6 @@ class TerminalSkinVi:
 
         self.vi_print("{} inserted".format(editor.format_touch_count()))
 
-        # FIXME: cancel Insert Repeat Count if moved away while inserting?
-
     def do_take_replacements(self):  # Vim R
         """Take many keyboard Input Chords as meaning replace Chars, till Esc"""
 
@@ -2346,13 +2338,6 @@ class TerminalSkinVi:
         editor = self.editor
 
         assert not editor.skin.arg1
-
-        # Keep Cursor in Columns of Line
-
-        columns = editor.count_columns_in_row()
-        if columns:
-            if editor.column >= columns:
-                editor.column -= 1
 
         # Suspend, run, resume
 
@@ -2735,8 +2720,6 @@ class TerminalKeyboardViInsert(TerminalKeyboard):
 
         self._init_correcting_many_chords("£".encode(), corrections=b"#")
 
-        # FIXME: choose which Controls to allow through I mode
-
 
 #
 # Replace Chars in the Line, or add Chars past its end, or add Lines after it
@@ -2789,11 +2772,6 @@ class TerminalKeyboardViReplace(TerminalKeyboard):
         # Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
 
         self._init_correcting_many_chords("£".encode(), corrections=b"#")
-
-        # FIXME: choose which Controls to allow through R mode
-        # FIXME: mix together TerminalKeyboardViInsert/ TerminalKeyboardViReplace
-
-        # FIXME: Delete after Replaces as undo Replaces, inside the R mode
 
 
 #
@@ -5698,12 +5676,25 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- bugs --
 
-# FIXME:  say more of files not found to read
+# TODO: code :r to try read files, pass and fail
+# TODO: code :w to try write files, pass and fail
+# TODO: code startup and :n to pass and fail try read files
+
+# TODO: test inception of i⌃O inside R⌃O etc
+
+# TODO: choose which Controls to allow through I mode
+# TODO: choose which Controls to allow through R mode
+# TODO: mix together TerminalKeyboardViInsert/ TerminalKeyboardViReplace
 
 # TODO:  find more bugs
 
 
 # -- future inventions --
+
+
+# TODO: Delete after Replaces as undo Replaces, inside the R mode
+# TODO: code Repeat Count for the a i o A I O variations of Insert
+# TODO: cancel Insert Repeat Count if moved away while inserting
 
 
 # TODO: ⌃O for Search Key input, not just Insert/ Replace input
