@@ -374,6 +374,9 @@ def do_args_pwnme(branch):
 
     to_relpath = from_relpath
 
+    callpath = to_relpath
+    callpath = callpath if (os.sep in callpath) else os.path.join(os.curdir, callpath)
+
     # Compose a Bash Script
     # to back up Self, replace Self, mark Self as executable, call new Self twice
 
@@ -390,12 +393,12 @@ def do_args_pwnme(branch):
     chmod_shline = "chmod ugo+x {relpath}".format(relpath=to_relpath)
 
     argv = list()
-    argv.append("./" + to_relpath)
+    argv.append(callpath)
     for arg in sys_argv[1:]:
         if not arg.startswith("--pwnme"):
             argv.append(arg)
 
-    vi_py_shline_0 = shlex_join([argv[0], "--version"])
+    vi_py_shline_0 = shlex_join([callpath, "--version"])
     vi_py_shline_1 = shlex_join(argv)
 
     shlines = (mv_shline, curl_shline, chmod_shline, vi_py_shline_0, vi_py_shline_1)
