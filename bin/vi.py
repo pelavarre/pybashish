@@ -330,7 +330,7 @@ def parse_vi_argv(argv):
         if not arg.startswith("+"):
             argv_tail.append(arg)
         else:
-            argv_tail.append("--plus=" + arg[len(":")])
+            argv_tail.append("--plus=" + arg[len("+"):])
 
     args = parser.parse_args(argv_tail)
     if args.help:
@@ -361,8 +361,8 @@ def do_args_pwnme(branch):
 
     # Find future Self  # TODO: rename to branch "main" from branch "master"
 
-    assert branch in (None, "master", "pelavarre-patch-1"), branch
-    branch_ = "master" if (branch is None) else branch
+    assert branch in (None, "", "master", "pelavarre-patch-1"), branch
+    branch_ = branch if branch else "master"
 
     link = (
         "https://raw.githubusercontent.com/" "pelavarre/pybashish/{}/" "bin/vi.py"
