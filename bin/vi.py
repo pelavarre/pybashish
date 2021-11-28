@@ -48,7 +48,7 @@ how to get Vi Py:
   /egg
 
 how to get Vi Py again:
-  python3 vi?py +q --pwnme
+  python3 vi?py --pwnme
 """
 
 # Vi Py also takes the \u0008 ⌃H BS \b chord in place of the \u007F ⌃? DEL chord
@@ -248,11 +248,15 @@ def main(argv):
 
     if args.pwnme is not False:
         do_args_pwnme(branch=args.pwnme)
-        sys.exit()
+        if not (args.files or args.plusses):
+
+            sys.exit()
 
     if args.version:
         do_args_version()
-        sys.exit()
+        if not (args.files or args.plusses):
+
+            sys.exit()
 
     # Visit each File
 
@@ -260,12 +264,18 @@ def main(argv):
 
     returncode = None
     try:
+
         vi.run_vi_terminal()  # like till SystemExit
         assert False  # unreached
+
     except OSError as exc:
+
         stderr_print("{}: {}".format(type(exc).__name__, exc))
+
         sys.exit(1)
+
     except SystemExit as exc:
+
         returncode = exc.code
         if vi.vi_traceback:
             stderr_print(vi.vi_traceback)
@@ -327,6 +337,7 @@ def parse_vi_argv(argv):
     args = parser.parse_args(argv_tail)
     if args.help:
         sys.stdout.write(parser_format_help(parser))
+
         sys.exit()
 
     return args
@@ -399,6 +410,7 @@ def do_args_pwnme(branch):
             _ = subprocess_run(shline, shell=True, check=True)
         except subprocess.CalledProcessError as exc:
             stderr_print("+ exit {}".format(exc.returncode))
+
             sys.exit(exc.returncode)
 
 
@@ -879,6 +891,7 @@ class TerminalSkinVi:
         """Lose last changes and quit"""
 
         returncode = self.get_vi_arg1_int(default=None)
+
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
 
     #
@@ -972,9 +985,11 @@ class TerminalSkinVi:
         columns = editor.count_columns_in_row()
 
         def in_vi_symbolic(ch):
+
             return ch in VI_SYMBOLIC_SET
 
         def not_in_vi_blank(ch):
+
             return ch not in VI_BLANK_SET
 
         # Take a Symbolic word, else a Non-Blank word
@@ -3744,6 +3759,7 @@ class TerminalEditor:
             chord = chr(chord_int).encode()
 
             if chord == b"\x03":  # ETX, ⌃C, 3
+
                 raise KeyboardInterrupt()
 
             return chord
@@ -4483,6 +4499,7 @@ class TerminalPainter:
         """Block till TerminalDriver 'kbhit', to return next Keyboard Input"""
 
         chord = self.terminal.getch()
+
         return chord
 
     def terminal_print(self, *args, end="\r\n"):
@@ -4936,6 +4953,7 @@ class TerminalShadow:
         """Block till next keyboard input Chord"""
 
         chord = self.terminal.getch()
+
         return chord
 
     def write(self, chars):
@@ -5220,6 +5238,7 @@ class TerminalDriver:
         """Do nothing much, when running TerminalDriver in place of TerminalShadow"""
 
         size = os.get_terminal_size(self.fd)
+
         return size
 
         # TODO: resolve the clash between no 'flush' here while named as 'reopen'
@@ -5233,10 +5252,15 @@ class TerminalDriver:
         """Get a (Columns, Lines) Terminal Size, a la 'os.get_terminal_size'"""
 
         size = os.get_terminal_size(self.fd)
+
         return size
 
     def kbhit(self, timeout):
         """Wait till next Keystroke, or next burst of Paste pasted"""
+
+        if self.inputs:
+
+            return True
 
         rlist = [self.stdio]
         wlist = list()
@@ -5245,6 +5269,7 @@ class TerminalDriver:
         (rlist_, wlist_, xlist_) = selected
 
         if rlist_ == rlist:
+
             return True
 
     def getch(self):
@@ -5455,6 +5480,7 @@ class KwArgsException(Exception):
     def __str__(self):
         kwargs = self.kwargs
         str_exc = ", ".join("{}={!r}".format(k, v) for (k, v) in kwargs.items())
+
         return str_exc
 
 
@@ -5644,11 +5670,13 @@ def shlex_join(argv):
 
     if hasattr(shlex, "join"):
         shline = shlex.join(argv)
+
         return shline
 
     # Emulate the library roughly, because often good enough
 
     shline = " ".join(shlex_quote(_) for _ in argv)
+
     return shline
 
 
@@ -5660,6 +5688,7 @@ def shlex_quote(arg):
 
     if hasattr(shlex, "quote"):
         quoted = shlex.quote(arg)
+
         return quoted
 
     # Emulate the library roughly, because often good enough
@@ -5677,6 +5706,7 @@ def shlex_quote(arg):
     likely_harmful = set(arg) - set(mostly_harmless)
     if likely_harmful:
         quoted = repr(arg)  # as if the Py rules agree with Sh rules
+
         return quoted
 
     return arg
@@ -5730,14 +5760,8 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- bugs --
 
-# TODO: code :r to try read files, pass and fail
-# TODO: code :w to try write files, pass and fail
-
-# TODO: test inception of i⌃O inside R⌃O etc
-
-# TODO: choose which Controls to allow through I mode
-# TODO: choose which Controls to allow through R mode
-# TODO: mix together TerminalKeyboardViInsert/ TerminalKeyboardViReplace
+# FIXME:  vim.py --pwnme should quit like --version does
+# FIXME:  vim.py --pwnme/--version +vi should be the way to stay open
 
 # TODO:  find more bugs
 
@@ -5785,31 +5809,27 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 # TODO: radically simplified undo:  u to explain radically simplified undo
 
 
+# TODO: save/load to/from local Os CopyPaste Buffer, like via Mac pbpaste/pbcopy
+
+
 # -- future improvements --
 
-# TODO: :! for like :!echo $(whoami)@$(hostname):$(pwd)/
+# TODO: test inception of i⌃O inside R⌃O etc
 
 # TODO: record and replay tests of:  cat bin/vi.py |vi.py - bin/vi.py
 
-# TODO: Vim :g/ :g? jumps to first word of line, not to last hit
 # TODO: recover :g/ Status when ⌃L has given us :set _lag_ of >1 Screen of Hits
 
 # TODO: name errors for undefined keys inside Ex of / ? etc
 
 # TODO: Vim \ n somehow doesn't disrupt the 'keep_up_vi_column_seek' of $
 
-# TODO: :0 ... :9 to work as 0..9 but then G after Prefix
-# TODO: accept more chords and DEL and ⌃U after : till \r
-# TODO: accept :123\r, but suggest 123G etc
-# TODO: accept :noh\r and :set ignorecase and so on, but suggest \Esc \i etc
-_ = """
-ex tests:
-  ls |bin/vi.py +3 -  # start on chosen line
-  ls |bin/vi.py +/Makefile -  # start on found line
-"""
-
 
 # -- future features --
+
+# TODO: choose which Controls to allow through I mode
+# TODO: choose which Controls to allow through R mode
+# TODO: mix together TerminalKeyboardViInsert/ TerminalKeyboardViReplace
 
 # TODO: ⌃I ⌃O walk the Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
 # TODO: despite Doc, to match Vim, include in the Jump List the * # forms of / ?
@@ -5817,11 +5837,20 @@ ex tests:
 # TODO: mm '' `` pins
 # TODO: qqq @q  => record input, replay input
 
-# TODO: save/load to/from local Os CopyPaste Buffer, like via Mac pbpaste/pbcopy
+# TODO: :! for like :!echo $(whoami)@$(hostname):$(pwd)/
+# TODO: accept more chords and DEL and ⌃U after : till \r
+# TODO: accept :123\r, but suggest 123G etc
+# TODO: accept :noh\r and :set ignorecase and so on, but suggest \i etc
 
 # TODO: toggled :set wrap, :set nowrap
 # TODO: ⌃D ⌃U scrolling
 # TODO: ⌃V o  => rectangular: opposite
+
+# TODO: code :r to try read files by name, pass and fail
+# TODO: code :w to try write files by name, pass and fail
+
+# TODO: ls |bin/vi.py +3 -  # start on chosen line
+# TODO: ls |bin/vi.py +/Makefile -  # start on found line
 
 
 if __name__ == "__main__":
