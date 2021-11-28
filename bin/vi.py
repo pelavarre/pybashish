@@ -15,8 +15,7 @@ optional arguments:
   --version         print a hash of this Code (its Md5Sum)
 
 quirks:
-  defaults to read from pipe when piped, so in place of '|vi -' you can say:  |vi.py
-  doesn't save your changes, as yet
+  works as pipe filter, pipe source, or pipe drain, like the pipe drain:  ls |vi -
 
 keyboard cheat sheet:
   ZQ ZZ ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wq!⌃M  => how to quit Vi Py
@@ -35,7 +34,7 @@ keyboard cheat sheet:
 keyboard easter eggs:
   9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz
   Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*Esc w*⌃C w*123456n⌃C w*:g/⌃M⌃C g/⌃Z
-  Qvi⌃My REsc \Fw*/Up \F/$Return 9⌃G :vi⌃M :n
+  Qvi⌃My REsc R⌃Zfg \Fw*/Up \F/$Return 9⌃G :vi⌃M :n
 
 pipe tests of ZQ vs ZZ:
   ls |bin/vi.py -
@@ -263,15 +262,11 @@ def main(argv):
     try:
         vi.run_vi_terminal()  # like till SystemExit
         assert False  # unreached
+    except OSError as exc:
+        stderr_print("{}: {}".format(type(exc).__name__, exc))
+        sys.exit(1)
     except SystemExit as exc:
         returncode = exc.code
-
-        if (not returncode) and vi.file_writing_stdout:
-
-            iobytearray = vi.editor.iobytearray
-            os.write(sys.stdout.fileno(), iobytearray)
-            sys.stdout.flush()
-
         if vi.vi_traceback:
             stderr_print(vi.vi_traceback)
 
@@ -416,6 +411,74 @@ VI_BLANK_SET = set(" \t")
 VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # r"[A-Za-z0-9_]"
 
 
+class TerminalFile(argparse.Namespace):
+    """Hold a copy of the Bytes of a File awhile"""
+
+    def __init__(self, path=None):
+        """Fetch the File"""
+
+        self.path = None  # Path to File
+        self.iobytes = b""  # Bytes of File, else None
+        self.iochars = ""  # Chars of File, else None
+        self.ended_lines = list()  # Ended Lines of File
+        self.touches = 0
+
+        if path is not None:
+
+            self.path = os.path.abspath(path)
+
+            with open(path, "rb") as reading:
+                self.iobytes = reading.read()
+
+            self.iochars = self.iobytes.decode(errors="surrogateescape")
+
+            self.ended_lines = self.iochars.splitlines(keepends=True)
+
+        write_path = "/dev/stdout" if (path in (None, "/dev/stdin")) else path
+        write_path = os.path.abspath(write_path)
+
+        self.write_path = write_path
+
+    def decode(self):
+        """Re-decode the File after changes"""
+
+        if not self.ended_lines:
+
+            return ""
+
+        self.iochars = "".join(self.ended_lines)
+        self.iobytes = self.iochars.encode(errors="surrogateescape")
+
+        return self.iochars
+
+        # TODO: stop re-decode'ing while 'self.ended_lines' unchanged
+
+    def encode(self):
+        """Re-encode the File after changes"""
+
+        if not self.ended_lines:
+
+            return b""
+
+        self.iochars = "".join(self.ended_lines)
+        self.iobytes = self.iochars.encode(errors="surrogateescape")
+
+        return self.iobytes
+
+        # TODO: stop re-encode'ing while 'self.ended_lines' unchanged
+
+    def flush(self):
+        """Store the File"""
+
+        write_path = self.write_path
+
+        iobytes = self.encode()
+        with open(write_path, "wb") as writing:
+            writing.write(iobytes)
+
+        self.touches = 0
+
+
 class TerminalPin(collections.namedtuple("TerminalPin", "row, column".split(", "))):
     """Pair up a Row with a Column"""
 
@@ -433,14 +496,14 @@ class TerminalSkinVi:
 
     def __init__(self, files, plusses):
 
-        self.files = files  # files to edit
+        self.vi_traceback = None  # capture Python Tracebacks
+
         self.plusses = plusses  # Ex commands to run after
 
-        self.file_index = None
-        self.file_path = None
-        self.file_writing_stdout = None
+        self.files = files  # files to edit
+        self.files_index = None
 
-        self.vi_traceback = None  # capture Python Tracebacks
+        self.held_file = None
 
         self.editor = None
 
@@ -457,91 +520,51 @@ class TerminalSkinVi:
     #
 
     def do_might_next_vi_file(self):  # Vim :n\r
-        """Halt if Dev Stdin held, else visit the next (or first) File"""
+        """Halt if touches Not flushed, else visit the next (or first) File"""
 
-        file_path = self.file_path
-        iobytearray = self.editor.iobytearray
+        if self.might_keep_changes():
 
-        if file_path == "/dev/stdin":
-            if iobytearray:
-                n = str(len(iobytearray))
-                self.vi_print(n + " chars at Dev Stdin - Do you mean :n!")  # :n Egg
-
-                return
+            return True
 
         self.do_next_vi_file()
-
-        return True
 
     def do_next_vi_file(self):  # Vim :n!\r
         """Visit the next (or first) File"""
 
-        file_index = self.file_index
-        file_path = self.file_path
+        editor = self.editor
+        files_index = self.files_index
         files = self.files
-
-        iobytearray = None
-        if hasattr(self.editor, "iobytearray"):
-            iobytearray = self.editor.iobytearray
-
-        # Loudly fail to flush, rather than losing the held Chars
-
-        if file_path == "/dev/stdin":
-            if iobytearray:
-
-                raise NotImplementedError(
-                    "Dev Stdin :n! - Do you mean ZZ, :wq, ZQ, or :q!"
-                )
 
         # Choose next File, else quit after last File
 
-        if file_index is None:
-            next_file_index = 0
-            next_file = None if (not files) else files[next_file_index]
-        elif file_index < (len(files) - 1):
-            next_file_index = file_index + 1
-            next_file = files[next_file_index]
+        if files_index is None:
+            next_files_index = 0
+            file_path = None if (not files) else files[next_files_index]
+        elif files_index < (len(files) - 1):
+            next_files_index = files_index + 1
+            file_path = files[next_files_index]
         else:
-            self.do_quit_vi()  # Vim doesn't quit, Vim chokes over no next file
+            self.do_quit_vi()  # Vim doesn't calmly quit, Vim chokes over no next file
             assert False  # unreached
 
-        self.file_index = next_file_index
+        self.files_index = next_files_index
 
-        # Visit the chosen File
+        # Map more abstract File Path Aliases to more concrete File Paths
 
-        path = next_file
-        if next_file == "-":
+        path = file_path
+        if file_path == "-":
             path = "/dev/stdin"
-        elif next_file is None:
+        elif file_path is None:
             if not sys.stdin.isatty():
                 path = "/dev/stdin"
 
-        self.reopen_vi_path(path)
+        # Visit the chosen File
 
-    def reopen_vi_path(self, path):
-        """Visit a chosen File"""
+        held_file = TerminalFile(path)
 
-        self.file_path = path
+        editor._reinit_with_held_file_(held_file)
 
-        editor = self.editor
-
-        # Fetch Bytes of File
-
-        iobytes = b""
-        if path is not None:
-
-            if sys.stdin.isatty():
-                if path == "/dev/stdin":
-                    stderr_print("Press ⌃D EOF to quit giving input")
-
-            with open(path, "rb") as reading:
-                iobytes = reading.read()
-
-        iobytearray = bytearray(iobytes)
-
-        # Swap in a new File of Lines
-
-        editor._init_iobytearray_etc_(iobytearray)
+        self.held_file = held_file
 
     #
     # Layer thinly over TerminalEditor
@@ -575,21 +598,10 @@ class TerminalSkinVi:
         # Feed Keyboard into Screen, like till SystemExit
 
         try:
-
             editor.run_terminal_with_keyboard(keyboard)  # TerminalKeyboardVi
             assert False  # unreached
-
         finally:
-
             self.vi_traceback = editor.skin.traceback  # /⌃G⌃CZQ Egg
-
-            if editor.iobytearray:
-                if not self.file_writing_stdout:
-
-                    stderr_print(  # "vi.py: quit without write, ...
-                        "vi.py: quit without write, "
-                        "like because ZQ, or :q!, or didn't read Stdin"
-                    )
 
     def get_vi_arg0_chars(self):
         """Get the Chars of the Chords pressed to call this Func"""
@@ -636,8 +648,11 @@ class TerminalSkinVi:
         """Reply once with more verbose details"""
 
         editor = self.editor
+        held_file = self.held_file
 
         showing_lag = editor.showing_lag
+
+        #
 
         if editor.finding_line:
             editor.finding_highlights = True
@@ -647,10 +662,17 @@ class TerminalSkinVi:
         if showing_lag is not None:
             str_lag = "{}s lag".format(showing_lag)
 
+        #
+
         joins = list()
-        joins.append(repr(self.file_path))
+
+        joins.append(repr(os.path.basename(self.held_file.path)))
+
         if str_lag:
             joins.append(str_lag)
+
+        if held_file.touches:
+            joins.append("{} bytes touched".format(held_file.touches))
 
         more_status = "  ".join(joins)
         editor.editor_print(more_status)  # such as "'bin/vi.py'  less lag"
@@ -723,15 +745,6 @@ class TerminalSkinVi:
     # Define Chords for entering, pausing, and exiting TerminalSkinVi
     #
 
-    def do_flush_quit_vi(self):  # Vim ZZ  # Vim :wq!\r
-        """Save last changes and quit"""
-
-        if self.file_path == "/dev/stdin":
-            self.file_writing_stdout = True
-
-        returncode = self.get_vi_arg1_int(default=None)
-        sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
-
     def do_help_quit_vi(self):  # Vim ⌃C  # Vi Py Init
         """Suggest ZQ to quit Vi Py"""
 
@@ -749,87 +762,123 @@ class TerminalSkinVi:
         # Vim rings a Bell for each extra ⌃C
 
     def do_might_flush_quit_vi(self):  # Vim :wq\r
-        """Halt if more files, else try might quit"""
+        """Write the File, but halt if more Files"""
 
-        file_index = self.file_index
-        files = self.files
+        if self.do_might_flush_vi():
 
-        more_files = files[file_index:][1:]
-        if more_files:
-            self.vi_print("{} more files - Do you mean :wq!".format(len(more_files)))
-            # :wq Egg  # Vim raises this IndexError only once, til next ':w' write
+            return True
 
-            return
+        if self.do_might_quit_vi():
 
-        self.do_flush_quit_vi()
+            return True
+
         assert False  # unreached
 
-    def do_might_flush_vi_io(self):  # Vim :w\r
-        """Halt if difficult to write, else write"""
+        # Vim :wq :wq quits despite more Files named than fetched
+        # Vi Py :wq doesn't quit while more Files named than fetched, vs its :wq! does
 
-        file_path = self.file_path
-        iobytearray = self.editor.iobytearray
+    def do_flush_quit_vi(self):  # Vim ZZ  # Vim :wq!\r
+        """Write the File and quit Vi"""
 
-        if file_path == "/dev/stdin":
-            if iobytearray:
-                n = str(len(iobytearray))
-                self.vi_print(n + " chars at Dev Stdin - Do you mean :w!")  # :w Egg
+        editor = self.editor
 
-                return
+        editor.skin.traceback = None
 
-        return True
+        self.do_flush_vi()
+        self.do_quit_vi()
 
-    def do_flush_vi_io(self):  # Vim :w!\r
-        """Mutate the File"""
+        # Vim :wq! quits when more Files named than fetched, Vim ZZ no, Vim ZZ ZZ yes
+        # Vi Py :wq! and ZZ quit despite more Files named than fetched
 
-        file_path = self.file_path
-        iobytearray = self.editor.iobytearray
+    def do_might_flush_vi(self):  # Vim :w\r
+        """Write the File but do not quit Vi"""
 
-        if file_path == "/dev/stdin":
-            if iobytearray:
+        self.do_flush_vi()
 
-                raise NotImplementedError(
-                    "Dev Stdin :w! - Do you mean ZZ, :wq, ZQ, or :q!"
-                )
+    def do_flush_vi(self):  # Vim :w!\r
+        """Write the File"""
+
+        editor = self.editor
+        held_file = self.held_file
+
+        painter = editor.painter
+
+        if held_file.write_path == held_file.path:
+            held_file.flush()
+        else:
+            exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
+            painter.__exit__(*exc_info)
+            try:
+                held_file.flush()
+                time.sleep(0.001)  # TODO: wout this, fails 1 of 10:  ls |vi.py |cat -n
+            finally:
+                painter.__enter__()
+
+            # TODO: shuffle this code down into TerminalEditor
+
+        self.vi_print(
+            "wrote {} lines as {} bytes".format(
+                len(held_file.ended_lines), len(held_file.iobytes)
+            )
+        )
+
+        # TODO: Vim :w! vs Vim :w
 
     def do_might_quit_vi(self):  # Vim :q\r
-        """Halt if more Files, else quit"""
+        """Halt if Touches not Flushed or More Files, else quit Vi"""
 
-        file_index = self.file_index
-        file_path = self.file_path
-        files = self.files
-        iobytearray = self.editor.iobytearray
+        if self.might_keep_changes():
 
-        if file_path == "/dev/stdin":
-            if iobytearray:
-                n = str(len(iobytearray))  # TODO: "{:_}".format(122213) in later Python
-                self.vi_print(n + " chars at Dev Stdin - Do you mean ZZ, :q!, ZQ")
-                # :q Egg
+            return True
 
-                return
+        if self.might_keep_files():
 
-        more_files = files[file_index:][1:]
-        if more_files:
-            self.vi_print("{} more files - Do you mean :n".format(len(more_files)))
-            # :q Egg  # Vim raises this IndexError only once, til next ':w' write
-
-            return
+            return True
 
         self.do_quit_vi()
         assert False  # unreached
 
+        # Vim :q :q quits despite more Files named than fetched
+        # Vi Py :q doesn't quit while more Files named than fetched, vs its :q! does
+
+    def might_keep_changes(self):
+
+        """Return None if no Touches held, else say how to bypass and return True"""
+        held_file = self.held_file
+
+        alt = self.get_vi_arg0_chars().rstrip() + "!"  # FIXME: factor this out
+        assert alt in (":n!", ":q!", ":wq!"), repr(alt)
+        alt = alt.replace(":q!", "ZQ")
+        alt = alt.replace(":wq!", "ZZ")
+
+        if held_file:
+            touches = held_file.touches
+            if touches:
+                self.vi_print("{} bytes touched - Do you mean {}".format(touches, alt))
+
+                return True
+
+    def might_keep_files(self):
+        """Return None if no Files held, else say how to bypass and return True"""
+
+        files = self.files
+        files_index = self.files_index
+
+        alt = self.get_vi_arg0_chars().rstrip() + "!"  # FIXME: factor this out
+        assert alt in (":q!", ":wq!")
+        alt = alt.replace(":q!", "ZQ")
+        alt = alt.replace(":wq!", "ZZ")
+
+        more_files = files[files_index:][1:]
+        if more_files:
+            self.vi_print("{} more files - Do you mean {}".format(len(more_files), alt))
+
+            return True
+
     def do_quit_vi(self):  # Vim ZQ  # Vim :q!\r
         """Lose last changes and quit"""
 
-        file_path = self.file_path
-        iobytearray = self.editor.iobytearray
-
-        returncode = None
-        if file_path == "/dev/stdin":
-            if iobytearray:
-                returncode = 1
-        returncode = self.get_vi_arg1_int(default=returncode)
-
+        returncode = self.get_vi_arg1_int(default=None)
         sys.exit(returncode)  # Mac & Linux take only 'returncode & 0xFF'
 
     #
@@ -2203,6 +2252,7 @@ class TerminalSkinVi:
 
         editor.column = 0
         editor.insert_one_line()  # insert an empty Line before Cursor Line
+        self.held_file.touches += 1
         editor.row -= 1
 
         # Take Input Chords into the new empty Line
@@ -2249,6 +2299,7 @@ class TerminalSkinVi:
         editor.column = 0
 
         editor.insert_one_line()  # insert an empty Line after Cursor Line
+        self.held_file.touches += 1
 
         editor.row -= 1
 
@@ -2349,15 +2400,16 @@ class TerminalSkinVi:
             editor.run_skin_with_keyboard(keyboard)  # TerminalKeyboardVi
             assert False  # unreached
         except SystemExit:
-            editor.skin.doing_traceback = editor.skin.traceback  # FIXME: test this
+            editor.skin.doing_traceback = editor.skin.traceback  # TODO: test this Egg
 
-        editor.skin.reply = keyboard.skin.reply  # FIXME: ugly
+        editor.skin.reply = keyboard.skin.reply  # TODO: ugly
 
     def do_insert_one_line(self):
         """Insert one Line"""
 
         editor = self.editor
         editor.insert_one_line()
+        self.held_file.touches += 1
         self.vi_print("inserted line")
 
     def do_insert_one_char(self):
@@ -2367,6 +2419,7 @@ class TerminalSkinVi:
 
         chars = self.get_vi_arg0_chars()
         editor.insert_some_chars(chars)  # insert as inserting itself
+        self.held_file.touches += 1
         self.vi_print("inserted char")
 
     def do_replace_with_choice(self):  # Vim r
@@ -2376,6 +2429,7 @@ class TerminalSkinVi:
 
         choice = self.get_vi_arg2_chords()
         editor.replace_some_chars(chars=choice)
+        self.held_file.touches += 1
         self.vi_print("{} replaced".format(editor.format_touch_count()))
 
         editor.continue_do_loop()
@@ -2387,6 +2441,7 @@ class TerminalSkinVi:
 
         chars = self.get_vi_arg0_chars()
         editor.replace_some_chars(chars)
+        self.held_file.touches += 1
         self.vi_print("replaced char")
 
 
@@ -2552,8 +2607,8 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func_by_many_chords(b":q\r", func=vi.do_might_quit_vi)
         self._init_func_by_many_chords(b":q!\r", func=vi.do_quit_vi)
         self._init_func_by_many_chords(b":vi\r", func=editor.do_resume_editor)
-        self._init_func_by_many_chords(b":w\r", func=vi.do_might_flush_vi_io)
-        self._init_func_by_many_chords(b":w!\r", func=vi.do_flush_vi_io)
+        self._init_func_by_many_chords(b":w\r", func=vi.do_might_flush_vi)
+        self._init_func_by_many_chords(b":w!\r", func=vi.do_flush_vi)
         self._init_func_by_many_chords(b":wq\r", func=vi.do_might_flush_quit_vi)
         self._init_func_by_many_chords(b":wq!\r", func=vi.do_flush_quit_vi)
 
@@ -2849,7 +2904,7 @@ class TerminalSkinEx:
         """Append the Chords to the Input Line"""
 
         editor = self.editor
-        chars = editor.get_vi_arg0_chars()
+        chars = editor.get_arg0_chars()
 
         if chars == "£":  # TODO: less personal choice
             self.ex_line += "#"  # a la Vim :abbrev £ #
@@ -3128,18 +3183,15 @@ class TerminalEditor:
         self.finding_slip = 0  # remember to Search again ahead or again behind
         self.finding_highlights = None  # show Searching as Highlights, or don't
 
-        self._init_iobytearray_etc_(iobytearray=b"")
+        self._reinit_with_held_file_(TerminalFile())
 
         # TODO: mutable namespaces for self.finding_, argv_, doing_, etc
 
-    def _init_iobytearray_etc_(self, iobytearray):
+    def _reinit_with_held_file_(self, held_file):
         """Swap in a new File of Lines"""
 
-        self.iobytearray = iobytearray
-
-        chars = iobytearray.decode(errors="surrogateescape")
-        ended_lines = chars.splitlines(keepends=True)
-        self.ended_lines = ended_lines  # Ended Lines of Chars decoded from Bytes
+        self.held_file = held_file
+        self.ended_lines = held_file.ended_lines
 
         self.row = 0  # point the Cursor to a Row of File
         self.column = 0  # point the Cursor to a Column of File
@@ -3226,7 +3278,7 @@ class TerminalEditor:
             if hello_line:
                 self.editor_print(hello_line)
 
-            keyboard.skin = self.skin  # FIXME: ugly
+            keyboard.skin = self.skin  # TODO: ugly
 
             self.skin = skin
 
@@ -3287,7 +3339,9 @@ class TerminalEditor:
                 # self.skin.chord_ints_ahead = list()
 
                 self.skin.traceback = traceback.format_exc()
-                # file_print(self.skin.traceback)
+                if not self.painter.rows:
+
+                    raise
 
                 keyboard.continue_do_func()
 
@@ -4024,8 +4078,9 @@ class TerminalEditor:
     def reopen_found_spans(self):
         """Find Chars in File"""
 
-        iobytearray = self.iobytearray
         iobytespans = self.iobytespans
+
+        iochars = self.held_file.decode()
 
         # Cancel the old Spans
 
@@ -4046,8 +4101,7 @@ class TerminalEditor:
             if not self.finding_case:
                 flags |= re.IGNORECASE
 
-            chars = iobytearray.decode(errors="surrogateescape")
-            matches = list(re.finditer(pattern, string=chars, flags=flags))
+            matches = list(re.finditer(pattern, string=iochars, flags=flags))
             iobytespans[::] = TerminalSpan.find_spans(matches)
 
             if matches:  # as many Spans as Matches, except for such as r"$" in "abc\n"
@@ -5678,7 +5732,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # TODO: code :r to try read files, pass and fail
 # TODO: code :w to try write files, pass and fail
-# TODO: code startup and :n to pass and fail try read files
 
 # TODO: test inception of i⌃O inside R⌃O etc
 
@@ -5717,11 +5770,15 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 
 # TODO: stop passing through Controls from the File
-# TODO: accept b"\t" as a form of b" "
+# TODO: test hard Tabs in File
 # TODO: solve /⌃V⌃IReturn
-# TODO: solve:  echo -n abc |vi -
+# TODO: accept b"\t" Hard Tabs as a form of b" " Space
 # TODO: show the first ~ past the end differently when No End for Last Line
 # TODO: revive the last Match of r"$" out there
+# TODO: show, delete, and insert the Eol of the last line
+# TODO: test Eol encodings of b"\r\n" and b"\r", apart from b"\n" in File
+# TODO: test chars outside  and far outside the basic "\u0000".."\u00FF" in File
+# TODO: test SurrogateEscape's in File
 
 
 # TODO: radically simplified undo:  3u to rollback 3 keystrokes
