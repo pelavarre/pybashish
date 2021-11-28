@@ -3,7 +3,7 @@
 r"""
 usage: vi.py [-h] [+PLUS] [--pwnme [BRANCH]] [--version] [FILE ...]
 
-read files, accept zero edits, write files
+read files, accept edits, write files
 
 positional arguments:
   FILE              a file to edit (default: '/dev/stdin')
@@ -258,31 +258,8 @@ def main(argv):
 
     # Visit each File
 
-    vi = TerminalEditorVi(files=args.files, plusses=args.plusses)
-
-    returncode = None
-    try:
-
-        vi.run_vi_terminal()  # like till SystemExit
-        assert False  # unreached
-
-    except OSError as exc:
-
-        stderr_print("{}: {}".format(type(exc).__name__, exc))
-
-        sys.exit(1)
-
-    except SystemExit as exc:
-
-        returncode = exc.code
-        if vi.vi_traceback:
-            stderr_print(vi.vi_traceback)
-
-        # TODO: log keystrokes interpreted before exit, or dropped by exit
-
-    # Exit
-
-    sys.exit(returncode)
+    vi_the_files(files=args.files, plusses=args.plusses)
+    emacs_the_files(files=args.files, plusses=args.plusses)
 
 
 def parse_vi_argv(argv):
@@ -330,7 +307,7 @@ def parse_vi_argv(argv):
         if not arg.startswith("+"):
             argv_tail.append(arg)
         else:
-            argv_tail.append("--plus=" + arg[len("+"):])
+            argv_tail.append("--plus=" + arg[len("+") :])
 
     args = parser.parse_args(argv_tail)
     if args.help:
@@ -423,6 +400,71 @@ def do_args_pwnme(branch):
             sys.exit(exc.returncode)
 
     sys.exit()  # exit old Self, after calling new Self once or twice
+
+
+def vi_the_files(files, plusses):
+    """Eval the Plusses and then visit each File, in the way of Vim"""
+
+    if os.path.basename(sys.argv[0]).startswith("emacs"):
+        return
+
+    vi = TerminalEditorVi(files, plusses=plusses)
+
+    returncode = None
+    try:
+
+        vi.run_vi_terminal()  # like till SystemExit
+        assert False  # unreached
+
+    except OSError as exc:
+
+        stderr_print("{}: {}".format(type(exc).__name__, exc))
+
+        sys.exit(1)
+
+    except SystemExit as exc:
+
+        returncode = exc.code
+        if vi.vi_traceback:
+            stderr_print(vi.vi_traceback)
+
+        # TODO: log keystrokes interpreted before Vi exit, or dropped by Vi exit
+
+    # Exit
+
+    sys.exit(returncode)
+
+
+def emacs_the_files(files, plusses):
+    """Eval the Plusses and then visit each File, in the way of Emacs"""
+
+    emacs = TerminalEditorEmacs(files)
+    _ = plusses  # TODO:  emacs.py --eval EXPR, --execute EXPR
+
+    returncode = None
+    try:
+
+        emacs.run_emacs_terminal()  # like till SystemExit
+        assert False  # unreached
+
+    except OSError as exc:
+
+        stderr_print("{}: {}".format(type(exc).__name__, exc))
+
+        sys.exit(1)
+
+    except SystemExit as exc:
+
+        returncode = exc.code
+        if emacs.emacs_traceback:
+            stderr_print(emacs.emacs_traceback)
+
+        # TODO: log keystrokes interpreted before Emacs exit, or dropped by Emacs exit
+
+    # Exit
+
+    sys.exit(returncode)
+
 
 
 #
@@ -2957,6 +2999,60 @@ class TerminalKeyboardEx(TerminalKeyboard):
         # TODO: input Search Keys containing more than BASIC_LATIN_STDINS and #
 
         # TODO: define Esc to replace live Regex punctuation with calmer r"."
+
+
+#
+# Carry an Emacs Py inside the Vi Py
+#
+
+
+r"""
+usage: emacs.py [-h] [-nw] [--no-splash] [--pwnme [BRANCH]] [--version] [FILE ...]
+
+read files, accept edits, write files
+
+positional arguments:
+  FILE                     a file to edit (default: '/dev/stdin')
+
+optional arguments:
+  -h, --help               show this help message and exit
+  -nw, --no-window-system  stay inside this Terminal
+  --no-splash              start with an empty file
+  --pwnme [BRANCH]         update and run this Code, don't just run it
+  --version                print a hash of this Code (its Md5Sum)
+
+quirks:
+  works as pipe filter, pipe source, or pipe drain, like the pipe drain:  ls |vi -
+
+keyboard cheat sheet:
+  ⌃X⌃C  => how to quit Emacs Py
+
+pipe tests:
+  ls |bin/emacs.py -
+  cat bin/emacs.py |bin/emacs.py
+  cat bin/emacs.py |bin/emacs.py |grep import
+
+how to get Emacs Py:
+  R=pelavarre/pybashish/master/bin/emacs.py
+  curl -sSO --location https://raw.githubusercontent.com/$R
+  python3 emacs?py emacs?py
+  /egg
+
+how to get Emacs Py again:
+  python3 emacs?py --pwnme
+"""
+
+
+class TerminalEditorEmacs:
+    """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Emacs"""
+
+    def __init__(self, files):
+
+        pass
+
+    def run_emacs_terminal(self):
+
+        raise NotImplementedError()
 
 
 #
