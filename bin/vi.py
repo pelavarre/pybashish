@@ -248,9 +248,7 @@ def main(argv):
 
     if args.pwnme is not False:
         do_args_pwnme(branch=args.pwnme)
-        if not (args.files or args.plusses):
-
-            sys.exit()
+        assert False  # unreached
 
     if args.version:
         do_args_version()
@@ -356,8 +354,6 @@ def do_args_version():
 def do_args_pwnme(branch):
     """Download fresh Code to run in place of this stale Code"""
 
-    sys_argv = sys.argv
-
     # Find present Self
 
     path = module_file_path()
@@ -378,7 +374,7 @@ def do_args_pwnme(branch):
     callpath = callpath if (os.sep in callpath) else os.path.join(os.curdir, callpath)
 
     # Compose a Bash Script
-    # to back up Self, replace Self, mark Self as executable, call new Self twice
+    # to back up Self, replace Self, mark Self as executable, call new Self
 
     when = main.since
     stamp = when.strftime("%m%djqd%H%M%S")
@@ -392,16 +388,26 @@ def do_args_pwnme(branch):
 
     chmod_shline = "chmod ugo+x {relpath}".format(relpath=to_relpath)
 
+    vi_py_shline_0 = shlex_join([callpath, "--version"])
+
+    shlines = [mv_shline, curl_shline, chmod_shline, vi_py_shline_0]
+
+    # Compose one more Bash Line to call new Self with Args, if more Args were given
+
     argv = list()
     argv.append(callpath)
-    for arg in sys_argv[1:]:
-        if not arg.startswith("--pwnme"):
-            argv.append(arg)
+    for (index, arg) in enumerate(sys.argv):
+        if index:
+            if arg.startswith("--pwnme"):
+                pass
+            elif sys.argv[index - 1] == "--pwnme":
+                pass
+            else:
+                argv.append(arg)
 
-    vi_py_shline_0 = shlex_join([callpath, "--version"])
-    vi_py_shline_1 = shlex_join(argv)
-
-    shlines = (mv_shline, curl_shline, chmod_shline, vi_py_shline_0, vi_py_shline_1)
+    if argv[1:]:
+        vi_py_shline_1 = shlex_join(argv)
+        shlines.append(vi_py_shline_1)
 
     # Run the Bash Script, and exit with its process exit status returncode
 
@@ -415,6 +421,8 @@ def do_args_pwnme(branch):
             stderr_print("+ exit {}".format(exc.returncode))
 
             sys.exit(exc.returncode)
+
+    sys.exit()  # exit old Self, after calling new Self once or twice
 
 
 #
