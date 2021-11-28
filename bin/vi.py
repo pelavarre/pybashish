@@ -400,7 +400,7 @@ def do_args_pwnme(branch):
         if index:
             if arg.startswith("--pwnme"):
                 pass
-            elif sys.argv[index - 1] == "--pwnme":
+            elif sys.argv[index - 1] == "--pwnme" and not arg.startswith("-"):
                 pass
             else:
                 argv.append(arg)
