@@ -258,7 +258,7 @@ def main(argv):
 
     # Visit each File
 
-    vi = TerminalSkinVi(files=args.files, plusses=args.plusses)
+    vi = TerminalEditorVi(files=args.files, plusses=args.plusses)
 
     returncode = None
     try:
@@ -434,87 +434,7 @@ VI_BLANK_SET = set(" \t")
 VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # r"[A-Za-z0-9_]"
 
 
-class TerminalFile(argparse.Namespace):
-    """Hold a copy of the Bytes of a File awhile"""
-
-    def __init__(self, path=None):
-        """Fetch the File"""
-
-        self.path = None  # Path to File
-        self.iobytes = b""  # Bytes of File, else None
-        self.iochars = ""  # Chars of File, else None
-        self.ended_lines = list()  # Ended Lines of File
-        self.touches = 0
-
-        if path is not None:
-
-            self.path = os.path.abspath(path)
-
-            with open(path, "rb") as reading:
-                self.iobytes = reading.read()
-
-            self.iochars = self.iobytes.decode(errors="surrogateescape")
-
-            self.ended_lines = self.iochars.splitlines(keepends=True)
-
-        write_path = "/dev/stdout" if (path in (None, "/dev/stdin")) else path
-        write_path = os.path.abspath(write_path)
-
-        self.write_path = write_path
-
-    def decode(self):
-        """Re-decode the File after changes"""
-
-        if not self.ended_lines:
-
-            return ""
-
-        self.iochars = "".join(self.ended_lines)
-        self.iobytes = self.iochars.encode(errors="surrogateescape")
-
-        return self.iochars
-
-        # TODO: stop re-decode'ing while 'self.ended_lines' unchanged
-
-    def encode(self):
-        """Re-encode the File after changes"""
-
-        if not self.ended_lines:
-
-            return b""
-
-        self.iochars = "".join(self.ended_lines)
-        self.iobytes = self.iochars.encode(errors="surrogateescape")
-
-        return self.iobytes
-
-        # TODO: stop re-encode'ing while 'self.ended_lines' unchanged
-
-    def flush(self):
-        """Store the File"""
-
-        write_path = self.write_path
-
-        iobytes = self.encode()
-        with open(write_path, "wb") as writing:
-            writing.write(iobytes)
-
-        self.touches = 0
-
-
-class TerminalPin(collections.namedtuple("TerminalPin", "row, column".split(", "))):
-    """Pair up a Row with a Column"""
-
-    # TODO:  class TerminalPinVi - to slip and step in the way of Vi
-
-
-class TerminalPinPlus(
-    collections.namedtuple("TerminalPinPlus", "row, column, obj".split(", "))
-):
-    """Add one more Thing to pairing up a Row with a Column"""
-
-
-class TerminalSkinVi:
+class TerminalEditorVi:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim"""
 
     def __init__(self, files, plusses):
@@ -647,7 +567,7 @@ class TerminalSkinVi:
         self.editor.editor_print(*args)  # 'def vi_print' calling
 
     #
-    # Layer thinly under the rest of TerminalSkinVi
+    # Layer thinly under the rest of TerminalEditorVi
     #
 
     def check_vi_index(self, truthy, **kwargs):
@@ -664,7 +584,7 @@ class TerminalSkinVi:
         self.seeking_more = True
 
     #
-    # Define Chords for pausing TerminalSkinVi
+    # Define Chords for pausing TerminalEditorVi
     #
 
     def do_say_more(self):  # Vim ⌃G
@@ -751,7 +671,7 @@ class TerminalSkinVi:
         self.vi_print(message)  # 'def vi_ask' calling
 
         vi_reply = self.format_vi_status(self.editor.skin.reply)
-        ex = TerminalSkinEx(editor, vi_reply=vi_reply)
+        ex = TerminalEditorEx(editor, vi_reply=vi_reply)
         ex.flush_ex_status()
 
     def do_vi_sig_tstp(self):  # Vim ⌃Zfg
@@ -765,7 +685,7 @@ class TerminalSkinVi:
             self.keep_up_vi_column_seek()
 
     #
-    # Define Chords for entering, pausing, and exiting TerminalSkinVi
+    # Define Chords for entering, pausing, and exiting TerminalEditorVi
     #
 
     def do_help_quit_vi(self):  # Vim ⌃C  # Vi Py Init
@@ -1174,7 +1094,7 @@ class TerminalSkinVi:
         editor = self.editor
 
         vi_reply = self.format_vi_status(self.editor.skin.reply)
-        ex = TerminalSkinEx(editor, vi_reply=vi_reply)
+        ex = TerminalEditorEx(editor, vi_reply=vi_reply)
         line = ex.read_ex_line()
 
         return line
@@ -2856,11 +2776,11 @@ class TerminalKeyboardViReplace(TerminalKeyboard):
 
 
 #
-# Edit some Chars in the Bottom Lines of the Screen
+# Feed Keyboard into Bottom Lines of the Screen, a la the Ex inside Vim
 #
 
 
-class TerminalSkinEx:
+class TerminalEditorEx:
     """Feed Keyboard into Line at Bottom of Screen of Scrolling Rows, a la Ex"""
 
     def __init__(self, editor, vi_reply):
@@ -3040,12 +2960,12 @@ class TerminalKeyboardEx(TerminalKeyboard):
 
 
 #
-# Define the Editors above in terms of Inputs, Outputs, & Selections of Chars
+# Define the Editors in terms of Keyboard, Screen, Files of Bytes, & Spans of Chars
 #
 
 
 class TerminalNudgeIn(argparse.Namespace):
-    """Collect the parts of one Nudge In"""
+    """Collect the parts of one Nudge In from the Keyboard"""
 
     def __init__(self, prefix=None, chords=None, suffix=None, epilog=None):
 
@@ -3072,7 +2992,7 @@ class TerminalNudgeIn(argparse.Namespace):
 
 
 class TerminalReplyOut(argparse.Namespace):
-    """Collect the parts of one Reply Out"""
+    """Collect the parts of one Reply Out to the Screen"""
 
     def __init__(self, flags=None, nudge=None, message=None, bell=None):
 
@@ -3082,6 +3002,86 @@ class TerminalReplyOut(argparse.Namespace):
         self.bell = bell  # ring bell
 
     # Jun/2018 Python 3.7 can say '._defaults=(None, None),'
+
+
+class TerminalFile(argparse.Namespace):
+    """Hold a copy of the Bytes of a File awhile"""
+
+    def __init__(self, path=None):
+        """Fetch the File"""
+
+        self.path = None  # Path to File
+        self.iobytes = b""  # Bytes of File, else None
+        self.iochars = ""  # Chars of File, else None
+        self.ended_lines = list()  # Ended Lines of File
+        self.touches = 0
+
+        if path is not None:
+
+            self.path = os.path.abspath(path)
+
+            with open(path, "rb") as reading:
+                self.iobytes = reading.read()
+
+            self.iochars = self.iobytes.decode(errors="surrogateescape")
+
+            self.ended_lines = self.iochars.splitlines(keepends=True)
+
+        write_path = "/dev/stdout" if (path in (None, "/dev/stdin")) else path
+        write_path = os.path.abspath(write_path)
+
+        self.write_path = write_path
+
+    def decode(self):
+        """Re-decode the File after changes"""
+
+        if not self.ended_lines:
+
+            return ""
+
+        self.iochars = "".join(self.ended_lines)
+        self.iobytes = self.iochars.encode(errors="surrogateescape")
+
+        return self.iochars
+
+        # TODO: stop re-decode'ing while 'self.ended_lines' unchanged
+
+    def encode(self):
+        """Re-encode the File after changes"""
+
+        if not self.ended_lines:
+
+            return b""
+
+        self.iochars = "".join(self.ended_lines)
+        self.iobytes = self.iochars.encode(errors="surrogateescape")
+
+        return self.iobytes
+
+        # TODO: stop re-encode'ing while 'self.ended_lines' unchanged
+
+    def flush(self):
+        """Store the File"""
+
+        write_path = self.write_path
+
+        iobytes = self.encode()
+        with open(write_path, "wb") as writing:
+            writing.write(iobytes)
+
+        self.touches = 0
+
+
+class TerminalPin(collections.namedtuple("TerminalPin", "row, column".split(", "))):
+    """Pair up a Row with a Column"""
+
+    # TODO:  class TerminalPinVi - to slip and step in the way of Vi
+
+
+class TerminalPinPlus(
+    collections.namedtuple("TerminalPinPlus", "row, column, obj".split(", "))
+):
+    """Add one more Thing to pairing up a Row with a Column"""
 
 
 class TerminalSpan(
@@ -3181,6 +3181,11 @@ class TerminalSkin:
         self.doing_more = None  # take the Arg1 as a Count of Repetition's
         self.doing_done = None  # count the Repetition's completed before now
         self.doing_traceback = None  # retain a Python Traceback till after more Chords
+
+
+#
+# Define the Editors above in terms of Inputs, Outputs, & Spans of Chars
+#
 
 
 class TerminalEditor:
@@ -5779,6 +5784,7 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- future inventions --
 
+# TODO: Generate an Emacs Py from Vi Py, and a Vi Py from Emacs Py
 
 # TODO: Delete after Replaces as undo Replaces, inside the R mode
 # TODO: code Repeat Count for the a i o A I O variations of Insert
