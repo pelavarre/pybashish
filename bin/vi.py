@@ -28,11 +28,12 @@ keyboard cheat sheet:
   ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
   \n \i \F Esc ⌃G  => toggle line numbers, search case/ regex, show hits
   /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => start search, next, previous
-  :g/... Delete ⌃U ⌃C Return :g?...  => give search key and print lines found
+  :?Return :/Return :g/Return  => search behind, ahead, print all, or new search
   a i rx o A I O R ⌃O Esc ⌃C  => enter/ suspend-resume/ exit insert/ replace
+  x X D J s S C  => cut chars, join lines, cut & insert
 
 keyboard easter eggs:
-  9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz
+  9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz ?Return /Return :g/Return
   Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*Esc w*⌃C w*123456n⌃C w*:g/⌃M⌃C g/⌃Z
   Qvi⌃My REsc R⌃Zfg \Fw*/Up \F/$Return 9⌃G :vi⌃M :n
 
@@ -56,6 +57,7 @@ how to get Vi Py again:
 
 import argparse
 import collections
+import copy
 import datetime as dt
 import difflib
 import hashlib
@@ -466,7 +468,6 @@ def emacs_the_files(files, plusses):
     sys.exit(returncode)
 
 
-
 #
 # Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim
 #
@@ -669,11 +670,12 @@ class TerminalEditorVi:
     def do_vi_c0_control_esc(self):  # Vim Esc
         """Cancel Digits Prefix, else suggest ZZ to quit Vi Py"""
 
+        count = self.get_vi_arg1_int(default=None)
+
         editor = self.editor
 
         version = module_file_version_zero()
 
-        count = self.get_vi_arg1_int(default=None)
         if count is not None:
             self.vi_print("Escaped Repeat Count")  # 123 Esc Egg, etc
         elif editor.finding_highlights:
@@ -1202,10 +1204,12 @@ class TerminalEditorVi:
     def do_slip(self):  # Vim |  # Emacs goto-char
         """Leap to first Column, else to a chosen Column"""
 
+        count = self.get_vi_arg1_int()
+
         editor = self.editor
 
         max_column = editor.spot_max_column()
-        column = min(max_column, self.get_vi_arg1_int() - 1)
+        column = min(max_column, count - 1)
 
         editor.column = column
 
@@ -1241,22 +1245,26 @@ class TerminalEditorVi:
     def do_slip_left(self):  # Vim h, ← Left Arrow  # Emacs left-char, backward-char
         """Slip left one Column or more"""
 
+        count = self.get_vi_arg1_int()
+
         editor = self.editor
 
         self.check_vi_index(editor.column)
 
-        left = min(editor.column, self.get_vi_arg1_int())
+        left = min(editor.column, count)
         editor.column -= left
 
     def do_slip_right(self):  # Vim l, → Right Arrow  #  emacs right-char, forward-char
         """Slip Right one Column or more"""
+
+        count = self.get_vi_arg1_int()
 
         editor = self.editor
 
         max_column = editor.spot_max_column()
         self.check_vi_index(editor.column < max_column)
 
-        right = min(max_column - editor.column, self.get_vi_arg1_int())
+        right = min(max_column - editor.column, count)
         editor.column += right
 
     #
@@ -1332,10 +1340,12 @@ class TerminalEditorVi:
     def do_step(self):  # Vim G, 1G  # Emacs goto-line
         """Leap to last Row, else to a chosen Row"""
 
+        count = self.get_vi_arg1_int()
+
         editor = self.editor
         last_row = editor.spot_last_row()
 
-        row = min(last_row, self.get_vi_arg1_int() - 1)
+        row = min(last_row, count - 1)
         row = last_row if (editor.skin.arg1 is None) else row
 
         editor.row = row
@@ -1344,33 +1354,38 @@ class TerminalEditorVi:
     def do_step_down_dent(self):  # Vim +, Return
         """Step down a Row or more, but land just past the Indent"""
 
-        self.step_down_repeatedly()
+        self.step_down_for_count()
         self.slip_dent()
 
-    def step_down_repeatedly(self):
+    def step_down_for_count(self):
         """Step down one Row or more"""
 
+        count = self.get_vi_arg1_int()
+
         editor = self.editor
+        row = editor.row
         last_row = editor.spot_last_row()
 
-        self.check_vi_index(editor.row < last_row)
-        down = min(last_row - editor.row, self.get_vi_arg1_int())
+        self.check_vi_index(row < last_row)
+        down = min(last_row - row, count)
 
         editor.row += down
 
     def do_step_down_minus_dent(self):  # Vim _
         """Leap to just past the Indent, but first Step Down if Arg"""
 
-        self.step_down_minus()
+        self.step_down_for_count_minus()
         self.slip_dent()
 
-    def step_down_minus(self):
+    def step_down_for_count_minus(self):
         """Step down zero or more Rows, not one or more Rows"""
 
-        down = self.get_vi_arg1_int() - 1
+        count = self.get_vi_arg1_int()
+
+        down = count - 1
         if down:
-            self.editor.skin.arg1 -= 1  # mutate
-            self.step_down_repeatedly()
+            self.editor.skin.arg1 -= 1  # mutate  # ugly
+            self.step_down_for_count()
 
     def do_step_max_low(self):  # Vim L
         """Leap to first Word of Bottom Row on Screen"""
@@ -1396,15 +1411,17 @@ class TerminalEditorVi:
     def do_step_up_dent(self):  # Vim -
         """Step up a Row or more, but land just past the Indent"""
 
-        self.step_up_repeatedly()
+        self.step_up_for_count()
         self.slip_dent()
 
-    def step_up_repeatedly(self):
+    def step_up_for_count(self):
         """Step up one Row or more"""
+
+        count = self.get_vi_arg1_int()
 
         editor = self.editor
         self.check_vi_index(editor.row)
-        up = min(editor.row, self.get_vi_arg1_int())
+        up = min(editor.row, count)
 
         editor.row -= up
 
@@ -1419,7 +1436,7 @@ class TerminalEditorVi:
 
         self.seeking_column = True
 
-        self.step_down_minus()
+        self.step_down_for_count_minus()
 
         editor.column = self.seek_vi_column()
         self.keep_up_vi_column_seek()
@@ -1432,7 +1449,7 @@ class TerminalEditorVi:
         if self.seeking_column is None:
             self.seeking_column = editor.column
 
-        self.step_down_repeatedly()
+        self.step_down_for_count()
 
         editor.column = self.seek_vi_column()
         self.keep_up_vi_column_seek()
@@ -1445,7 +1462,7 @@ class TerminalEditorVi:
         if self.seeking_column is None:
             self.seeking_column = editor.column
 
-        self.step_up_repeatedly()
+        self.step_up_for_count()
 
         editor.column = self.seek_vi_column()
         self.keep_up_vi_column_seek()
@@ -1951,6 +1968,8 @@ class TerminalEditorVi:
     def slip_index(self):
         """Find Char to Right in row, once or more"""
 
+        count = self.get_vi_arg1_int()
+
         editor = self.editor
 
         last_column = editor.spot_last_column()
@@ -1958,8 +1977,6 @@ class TerminalEditorVi:
 
         choice = self.slip_choice
         after = self.slip_after
-
-        count = self.get_vi_arg1_int()
 
         # Index each
 
@@ -2017,6 +2034,8 @@ class TerminalEditorVi:
     def slip_rindex(self):
         """Find Char to left in Row, once or more"""
 
+        count = self.get_vi_arg1_int()
+
         editor = self.editor
 
         last_column = editor.spot_last_column()
@@ -2024,8 +2043,6 @@ class TerminalEditorVi:
 
         choice = self.slip_choice
         after = self.slip_after
-
-        count = self.get_vi_arg1_int()
 
         # R-Index each
 
@@ -2320,7 +2337,7 @@ class TerminalEditorVi:
 
         # Take many keyboard Input Chords
 
-        self.vi_print("Type chars to insert, press Esc when done")
+        self.vi_print("Press Esc to quit, else type chars to insert")
 
         keyboard = TerminalKeyboardViInsert(vi=self)
         editor.touching_beyond = True
@@ -2351,7 +2368,7 @@ class TerminalEditorVi:
 
         # Take many keyboard Input Chords
 
-        self.vi_print("Type chars to replace, press Esc when done")
+        self.vi_print("Press Esc to quit, else type chars to spill over")
 
         keyboard = TerminalKeyboardViReplace(vi=self)
         editor.touching_beyond = True
@@ -2380,8 +2397,10 @@ class TerminalEditorVi:
 
         # Suspend, run, resume
 
+        self.vi_print("Press Esc to quit, else give one ordinary command")
+
         keyboard = TerminalKeyboardVi(vi=self)
-        keyboard.hello_line = "Give one command"
+        keyboard.first_reply = copy.deepcopy(editor.skin.reply)
         keyboard.continue_do_func = editor.do_sys_exit
 
         try:
@@ -2426,11 +2445,175 @@ class TerminalEditorVi:
         """Replace one char"""
 
         editor = self.editor
+        column = editor.column
+        columns = editor.count_columns_in_row()
 
         chars = self.get_vi_arg0_chars()
         editor.replace_some_chars(chars)
         self.held_file.touches += 1
-        self.vi_print("replaced char")
+
+        if column < columns:
+            self.vi_print("replaced char")
+        else:
+            self.vi_print("inserted char")
+
+    #
+    # Variations on Cut Char and Cut Lines
+    #
+
+    def do_cut_behind(self):  # Vim X
+        """Cut as many as the count of Chars behind"""
+
+        count = self.get_vi_arg1_int()
+
+        editor = self.editor
+
+        left = min(editor.column, count)
+        editor.column -= left  # a la Vim h Left
+
+        touches = editor.delete_some_chars(count=left)
+        self.held_file.touches += touches
+
+    def do_cut_ahead_take_inserts(self):  # Vim s
+        """Cut as many as the count of Chars ahead, and then take Chords as Inserts"""
+
+        count = self.get_vi_arg1_int()
+
+        self.cut_some_vi_chars(count)
+        self.take_inserts()
+
+    def do_cut_ahead(self):  # Vim x
+        """Cut as many as the count of Chars ahead, but land the Cursor in the Line"""
+
+        count = self.get_vi_arg1_int()
+
+        self.cut_some_vi_chars(count)
+        self.slip_back_into_vi_line()
+
+    def slip_back_into_vi_line(self):
+        """Slip back to the Max Column if now just beyond it"""
+
+        editor = self.editor
+        column = editor.column
+        max_column = editor.spot_max_column()
+        columns = editor.count_columns_in_row()
+
+        if column == columns == (max_column + 1):
+            editor.column = columns - 1
+
+    def cut_some_vi_chars(self, count):
+        """Cut as many as the count of Chars ahead"""
+
+        editor = self.editor
+
+        columns = editor.count_columns_in_row()  # a la Vim l Right
+        right = min(columns - editor.column, count)
+
+        touches = editor.delete_some_chars(count=right)
+        self.held_file.touches += touches
+
+    def do_slip_last_join_right(self):  # Vim J
+        """Join 1 Line or N - 1 Lines to this Line, as if dented by single Spaces"""
+
+        count = self.get_vi_arg1_int()
+        count_below = (count - 1) if (count > 1) else 1
+
+        editor = self.editor
+        row = editor.row
+        last_row = editor.spot_last_row()
+
+        self.check_vi_index(row < last_row)
+        joinings = min(last_row - row, count_below)
+
+        touches = editor.join_some_lines(joinings)
+        self.held_file.touches += touches
+
+    def do_chop_take_inserts(self):  # Vim C
+        """Cut N - 1 Lines below & Chars to right in Line, and take Chords as Inserts"""
+
+        count = self.get_vi_arg1_int()
+
+        self.chop_some_vi_lines(count)
+        self.take_inserts()
+
+    def do_chop(self):  # Vim D  # TODO: ugly to doc
+        """Cut N - 1 Lines below & Chars to right in Line, and land Cursor in Line"""
+        # except if N > 1 and at or left of Dent, then delete N Lines and Slip to Dent
+
+        count = self.get_vi_arg1_int()
+
+        editor = self.editor
+
+        column = editor.column
+        last_row = editor.spot_last_row()
+        line = editor.fetch_row_line()
+        row = editor.row
+        rows = editor.count_rows_in_file()
+
+        # If N > 1 and at or left of Dent, then delete N Lines and Slip to Dent
+
+        len_dent = len(line) - len(line.lstrip())
+        if count > 1:
+            if column <= len_dent:
+                self.check_vi_index(row < last_row)
+                down = min(rows - row, count)
+
+                touches = editor.delete_some_lines(count=down)
+                self.held_file.touches += touches
+
+                self.slip_dent()
+
+                return
+
+        # Cut N - 1 Lines below & Chars to right in Line, and land Cursor in Line
+
+        self.chop_some_vi_lines(count)
+        self.slip_back_into_vi_line()
+
+    def do_slip_first_chop_take_inserts(self):  # Vim S
+        """Cut N - 1 Lines below & all Chars of this Line, and take Chords as Inserts"""
+
+        count = self.get_vi_arg1_int()
+
+        editor = self.editor
+
+        editor.column = 0
+        self.chop_some_vi_lines(count)
+        self.take_inserts()
+
+    def chop_some_vi_lines(self, count):
+        """Cut N - 1 Lines below & Chars to right in Line"""
+
+        editor = self.editor
+
+        if count > 1:
+            self.delete_vi_lines_below(count=(count - 1))
+
+        row = editor.row
+        rows = editor.count_rows_in_file()
+
+        if row < rows:
+
+            columns = editor.count_columns_in_row(row=editor.row)
+            touches = editor.delete_some_chars(count=columns)
+            self.held_file.touches += touches
+
+    def delete_vi_lines_below(self, count):
+        """Cut N Lines below"""
+
+        editor = self.editor
+
+        row = editor.row
+        last_row = editor.spot_last_row()
+
+        self.check_vi_index(row < last_row)
+        down = min(last_row - row, count)
+
+        editor.row += 1
+        touches = editor.delete_some_lines(count=down)
+        self.held_file.touches += touches
+
+        editor.row = row
 
 
 class TerminalKeyboard:
@@ -2439,7 +2622,7 @@ class TerminalKeyboard:
     def __init__(self):
 
         self.cursor_style = None
-        self.hello_line = None
+        self.first_reply = TerminalReplyOut()
 
         self.format_status_func = lambda: None
         self.place_cursor_func = lambda: None
@@ -2609,8 +2792,8 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         func_by_chords[b"A"] = vi.do_slip_beyond_last_take_inserts
         func_by_chords[b"B"] = vi.do_big_word_start_behind
-        # func_by_chords[b"C"] = vi.do_chop_open
-        # func_by_chords[b"D"] = vi.do_chop
+        func_by_chords[b"C"] = vi.do_chop_take_inserts
+        func_by_chords[b"D"] = vi.do_chop
         func_by_chords[b"E"] = vi.do_big_word_end_ahead
 
         self._init_suffix_func(b"F", func=vi.do_slip_rindex_choice)
@@ -2618,7 +2801,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"G"] = vi.do_step
         func_by_chords[b"H"] = vi.do_step_max_high
         func_by_chords[b"I"] = vi.do_slip_dent_take_inserts
-        # func_by_chords[b"J"] = vi.do_slip_last_join_right
+        func_by_chords[b"J"] = vi.do_slip_last_join_right
         # func_by_chords[b"K"] = vi.do_lookup
         func_by_chords[b"L"] = vi.do_step_max_low
         func_by_chords[b"M"] = vi.do_step_to_middle
@@ -2629,14 +2812,14 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func_by_many_chords(b"Qvi\r", func=vi.do_continue_vi)
 
         func_by_chords[b"R"] = vi.do_take_replacements
-        # func_by_chords[b"S"] = vi.do_slip_first_chop_open
+        func_by_chords[b"S"] = vi.do_slip_first_chop_take_inserts
 
         self._init_suffix_func(b"T", func=vi.do_slip_rindex_plus_choice)
 
         # func_by_chords[b"U"] = vi.do_row_undo
         # func_by_chords[b"V"] = vi.do_gloss_rows
         func_by_chords[b"W"] = vi.do_big_word_start_ahead
-        # func_by_chords[b"X"] = vi.do_cut_behind
+        func_by_chords[b"X"] = vi.do_cut_behind
         # func_by_chords[b"Y"] = vi.do_copy_row
 
         self._init_correcting_many_chords(b"QZ", corrections=b"Z")
@@ -2660,7 +2843,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         func_by_chords[b"a"] = vi.do_slip_take_inserts
         func_by_chords[b"b"] = vi.do_lil_word_start_behind
-        # func_by_chords[b"c"] = vi.do_chop_after_open
+        # func_by_chords[b"c"] = vi.do_chop_after_take_inserts
         # func_by_chords[b"d"] = vi.do_chop_after
         func_by_chords[b"e"] = vi.do_lil_word_end_ahead
 
@@ -2687,14 +2870,14 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         self._init_suffix_func(b"r", func=vi.do_replace_with_choice)
 
-        # func_by_chords[b"s"] = vi.do_cut_behind_open
+        func_by_chords[b"s"] = vi.do_cut_ahead_take_inserts
 
         self._init_suffix_func(b"t", func=vi.do_slip_index_minus_choice)
 
         # func_by_chords[b"u"] = vi.do_undo
         # func_by_chords[b"v"] = vi.do_gloss_chars
         func_by_chords[b"w"] = vi.do_lil_word_start_ahead
-        # func_by_chords[b"x"] = vi.do_cut_ahead
+        func_by_chords[b"x"] = vi.do_cut_ahead
         # func_by_chords[b"y"] = vi.do_copy_after
 
         self._init_func_by_many_chords(b"zb", func=vi.do_scroll_till_bottom)
@@ -2727,8 +2910,7 @@ class TerminalKeyboardViInsert(TerminalKeyboard):
 
         self.vi = vi
         self.editor = vi.editor
-
-        self.hello_line = "Press Esc to quit, else type chars to insert"
+        self.first_reply = copy.deepcopy(vi.editor.skin.reply)
 
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
@@ -2780,8 +2962,7 @@ class TerminalKeyboardViReplace(TerminalKeyboard):
 
         self.vi = vi
         self.editor = vi.editor
-
-        self.hello_line = "Press Esc to quit, else type replacement chars" ""
+        self.first_reply = copy.deepcopy(vi.editor.skin.reply)
 
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
@@ -3063,6 +3244,7 @@ class TerminalEditorEmacs:
 class TerminalNudgeIn(argparse.Namespace):
     """Collect the parts of one Nudge In from the Keyboard"""
 
+    # FIXME: cut the 'copy.deepcopy's, rewrite as:  def __init__(nudge=None)
     def __init__(self, prefix=None, chords=None, suffix=None, epilog=None):
 
         self.prefix = prefix  # such as Repeat Count Digits before Vi Chords
@@ -3090,6 +3272,7 @@ class TerminalNudgeIn(argparse.Namespace):
 class TerminalReplyOut(argparse.Namespace):
     """Collect the parts of one Reply Out to the Screen"""
 
+    # FIXME: cut the 'copy.deepcopy's, rewrite as:  def __init__(reply=None)
     def __init__(self, flags=None, nudge=None, message=None, bell=None):
 
         self.flags = flags  # such as "-Fin" Grep-Like Search
@@ -3378,12 +3561,13 @@ class TerminalEditor:
     def run_skin_with_keyboard(self, keyboard):
         """Prompt, take nudge, give reply, repeat till quit"""
 
+        first_reply = keyboard.first_reply
+
         painter = self.painter
         skin = self.skin
 
         chords = skin.chord_ints_ahead  # TODO: works, but clashes types
         cursor_style = skin.keyboard.cursor_style if skin.keyboard else None
-        hello_line = skin.keyboard.hello_line if skin.keyboard else None
 
         self.skin = TerminalSkin(chords)
 
@@ -3392,8 +3576,7 @@ class TerminalEditor:
                 painter.terminal_write(keyboard.cursor_style)
 
         try:
-            if keyboard.hello_line:
-                self.editor_print(keyboard.hello_line)
+            self.skin.reply = copy.deepcopy(first_reply)
             self.run_keyboard(keyboard)  # like till SystemExit
         finally:
             skin.traceback = self.skin.traceback
@@ -3401,9 +3584,6 @@ class TerminalEditor:
             if skin.keyboard:
                 if cursor_style != keyboard.cursor_style:
                     painter.terminal_write(cursor_style)
-
-            if hello_line:
-                self.editor_print(hello_line)
 
             keyboard.skin = self.skin  # TODO: ugly
 
@@ -4490,6 +4670,77 @@ class TerminalEditor:
 
         self.row = row_plus
         self.column = 0
+
+    def delete_some_chars(self, count):
+        """Delete between 0 and N Chars from this Line at this Column"""
+
+        ended_lines = self.ended_lines
+        row = self.row
+
+        (head, _, ended_tail) = self.split_row_line_for_chars(chars=None)
+        tail = ended_tail.splitlines()[0]
+        line_end = ended_tail[len(tail) :]  # may be empty
+
+        chars_dropped = tail[:count]
+
+        pin_plus = self.spot_pin_plus(chars_dropped)
+        self.touching_pins[-1] = pin_plus  # ugly
+
+        chopped_tail = tail[count:]
+
+        if ended_lines:
+            ended_lines[row] = head + chopped_tail + line_end
+
+        return len(chars_dropped)
+
+    def delete_some_lines(self, count):
+        """Delete between 0 and N Lines at this Row"""
+
+        ended_lines = self.ended_lines
+        row = self.row
+        rows = self.count_rows_in_file()
+
+        touches = 0
+        if row < rows:
+            row_below = min(rows, row + count)
+            ended_lines[row:] = ended_lines[row_below:]
+
+            touches = row_below - row
+
+        return touches
+
+    def join_some_lines(self, joinings):
+        """Join N Lines to this Line, as if dented by single Spaces"""
+
+        ended_lines = self.ended_lines
+
+        for index in range(joinings):
+            row = self.row
+            row_below = row + 1
+            rows = self.count_rows_in_file()
+
+            assert row_below <= rows
+
+            # Leap just beyond End of Line
+
+            columns = self.count_columns_in_row(row=row)
+            self.column = columns
+
+            # Copy the next Line into this Line, as if dented by a single Space
+
+            ended_line = ended_lines[row]
+            line = ended_line.splitlines()[0]
+
+            ended_line_below = ended_lines[row_below]
+            line_below = ended_line_below.splitlines()[0]
+            line_end_below = ended_line_below[len(line_below) :]
+
+            # Delete the copied Line
+
+            ended_lines[row:] = ended_lines[row_below:]
+            ended_lines[row] = line + " " + line_below.lstrip() + line_end_below
+
+        return joinings
 
     def split_row_line_for_chars(self, chars):
         """Split this Line to insert or replace Char or Line, and remember where"""
@@ -5872,8 +6123,7 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- bugs --
 
-# FIXME:  vim.py --pwnme should quit like --version does
-# FIXME:  vim.py --pwnme/--version +vi should be the way to stay open
+# FIXME: react visibly when one Vi Print replaces another, maybe a leading Ellipsis?
 
 # TODO:  find more bugs
 
