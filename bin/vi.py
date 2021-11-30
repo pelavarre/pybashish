@@ -57,7 +57,6 @@ how to get Vi Py again:
 
 import argparse
 import collections
-import copy
 import datetime as dt
 import difflib
 import hashlib
@@ -2400,7 +2399,7 @@ class TerminalEditorVi:
         self.vi_print("Press Esc to quit, else give one ordinary command")
 
         keyboard = TerminalKeyboardVi(vi=self)
-        keyboard.first_reply = copy.deepcopy(editor.skin.reply)
+        keyboard.first_reply = TerminalReplyOut(editor.skin.reply)
         keyboard.continue_do_func = editor.do_sys_exit
 
         try:
@@ -2910,7 +2909,7 @@ class TerminalKeyboardViInsert(TerminalKeyboard):
 
         self.vi = vi
         self.editor = vi.editor
-        self.first_reply = copy.deepcopy(vi.editor.skin.reply)
+        self.first_reply = TerminalReplyOut(vi.editor.skin.reply)
 
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
@@ -2962,7 +2961,7 @@ class TerminalKeyboardViReplace(TerminalKeyboard):
 
         self.vi = vi
         self.editor = vi.editor
-        self.first_reply = copy.deepcopy(vi.editor.skin.reply)
+        self.first_reply = TerminalReplyOut(vi.editor.skin.reply)
 
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
@@ -3244,13 +3243,23 @@ class TerminalEditorEmacs:
 class TerminalNudgeIn(argparse.Namespace):
     """Collect the parts of one Nudge In from the Keyboard"""
 
-    # FIXME: cut the 'copy.deepcopy's, rewrite as:  def __init__(nudge=None)
-    def __init__(self, prefix=None, chords=None, suffix=None, epilog=None):
+    def __init__(self, nudge=None):
 
-        self.prefix = prefix  # such as Repeat Count Digits before Vi Chords
-        self.chords = chords  # such as b"Qvi\r" Vi Chords
-        self.suffix = suffix  # such as b"x" of b"fx" to Find Char "x" in Vi
-        self.epilog = epilog  # such as b"⌃C" of b"f⌃C" to cancel b"f"
+        self.prefix = None  # such as Repeat Count b"1234567890" before Vi Chords
+        self.chords = None  # such as b"Qvi\r" Vi Chords
+        self.suffix = None  # such as b"x" of b"fx" to Find Char "x" in Vi
+        self.epilog = None  # such as b"⌃C" of b"f⌃C" to cancel b"f"
+
+        # Remake Self into a 'copy.deepcopy' of 'nudge'
+
+        if nudge is not None:
+
+            vars(self).update(vars(nudge))
+
+            assert (self.prefix is None) or isinstance(self.prefix, bytes)
+            assert (self.chords is None) or isinstance(self.chords, bytes)
+            assert (self.suffix is None) or isinstance(self.suffix, bytes)
+            assert (self.epilog is None) or isinstance(self.epilog, bytes)
 
     def join_bytes(self):
         """Echo all the Chords of this one Input, in order"""
@@ -3272,15 +3281,23 @@ class TerminalNudgeIn(argparse.Namespace):
 class TerminalReplyOut(argparse.Namespace):
     """Collect the parts of one Reply Out to the Screen"""
 
-    # FIXME: cut the 'copy.deepcopy's, rewrite as:  def __init__(reply=None)
-    def __init__(self, flags=None, nudge=None, message=None, bell=None):
+    def __init__(self, reply=None):
 
-        self.flags = flags  # such as "-Fin" Grep-Like Search
-        self.nudge = nudge  # keep up a trace of the last input that got us here
-        self.message = message  # say more
-        self.bell = bell  # ring bell
+        self.flags = None  # such as "-Fin" Grep-Like Search
+        self.nudge = None  # keep up a trace of the last input that got us here
+        self.message = None  # say more
+        self.bell = None  # ring bell
 
-    # Jun/2018 Python 3.7 can say '._defaults=(None, None),'
+        # Remake Self into a 'copy.deepcopy' of 'reply'
+
+        if reply is not None:
+
+            vars(self).update(vars(reply))
+
+            assert (self.flags is None) or isinstance(self.flags, str)
+            self.nudge = TerminalNudgeIn(self.nudge)
+            assert (self.message is None) or isinstance(self.message, str)
+            assert (self.bell is None) or isinstance(self.bell, bool)
 
 
 class TerminalFile(argparse.Namespace):
@@ -3351,20 +3368,23 @@ class TerminalFile(argparse.Namespace):
         self.touches = 0
 
 
-class TerminalPin(collections.namedtuple("TerminalPin", "row, column".split(", "))):
+class TerminalPin(
+    collections.namedtuple("TerminalPin", "row, column".split(", ")),
+):
+
     """Pair up a Row with a Column"""
 
     # TODO:  class TerminalPinVi - to slip and step in the way of Vi
 
 
 class TerminalPinPlus(
-    collections.namedtuple("TerminalPinPlus", "row, column, obj".split(", "))
+    collections.namedtuple("TerminalPinPlus", "row, column, obj".split(", ")),
 ):
     """Add one more Thing to pairing up a Row with a Column"""
 
 
 class TerminalSpan(
-    collections.namedtuple("TerminalSpan", "row, column, beyond".split(", "))
+    collections.namedtuple("TerminalSpan", "row, column, beyond".split(", ")),
 ):
     """Pick out the Columns of Rows covered by a Match of Chars"""
 
@@ -3576,7 +3596,7 @@ class TerminalEditor:
                 painter.terminal_write(keyboard.cursor_style)
 
         try:
-            self.skin.reply = copy.deepcopy(first_reply)
+            self.skin.reply = TerminalReplyOut(first_reply)
             self.run_keyboard(keyboard)  # like till SystemExit
         finally:
             skin.traceback = self.skin.traceback
