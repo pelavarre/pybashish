@@ -593,7 +593,7 @@ alias -- -gsun='--exec-echo-xe git status --untracked-files=no'
 
 alias -- -gdno1='--exec-echo-xe git diff --name-only HEAD~1'
 alias -- -glqv0='--exec-echo-xe git log --decorate --oneline'
-alias -- -gpfwl='dirs -p |head -1 && --exec-echo-xe-maybe git push --force-with-lease'
+alias -- -gpfwl=--git-push-force-with-lease
 
 
 # TODO: solve dry run of -gco -  => git log -1 --oneline --decorate @{-1}
@@ -706,6 +706,18 @@ function --git-ls-files () {
     else
         --exec-echo-xe git ls-files "$@"
     fi
+}
+
+function --git-push-force-with-lease () {
+    : :: 'Git Push Force With Lease'
+
+    echo '+ dirs -p |head -1' >&2
+    dirs -p |head -1
+
+    echo "+ git branch |grep '[*]'" >&2
+    git branch |grep '[*]'
+
+    --exec-echo-xe-maybe git push --force-with-lease "$@"
 }
 
 function --git-push-origin-head-maybe () {  # for '-gpoh'
