@@ -507,7 +507,7 @@ class TerminalEditorVi:
     def do_might_next_vi_file(self):  # Vim :n\r
         """Halt if touches Not flushed, else visit the next (or first) File"""
 
-        if self.might_keep_changes():
+        if self.might_keep_changes(alt=":n!"):
 
             return True
 
@@ -748,20 +748,22 @@ class TerminalEditorVi:
         # Vim rings a Bell for each extra ⌃C
 
     def do_might_flush_quit_vi(self):  # Vim :wq\r
-        """Write the File, but halt if more Files"""
+        """Write the File and quit, except only write without quit if more Files"""
 
-        if self.do_might_flush_vi():
-
-            return True
-
-        if self.do_might_quit_vi():
+        if self.might_keep_changes(alt=":wq!"):
 
             return True
 
+        if self.might_keep_files(alt=":wq!"):
+
+            return True
+
+        self.do_flush_quit_vi()
         assert False  # unreached
 
-        # Vim :wq :wq quits despite more Files named than fetched
-        # Vi Py :wq doesn't quit while more Files named than fetched, vs its :wq! does
+        # Vim :wq writes despite more Files chosen than fetched, and doesn't quit
+        # Vim :wq :wq quits despite more Files chosen than fetched
+        # Vi Py :wq doesn't write nor quit, while more Files chosen than fetched
 
     def do_flush_quit_vi(self):  # Vim ZZ  # Vim :wq!\r
         """Write the File and quit Vi"""
@@ -773,8 +775,8 @@ class TerminalEditorVi:
         self.do_flush_vi()
         self.do_quit_vi()
 
-        # Vim :wq! quits when more Files named than fetched, Vim ZZ no, Vim ZZ ZZ yes
-        # Vi Py :wq! and ZZ quit despite more Files named than fetched
+        # Vim :wq! quits when more Files chosen than fetched, Vim ZZ no, Vim ZZ ZZ yes
+        # Vi Py :wq! and ZZ quit despite more Files chosen than fetched
 
     def do_might_flush_vi(self):  # Vim :w\r
         """Write the File but do not quit Vi"""
@@ -813,29 +815,24 @@ class TerminalEditorVi:
     def do_might_quit_vi(self):  # Vim :q\r
         """Halt if Touches not Flushed or More Files, else quit Vi"""
 
-        if self.might_keep_changes():
+        if self.might_keep_changes(alt=":q!"):
 
             return True
 
-        if self.might_keep_files():
+        if self.might_keep_files(alt=":q!"):
 
             return True
 
         self.do_quit_vi()
         assert False  # unreached
 
-        # Vim :q :q quits despite more Files named than fetched
-        # Vi Py :q doesn't quit while more Files named than fetched, vs its :q! does
+        # Vim :q :q quits despite more Files chosen than fetched
+        # Vi Py :q doesn't quit while more Files chosen than fetched, vs its :q! does
 
-    def might_keep_changes(self):
+    def might_keep_changes(self, alt):
 
         """Return None if no Touches held, else say how to bypass and return True"""
         held_file = self.held_file
-
-        alt = self.get_vi_arg0_chars().rstrip() + "!"  # FIXME: factor this out
-        assert alt in (":n!", ":q!", ":wq!"), repr(alt)
-        alt = alt.replace(":q!", "ZQ")
-        alt = alt.replace(":wq!", "ZZ")
 
         if held_file:
             touches = held_file.touches
@@ -844,16 +841,11 @@ class TerminalEditorVi:
 
                 return True
 
-    def might_keep_files(self):
+    def might_keep_files(self, alt):
         """Return None if no Files held, else say how to bypass and return True"""
 
         files = self.files
         files_index = self.files_index
-
-        alt = self.get_vi_arg0_chars().rstrip() + "!"  # FIXME: factor this out
-        assert alt in (":q!", ":wq!")
-        alt = alt.replace(":q!", "ZQ")
-        alt = alt.replace(":wq!", "ZZ")
 
         more_files = files[files_index:][1:]
         if more_files:
@@ -1050,6 +1042,7 @@ class TerminalEditorVi:
         stale_status = self.format_vi_status(editor.skin.reply) + editor.finding_line
 
         if editor.find_ahead_and_reply():
+            self.vi_print()  # consume such as '1/358  Found 3 chars ahead as:  def'
 
             iobytespans = editor.iobytespans
             assert iobytespans
@@ -3469,12 +3462,12 @@ class TerminalSkin:
 
         self.traceback = None  # capture Python Tracebacks
 
-        self.nudge = TerminalNudgeIn()  # split the Chords of one Keyboard Input
+        self.nudge = TerminalNudgeIn()  # begin with no Input pulled from Keyboard
         self.arg0_chords = None  # take all the Chords as Chars in a Row
         self.arg1 = None  # take the Prefix Bytes as an Int of Decimal Digits
         self.arg2_chords = None  # take the Suffix Bytes as one Encoded Char
 
-        self.reply = TerminalReplyOut()  # declare an Empty Reply
+        self.reply = TerminalReplyOut()  # begin with no Reply
 
         self.doing_less = None  # reject the Arg1 when not explicitly accepted
         self.doing_more = None  # take the Arg1 as a Count of Repetition's
@@ -3646,6 +3639,7 @@ class TerminalEditor:
                 keyboard.continue_do_func()
 
             except KeyboardInterrupt:  # Egg of *123456n⌃C, etc
+                self.skin.reply = TerminalReplyOut()
 
                 self.editor_print("Interrupted")
                 self.reply_with_bell()
@@ -3656,6 +3650,7 @@ class TerminalEditor:
                 keyboard.continue_do_func()
 
             except Exception as exc:  # Egg of NotImplementedError, etc
+                self.skin.reply = TerminalReplyOut()
 
                 name = type(exc).__name__
                 str_exc = str(exc)
@@ -3939,6 +3934,8 @@ class TerminalEditor:
 
                     _ = self.peek_editor_chord()  # raise KeyboardInterrupt at ⌃C
 
+                    self.skin.reply = TerminalReplyOut()  # clear pending Status
+
                     continue
 
             break
@@ -4030,6 +4027,10 @@ class TerminalEditor:
         """Capture some Status now, to show with next Prompt"""
 
         message = " ".join(str(_) for _ in args)
+
+        earlier_message = self.skin.reply.message
+        assert not (earlier_message and message), (earlier_message, message)
+
         self.skin.reply.message = message
 
     def reply_with_finding(self):
@@ -6143,22 +6144,28 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- bugs --
 
-# FIXME: react visibly when one Vi Print replaces another, maybe a leading Ellipsis?
+# FIXME: test inception of i⌃O inside R⌃O etc
+# FIXME: consult a '.skin.alt_keyboard' whenever it's not None
+# FIXME: the i R Esc etc change the '.alt_keyboard'
+# FIXME: the ⌃O bypasses the '.alt_keyboard' without changing it
+# FIXME: choose which Controls to allow through I mode
+# FIXME: choose which Controls to allow through R mode
+# FIXME: mix together TerminalKeyboardViInsert/ TerminalKeyboardViReplace
+
+# FIXME: announce Nth of K Files, after each :n
 
 # TODO:  find more bugs
 
 
 # -- future inventions --
 
-# TODO: Generate an Emacs Py from Vi Py, and a Vi Py from Emacs Py
+# TODO: ⌃O for Search Key input, not just Insert/ Replace input
 
 # TODO: Delete after Replaces as undo Replaces, inside the R mode
 # TODO: code Repeat Count for the a i o A I O variations of Insert
 # TODO: cancel Insert Repeat Count if moved away while inserting
 
-
-# TODO: ⌃O for Search Key input, not just Insert/ Replace input
-
+# TODO: Generate an Emacs Py from Vi Py, and a Vi Py from Emacs Py
 
 # TODO: something akin to Vim :set cursorline, :set nocursorline
 # TODO: Vim V V to highlight the Line at the Cursor
@@ -6197,8 +6204,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- future improvements --
 
-# TODO: test inception of i⌃O inside R⌃O etc
-
 # TODO: record and replay tests of:  cat bin/vi.py |vi.py - bin/vi.py
 
 # TODO: recover :g/ Status when ⌃L has given us :set _lag_ of >1 Screen of Hits
@@ -6209,10 +6214,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 
 # -- future features --
-
-# TODO: choose which Controls to allow through I mode
-# TODO: choose which Controls to allow through R mode
-# TODO: mix together TerminalKeyboardViInsert/ TerminalKeyboardViReplace
 
 # TODO: ⌃I ⌃O walk the Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
 # TODO: despite Doc, to match Vim, include in the Jump List the * # forms of / ?
