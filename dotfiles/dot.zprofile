@@ -557,13 +557,13 @@ alias -- -gco='--exec-echo-xe git checkout'  # especially:  gco -
 alias -- -gcp='--exec-echo-xe git cherry-pick'
 alias -- -gdh=--git-diff-head
 alias -- -gfp='--exec-echo-xe git fetch --prune'
-alias -- -gfr='--exec-echo-xe "(set -xe; git fetch && git rebase)"'
+alias -- -gfr=--git-fetch-rebase
 alias -- -ggc='--exec-echo-xe git gc'
 alias -- -ggl='--exec-echo-xe git grep -l'  # --files-with-matches
 alias -- -gl1='--exec-echo-xe git log -1 --decorate'
 alias -- -glf=--git-ls-files
 alias -- -glg='--exec-echo-xe git log --no-decorate --oneline --grep'
-alias -- -glq=--git-log-nodecorate-oneline
+alias -- -glq=--git-log-oneline-nodecorate
 alias -- -gls='--exec-echo-xe git log --stat'
 alias -- -grh='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard'
 alias -- -gri=--git-rebase-interactive
@@ -582,7 +582,7 @@ alias -- -gcpc='--exec-echo-xe git cherry-pick --continue'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
 alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
 alias -- -glq1='--exec-echo-xe git log -1 --no-decorate --oneline'
-alias -- -glqv=--git-log-decorate-oneline
+alias -- -glqv=--git-log-oneline-decorate
 alias -- -gpod='--exec-echo-xe-maybe git push origin --delete'
 alias -- -gpoh=--git-push-origin-head-maybe
 alias -- -grhu='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard @{upstream}'
@@ -592,8 +592,11 @@ alias -- -gssn='--exec-echo-xe git shortlog --summary --numbered'
 alias -- -gsun='--exec-echo-xe git status --untracked-files=no'
 
 alias -- -gdno1='--exec-echo-xe git diff --name-only HEAD~1'
+alias -- -gcofr='--git-checkout-fetch-rebase'
 alias -- -glqv0='--exec-echo-xe git log --decorate --oneline'
 alias -- -gpfwl=--git-push-force-with-lease
+
+alias -- -gcofrlqv='--git-checkout-fetch-rebase-log-quiet-verbose'
 
 
 # TODO: solve dry run of -gco -  => git log -1 --oneline --decorate @{-1}
@@ -615,7 +618,7 @@ alias -- -gpfwl=--git-push-force-with-lease
 #
 
 
-function --git () {
+function --git () {  # -g
     : :: 'Git Status for huge Git Repos - as in hulking, large, and slow'
 
     echo + >&2
@@ -638,21 +641,48 @@ function --git () {
     fi
 }
 
-function --git-chdir () {
+function --git-chdir () {  # -gcd
     : :: 'ChDir to root of Git Clone'
     --exec-echo-xe 'cd $(git rev-parse --show-toplevel) && cd ./'$@' && dirs -p |head -1'
 }
 
-function --git-commit () {
-    : :: 'Add and commit all tracked, else less simple, such as:  git commit .'
+function --git-checkout-fetch-rebase () {  # -gcofr
+    : :: 'Pull a fresh View of a chosen Branch'
     if [ $# = 0 ]; then
-        --exec-echo-xe git commit --all
+        echo -gbq "$@" >&2
+        -gbq "$@" >&2
+    else
+        echo -gco "$@" >&2
+        -gco "$@" >&2
+    fi
+    echo -gfr >&2
+    -gfr >&2
+}
+
+function --git-checkout-fetch-rebase-log-quiet-verbose () {  # -gcofrlqv
+    : :: 'Pull a fresh View of a chosen Branch and glance over the Head of it'
+    if [ $# = 0 ]; then
+        echo -gbq "$@" >&2
+        -gbq "$@" >&2
+    else
+        echo -gco "$@" >&2
+        -gco "$@" >&2
+    fi
+    echo -gfr >&2
+    -gfr >&2
+    echo -glqv >&2
+    -glqv >&2
+}
+
+function --git-commit () {  # -gc
+    if [ $# = 0 ]; then
+        --exec-echo-xe git commit --all -m WIP
     else
         --exec-echo-xe git commit "$@"
     fi
 }
 
-function --git-commit-all-fixup () {
+function --git-commit-all-fixup () {  # -gcaf
     : :: 'Add all tracked and commit fixup to Head, else to some Commit'
     if [ $# = 0 ]; then
         --exec-echo-xe git commit --all --fixup HEAD
@@ -661,7 +691,7 @@ function --git-commit-all-fixup () {
     fi
 }
 
-function --git-commit-fixup () {
+function --git-commit-fixup () {  # -gcf
     : :: 'Commit fixup to Head, else to some Commit'
     if [ $# = 0 ]; then
         --exec-echo-xe git commit --fixup HEAD
@@ -670,7 +700,7 @@ function --git-commit-fixup () {
     fi
 }
 
-function --git-diff-head () {
+function --git-diff-head () {  # -gdh
     : :: 'Commit Diff since before Head, else since some Commit'
     if [ $# = 0 ]; then
         --exec-echo-xe git diff HEAD~1
@@ -681,23 +711,30 @@ function --git-diff-head () {
     fi
 }
 
-function --git-log-decorate-oneline () {
+function --git-fetch-rebase () {  # -gfr
+    echo + git fetch >&2
+    git fetch
+    echo + git rebase >&2
+    git rebase
+}
+
+function --git-log-oneline-decorate () {  # -glqv
     if [ $# = 0 ]; then
-        --exec-echo-xe git log --decorate --oneline -19
+        --exec-echo-xe git log --oneline --decorate -19
     else
-        --exec-echo-xe git log --decorate --oneline "$@"
+        --exec-echo-xe git log --oneline --decorate "$@"
     fi
 }
 
-function --git-log-nodecorate-oneline () {
+function --git-log-oneline-nodecorate () {  # -glq
     if [ $# = 0 ]; then
-        --exec-echo-xe git log --no-decorate --oneline -19
+        --exec-echo-xe git log --oneline --no-decorate -19
     else
-        --exec-echo-xe git log --no-decorate --oneline "$@"
+        --exec-echo-xe git log --oneline --no-decorate "$@"
     fi
 }
 
-function --git-ls-files () {
+function --git-ls-files () {  # -glf
     : :: 'Find tracked files at and beneath root of Git Clone, else below some Dir'
     if [ $# = 0 ]; then
         local abs=$(git rev-parse --show-toplevel)
@@ -708,7 +745,7 @@ function --git-ls-files () {
     fi
 }
 
-function --git-push-force-with-lease () {
+function --git-push-force-with-lease () {  # -gpfwl
     : :: 'Git Push Force With Lease'
 
     echo '+ dirs -p |head -1' >&2
@@ -720,12 +757,12 @@ function --git-push-force-with-lease () {
     --exec-echo-xe-maybe git push --force-with-lease "$@"
 }
 
-function --git-push-origin-head-maybe () {  # for '-gpoh'
+function --git-push-origin-head-maybe () {  # -gpoh
     : :: 'Push Origin to Head Colon'
     --exec-echo-xe-maybe git push origin HEAD:"$@"
 }
 
-function --git-rebase-interactive () {
+function --git-rebase-interactive () {  # gri
     : :: 'Rebase Interactive with Auto Squash of the last 19, else of the last N'
     if [ $# = 0 ]; then
         --exec-echo-xe git rebase -i --autosquash @{upstream}
@@ -736,14 +773,12 @@ function --git-rebase-interactive () {
     fi
 }
 
-function --git-show-conflict () {
-    : :: 'Exit loud & nonzero, else Show Conflict Base, else Show choice of Conflict'
-    if [ $# = 1 ]; then
-        --exec-echo-xe git show ":1:$1"
-    elif [ $# = 2 ]; then
-        --exec-echo-xe git show ":$1:$2"
+function --git-show-conflict () {  # -gs1, -gs2, -gs3
+    : :: 'Show Conflict Base of all Files, else whichever of one File, else Help'
+    if [ $# = 2 ]; then
+        --exec-echo-xe git show "$1:$2"
     else
-        echo 'usage: -gs 1|2|3 FILENAME |less  # base | theirs | ours'
+        echo 'usage: -gs1|-gs2|-gs3 FILENAME |less  # base | theirs | ours'
         return 2
     fi
 }
