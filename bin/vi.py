@@ -123,6 +123,8 @@ _INSERT_CURSOR_STYLE_ = DECSCUSR_N.format(6)  # Steady Bar
 
 class TerminalOrder(argparse.Namespace):
     """Split Terminal Output into magic and literals"""
+    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-many-instance-attributes
 
     TERMINAL_WRITE_REGEX = r"".join(
         [
@@ -140,6 +142,8 @@ class TerminalOrder(argparse.Namespace):
 
     def __init__(self, match):
         """Parse one whole Terminal Order, found as Re Match of TERMINAL_WRITE_REGEX"""
+        # pylint: disable=super-init-not-called
+        # TODO: no docstring at:  def __init__
 
         self.match = match
 
@@ -170,7 +174,7 @@ class TerminalOrder(argparse.Namespace):
 
         # Raise ValueError if CSI Order carries an X or Y that is not Decimal Int
 
-        rep = repr(self.chars)
+        exc_arg = repr(self.chars)
 
         self.int_x = None
         if self.x is not None:
@@ -178,7 +182,7 @@ class TerminalOrder(argparse.Namespace):
                 self.int_x = int(self.x)
             except ValueError:
 
-                raise ValueError(rep)  # such as _XTERM_ALT_ or _XTERM_MAIN_
+                raise ValueError(exc_arg) from None
 
         self.int_y = None
         if self.y is not None:
@@ -192,17 +196,19 @@ class TerminalOrder(argparse.Namespace):
         if self.escape_plus and self.escape_plus.endswith(CSI):  # "\x1B["
             assert self.escape_plus == CSI  # as per TERMINAL_WRITE_REGEX
 
-            raise ValueError(rep)  # incomplete CSI TerminalOrder
+            raise ValueError(exc_arg)  # incomplete CSI TerminalOrder
 
         if self.controls and self.controls.endswith(ESC):  # "\x1B"
 
-            raise ValueError(rep)  # incomplete CSI TerminalOrder
+            raise ValueError(exc_arg)  # incomplete CSI TerminalOrder
 
 
 class TerminalWriter(argparse.Namespace):
     """Split a mix of C0_CONTROL and other Chars into complete TerminalOrder's"""
+    # pylint: disable=too-few-public-methods
 
     def __init__(self, chars):
+        # pylint: disable=super-init-not-called
 
         regex = TerminalOrder.TERMINAL_WRITE_REGEX
 
@@ -338,6 +344,7 @@ def do_args_version():
 
 def do_args_pwnme(branch):
     """Download fresh Code to run in place of this stale Code"""
+    # pylint: disable=too-many-locals
 
     # Find present Self
 
@@ -414,6 +421,7 @@ def vi_the_files(files, plusses):
     """Eval the Plusses and then visit each File, in the way of Vim"""
 
     if os.path.basename(sys.argv[0]).startswith("emacs"):
+
         return
 
     vi = TerminalEditorVi(files, plusses=plusses)
@@ -436,11 +444,11 @@ def vi_the_files(files, plusses):
         if vi.vi_traceback:
             stderr_print(vi.vi_traceback)
 
+        sys.exit(returncode)
+
         # TODO: log keystrokes interpreted before Vi exit, or dropped by Vi exit
 
-    # Exit
-
-    sys.exit(returncode)
+    assert False  # unreached
 
 
 def emacs_the_files(files, plusses):
@@ -485,6 +493,8 @@ VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # r"[A-Za-z0-
 
 class TerminalEditorVi:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim"""
+    # pylint: disable=too-many-public-methods
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, files, plusses):
 
@@ -516,7 +526,7 @@ class TerminalEditorVi:
 
         if self.might_keep_changes(alt=":n!"):
 
-            return True
+            return
 
         self.do_next_vi_file()
 
@@ -554,7 +564,7 @@ class TerminalEditorVi:
 
         held_file = TerminalFile(path)
 
-        editor._reinit_with_held_file_(held_file)
+        editor.load_editor_file(held_file)
 
         self.held_file = held_file
 
@@ -563,7 +573,7 @@ class TerminalEditorVi:
     #
 
     def run_vi_terminal(self):
-        """Enter Terminal Driver, then run Keyboard, then exit Terminal Driver"""
+        """Enter Terminal Driver, then run Vi Keyboard, then exit Terminal Driver"""
 
         plusses = self.plusses  # Vim starts with lines of '~/.vimrc'
 
@@ -619,8 +629,9 @@ class TerminalEditorVi:
     # Layer thinly under the rest of TerminalEditorVi
     #
 
-    def check_vi_index(self, truthy, **kwargs):
+    def check_vi_index(self, truthy):
         """Fail fast, else proceed"""
+        # pylint: disable=no-self-use
 
         if not truthy:
 
@@ -687,13 +698,13 @@ class TerminalEditorVi:
 
             assert False  # unreached, because ⌃C cancels Digits Prefix earlier
 
-        elif keyboard.default_do_func == self.do_insert_per_chord:
+        elif keyboard.default_do_func is self.do_insert_per_chord:
 
             self.do_take_views()
             count = editor.format_touch_count()
             self.vi_print("Cancelled insert after {} inserted".format(count))
 
-        elif keyboard.default_do_func == self.do_replace_per_chord:
+        elif keyboard.default_do_func is self.do_replace_per_chord:
 
             self.do_take_views()
             count = editor.format_touch_count()
@@ -725,13 +736,13 @@ class TerminalEditorVi:
 
             self.vi_print("Escaped Repeat Count")  # 123 Esc Egg, etc
 
-        elif keyboard.default_do_func == self.do_insert_per_chord:
+        elif keyboard.default_do_func is self.do_insert_per_chord:
 
             self.do_take_views()
             count = editor.format_touch_count()
             self.vi_print("Escaped after {} inserted".format(count))
 
-        elif keyboard.default_do_func == self.do_replace_per_chord:
+        elif keyboard.default_do_func is self.do_replace_per_chord:
 
             self.do_take_views()
             count = editor.format_touch_count()
@@ -799,11 +810,11 @@ class TerminalEditorVi:
 
         if self.might_keep_changes(alt=":wq!"):
 
-            return True
+            return
 
         if self.might_keep_files(alt=":wq!"):
 
-            return True
+            return
 
         self.do_flush_quit_vi()
         assert False  # unreached
@@ -864,11 +875,11 @@ class TerminalEditorVi:
 
         if self.might_keep_changes(alt=":q!"):
 
-            return True
+            return
 
         if self.might_keep_files(alt=":q!"):
 
-            return True
+            return
 
         self.do_quit_vi()
         assert False  # unreached
@@ -888,6 +899,8 @@ class TerminalEditorVi:
 
                 return True
 
+        return False
+
     def might_keep_files(self, alt):
         """Return None if no Files held, else say how to bypass and return True"""
 
@@ -899,6 +912,8 @@ class TerminalEditorVi:
             self.vi_print("{} more files - Do you mean {}".format(len(more_files), alt))
 
             return True
+
+        return False
 
     def do_quit_vi(self):  # Vim ZQ  # Vim :q!\r
         """Lose last changes and quit"""
@@ -987,6 +1002,8 @@ class TerminalEditorVi:
 
             return word
 
+        return None
+
     def slip_fetch_vi_word_here(self):
         """Slip to start Symbolic word, else Non-Blank word, in Line and return it"""
 
@@ -1059,7 +1076,7 @@ class TerminalEditorVi:
         # Take up a new Search Key
 
         if not editor.skin.doing_done:
-            if self.find_read_vi_line(slip=+1) is None:
+            if not self.take_read_vi_line(slip=+1):
 
                 return
 
@@ -1080,7 +1097,7 @@ class TerminalEditorVi:
 
         # Take Search Key as input, but leave Search Slip unchanged
 
-        if self.find_read_vi_line(slip=0) is None:
+        if not self.take_read_vi_line(slip=0):
 
             return
 
@@ -1122,7 +1139,7 @@ class TerminalEditorVi:
         editor.reply_with_finding()
 
         if not editor.skin.doing_done:
-            if self.find_read_vi_line(slip=-1) is None:
+            if not self.take_read_vi_line(slip=-1):
 
                 return
 
@@ -1130,7 +1147,7 @@ class TerminalEditorVi:
 
             editor.continue_do_loop()
 
-    def find_read_vi_line(self, slip):
+    def take_read_vi_line(self, slip):
         """Take a Search Key"""
 
         editor = self.editor
@@ -1150,12 +1167,12 @@ class TerminalEditorVi:
             if finding_line is None:
                 self.vi_print("Search cancelled")  # /⌃C, ?⌃C Eggs
 
-                return
+                return False
 
             if not editor.finding_line:  # Vim Return
                 self.vi_print("Press one of / ? * # to enter a Search Key")  # n Egg
 
-                return
+                return False
 
         # Take fresh Slip always, and take fresh Search Key if given
 
@@ -1319,6 +1336,7 @@ class TerminalEditorVi:
             self.check_vi_index(editor.spot_pin() < editor.spot_last_pin())
 
         if self.slip_ahead_one():
+
             editor.continue_do_loop()
 
     def slip_ahead_one(self):
@@ -1334,11 +1352,13 @@ class TerminalEditorVi:
 
             return 1
 
-        elif editor.row < last_row:
+        if editor.row < last_row:
             editor.column = 0
             editor.row += 1
 
             return 1
+
+        return 0
 
         # Vim ⌃O Space skips over the column beyond end of line, unlike Vi Py's
         # Vim ⌃O Delete visits the column beyond end of line, same as Vi Py's
@@ -1356,7 +1376,7 @@ class TerminalEditorVi:
             editor.continue_do_loop()
 
     def slip_behind_one(self):
-        """Slip left or down, and return 1, else return None at Start of File"""
+        """Slip left or up, and return -1, else return 0 at Start of File"""
 
         editor = self.editor
 
@@ -1365,12 +1385,14 @@ class TerminalEditorVi:
 
             return -1
 
-        elif editor.row:
+        if editor.row:
             editor.row -= 1
             row_max_column = editor.spot_max_column(row=editor.row)
             editor.column = row_max_column
 
             return -1
+
+        return 0
 
     #
     # Step the Cursor across zero, one, or more Lines of the same File
@@ -1506,7 +1528,7 @@ class TerminalEditorVi:
         editor.column = self.seek_vi_column()
         self.keep_up_vi_column_seek()
 
-    def seek_vi_column(self, column=True):
+    def seek_vi_column(self):
         """Begin seeking a Column, if not begun already"""
 
         editor = self.editor
@@ -1566,7 +1588,7 @@ class TerminalEditorVi:
 
         # Choose new Row and Column
 
-        if row < top_row:
+        if row < top_row:  # pylint: disable=consider-using-max-builtin
             row = top_row
 
         editor.row = row
@@ -1616,7 +1638,7 @@ class TerminalEditorVi:
         # Choose new Row and Column
 
         bottom_row = editor.spot_bottom_row()
-        if row > bottom_row:
+        if row > bottom_row:  # pylint: disable=consider-using-min-builtin
             editor.row = bottom_row
 
         self.slip_dent()
@@ -1650,7 +1672,7 @@ class TerminalEditorVi:
 
         if top_row < last_row:
             top_row += 1
-            if row < top_row:
+            if row < top_row:  # pylint: disable=consider-using-max-builtin
                 row = top_row
 
         editor.top_row = top_row  # always different Top Row
@@ -1682,7 +1704,7 @@ class TerminalEditorVi:
             top_row -= 1
 
             bottom_row = editor.spot_bottom_row(top_row)
-            if row > bottom_row:
+            if row > bottom_row:  # pylint: disable=consider-using-min-builtin
                 row = bottom_row
 
         editor.top_row = top_row  # always different Top Row
@@ -1753,20 +1775,24 @@ class TerminalEditorVi:
         editor = self.editor
 
         if editor.skin.doing_done:
-            if editor.spot_pin >= editor.spot_last_pin():
+            if editor.spot_pin() >= editor.spot_last_pin():
 
                 raise IndexError()
 
         while not editor.count_columns_in_row():
             if editor.row >= editor.spot_last_row():
+
                 break
+
             editor.row += 1
             editor.column = 0
 
         while editor.count_columns_in_row():
             if editor.row >= editor.spot_last_row():
                 editor.column = editor.spot_last_column()  # end at last Pin, not max
+
                 break
+
             editor.row += 1
             editor.column = 0
 
@@ -1784,12 +1810,16 @@ class TerminalEditorVi:
 
         while not editor.count_columns_in_row():
             if not editor.row:
+
                 break
+
             editor.row -= 1
 
         while editor.count_columns_in_row():
             if not editor.row:
+
                 break
+
             editor.row -= 1
 
         editor.column = 0
@@ -2029,8 +2059,9 @@ class TerminalEditorVi:
             try:
                 right = line[column:].index(choice)
             except ValueError:
+                exc_arg = "substring {!r} not found ahead".format(choice)
 
-                raise ValueError("substring {!r} not found ahead".format(choice))
+                raise ValueError(exc_arg) from None  # substring ... not found ahead
 
             column += right
 
@@ -2095,8 +2126,9 @@ class TerminalEditorVi:
             try:
                 column = line[: (column + 1)].rindex(choice)
             except ValueError:
+                exc_arg = "substring {!r} not found behind".format(choice)
 
-                raise ValueError("substring {!r} not found behind".format(choice))
+                raise ValueError(exc_arg) from None  # substring ... not found behind
 
         # Option to slip right one column
 
@@ -2443,8 +2475,6 @@ class TerminalEditorVi:
         except SystemExit:
             editor.skin.doing_traceback = editor.skin.traceback  # TODO: test this Egg
 
-        editor.skin.reply = keyboard.skin.reply  # TODO: ugly
-
     def do_insert_per_chord(self):
         """Insert a copy of the Input Char, else insert a Line"""
 
@@ -2670,6 +2700,8 @@ class TerminalEditorVi:
 
 class TerminalKeyboard:
     """Map Keyboard Inputs to Code"""
+    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self):
 
@@ -2731,9 +2763,10 @@ class TerminalKeyboard:
 
 class TerminalKeyboardVi(TerminalKeyboard):
     """Map Keyboard Inputs to Code, for when feeling like Vi"""
+    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, vi):
-
         super().__init__()
 
         self.vi = vi
@@ -2750,6 +2783,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_by_vi_chords_()
 
     def _init_by_vi_chords_(self):
+        # pylint: disable=too-many-statements
 
         editor = self.editor
         func_by_chords = self.func_by_chords
@@ -2990,6 +3024,8 @@ class TerminalEditorEx:
     def format_ex_status(self, reply):
         """Keep up the Vi Reply while working the Ex Keyboard, but add the Input Line"""
 
+        _ = reply
+
         ex_line = self.ex_line
         vi_reply = self.vi_reply
 
@@ -3033,8 +3069,6 @@ class TerminalEditorEx:
 
         raise NotImplementedError("⌃V", repr(chars))
 
-        self.ex_line += chars
-
     def do_undo_append_char(self):
         """Undo the last Append Char, else Quit Ex"""
 
@@ -3073,9 +3107,9 @@ class TerminalEditorEx:
 
 class TerminalKeyboardEx(TerminalKeyboard):
     """Map Keyboard Inputs to Code, for when feeling like Ex"""
+    # pylint: disable=too-few-public-methods
 
     def __init__(self, ex):
-
         super().__init__()
 
         self.ex = ex
@@ -3131,7 +3165,7 @@ class TerminalKeyboardEx(TerminalKeyboard):
 #
 
 
-r"""
+_ = r"""
 usage: emacs.py [-h] [-nw] [--no-splash] [--pwnme [BRANCH]] [--version] [FILE ...]
 
 read files, accept edits, write files
@@ -3170,12 +3204,16 @@ how to get Emacs Py again:
 
 class TerminalEditorEmacs:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Emacs"""
+    # pylint: disable=too-few-public-methods
 
     def __init__(self, files):
 
-        pass
+        _ = files
+
+        self.emacs_traceback = None  # TODO: Egg of well known fail then ⌃X⌃C
 
     def run_emacs_terminal(self):
+        """Enter Terminal Driver, then run Emacs Keyboard, then exit Terminal Driver"""
 
         raise NotImplementedError()
 
@@ -3187,8 +3225,10 @@ class TerminalEditorEmacs:
 
 class TerminalNudgeIn(argparse.Namespace):
     """Collect the parts of one Nudge In from the Keyboard"""
+    # pylint: disable=too-few-public-methods
 
     def __init__(self, nudge=None):
+        # pylint: disable=super-init-not-called
 
         self.prefix = None  # such as Repeat Count b"1234567890" before Vi Chords
         self.chords = None  # such as b"Qvi\r" Vi Chords
@@ -3225,8 +3265,10 @@ class TerminalNudgeIn(argparse.Namespace):
 
 class TerminalReplyOut(argparse.Namespace):
     """Collect the parts of one Reply Out to the Screen"""
+    # pylint: disable=too-few-public-methods
 
     def __init__(self, reply=None):
+        # pylint: disable=super-init-not-called
 
         self.flags = None  # such as "-Fin" Grep-Like Search
         self.nudge = None  # keep up a trace of the last input that got us here
@@ -3249,7 +3291,9 @@ class TerminalFile(argparse.Namespace):
     """Hold a copy of the Bytes of a File awhile"""
 
     def __init__(self, path=None):
-        """Fetch the File"""
+        """Init and fetch the File"""
+        # TODO: no docstring at:  def __init__
+        # pylint: disable=super-init-not-called
 
         self.path = None  # Path to File
         self.iobytes = b""  # Bytes of File, else None
@@ -3313,16 +3357,15 @@ class TerminalFile(argparse.Namespace):
         self.touches = 0
 
 
-class TerminalPin(
+class TerminalPin(  # pylint: disable=too-few-public-methods
     collections.namedtuple("TerminalPin", "row, column".split(", ")),
 ):
-
     """Pair up a Row with a Column"""
 
     # TODO:  class TerminalPinVi - to slip and step in the way of Vi
 
 
-class TerminalPinPlus(
+class TerminalPinPlus(  # pylint: disable=too-few-public-methods
     collections.namedtuple("TerminalPinPlus", "row, column, obj".split(", ")),
 ):
     """Add one more Thing to pairing up a Row with a Column"""
@@ -3332,10 +3375,12 @@ class TerminalSpan(
     collections.namedtuple("TerminalSpan", "row, column, beyond".split(", ")),
 ):
     """Pick out the Columns of Rows covered by a Match of Chars"""
+    # pylint: disable=too-few-public-methods
 
     @staticmethod
     def find_spans(matches):
         """Quickly calculate the Row and Column of each of a List of Spans"""
+        # pylint: disable=too-many-locals
 
         if not matches:
 
@@ -3405,6 +3450,8 @@ class TerminalSpan(
 
 class TerminalSkin:
     """Form a Skin out of keyboard Input Chords and an Output Reply"""
+    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, chords=()):
 
@@ -3434,6 +3481,8 @@ class TerminalSkin:
 
 class TerminalEditor:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars"""
+    # pylint: disable=too-many-public-methods
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, chords):
 
@@ -3458,11 +3507,19 @@ class TerminalEditor:
         self.finding_slip = 0  # remember to Search again ahead or again behind
         self.finding_highlights = None  # show Searching as Highlights, or don't
 
-        self._reinit_with_held_file_(TerminalFile())
+        self.row = None  # pacify PyLint W0201 'attribute-defined-outside-init'
+        self.column = None
+        self.top_row = None
+
+        # self.held_file = None  # dunno why PyLint doesn't need these too
+        # self.ended_lines = None
+        # self.iobytespans = None
+
+        self.load_editor_file(TerminalFile())
 
         # TODO: mutable namespaces for self.finding_, argv_, doing_, etc
 
-    def _reinit_with_held_file_(self, held_file):
+    def load_editor_file(self, held_file):
         """Swap in a new File of Lines"""
 
         self.held_file = held_file
@@ -3480,14 +3537,15 @@ class TerminalEditor:
     # Stack Skin's with Keyboard's on top of a Terminal I/O Stack
     #
 
-    def _reopen_terminal_(self):
+    def reopen_terminal(self):
         """Clear the Caches of this Terminal, here and below, if cacheing here"""
 
         showing_lag = self.showing_lag
         painter = self.painter
 
         if not painter.rows:
-            return
+
+            return None
 
         if showing_lag is not None:
             self.driver.lag = showing_lag
@@ -3496,7 +3554,7 @@ class TerminalEditor:
             self.driver.lag = None
             painter.terminal = self.shadow
 
-        size = painter._reopen_terminal_()
+        size = painter.reopen_terminal()
         self.terminal_size = size
 
         return size
@@ -3509,7 +3567,7 @@ class TerminalEditor:
         if self.terminal_size is not None:
             if self.driver.get_terminal_size() != self.terminal_size:
 
-                self._reopen_terminal_()  # for resize
+                self.reopen_terminal()  # for resize
                 self.flush_editor(keyboard, reply=reply)  # for resize
 
     def run_terminal_with_keyboard(self, keyboard):
@@ -3577,6 +3635,7 @@ class TerminalEditor:
             try:
 
                 self.call_chords_func(chords_func)  # reply to one whole Nudge
+
                 keyboard.continue_do_func()
 
             except KeyboardInterrupt:  # Egg of *123456n⌃C, etc
@@ -3590,12 +3649,13 @@ class TerminalEditor:
 
                 keyboard.continue_do_func()
 
-            except Exception as exc:  # Egg of NotImplementedError, etc
+            except Exception as exc:  # pylint: disable=broad-except
                 self.skin.reply = TerminalReplyOut()
 
                 name = type(exc).__name__
                 str_exc = str(exc)
                 line = "{}: {}".format(name, str_exc) if str_exc else name
+                # Egg of NotImplementedError, etc
 
                 self.editor_print(line)  # "{exc_type}: {str_exc}"
                 self.reply_with_bell()
@@ -3621,7 +3681,7 @@ class TerminalEditor:
         """Set up XTerm Alt Screen & Keyboard, till 'self.painter.__exit__'"""
 
         self.painter.__enter__()
-        self._reopen_terminal_()
+        self.reopen_terminal()
 
     def scroll_cursor_into_screen(self):
         """Scroll to place Cursor on Screen"""
@@ -3680,7 +3740,7 @@ class TerminalEditor:
         # 1st: Option to rewrite whole Screen slowly
 
         if (self.showing_lag is None) and reply.bell:
-            self._reopen_terminal_()  # for bell
+            self.reopen_terminal()  # for bell
 
         # 2nd: Call back to format Status and place Cursor
 
@@ -3735,6 +3795,7 @@ class TerminalEditor:
 
     def choose_chords_func(self, chord):
         """Accept one Keyboard Input into Prefix, into main Chords, or as Suffix"""
+        # pylint: disable=too-many-locals
 
         chord_ints_ahead = self.skin.chord_ints_ahead
         chords = self.skin.nudge.chords
@@ -3771,9 +3832,8 @@ class TerminalEditor:
         if prefix or chords:
             if chord == b"\x03":  # ETX, ⌃C, 3
                 self.skin.nudge.chords = chords_plus
-                self.editor_print("Cancelled input")  # 123⌃C Egg, f⌃C Egg, etc
 
-                return lambda: self.get_arg1_int()
+                return self.do_little
 
         # If not taking a Suffix now  # FIXME: ugly
 
@@ -4099,6 +4159,7 @@ class TerminalEditor:
             while True:
                 self._keep_busy_(reply=reply_stale_chord)
                 if self.driver.kbhit(timeout=0.250):
+
                     break
 
         chord = painter.take_painter_chord()
@@ -4202,6 +4263,7 @@ class TerminalEditor:
 
     def spot_first_pin(self):
         """Spot the First Char of File, else as if it were a File of 1 Char"""
+        # pylint: disable=no-self-use
 
         first_pin = TerminalPin(0, column=0)
 
@@ -4286,6 +4348,13 @@ class TerminalEditor:
     # Define Chords common to many TerminalEditor's
     #
 
+    def do_little(self):
+        """Accept worthless Keyboard Input without doing much of anything with it"""
+
+        _ = self.get_arg1_int()
+
+        self.editor_print("Cancelled input")  # 123⌃C Egg, f⌃C Egg, etcA
+
     def do_raise_name_error(self):  # Vim Zz  # Vim zZ  # etc
         """Reply to meaningless Keyboard Input"""
 
@@ -4315,7 +4384,7 @@ class TerminalEditor:
         else:
             self.editor_print(":set _lag_={}".format(lag))
 
-        self._reopen_terminal_()  # for redraw
+        self.reopen_terminal()  # for redraw
 
     def do_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
@@ -4329,6 +4398,7 @@ class TerminalEditor:
 
     def do_sys_exit(self):  # Ex Return
         """Stop taking more Keyboard Input"""
+        # pylint: disable=no-self-use
 
         sys.exit()
 
@@ -4405,6 +4475,7 @@ class TerminalEditor:
 
     def print_some_found_spans(self, stale_status):
         """Print as many of the Found Spans as fit on screen"""
+        # pylint: disable=too-many-locals
 
         ended_lines = self.ended_lines
         iobytespans = self.iobytespans
@@ -4429,7 +4500,7 @@ class TerminalEditor:
         printed_row = None
         for span in iobytespans:
 
-            (found_row, found_column, _) = span
+            (found_row, _, _) = span
 
             line_number = 1 + found_row
             str_line_number = ""  # TODO: merge with 'format_as_line_number'
@@ -4474,13 +4545,14 @@ class TerminalEditor:
         except KeyboardInterrupt:
             pass  # take ⌃C as Return here
 
-        self._reopen_terminal_()  # after 'painter.terminal_print'
+        self.reopen_terminal()  # after 'painter.terminal_print'
 
         # TODO: highlight Matches in :g/ Lines
         # TODO: Vim prints more through a Less-like Paginator
 
-    def find_ahead_and_reply(self):
+    def find_ahead_and_reply(self):  # pylint: disable=inconsistent-return-statements
         """Find the Search Key ahead, else after start, else fail silently"""
+        # pylint: disable=too-many-locals
 
         rep_line = self.format_finding_line()
         spans = self.iobytespans
@@ -4525,8 +4597,9 @@ class TerminalEditor:
 
         assert False, spans  # unreached
 
-    def find_behind_and_reply(self):
+    def find_behind_and_reply(self):  # pylint: disable=inconsistent-return-statements
         """Find the Search Key loudly: behind, else before end, else not"""
+        # pylint: disable=too-many-locals
 
         rep_line = self.format_finding_line()
         rows = self.count_rows_in_file()
@@ -4637,7 +4710,7 @@ class TerminalEditor:
         column = self.column
         row = self.row
 
-        (head, ended_head, ended_tail) = self.split_row_line_for_chars(chars)
+        (head, _, ended_tail) = self.split_row_line_for_chars(chars)
         if not ended_lines:
             ended_lines[:] = [""]
         ended_lines[row] = head + chars + ended_tail
@@ -4651,7 +4724,7 @@ class TerminalEditor:
         row = self.row
         row_plus = row + 1
 
-        (head, ended_head, ended_tail) = self.split_row_line_for_chars(chars=None)
+        (_, ended_head, ended_tail) = self.split_row_line_for_chars(chars=None)
         ended_lines[row] = ended_head
         ended_lines.insert(row_plus, ended_tail)
 
@@ -4701,7 +4774,7 @@ class TerminalEditor:
 
         ended_lines = self.ended_lines
 
-        for index in range(joinings):
+        for _ in range(joinings):
             row = self.row
             row_below = row + 1
             rows = self.count_rows_in_file()
@@ -4783,6 +4856,7 @@ class TerminalEditor:
 
 class TerminalPainter:
     """Paint a Screen of Rows of Chars"""
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, terminal):
 
@@ -4790,7 +4864,9 @@ class TerminalPainter:
 
         self.rows = None  # count Rows on Screen
         self.columns = None  # count Columns per Row
-        self.scrolling_rows = None  # divide the Screen into Scrolling Rows and Status
+
+        self.scrolling_rows = None  # count Scrolling Rows at top of Screen
+        self.status_row = None  # index the 1 Status Row at bottom of Screen
 
         self.top_line_number = 1  # number the Scrolling Rows down from First of Screen
         self.last_line_number = 1  # number all Rows as wide as the Last Row of File
@@ -4803,23 +4879,26 @@ class TerminalPainter:
 
         if self.rows is None:
             self.terminal.__enter__()
-            self._reopen_terminal_()
+            self.reopen_terminal()
 
     def __exit__(self, exc_type, exc_value, traceback):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
-        if self.rows is not None:
+        rows = self.rows
+        terminal = self.terminal
+
+        if rows is not None:
             self.rows = None
             self.columns = None  # TODO: think into how much TerminalPainter to wipe
 
-            self.terminal.__exit__(exc_type, exc_value, traceback)  # positional args
+            terminal.__exit__(exc_type, exc_value, exc_traceback)  # pos args
 
-    def _reopen_terminal_(self):
+    def reopen_terminal(self):
         """Clear the Caches of this Terminal, here and below"""
 
         terminal = self.terminal
 
-        size = terminal._reopen_terminal_()  # a la os._reopen_terminal_(fd)
+        size = terminal.reopen_terminal()  # a la os.get_terminal_size(fd)
 
         (columns, rows) = (size.columns, size.lines)
         assert rows
@@ -4837,7 +4916,7 @@ class TerminalPainter:
 
         exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
         self.__exit__(*exc_info)
-        pdb.set_trace()
+        pdb.set_trace()  # pylint: disable=forgotten-debug-statement
         self.__enter__()
 
     def flush_painter(self):
@@ -4880,6 +4959,8 @@ class TerminalPainter:
 
     def paint_screen(self, ended_lines, spans, status, cursor_style, cursor, bell):
         """Write over the Rows of Chars on Screen"""
+        # pylint: disable=too-many-arguments
+        # pylint: disable=too-many-locals
 
         (row, column) = self.spot_nearby_cursor(cursor.row, column=cursor.column)
 
@@ -4983,15 +5064,17 @@ class TerminalPainter:
 
     def style_line(self, row, line, cursor, spans):
         """Inject kinds of SGR so as to style the Chars of a Row"""
+        # pylint: disable=too-many-locals
 
         # Work only inside this Row
 
         (spans0, line_plus) = self.spread_spans(row, line=line, spans=spans)
 
         # Add a one Char Span at the Cursor
+        # to show SGR_N in placed of DECSCUSR_N for styling the Cursor
 
         spans1 = list(spans0)
-        if False:
+        if False:  # pylint: disable=using-constant-test
             if row == cursor.row:
                 cursor_span = TerminalSpan(
                     row=cursor.row, column=cursor.column, beyond=(cursor.column + 1)
@@ -5047,6 +5130,7 @@ class TerminalPainter:
 
     def spread_spans(self, row, line, spans):
         """Spread each Empty Span to cover one more Column beyond it"""
+        # pylint: disable=too-many-locals
 
         columns = self.columns
         left_column = self.spot_left_column()
@@ -5118,6 +5202,7 @@ class TerminalPainter:
 
 class TerminalShadow:
     """Simulate a Terminal, to mostly write just the Diffs, to reduce Lag"""
+    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, terminal):
 
@@ -5149,12 +5234,12 @@ class TerminalShadow:
         if rows is None:
 
             terminal.__enter__()
-            self._reopen_terminal_()
+            self.reopen_terminal()
 
             if enter_cursor_style_chars:
                 terminal.write(enter_cursor_style_chars)
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, exc_traceback):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
         exit_cursor_style_chars = self.exit_cursor_style_chars
@@ -5164,21 +5249,21 @@ class TerminalShadow:
         if rows is not None:
 
             if exit_cursor_style_chars:
-                terminal.write(exit_cursor_style_chars)
+                terminal.write(self.exit_cursor_style_chars)
 
             self.rows = None
             self.columns = None  # TODO: think into how much TerminalShadow to wipe
 
-            terminal.__exit__(exc_type, exc_value, traceback)  # positional args
+            terminal.__exit__(exc_type, exc_value, exc_traceback)  # pos args
 
-    def _reopen_terminal_(self):
+    def reopen_terminal(self):
         """Clear the Caches of this Terminal, here and below"""
 
         terminal = self.terminal
 
         # Count Rows x Columns below
 
-        size = terminal._reopen_terminal_()
+        size = terminal.reopen_terminal()
         (columns, rows) = (size.columns, size.lines)
 
         # Size this Terminal to match the Terminal Below
@@ -5408,6 +5493,7 @@ class TerminalShadow:
         elif order.a == DECSCUSR_N[-2:] == " q":
             self.write_csi_cursor_decscusr_order(order)
         else:
+
             raise NotImplementedError(order)
 
     def write_ed_2_order(self):
@@ -5431,6 +5517,7 @@ class TerminalShadow:
 
     def write_csi_sgr_order(self, order):
         """Write one instance of SGR_N"""
+        # pylint: disable=no-self-use
 
         if order.x is None:
             if order.int_y in (None, 7):
@@ -5440,6 +5527,7 @@ class TerminalShadow:
         raise NotImplementedError(order)
 
     def write_csi_cursor_decscusr_order(self, order):
+        """Write once instance of DECSCUSR_N"""
 
         if order.x is None:
             if order.int_y in (2, 4, 6):
@@ -5584,10 +5672,10 @@ class TerminalDriver:
 
             self.stdio.write(_CURSES_INITSCR_)
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, exc_traceback):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
-        _ = (exc_type, exc_value, traceback)
+        _ = (exc_type, exc_value, exc_traceback)
 
         self.stdio.flush()
 
@@ -5602,7 +5690,7 @@ class TerminalDriver:
             when = termios.TCSADRAIN
             termios.tcsetattr(fd, when, attributes)
 
-    def _reopen_terminal_(self):
+    def reopen_terminal(self):
         """Do nothing much, when running TerminalDriver in place of TerminalShadow"""
 
         size = os.get_terminal_size(self.fd)
@@ -5634,11 +5722,13 @@ class TerminalDriver:
         wlist = list()
         xlist = list()
         selected = select.select(rlist, wlist, xlist, timeout)
-        (rlist_, wlist_, xlist_) = selected
+        (rlist_, _, _) = selected
 
         if rlist_ == rlist:
 
             return True
+
+        return False
 
     def getch(self):
         """Block to fetch next Char of Paste, next Keystroke, or empty Eof"""
@@ -5691,11 +5781,13 @@ class TerminalDriver:
 
             if self.with_termios:
                 if not self.kbhit(timeout=0):
+
                     break
 
             more = os.read(self.stdio.fileno(), 1)
             if not more:
                 assert not self.with_termios
+
                 break
 
             stdin += more
@@ -5843,6 +5935,8 @@ class KwArgsException(Exception):
     """Raise a string of Key-Value Pairs"""
 
     def __init__(self, **kwargs):
+        # pylint: disable=super-init-not-called
+
         self.kwargs = kwargs
 
     def __str__(self):
@@ -6082,6 +6176,8 @@ def shlex_quote(arg):
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
     print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
