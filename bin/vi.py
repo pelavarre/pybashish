@@ -2376,8 +2376,9 @@ class TerminalEditorVi:
 
         # Insert beyond this Char
 
-        if column <= columns:
-            editor.column = column + 1
+        if columns:
+            if column <= columns:
+                editor.column = column + 1
 
         self.take_inserts()
 
@@ -2547,6 +2548,7 @@ class TerminalEditorVi:
 
         chars = self.get_vi_arg0_chars()
         editor.insert_some_chars(chars)  # insert as inserting itself
+
         self.held_file.touches += 1
         self.vi_print("inserted char")
 
@@ -2555,8 +2557,15 @@ class TerminalEditorVi:
 
         editor = self.editor
 
+        column = editor.column
+        columns = editor.count_columns_in_row()
+
+        self.check_vi_index(editor.column < columns)
+
         choice = self.get_vi_arg2_chords()
         editor.replace_some_chars(chars=choice)
+        editor.column = column
+
         self.held_file.touches += 1
         self.vi_print("{} replaced".format(editor.format_touch_count()))
 
@@ -4859,10 +4868,11 @@ class TerminalEditor:
         row_plus = row + 1
 
         (_, ended_head, ended_tail) = self.split_row_line_for_chars(chars=None)
-        ended_lines[row] = ended_head
+        if ended_lines:
+            ended_lines[row] = ended_head
         ended_lines.insert(row_plus, ended_tail)
 
-        self.row = row_plus
+        self.row = row_plus if ended_lines else 0
         self.column = 0
 
     def delete_some_chars(self, count):
@@ -4938,6 +4948,7 @@ class TerminalEditor:
 
             ended_line = ended_lines[row]
             line = ended_line.splitlines()[0]
+            sep = " " if (line and (line.rstrip() == line)) else ""
 
             ended_line_below = ended_lines[row_below]
             line_below = ended_line_below.splitlines()[0]
@@ -4946,22 +4957,27 @@ class TerminalEditor:
             # Delete the copied Line
 
             ended_lines[row:] = ended_lines[row_below:]
-            ended_lines[row] = line + " " + line_below.lstrip() + line_end_below
+            ended_lines[row] = line + sep + line_below.lstrip() + line_end_below
 
         return joinings
 
     def split_row_line_for_chars(self, chars):
         """Split this Line to replace or insert Char or Line, and remember where"""
 
+        ended_lines = self.ended_lines
         row = self.row
         column = self.column
 
         pin_plus = self.spot_pin_plus(chars)
         self.intake_pins.append(pin_plus)
 
-        ended_line = self.ended_lines[row] if self.ended_lines else _EOL_
+        ended_line = ended_lines[row] if ended_lines else _EOL_
         columns = len(ended_line.splitlines()[0])
         line_end = ended_line[columns:]
+
+        rows = len(ended_lines)
+        if row < rows:
+            assert line_end, row
 
         (head, ended_tail) = (ended_line[:column], ended_line[column:])
         ended_head = head + line_end
@@ -6394,11 +6410,6 @@ def str_join_first_paragraph(doc):
 
 # -- bugs --
 
-# FIXME: Vim A⌃O~⌃CZQ doesn't dump that traceback
-# FIXME: insert \u00C7 ç and \u00F1 ñ etc - all the Unicode outside of C0 Controls
-
-# FIXME: empty file tests of O r a o
-# FIXME: test J from an empty line
 # FIXME: define b":wn\r"
 # FIXME: abbreviate paths in PermissionError
 
@@ -6464,6 +6475,8 @@ def str_join_first_paragraph(doc):
 
 
 # -- future improvements --
+
+# TODO: insert \u00C7 ç and \u00F1 ñ etc - all the Unicode outside of C0 Controls
 
 # TODO: record and replay tests of:  cat bin/vi.py |vi.py - bin/vi.py
 
