@@ -78,6 +78,32 @@ import tty
 subprocess_run = subprocess.run  # evade Linters who freak over "shell=True"
 
 
+# Name some Terminal Input magic
+
+C0_CONTROL_STDINS = list(chr(codepoint).encode() for codepoint in range(0x00, 0x20))
+C0_CONTROL_STDINS.append(chr(0x7F).encode())
+
+assert len(C0_CONTROL_STDINS) == 33 == (128 - 95) == ((0x20 - 0x00) + 1)
+
+ORD_CR = 0x0D  # CR, ⌃M, 13 \r  # the Return key on a Mac Keyboard
+CR_CHAR = chr(ORD_CR)
+CR_STDIN = CR_CHAR.encode()
+
+ORD_ESC = 0x1B  # ESC, ⌃[, 27
+ESC_CHAR = chr(ORD_ESC)
+ESC_STDIN = ESC_CHAR.encode()
+
+BASIC_LATIN_STDINS = list(chr(codepoint).encode() for codepoint in range(0x20, 0x7F))
+
+assert len(BASIC_LATIN_STDINS) == 95 == (128 - 33) == (0x7F - 0x20)
+assert len(C0_CONTROL_STDINS + BASIC_LATIN_STDINS) == 128
+
+X40_CONTROL_MASK = 0x40
+
+X20_LOWER_MASK = 0x20
+X20_UPPER_MASK = 0x20
+
+
 # Name some Terminal Output magic
 
 ESC = "\x1B"  # Esc
@@ -122,7 +148,8 @@ _INSERT_CURSOR_STYLE_ = DECSCUSR_N.format(6)  # Steady Bar
 
 
 class TerminalOrder(argparse.Namespace):
-    """Split Terminal Output into magic and literals"""
+    """Split one whole Terminal Output Order into its Parts"""
+
     # pylint: disable=too-few-public-methods
     # pylint: disable=too-many-instance-attributes
 
@@ -141,13 +168,11 @@ class TerminalOrder(argparse.Namespace):
     )
 
     def __init__(self, match):
-        """Parse one whole Terminal Order, found as Re Match of TERMINAL_WRITE_REGEX"""
         # pylint: disable=super-init-not-called
-        # TODO: no docstring at:  def __init__
 
         self.match = match
 
-        # Name Groups of the Match
+        # Name Groups of the Re Match of TERMINAL_WRITE_REGEX
 
         m = match
         self.chars = m.string[m.start() : m.end()]
@@ -205,6 +230,7 @@ class TerminalOrder(argparse.Namespace):
 
 class TerminalWriter(argparse.Namespace):
     """Split a mix of C0_CONTROL and other Chars into complete TerminalOrder's"""
+
     # pylint: disable=too-few-public-methods
 
     def __init__(self, chars):
@@ -219,33 +245,6 @@ class TerminalWriter(argparse.Namespace):
             orders.append(order)
 
         self.orders = orders
-
-
-# Name some Terminal Input magic
-# FIXME: Shuffle brief Terminal Input magic up above extensive Terminal Output magic
-
-C0_CONTROL_STDINS = list(chr(codepoint).encode() for codepoint in range(0x00, 0x20))
-C0_CONTROL_STDINS.append(chr(0x7F).encode())
-
-assert len(C0_CONTROL_STDINS) == 33 == (128 - 95) == ((0x20 - 0x00) + 1)
-
-ORD_CR = 0x0D  # CR, ⌃M, 13 \r  # the Return key on a Mac Keyboard
-CR_CHAR = chr(ORD_CR)
-CR_STDIN = CR_CHAR.encode()
-
-ORD_ESC = 0x1B  # ESC, ⌃[, 27
-ESC_CHAR = chr(ORD_ESC)
-ESC_STDIN = ESC_CHAR.encode()
-
-BASIC_LATIN_STDINS = list(chr(codepoint).encode() for codepoint in range(0x20, 0x7F))
-
-assert len(BASIC_LATIN_STDINS) == 95 == (128 - 33) == (0x7F - 0x20)
-assert len(C0_CONTROL_STDINS + BASIC_LATIN_STDINS) == 128
-
-X40_CONTROL_MASK = 0x40
-
-X20_LOWER_MASK = 0x20
-X20_UPPER_MASK = 0x20
 
 
 #
@@ -493,6 +492,7 @@ VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # r"[A-Za-z0-
 
 class TerminalEditorVi:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim"""
+
     # pylint: disable=too-many-public-methods
     # pylint: disable=too-many-instance-attributes
 
@@ -2700,6 +2700,7 @@ class TerminalEditorVi:
 
 class TerminalKeyboard:
     """Map Keyboard Inputs to Code"""
+
     # pylint: disable=too-few-public-methods
     # pylint: disable=too-many-instance-attributes
 
@@ -2763,6 +2764,7 @@ class TerminalKeyboard:
 
 class TerminalKeyboardVi(TerminalKeyboard):
     """Map Keyboard Inputs to Code, for when feeling like Vi"""
+
     # pylint: disable=too-few-public-methods
     # pylint: disable=too-many-instance-attributes
 
@@ -3107,6 +3109,7 @@ class TerminalEditorEx:
 
 class TerminalKeyboardEx(TerminalKeyboard):
     """Map Keyboard Inputs to Code, for when feeling like Ex"""
+
     # pylint: disable=too-few-public-methods
 
     def __init__(self, ex):
@@ -3204,6 +3207,7 @@ how to get Emacs Py again:
 
 class TerminalEditorEmacs:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Emacs"""
+
     # pylint: disable=too-few-public-methods
 
     def __init__(self, files):
@@ -3225,6 +3229,7 @@ class TerminalEditorEmacs:
 
 class TerminalNudgeIn(argparse.Namespace):
     """Collect the parts of one Nudge In from the Keyboard"""
+
     # pylint: disable=too-few-public-methods
 
     def __init__(self, nudge=None):
@@ -3265,6 +3270,7 @@ class TerminalNudgeIn(argparse.Namespace):
 
 class TerminalReplyOut(argparse.Namespace):
     """Collect the parts of one Reply Out to the Screen"""
+
     # pylint: disable=too-few-public-methods
 
     def __init__(self, reply=None):
@@ -3291,30 +3297,36 @@ class TerminalFile(argparse.Namespace):
     """Hold a copy of the Bytes of a File awhile"""
 
     def __init__(self, path=None):
-        """Init and fetch the File"""
-        # TODO: no docstring at:  def __init__
         # pylint: disable=super-init-not-called
 
-        self.path = None  # Path to File
+        self.path = None  # Path to Fetched File
+
         self.iobytes = b""  # Bytes of File, else None
         self.iochars = ""  # Chars of File, else None
         self.ended_lines = list()  # Ended Lines of File
-        self.touches = 0
+        self.touches = 0  # count of Changes to File
+
+        self.write_path = "/dev/stdout"  # Path to Stored File
+
+        # reinit by loading the File, if some File chosen
 
         if path is not None:
+            self._load_file_(path)
 
-            self.path = os.path.abspath(path)
+    def _load_file_(path):
+        """Read the Bytes of the File, decode as Chars, split as Lines"""
 
-            with open(path, "rb") as reading:
-                self.iobytes = reading.read()
+        self.path = os.path.abspath(path)
 
-            self.iochars = self.iobytes.decode(errors="surrogateescape")
+        with open(path, "rb") as reading:
+            self.iobytes = reading.read()
 
-            self.ended_lines = self.iochars.splitlines(keepends=True)
+        self.iochars = self.iobytes.decode(errors="surrogateescape")
 
-        write_path = "/dev/stdout" if (path in (None, "/dev/stdin")) else path
+        self.ended_lines = self.iochars.splitlines(keepends=True)
+
+        write_path = "/dev/stdout" if (path == "/dev/stdin") else path
         write_path = os.path.abspath(write_path)
-
         self.write_path = write_path
 
     def decode(self):
@@ -3375,6 +3387,7 @@ class TerminalSpan(
     collections.namedtuple("TerminalSpan", "row, column, beyond".split(", ")),
 ):
     """Pick out the Columns of Rows covered by a Match of Chars"""
+
     # pylint: disable=too-few-public-methods
 
     @staticmethod
@@ -3450,6 +3463,7 @@ class TerminalSpan(
 
 class TerminalSkin:
     """Form a Skin out of keyboard Input Chords and an Output Reply"""
+
     # pylint: disable=too-few-public-methods
     # pylint: disable=too-many-instance-attributes
 
@@ -3481,6 +3495,7 @@ class TerminalSkin:
 
 class TerminalEditor:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars"""
+
     # pylint: disable=too-many-public-methods
     # pylint: disable=too-many-instance-attributes
 
@@ -3559,7 +3574,7 @@ class TerminalEditor:
 
         return size
 
-    def _keep_busy_(self, reply):
+    def keep_busy(self, reply):
         """Work while waiting for input"""
 
         keyboard = self.skin.keyboard
@@ -4112,7 +4127,7 @@ class TerminalEditor:
         # Consume the Chord and raise KeyboardInterrupt, if it is ETX, ⌃C, 3
 
         if self.showing_lag is None:
-            self._keep_busy_(reply=self.skin.reply)  # give 1 Time Slice for this Chord
+            self.keep_busy(reply=self.skin.reply)  # give 1 Time Slice for this Chord
 
         chord = painter.take_painter_chord()
         if chord == b"\x03":  # ETX, ⌃C, 3
@@ -4157,7 +4172,7 @@ class TerminalEditor:
 
         if self.showing_lag is None:
             while True:
-                self._keep_busy_(reply=reply_stale_chord)
+                self.keep_busy(reply=reply_stale_chord)
                 if self.driver.kbhit(timeout=0.250):
 
                     break
@@ -4856,6 +4871,7 @@ class TerminalEditor:
 
 class TerminalPainter:
     """Paint a Screen of Rows of Chars"""
+
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, terminal):
@@ -5202,6 +5218,7 @@ class TerminalPainter:
 
 class TerminalShadow:
     """Simulate a Terminal, to mostly write just the Diffs, to reduce Lag"""
+
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self, terminal):
