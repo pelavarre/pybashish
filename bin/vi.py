@@ -30,7 +30,7 @@ keyboard cheat sheet:
   /... Delete ⌃U ⌃C Return  ?...   * £ # n N  => start search, next, previous
   :?Return :/Return :g/Return  => search behind, ahead, print all, or new search
   a i rx o A I O R ⌃O Esc ⌃C  => enter/ suspend-resume/ exit insert/ replace
-  x X D J s S C  => cut chars, join lines, cut & insert
+  x X dd D J s S C  => cut chars or lines, join lines, cut & insert
 
 keyboard easter eggs:
   9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz ?Return /Return :g/Return
@@ -2673,23 +2673,14 @@ class TerminalEditorVi:
         editor = self.editor
 
         column = editor.column
-        last_row = editor.spot_last_row()
         line = editor.fetch_row_line()
-        row = editor.row
-        rows = editor.count_rows_in_file()
 
         # If N > 1 and at or left of Dent, then delete N Lines and Slip to Dent
 
         len_dent = len(line) - len(line.lstrip())
         if count > 1:
             if column <= len_dent:
-                self.check_vi_index(row < last_row)
-                down = min(rows - row, count)
-
-                touches = editor.delete_some_lines(count=down)
-                self.held_file.touches += touches
-
-                self.slip_dent()
+                self.chop_down(count)
 
                 return
 
@@ -2697,6 +2688,30 @@ class TerminalEditorVi:
 
         self.chop_some_vi_lines(count)
         self.slip_back_into_vi_line()
+
+    def do_chop_down(self):  # Vim dd
+        """Delete N Lines and Slip to Dent"""
+
+        count = self.get_vi_arg1_int()
+
+        self.chop_down(count)
+
+    def chop_down(self, count):
+        "Delete at least 1 but no more than N Lines and Slip to Dent"
+
+        editor = self.editor
+
+        last_row = editor.spot_last_row()
+        row = editor.row
+        rows = editor.count_rows_in_file()
+
+        self.check_vi_index(row < last_row)
+        down = min(rows - row, count)
+
+        touches = editor.delete_some_lines(count=down)
+        self.held_file.touches += touches
+
+        self.slip_dent()
 
     def do_slip_first_chop_take_inserts(self):  # Vim S
         """Cut N - 1 Lines below & all Chars of this Line, and take Chords as Inserts"""
@@ -2978,6 +2993,9 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"b"] = vi.do_lil_word_start_behind
         # func_by_chords[b"c"] = vi.do_chop_after_take_inserts
         # func_by_chords[b"d"] = vi.do_chop_after
+
+        self._init_func_by_many_chords(b"dd", func=vi.do_chop_down)
+
         func_by_chords[b"e"] = vi.do_lil_word_end_ahead
 
         self._init_suffix_func(b"f", func=vi.do_slip_index_choice)
@@ -3900,7 +3918,7 @@ class TerminalEditor:
 
                 return self.do_little
 
-        # If not taking a Suffix now  # FIXME: ugly
+        # If not taking a Suffix now
 
         chords_func = self.editor_func_by_chords(chords)
         chords_plus_func = self.editor_func_by_chords(chords=chords_plus)
@@ -4874,12 +4892,26 @@ class TerminalEditor:
         row = self.row
         rows = self.count_rows_in_file()
 
+        # Fall back to delete 0 Rows
+
         touches = 0
+
+        # Delete between 1 and N Lines
+
         if row < rows:
             row_below = min(rows, row + count)
             ended_lines[row:] = ended_lines[row_below:]
 
             touches = row_below - row
+
+            # Recover from deleting the Line beneath the Cursor
+
+            row_rows = self.count_rows_in_file()
+            if row >= row_rows:
+                assert row == row_rows
+
+                if row_rows:
+                    self.row = row_rows - 1
 
         return touches
 
@@ -6359,8 +6391,6 @@ def str_join_first_paragraph(doc):
 
 
 # -- bugs --
-
-# FIXME: code up 'dd'
 
 # FIXME: Vim :wq with changes pending, without/ with:  chmod -w tests/v.vim
 
