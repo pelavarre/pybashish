@@ -819,10 +819,6 @@ class TerminalEditorVi:
     def do_might_flush_quit_vi(self):  # Vim :wq\r
         """Write the File and quit, except only write without quit if more Files"""
 
-        if self.might_keep_changes(alt=":wq!"):
-
-            return
-
         if self.might_keep_files(alt=":wq!"):
 
             return
