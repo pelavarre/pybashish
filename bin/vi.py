@@ -34,7 +34,7 @@ keyboard cheat sheet:
 
 keyboard easter eggs:
   9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz ?Return /Return :g/Return
-  Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*Esc w*⌃C w*123456n⌃C w*:g/⌃M⌃C g/⌃Z
+  ⌃C Esc 123⌃C zZZQ 3ZQ A⌃OzZ⌃CZQ f⌃C w*⌃C w*123456n⌃C /⌃G⌃CZQ w*g/⌃M⌃C g/⌃Z
   Qvi⌃My REsc R⌃Zfg OO⌃O_⌃O^ \Fw*/Up \F/$Return 2⌃G :vi⌃M :n
 
 pipe tests of ZQ vs ZZ:
@@ -749,7 +749,11 @@ class TerminalEditorVi:
             count = editor.format_touch_count()
             self.vi_print("{} after {} inserted".format(verbed, count))
 
+            skin.doing_traceback = skin.traceback
+
         elif editor.intake_beyond == "replacing":  # R then Esc or ⌃C
+
+            skin.doing_traceback = skin.traceback
 
             self.do_take_views()
             count = editor.format_touch_count()
@@ -2516,6 +2520,8 @@ class TerminalEditorVi:
         skin.cursor_style = _VIEW_CURSOR_STYLE_
 
         self.vi_print("Type one command")
+
+        skin.doing_traceback = skin.traceback
 
     def do_insert_per_chord(self):
         """Insert a copy of the Input Char, else insert a Line"""
@@ -6388,10 +6394,6 @@ def str_join_first_paragraph(doc):
 
 # -- bugs --
 
-# FIXME: Vim :wq with changes pending, without/ with:  chmod -w tests/v.vim
-
-# FIXME: Vim A⌃O⌃L does somehow only temporarily slip the Cursor on File
-# FIXME: hmm somehow by tonight lots of our A⌃O doesn't slip the Cursor back like A⌃O⌃L
 # FIXME: Vim A⌃O~⌃CZQ doesn't dump that traceback
 # FIXME: insert \u00C7 ç and \u00F1 ñ etc - all the Unicode outside of C0 Controls
 
