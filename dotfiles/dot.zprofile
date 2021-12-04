@@ -795,7 +795,7 @@ function --pylint () {
 
     ~/.venvs/pylint/bin/pylint \
         --rcfile=/dev/null --reports=n --score=n --disable=locally-disabled \
-        -d R1734,R1735 -d C0103,C0201,C0209,C0302,C0411 -d W1514 \
+        -d R1734,R1735 -d C0103,C0201,C0209,C0302,C0325,C0411 -d W1514 \
         "$@"
 }
 
@@ -828,6 +828,10 @@ function --pylint () {
 # C0302: Too many lines in module (.../1000)
 # yes, but large files do have a place, albeit only rarely
 #
+# (superfluous-parens)
+# C0325: Unnecessary parens after 'not' keyword
+# nope, i applaud the clarity of 'if not (0 < i <= last):'
+#
 # (wrong-import-order)
 # C0411: standard import "import ..." should be placed before "import __main__"
 # nope, i give the win to Flake8
@@ -853,12 +857,12 @@ alias -- -e='--exec-echo-xe emacs -nw --no-splash'
 alias -- -v='--exec-echo-xe vim'
 
 function -eg () {
-    echo 'emacs -nw --no-splash $(git show --name-only --pretty=)' >&2
-    vim       $(git show --name-only --pretty=)
+    echo 'emacs -nw --no-splash $(git show --name-only --pretty=)' "$@" >&2
+    vim       $(git show --name-only --pretty=) "$@"
 }
 function -vg () {
-    echo 'vim $(git show --name-only --pretty=)' >&2
-    vim       $(git show --name-only --pretty=)
+    echo 'vim $(git show --name-only --pretty=)' "$@" >&2
+    vim       $(git show --name-only --pretty=) "$@"
 }
 
 

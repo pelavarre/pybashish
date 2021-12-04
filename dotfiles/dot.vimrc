@@ -33,7 +33,7 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 :nnoremap <Bslash> :<return>
 
 " \ Esc  => cancel the :set hlsearch highlighting of all search hits on screen
-:nnoremap <Bslash><esc> :noh<return>
+:nnoremap <Bslash><Esc> :noh<return>
 
 " \ e  => reload, if no changes not-saved
 :nnoremap <Bslash>e :e<return>
@@ -58,17 +58,15 @@ function! RStripEachLine()
     call cursor(with_line, with_col)
 endfun
 
-" £  => insert # instead, because Shift+3 at UK/US Keyboards
-" :nmap £ #
-" :imap £ #
-" :vmap £ #
-" :xmap £ #
-" :smap £ #
-" :cmap £ #
-" :omap £ #
+" accept Option+3 from US Keyboards as meaning '#' \u0023 Hash Sign
 
-" :cnoremap £ #
-" :inoremap £ #
-:abbrev £ #
+:cmap <Esc>3 #
+:imap <Esc>3 #
+:nmap <Esc>3 #
+:omap <Esc>3 #
+:smap <Esc>3 #
+:vmap <Esc>3 #
+:xmap <Esc>3 #
+
 
 " copied from:  git clone https://github.com/pelavarre/pybashish.git
