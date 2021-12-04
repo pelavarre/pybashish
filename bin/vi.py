@@ -18,7 +18,7 @@ quirks:
   works as pipe filter, pipe source, or pipe drain, like the pipe drain:  ls |vi -
 
 keyboard cheat sheet:
-  ZQ ZZ ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wq!⌃M  => how to quit Vi Py
+  ZQ ZZ ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wn!⌃M :wq!⌃M :n⌃M :q⌃M  => how to quit Vi Py
   ⌃C Up Down Right Left Space Delete Return  => natural enough
   0 ^ $ fx tx Fx Tx ; , | h l  => leap to column
   b e w B E W { }  => leap across small word, large word, paragraph
@@ -524,13 +524,20 @@ class TerminalEditorVi:
     def do_might_next_vi_file(self):  # Vim :n\r
         """Halt if touches Not flushed, else visit the next (or first) File"""
 
-        if self.might_keep_changes(alt=":n!"):
+        if self.might_keep_changes(alt=":wn"):
 
             return
 
-        self.do_next_vi_file()
+        self.next_vi_file()
+        self.do_say_more()  # TODO: 'self.do_...' can too easily spiral out of control
 
     def do_next_vi_file(self):  # Vim :n!\r
+        """Visit the next (or first) File"""
+
+        self.next_vi_file()
+        self.do_say_more()
+
+    def next_vi_file(self):  # Vim :n!\r
         """Visit the next (or first) File"""
 
         editor = self.editor
@@ -566,6 +573,9 @@ class TerminalEditorVi:
         # Visit the chosen File
 
         held_file = TerminalFile(path=read_path)
+
+        if read_path == "/dev/stdin":
+            held_file.touches = len(held_file.iobytes)
 
         editor.load_editor_file(held_file)
 
@@ -661,7 +671,7 @@ class TerminalEditorVi:
         held_file = self.held_file
         write_path = held_file.write_path
 
-        #
+        # Choose how to mention the Write Path of the File
 
         nickname = None
         assert held_file
@@ -675,17 +685,19 @@ class TerminalEditorVi:
 
         enough_path = homepath if (count > 1) else nickname
 
-        #
+        # Mention the Search in progress
 
         if editor.finding_line:
             editor.finding_highlights = True
             editor.reply_with_finding()
 
+        # Mention injecting Lag
+
         str_lag = None
         if showing_lag is not None:
             str_lag = "{}s lag".format(showing_lag)
 
-        #
+        # Collect the mentions into one Status Row
 
         joins = list()
 
@@ -820,10 +832,28 @@ class TerminalEditorVi:
     # Define Chords for entering, pausing, and exiting TerminalEditorVi
     #
 
+    def do_might_flush_next_vi(self):  # Vim :wn\r
+
+        self.do_flush_next_vi()  # TODO: distinguish :wn from :wn!
+
+        # Vi Py :wn quits after last File
+        # Vim :wn quirk chokes over no more Files chosen, after last File
+
+    def do_flush_next_vi(self):  # Vim :wn!\r
+
+        self.do_flush_vi()
+        self.next_vi_file()
+
+        # Vi Py :wn! quits after last File
+        # Vim :wn! quirk chokes over no more Files chosen, after last File
+
+        # Vi Py :wn and :wn! announce the Write, and not the Next
+        # Vim quirks in :wn and :wn! announce the Next, and not the Write
+
     def do_might_flush_quit_vi(self):  # Vim :wq\r
         """Write the File and quit, except only write without quit if more Files"""
 
-        if self.might_keep_files(alt=":wq!"):
+        if self.might_keep_files(alt=":wn"):
 
             return
 
@@ -850,7 +880,7 @@ class TerminalEditorVi:
     def do_might_flush_vi(self):  # Vim :w\r
         """Write the File but do not quit Vi"""
 
-        self.do_flush_vi()
+        self.do_flush_vi()  # TODO: distinguish :w from :w!
 
     def do_flush_vi(self):  # Vim :w!\r
         """Write the File"""
@@ -884,11 +914,11 @@ class TerminalEditorVi:
     def do_might_quit_vi(self):  # Vim :q\r
         """Halt if Touches not Flushed or More Files, else quit Vi"""
 
-        if self.might_keep_changes(alt=":q!"):
+        if self.might_keep_changes(alt=":wq"):
 
             return
 
-        if self.might_keep_files(alt=":q!"):
+        if self.might_keep_files(alt=":n"):
 
             return
 
@@ -2939,6 +2969,8 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func_by_many_chords(b":vi\r", func=editor.do_resume_editor)
         self._init_func_by_many_chords(b":w\r", func=vi.do_might_flush_vi)
         self._init_func_by_many_chords(b":w!\r", func=vi.do_flush_vi)
+        self._init_func_by_many_chords(b":wn\r", func=vi.do_might_flush_next_vi)
+        self._init_func_by_many_chords(b":wn!\r", func=vi.do_flush_next_vi)
         self._init_func_by_many_chords(b":wq\r", func=vi.do_might_flush_quit_vi)
         self._init_func_by_many_chords(b":wq!\r", func=vi.do_flush_quit_vi)
 
@@ -6410,7 +6442,6 @@ def str_join_first_paragraph(doc):
 
 # -- bugs --
 
-# FIXME: define b":wn\r"
 # FIXME: abbreviate paths in PermissionError
 
 # FIXME: insert/ delete/ replace should trigger re-eval of search spans in lines
