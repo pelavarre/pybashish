@@ -27,7 +27,7 @@ keyboard cheat sheet:
   ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll rows
   ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
   \n \i \F Esc ⌃G  => toggle line numbers, search case/ regex, show hits
-  /... Delete ⌃U ⌃C Return  ?...   * # £ n N  => start search, next, previous
+  /... Delete ⌃U ⌃C Return  ?...   * £ # n N  => start search, next, previous
   :?Return :/Return :g/Return  => search behind, ahead, print all, or new search
   a i rx o A I O R ⌃O Esc ⌃C  => enter/ suspend-resume/ exit insert/ replace
   x X D J s S C  => cut chars, join lines, cut & insert
@@ -35,7 +35,7 @@ keyboard cheat sheet:
 keyboard easter eggs:
   9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz ?Return /Return :g/Return
   Esc ⌃C 123Esc 123⌃C zZZQ /⌃G⌃CZQ 3ZQ f⌃C w*Esc w*⌃C w*123456n⌃C w*:g/⌃M⌃C g/⌃Z
-  Qvi⌃My REsc R⌃Zfg \Fw*/Up \F/$Return 9⌃G :vi⌃M :n
+  Qvi⌃My REsc R⌃Zfg OO⌃O_⌃O^ \Fw*/Up \F/$Return 2⌃G :vi⌃M :n
 
 pipe tests of ZQ vs ZZ:
   ls |bin/vi.py -
@@ -292,7 +292,7 @@ def parse_vi_argv(argv):
     )
 
     parser.add_argument(
-        "--plus",  # Vim "+"
+        "--plus",  # Vim +ex_command
         metavar="PLUS",
         dest="plusses",
         action="append",  # 'man vim' says <= 10 commands
@@ -300,7 +300,7 @@ def parse_vi_argv(argv):
     )
 
     parser.add_argument(
-        "--pwnme",  # Vim doesn't do software-update-in-place
+        "--pwnme",  # Vim quirkily doesn't do software-update-in-place
         metavar="BRANCH",
         nargs="?",
         default=False,
@@ -347,8 +347,8 @@ def do_args_pwnme(branch):
 
     # Find present Self
 
-    path = module_file_path()
-    from_relpath = os.path.relpath(path)
+    from_abspath = module_file_path()
+    from_relpath = os.path.relpath(from_abspath)
 
     # Find future Self  # TODO: rename to branch "main" from branch "master"
 
@@ -546,23 +546,26 @@ class TerminalEditorVi:
             next_files_index = files_index + 1
             file_path = files[next_files_index]
         else:
-            self.do_quit_vi()  # Vim doesn't calmly quit, Vim chokes over no next file
+            self.do_quit_vi()
             assert False  # unreached
+
+            # Vi Py :n quits after last File
+            # Vim :n quirk chokes over no more Files chosen, after last File
 
         self.files_index = next_files_index
 
         # Map more abstract File Path Aliases to more concrete File Paths
 
-        path = file_path
+        read_path = file_path
         if file_path == "-":
-            path = "/dev/stdin"
+            read_path = "/dev/stdin"
         elif file_path is None:
             if not sys.stdin.isatty():
-                path = "/dev/stdin"
+                read_path = "/dev/stdin"
 
         # Visit the chosen File
 
-        held_file = TerminalFile(path)
+        held_file = TerminalFile(path=read_path)
 
         editor.load_editor_file(held_file)
 
@@ -575,7 +578,7 @@ class TerminalEditorVi:
     def run_vi_terminal(self):
         """Enter Terminal Driver, then run Vi Keyboard, then exit Terminal Driver"""
 
-        plusses = self.plusses  # Vim starts with lines of '~/.vimrc'
+        plusses = self.plusses  # Vim quirk starts with lines of '~/.vimrc'
 
         # Choose how to start up
 
@@ -650,10 +653,27 @@ class TerminalEditorVi:
     def do_say_more(self):  # Vim ⌃G
         """Reply once with more verbose details"""
 
-        editor = self.editor
-        held_file = self.held_file
+        count = self.get_vi_arg1_int()
 
+        editor = self.editor
         showing_lag = editor.showing_lag
+
+        held_file = self.held_file
+        write_path = held_file.write_path
+
+        #
+
+        nickname = None
+        assert held_file
+        if held_file:
+            write_path = held_file.write_path
+            nickname = os.path.basename(write_path)
+            if write_path.startswith("/dev/"):
+                nickname = write_path
+
+        homepath = os_path_homepath(write_path)
+
+        enough_path = homepath if (count > 1) else nickname
 
         #
 
@@ -669,7 +689,7 @@ class TerminalEditorVi:
 
         joins = list()
 
-        joins.append(repr(os.path.basename(self.held_file.path)))
+        joins.append(repr(enough_path))
 
         if str_lag:
             joins.append(str_lag)
@@ -682,82 +702,73 @@ class TerminalEditorVi:
 
         # Vim ⌃G doesn't turn Search highlights back on
 
-        # TODO: 1⌃G to show Dir of File Path
-
     def do_vi_c0_control_etx(self):  # Vim ⌃C  # Vi Py Init
         """Cancel Digits Prefix, or close Insert/ Replace, or suggest ZZ to quit Vi Py"""
 
-        count = self.get_vi_arg1_int(default=None)
+        self.cancel_escape_whatever("Cancelled")
 
-        editor = self.editor
-        keyboard = editor.skin.keyboard
-
-        version = module_file_version_zero()
-
-        if count is not None:
-
-            assert False  # unreached, because ⌃C cancels Digits Prefix earlier
-
-        elif keyboard.default_do_func is self.do_insert_per_chord:
-
-            self.do_take_views()
-            count = editor.format_touch_count()
-            self.vi_print("Cancelled insert after {} inserted".format(count))
-
-        elif keyboard.default_do_func is self.do_replace_per_chord:
-
-            self.do_take_views()
-            count = editor.format_touch_count()
-            self.vi_print("Cancelled replace after {} replaced".format(count))
-
-        elif editor.finding_highlights:
-
-            self.vi_print("Cancelled Search")  # *⌃C Egg
-            editor.finding_highlights = None  # Vim leaves highlights up
-
-        else:
-
-            self.vi_print("Press ZQ to save changes and quit Vi Py", version)  # ⌃C Egg
-
-        # Vim rings a Bell for each extra ⌃C
+        # Vim ⌃C quirk rapidly rings a Bell for each extra ⌃C, Vi Py doesn't
 
     def do_vi_c0_control_esc(self):  # Vim Esc
         """Cancel Digits Prefix, or close Insert/ Replace, or suggest ZZ to quit Vi Py"""
 
+        self.cancel_escape_whatever("Escaped")
+
+        # Vim Esc quirk slowly rings a Bell for each extra Esc, Vi Py doesn't
+
+    def cancel_escape_whatever(self, verbed):
+        """Cancel or escape some one thing that is most going on"""
+
+        version = module_file_version_zero()
         count = self.get_vi_arg1_int(default=None)
 
         editor = self.editor
         skin = editor.skin
         keyboard = skin.keyboard
 
-        version = module_file_version_zero()
+        held_file = self.held_file
 
-        if count is not None:
+        nickname = None
+        if held_file:
+            write_path = held_file.write_path
+            nickname = os.path.basename(write_path)
+            if write_path.startswith("/dev/"):
+                nickname = write_path
 
-            self.vi_print("Escaped Repeat Count")  # 123 Esc Egg, etc
+        if count is not None:  # 123 ⌃C Egg, 123 Esc Egg, etc
 
-        elif keyboard.default_do_func is self.do_insert_per_chord:
+            self.vi_print("{} Repeat Count".format(verbed))
+
+        elif keyboard.intake_bypass:  # ⌃O⌃C Egg, ⌃O⌃Esc Egg
+
+            self.vi_print("{} ⌃O Bypass".format(verbed))
+
+        elif editor.intake_beyond == "inserting":  # AIO aio then Esc ⌃C
 
             self.do_take_views()
             count = editor.format_touch_count()
-            self.vi_print("Escaped after {} inserted".format(count))
+            self.vi_print("{} after {} inserted".format(verbed, count))
 
-        elif keyboard.default_do_func is self.do_replace_per_chord:
+        elif editor.intake_beyond == "replacing":  # R then Esc or ⌃C
 
             self.do_take_views()
             count = editor.format_touch_count()
-            self.vi_print("Escaped after {} replaced".format(count))
+            self.vi_print("{} after {} replaced".format(verbed, count))
 
-        elif editor.finding_highlights:
+        elif editor.finding_highlights:  # *⌃C Egg, *Esc Egg, etc
 
-            self.vi_print("Escaped Search")  # *Esc Egg
-            editor.finding_highlights = None  # Vim leaves highlights up
+            self.vi_print("{} Search".format(verbed))
+            editor.finding_highlights = None  # Vim ⌃C, Esc quirks leave highlights up
 
-        else:
+        else:  # ⌃C Egg, Esc Egg
 
-            self.vi_print("Press ZZ to save changes and quit Vi Py", version)  # Esc Egg
+            pressable = "Press ZQ to lose changes"
+            if verbed == "Escaped":
+                pressable = "Press ZZ to save changes"
 
-        # Vim rings a Bell for each extra Esc
+            self.vi_print(
+                "{!r}  Press {} and quit Vi Py  {}".format(nickname, pressable, version)
+            )
 
     def do_continue_vi(self):  # Vim Q v i Return  # Vim b"Qvi\r"  # not Ex mode
         """Accept Q v i Return, without ringing the Terminal bell"""
@@ -819,9 +830,9 @@ class TerminalEditorVi:
         self.do_flush_quit_vi()
         assert False  # unreached
 
-        # Vim :wq writes despite more Files chosen than fetched, and doesn't quit
-        # Vim :wq :wq quits despite more Files chosen than fetched
         # Vi Py :wq doesn't write nor quit, while more Files chosen than fetched
+        # Vim :wq quirk doesn't quit and does write, when more Files chosen than fetched
+        # Vim :wq :wq quirk quits, despite more Files chosen than fetched
 
     def do_flush_quit_vi(self):  # Vim ZZ  # Vim :wq!\r
         """Write the File and quit Vi"""
@@ -833,8 +844,8 @@ class TerminalEditorVi:
         self.do_flush_vi()
         self.do_quit_vi()
 
-        # Vim :wq! quits when more Files chosen than fetched, Vim ZZ no, Vim ZZ ZZ yes
-        # Vi Py :wq! and ZZ quit despite more Files chosen than fetched
+        # Vi Py ZZ and :wq! do quit, despite more Files chosen than fetched
+        # Vim ZZ quirk doesn't, but Vim ZZ ZZ and :wq! quirks do quit, despite more
 
     def do_might_flush_vi(self):  # Vim :w\r
         """Write the File but do not quit Vi"""
@@ -849,7 +860,7 @@ class TerminalEditorVi:
 
         painter = editor.painter
 
-        if held_file.write_path == held_file.path:
+        if held_file.write_path == held_file.read_path:
             held_file.flush()
         else:
             exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
@@ -884,8 +895,8 @@ class TerminalEditorVi:
         self.do_quit_vi()
         assert False  # unreached
 
-        # Vim :q :q quits despite more Files chosen than fetched
-        # Vi Py :q doesn't quit while more Files chosen than fetched, vs its :q! does
+        # Vim :q :q quirk quits, despite more Files chosen than fetched
+        # Vi Py :q doesn't quit while more Files chosen than fetched, Vi Py :q! does
 
     def might_keep_changes(self, alt):
 
@@ -936,7 +947,7 @@ class TerminalEditorVi:
 
         if not editor.skin.doing_done:
             if self.slip_find_fetch_vi_this(slip=+1) is None:
-                self.vi_print("Press * and # only when Not on a blank line")  # * Egg
+                self.vi_print("Press * # £ only when Not on a blank line")  # * Egg
 
                 return
 
@@ -946,10 +957,10 @@ class TerminalEditorVi:
 
             editor.continue_do_loop()
 
-        # Vim echoes the * Search Key as Status, unless not found ahead on same screen
-        # Vi Py echoes the * Search Key as Status, at /Up, at :g/Up, etc
+        # Vi Py "*" echoes its Search Key as Status, at *, at /Up, at :g/Up, etc
+        # Vim "*" quirk echoes its Search Key as Status, only if ahead on same screen
 
-    def do_find_behind_vi_this(self):  # Vim #  # Vim £
+    def do_find_behind_vi_this(self):  # Vim #, Vim £
         """Take a Search Key from this Line, and then look behind for it"""
 
         editor = self.editor
@@ -958,9 +969,8 @@ class TerminalEditorVi:
         # Take up a new Search Key
 
         if not editor.skin.doing_done:
-            if self.slip_find_fetch_vi_this(slip=-1) is None:
-                self.vi_print("Press # and £ and * only when Not on a blank line")
-                # £, # Eggs
+            if self.slip_find_fetch_vi_this(slip=-1) is None:  # # Egg, £ Egg
+                self.vi_print("Press # £ * only when Not on a blank line")
 
                 return
 
@@ -970,8 +980,8 @@ class TerminalEditorVi:
 
             editor.continue_do_loop()
 
-        # Vim echoes the # Search Key as Status, unless not found behind on same screen
-        # Vi Py echoes the # Search Key as Status, at ?Up, at :g?Up, etc
+        # Vi Py "#" echoes its Search Key as Status, at #, at /Up, at :g/Up, etc
+        # Vim "#" quirk echoes its Search Key as Status, only if behind on same screen
 
     def slip_find_fetch_vi_this(self, slip):
         """Take a Word from this Line and return Truthy, else don't"""
@@ -1086,8 +1096,8 @@ class TerminalEditorVi:
 
             editor.continue_do_loop()
 
-        # Vim echoes the / Search Key as Status, unless not found ahead
-        # Vi Py echoes the / Search Key as Status, at /Up, at :g/Up, etc
+        # Vi Py / echoes its Search Key as Status, at /, at /Up, at :g/Up, etc
+        # Vim / quirk echoes its Search Key as Status, only if ahead on same screen
 
     def do_find_all_vi_line(self):  # Vim :g/   # Vim :g?  # Vi Py :g/, :g?, g/, g?
         """Across all the File, print each Line containing 1 or More Matches"""
@@ -1125,12 +1135,16 @@ class TerminalEditorVi:
                 )
             )
 
-        # Vim lands the cursor in the first non-blank column
+        # Vi Py :g/ lands the Cursor on the last Hit in File
+        # Vim :g/ quirk kicks the Cursor to the first non-blank Column in Line of Hit
 
-        # Vim echoes the ? Search Key as Status, unless not found behind
-        # Vi Py echoes the ? Search Key as Status, at ?Up, at :g?Up, etc
+        # FIXME: Vi Py :g? lands the Cursor on the first Hit in File
+        # Vim :g? quirk takes it as an alias of Vim :g/
 
-        # TODO: Vim :4g/ means search only line 4, not pick +-Nth match
+        # Vi Py shares one Search Key input history across * # / ? g/ g? :g/ :g?
+        # Vim quirks in * # / ? :g/ :g? divide their work into three input histories
+
+        # TODO: Vim :4g/ quirk means search only line 4, not pick +-Nth match
 
     def do_find_behind_vi_line(self):  # Vim ?
         """Take a Search Key as input, and then look behind for it"""
@@ -1146,6 +1160,9 @@ class TerminalEditorVi:
         if editor.find_behind_and_reply():  # TODO: extra far scroll # <= zt L 23Down N
 
             editor.continue_do_loop()
+
+        # Vi Py ? echoes its Search Key as Status, at ?, at ?Up, at :g?Up, etc
+        # Vim ? quirk echoes its Search Key as Status, only if ahead on same screen
 
     def take_read_vi_line(self, slip):
         """Take a Search Key"""
@@ -1273,10 +1290,19 @@ class TerminalEditorVi:
         """Leap to just past the Indent, but first Step Down if Arg"""
 
         count = self.get_vi_arg1_int(default=None)
+
+        editor = self.editor
+
         if count is not None:
             self.vi_print("Do you mean {} _".format(count))  # 9^ Egg, etc
 
+        if False:  # pylint: disable=using-constant-test
+            editor.clear_intake_bypass()  # OO⌃O_⌃O^ Egg
+
         self.slip_dent()
+
+        # Vim ⌃O quirk past a Line of 1 Dented Char snaps back after _ but not after ^
+        # Vi Py could, and does Not, repro this quirk
 
     def slip_dent(self):
         """Leap to the Column after the Indent"""
@@ -2016,11 +2042,10 @@ class TerminalEditorVi:
 
         self.slip_redo()
 
-        # TODO: Vim f⎋ means escaped without Bell
-        # TODO: Vim f⌃C means cancelled with Bell
-        # TODO: Vim f⌃? means cancelled with Bell
-
-        # TODO: Vim f⌃VX means go find a ⌃V char, not go find X
+        # TODO: Vi Py vs Vim f, t, F, T quirks
+        # Vim fEsc quirk means escaped without Bell
+        # Vim f⌃C quirk means cancelled with Bell
+        # Vim f⌃Vx quirk means literally go find a ⌃V char, not go find the X char
 
     def do_slip_index_minus_choice(self):  # Vim tx
         """Find Char to Right in row, once or more, but then slip left one Column"""
@@ -2416,10 +2441,9 @@ class TerminalEditorVi:
         self.vi_print("Press Esc to quit, else type chars to insert")
 
         skin.cursor_style = _INSERT_CURSOR_STYLE_
-        keyboard.default_do_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
-        keyboard.default_do_func = self.do_insert_per_chord
-        editor.touching_beyond = True
-        keyboard.func_by_chords[b"\x0F"] = self.do_run_one_nudge  # SI, ⌃O, 15
+        keyboard.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
+        keyboard.intake_func = self.do_insert_per_chord
+        editor.intake_beyond = "inserting"
 
     def do_take_replaces(self):  # Vim R
         """Take keyboard Input Chords to mean replace Chars, till Esc"""
@@ -2435,10 +2459,9 @@ class TerminalEditorVi:
         self.vi_print("Press Esc to quit, else type chars to spill over")
 
         skin.cursor_style = _REPLACE_CURSOR_STYLE_
-        keyboard.default_do_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
-        keyboard.default_do_func = self.do_replace_per_chord
-        editor.touching_beyond = True
-        keyboard.func_by_chords[b"\x0F"] = self.do_run_one_nudge  # SI, ⌃O, 15
+        keyboard.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
+        keyboard.intake_func = self.do_replace_per_chord
+        editor.intake_beyond = "replacing"
 
     def do_take_views(self):
         """Stop taking keyboard Input Chords to mean replace/ insert Chars"""
@@ -2448,32 +2471,55 @@ class TerminalEditorVi:
         keyboard = skin.keyboard
 
         skin.cursor_style = _VIEW_CURSOR_STYLE_
-        keyboard.default_do_chords_set = set()
-        keyboard.default_do_func = None
+        keyboard.intake_chords_set = set()
+        keyboard.intake_func = None
 
-        editor.touching_beyond = False
+        editor.intake_beyond = ""
         if editor.column:
             editor.column -= 1
 
-    def do_run_one_nudge(self):  # Vim ⌃O after Vim A I O R a i o etc
-        """Take one Terminal Nudge In, as if Not inserting or replacing Chars"""
+    def do_vi_c0_control_si(self):
+        """Define ⌃O during AIO aio R, but not yet otherwise"""
+
+        editor = self.editor
+        if editor.intake_beyond:
+            self.do_take_one_bypass()
+        else:
+            editor.do_raise_name_error()
+
+    def do_take_one_bypass(self):  # Vim ⌃O during AIO aio R
+        """Pause taking keyboard Input Chords to mean replace/ insert Chars"""
 
         editor = self.editor
 
-        assert not editor.skin.arg1
+        column = editor.column
+        row = editor.row
+        skin = editor.skin
 
-        # Suspend, run, resume
+        keyboard = skin.keyboard
 
-        self.vi_print("Press Esc to quit, else give one ordinary command")
+        #
 
-        keyboard = TerminalKeyboardVi(vi=self)
-        keyboard.continue_do_func = editor.do_sys_exit
+        assert editor.intake_beyond
 
-        try:
-            editor.run_skin_with_keyboard(keyboard)  # TerminalKeyboardVi
-            assert False  # unreached
-        except SystemExit:
-            editor.skin.doing_traceback = editor.skin.traceback  # TODO: test this Egg
+        keyboard.intake_bypass = editor.intake_beyond
+        editor.intake_beyond = None
+
+        #
+
+        editor.intake_column = column
+
+        row_max_column = editor.spot_max_column(row=row)
+        if column > row_max_column:
+            assert column == (row_max_column + 1), (row_max_column, column)
+
+            editor.column -= 1
+
+        #
+
+        skin.cursor_style = _VIEW_CURSOR_STYLE_
+
+        self.vi_print("Type one command")
 
     def do_insert_per_chord(self):
         """Insert a copy of the Input Char, else insert a Line"""
@@ -2710,9 +2756,9 @@ class TerminalKeyboard:
         self.place_cursor_func = lambda: None
 
         self.enter_do_func = lambda: None
-        self.default_do_chords_set = set()
-        self.default_do_func = None
-        self.continue_do_func = lambda: None
+        self.intake_bypass = ""
+        self.intake_chords_set = set()
+        self.intake_func = None
         self.exit_do_func = lambda: None
 
         self.prefix_chords = b""
@@ -2808,7 +2854,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"\x0C"] = editor.do_redraw  # FF, ⌃L, 12 \f
         func_by_chords[b"\x0D"] = vi.do_step_down_dent  # CR, ⌃M, 13 \r
         func_by_chords[b"\x0E"] = vi.do_step_down_seek  # SO, ⌃N, 14
-        # func_by_chords[b"\x0F"] = vi.do_run_one_nudge  # SI, ⌃O, 15
+        func_by_chords[b"\x0F"] = vi.do_vi_c0_control_si  # SI, ⌃O, 15
         func_by_chords[b"\x10"] = vi.do_step_up_seek  # DLE, ⌃P, 16
         # func_by_chords[b"\x11"] = vi.do_c0_control_dc1  # DC1, XON, ⌃Q, 17
         # func_by_chords[b"\x12"] = vi.do_c0_control_dc2  # DC2, ⌃R, 18
@@ -2822,6 +2868,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         func_by_chords[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
 
         func_by_chords[b"\x1B"] = vi.do_vi_c0_control_esc  # ESC, ⌃[, 27
+        # TODO: corrections_by_chords[b"\x1B3"] = b"#"
         func_by_chords[b"\x1B[A"] = vi.do_step_up_seek  # ↑ Up Arrow
         func_by_chords[b"\x1B[B"] = vi.do_step_down_seek  # ↓ Down Arrow
         func_by_chords[b"\x1B[C"] = vi.do_slip_right  # → Right Arrow
@@ -2977,7 +3024,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         # Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
 
-        self._init_correcting_many_chords("£".encode(), corrections=b"#")
+        func_by_chords["£".encode()] = vi.do_find_behind_vi_this
 
 
 #
@@ -3059,7 +3106,7 @@ class TerminalEditorEx:
         editor = self.editor
         chars = editor.get_arg0_chars()
 
-        if chars == "£":  # TODO: less personal choice
+        if chars == "£":  # TODO: accept \u00A3 £ Pound Sign into Search Keys
             self.ex_line += "#"  # a la Vim :abbrev £ #
         else:
             self.ex_line += chars
@@ -3154,11 +3201,11 @@ class TerminalKeyboardEx(TerminalKeyboard):
         for chords in BASIC_LATIN_STDINS:
             func_by_chords[chords] = ex.do_append_char
 
-        # Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
-
         func_by_chords["£".encode()] = ex.do_append_char
 
         # TODO: input Search Keys containing more than BASIC_LATIN_STDINS and #
+        # TODO: Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
+        # TODO: such as \u00A3 £ Pound Sign
 
         # TODO: define Esc to replace live Regex punctuation with calmer r"."
 
@@ -3293,13 +3340,14 @@ class TerminalReplyOut(argparse.Namespace):
             assert (self.bell is None) or isinstance(self.bell, bool)
 
 
+# FIXME: shuffle much of Nickname down into TerminalFile
 class TerminalFile(argparse.Namespace):
     """Hold a copy of the Bytes of a File awhile"""
 
     def __init__(self, path=None):
         # pylint: disable=super-init-not-called
 
-        self.path = None  # Path to Fetched File
+        self.read_path = None  # Path to Fetched File
 
         self.iobytes = b""  # Bytes of File, else None
         self.iochars = ""  # Chars of File, else None
@@ -3313,21 +3361,26 @@ class TerminalFile(argparse.Namespace):
         if path is not None:
             self._load_file_(path)
 
-    def _load_file_(path):
+    def _load_file_(self, path):
         """Read the Bytes of the File, decode as Chars, split as Lines"""
 
-        self.path = os.path.abspath(path)
+        read_path = os.path.abspath(path)
+        self.read_path = read_path
 
-        with open(path, "rb") as reading:
-            self.iobytes = reading.read()
+        with open(read_path, "rb") as reading:
+            if reading.isatty():
+                stderr_print("Press ⌃D EOF to quit")
+            try:
+                self.iobytes = reading.read()
+            except KeyboardInterrupt:  # Egg at:  bin/vi.py -
+                stderr_print()
+                sys.exit(1)
 
         self.iochars = self.iobytes.decode(errors="surrogateescape")
 
         self.ended_lines = self.iochars.splitlines(keepends=True)
 
-        write_path = "/dev/stdout" if (path == "/dev/stdin") else path
-        write_path = os.path.abspath(write_path)
-        self.write_path = write_path
+        self.write_path = "/dev/stdout" if (path == "/dev/stdin") else read_path
 
     def decode(self):
         """Re-decode the File after changes"""
@@ -3513,8 +3566,9 @@ class TerminalEditor:
         self.showing_line_number = None  # show Line Numbers or not
         self.showing_lag = None  # inject None or 0s or more Lag
 
-        self.touching_beyond = None  # slip the Cursor past Last Char in Line, or not
-        self.touching_pins = list()  # collect a TerminalPinPlus per edit
+        self.intake_beyond = ""  # take input from Cursor past Last Char, or don't
+        self.intake_column = None  # struggle to snap Cursor past Last Char, or don't
+        self.intake_pins = list()  # collect a TerminalPinPlus per edit
 
         self.finding_case = None  # ignore Upper/Lower Case in Searching or not
         self.finding_line = None  # remember the Search Key
@@ -3610,11 +3664,9 @@ class TerminalEditor:
         finally:
             skin.traceback = self.skin.traceback
 
-            keyboard.skin = self.skin  # TODO: ugly
-
             self.skin = skin
 
-        # FIXME: reconceive 'run_skin_with_keyboard'
+        # FIXME: reconceive 'run_skin_with_keyboard' as one of .intake_beyond
 
     def run_keyboard(self, keyboard):
         """Prompt, take nudge, give reply, repeat till quit"""
@@ -3647,11 +3699,10 @@ class TerminalEditor:
             # Reply
 
             keyboard.enter_do_func()
+            with_bypass = keyboard.intake_bypass
             try:
 
                 self.call_chords_func(chords_func)  # reply to one whole Nudge
-
-                keyboard.continue_do_func()
 
             except KeyboardInterrupt:  # Egg of *123456n⌃C, etc
                 self.skin.reply = TerminalReplyOut()
@@ -3661,8 +3712,6 @@ class TerminalEditor:
                 # self.skin.chord_ints_ahead = list()
 
                 self.skin.traceback = traceback.format_exc()
-
-                keyboard.continue_do_func()
 
             except Exception as exc:  # pylint: disable=broad-except
                 self.skin.reply = TerminalReplyOut()
@@ -3681,14 +3730,12 @@ class TerminalEditor:
 
                     raise
 
-                keyboard.continue_do_func()
-
             finally:
+                if with_bypass:
+                    self.close_keyboard_intake()
                 keyboard.exit_do_func()
 
             self.skin.nudge = TerminalNudgeIn()  # consume the whole Nudge
-
-            # Vim replies with Bell more often
 
         # TODO: shuffle away 'run_keyboard', 'choose_chords_func', 'call_chords_func'
 
@@ -3820,13 +3867,16 @@ class TerminalEditor:
         prefix_chords = keyboard.prefix_chords
         more_prefix_chords = keyboard.more_prefix_chords
         corrections_by_chords = keyboard.corrections_by_chords
-        default_do_chords_set = keyboard.default_do_chords_set
+
+        intake_chords_set = set()
+        if not keyboard.intake_bypass:
+            intake_chords_set = keyboard.intake_chords_set
 
         assert self.skin.nudge.suffix is None, (chords, chord)  # one Chord only
 
         # Take more decimal Digits, while nothing but decimal Digits given
 
-        if (not chords) and (chord not in default_do_chords_set):
+        if (not chords) and (chord not in intake_chords_set):
             if (chord in prefix_chords) or (prefix and chord in more_prefix_chords):
 
                 prefix_plus = chord if (prefix is None) else (prefix + chord)
@@ -3856,7 +3906,7 @@ class TerminalEditor:
         chords_plus_func = self.editor_func_by_chords(chords=chords_plus)
 
         chords_plus_want_suffix = False
-        if chords_plus not in default_do_chords_set:
+        if chords_plus not in intake_chords_set:
             chords_plus_want_suffix = chords_plus in keyboard.suffixes_by_chords.keys()
 
         if (not chords_func) or chords_plus_want_suffix:
@@ -3914,34 +3964,37 @@ class TerminalEditor:
         keyboard = self.skin.keyboard
 
         func_by_chords = keyboard.func_by_chords
-        default_do_func = keyboard.default_do_func
-        default_do_chords_set = keyboard.default_do_chords_set
+        intake_func = keyboard.intake_func
+
+        intake_chords_set = set()
+        if not keyboard.intake_bypass:
+            intake_chords_set = keyboard.intake_chords_set
 
         chords_func = None
         if chords:
-            chords_func = default_do_func
-            if chords not in default_do_chords_set:
+            chords_func = intake_func
+            if chords not in intake_chords_set:
                 chords_func = self.do_raise_name_error
                 if chords in func_by_chords.keys():
                     chords_func = func_by_chords[chords]
 
         return chords_func
 
-    def call_chords_func(self, chords_func):
+    def call_chords_func(self, chords_func):  # TODO  # noqa C901
         """Call the Func once or more, in reply to one Terminal Nudge In"""
 
+        skin = self.skin
+
         # Setup before first calling the Func
+        # TODO: rewrite this work as a chain of 'enter_do_func's
 
-        self.skin.doing_done = 0
-        self.skin.doing_less = True
-
-        if not self.touching_beyond:
-            self.touching_pins[:] = list()
+        skin.doing_done = 0
+        skin.doing_less = True
 
         # Call the Func once or more
 
         while True:
-            self.skin.doing_more = None
+            skin.doing_more = None
 
             # Call the Func, for the first time or again
             # Forget any Python Traceback older than the Func after the Func exits
@@ -3955,13 +4008,13 @@ class TerminalEditor:
                     self.keep_cursor_on_file()
 
             except Exception:  # do Not finally catch SystemExit, KeyboardInterrupt
-                self.skin.traceback = self.skin.doing_traceback
-                self.skin.doing_traceback = None
+                skin.traceback = skin.doing_traceback
+                skin.doing_traceback = None
 
                 raise
 
-            self.skin.traceback = self.skin.doing_traceback
-            self.skin.doing_traceback = None
+            skin.traceback = skin.doing_traceback
+            skin.doing_traceback = None
 
             # Raise an Exception when the Func has gone egregiously wrong
 
@@ -3969,17 +4022,60 @@ class TerminalEditor:
 
             # Let the Func take the Arg as a Count of Repetitions, but don't force it
 
-            if self.skin.doing_more:
-                self.skin.doing_done += 1
-                if self.skin.doing_done < self.get_arg1_int():
+            if skin.doing_more:
+                skin.doing_done += 1
+                if skin.doing_done < self.get_arg1_int():
 
                     _ = self.peek_editor_chord()  # raise KeyboardInterrupt at ⌃C
 
-                    self.skin.reply = TerminalReplyOut()  # clear pending Status
+                    skin.reply = TerminalReplyOut()  # clear pending Status
 
                     continue
 
             break
+
+    def close_keyboard_intake(self):
+        """Shut down the Keyboard Intake Bypass, or the Counting of Keyboard Intake"""
+
+        column = self.column
+        row = self.row
+        skin = self.skin
+
+        keyboard = skin.keyboard
+
+        # Clear the Keyboard Bypass
+
+        if keyboard.intake_bypass:
+
+            assert not self.intake_beyond
+
+            self.intake_beyond = keyboard.intake_bypass
+            keyboard.intake_bypass = ""
+
+            # Restore the Cursor Style
+
+            if self.intake_beyond == "inserting":
+                skin.cursor_style = _INSERT_CURSOR_STYLE_
+            else:
+                assert self.intake_beyond == "replacing"
+                skin.cursor_style = _REPLACE_CURSOR_STYLE_
+
+            # Restore the choice of Column
+
+            row_max_column = self.spot_max_column(row=row)
+            if column == (row_max_column - 1):
+                if self.intake_column == row_max_column:
+
+                    self.column += 1
+
+            self.intake_column = None
+
+            return
+
+        # Clear the changes counted while taking commands to View, not Insert/ Replace
+
+        if not self.intake_beyond:
+            self.intake_pins[:] = list()
 
     def raise_blame_for_chords_func(self, pin):
         """Raise an Exception when the Func has gone egregiously wrong"""
@@ -4318,7 +4414,7 @@ class TerminalEditor:
     def spot_max_column(self, row=None):
         """Spot the last Column in Row, else one beyond while inserting/ replacing"""
 
-        if self.touching_beyond:
+        if self.intake_beyond:
             max_column = self.count_columns_in_row(row=row)
         else:
             max_column = self.spot_last_column(row=row)
@@ -4386,7 +4482,7 @@ class TerminalEditor:
         raise NameError(arg)
 
     def do_redraw(self):  # Vim ⌃L
-        """Toggle between more and less Lag (vs Vim injects lots of Lag exactly once)"""
+        """Toggle between more and less Lag"""
 
         lag_plus = self.get_arg1_int(default=None)
         lag = None if (lag_plus is None) else ((lag_plus - 1) / 1e6)
@@ -4400,6 +4496,9 @@ class TerminalEditor:
             self.editor_print(":set _lag_={}".format(lag))
 
         self.reopen_terminal()  # for redraw
+
+        # Vi Py ⌃L does work in the absence of Redraw bugs
+        # Vim ⌃L quirk just adds lag, each time it's called
 
     def do_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
@@ -4680,8 +4779,8 @@ class TerminalEditor:
 
         there_row = span.row
 
-        row_last_column = self.spot_last_column(row=there_row)
-        there_column = min(row_last_column, span.column)
+        row_max_column = self.spot_max_column(row=there_row)
+        there_column = min(row_max_column, span.column)
 
         there = TerminalPin(row=there_row, column=there_column)
 
@@ -4759,7 +4858,7 @@ class TerminalEditor:
         chars_dropped = tail[:count]
 
         pin_plus = self.spot_pin_plus(chars_dropped)
-        self.touching_pins[-1] = pin_plus  # ugly
+        self.intake_pins[-1] = pin_plus  # ugly
 
         chopped_tail = tail[count:]
 
@@ -4824,7 +4923,7 @@ class TerminalEditor:
         column = self.column
 
         pin_plus = self.spot_pin_plus(chars)
-        self.touching_pins.append(pin_plus)
+        self.intake_pins.append(pin_plus)
 
         ended_line = self.ended_lines[row] if self.ended_lines else _EOL_
         columns = len(ended_line.splitlines()[0])
@@ -4838,7 +4937,7 @@ class TerminalEditor:
     def format_touch_count(self):
         """Describe the list of Touched Pins"""
 
-        pins = self.touching_pins
+        pins = self.intake_pins
 
         if not pins:
             rep = "0 chars"
@@ -4897,7 +4996,7 @@ class TerminalPainter:
             self.terminal.__enter__()
             self.reopen_terminal()
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, exc_traceback):
         """Switch Screen to Xterm Main Screen and disconnect Keyboard"""
 
         rows = self.rows
@@ -5935,8 +6034,13 @@ function! RStripEachLine()
     call cursor(with_line, with_col)
 endfun
 
-" £  => insert # instead, because Shift+3 at UK/US Keyboards
-:abbrev £ #
+:cmap <Esc>3 #
+:imap <Esc>3 #
+:nmap <Esc>3 #
+:omap <Esc>3 #
+:smap <Esc>3 #
+:vmap <Esc>3 #
+:xmap <Esc>3 #
 
 " copied from:  git clone https://github.com/pelavarre/pybashish.git
 """
@@ -6029,8 +6133,8 @@ def exit_unless_doc_eq(parser):
 
     if sys.version_info[:3] < (3, 9, 6):
 
-        alt_module_doc = join_first_paragraph(alt_module_doc)
-        alt_parser_doc = join_first_paragraph(alt_parser_doc)
+        alt_module_doc = str_join_first_paragraph(alt_module_doc)
+        alt_parser_doc = str_join_first_paragraph(alt_parser_doc)
 
         if "[FILE ...]" in module_doc:
             alt_parser_doc = alt_parser_doc.replace("[FILE [FILE ...]]", "[FILE ...]")
@@ -6129,16 +6233,19 @@ def file_print(*args):  # later Python 3 accepts ', **kwargs' here
         print(*args, file=printing)
 
 
-# deffed in many files
-def join_first_paragraph(doc):
-    """Join by single spaces all the leading lines up to the first empty line"""
+# deffed in many files  # missing from docs.python.org
+def os_path_homepath(path):
+    """Return the ~/... RelPath of a File or Dir of the Home, else the AbsPath"""
 
-    index = (doc + "\n\n").index("\n\n")
-    lines = doc[:index].splitlines()
-    chars = " ".join(_.strip() for _ in lines)
-    alt = chars + doc[index:]
+    home = os.path.abspath(os.environ["HOME"])
 
-    return alt
+    homepath = path
+    if path == home:
+        homepath = "~"
+    elif path.startswith(home + os.path.sep):
+        homepath = "~" + os.path.sep + os.path.relpath(path, start=home)
+
+    return homepath
 
 
 # deffed in many files  # missing from Python till Oct/2019 Python 3.8
@@ -6200,6 +6307,18 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
+# deffed in many files
+def str_join_first_paragraph(doc):
+    """Join by single spaces all the leading lines up to the first empty line"""
+
+    index = (doc + "\n\n").index("\n\n")
+    lines = doc[:index].splitlines()
+    chars = " ".join(_.strip() for _ in lines)
+    alt = chars + doc[index:]
+
+    return alt
+
+
 # Cite some Terminal Doc's and Git-track experience of Terminal Output magic
 #
 #       https://en.wikipedia.org/wiki/ANSI_escape_code
@@ -6241,16 +6360,27 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # -- bugs --
 
-# FIXME: ⌃O mapped always, suspending keyboard.default_do_chords_set
-# keyboard.intake_bypass
-# keyboard.intake_chords_set
-# keyboard.intake_func
+# FIXME: code up 'dd'
 
-# FIXME: Vim A ⌃O ⌃L does somehow only temporarily slip the Cursor on File
+# FIXME: Vim :wq with changes pending, without/ with:  chmod -w tests/v.vim
+
+# FIXME: Vim A⌃O⌃L does somehow only temporarily slip the Cursor on File
+# FIXME: hmm somehow by tonight lots of our A⌃O doesn't slip the Cursor back like A⌃O⌃L
+# FIXME: Vim A⌃O~⌃CZQ doesn't dump that traceback
+# FIXME: insert \u00C7 ç and \u00F1 ñ etc - all the Unicode outside of C0 Controls
+
+# FIXME: empty file tests of O r a o
+# FIXME: test J from an empty line
+# FIXME: define b":wn\r"
+# FIXME: abbreviate paths in PermissionError
+
+# FIXME: insert/ delete/ replace should trigger re-eval of search spans in lines
 
 # FIXME: announce Nth of K Files, after each :n
 
 # FIXME: spell out how much input lost by ZQ
+
+# FIXME: echo £ as itself, not as Â £
 
 # TODO:  find more bugs
 
