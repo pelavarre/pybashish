@@ -644,6 +644,16 @@ class TerminalEditorVi:
     # Layer thinly under the rest of TerminalEditorVi
     #
 
+    def check_vi_count(self):
+        """Raise NotImplementedError for Repeat Count, while it's Not coded"""
+
+        editor = self.editor
+
+        arg1 = editor.get_arg1_int(default=None)
+        if arg1 is not None:
+
+            raise NotImplementedError("Repeat Count {}".format(arg1))
+
     def check_vi_index(self, truthy):
         """Fail fast, else proceed"""
         # pylint: disable=no-self-use
@@ -2338,11 +2348,7 @@ class TerminalEditorVi:
         editor = self.editor
         columns = editor.count_columns_in_row()
 
-        # Raise NotImplementedError: Repeat Count  # TODO: till coded
-
-        if editor.skin.arg1:
-
-            return  # return to raise NotImplementedError: Repeat Count
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         # Insert beyond Last Column
 
@@ -2356,13 +2362,7 @@ class TerminalEditorVi:
     def do_slip_dent_take_inserts(self):  # Vim I
         """Take Input Chords after the Dent of the Line"""
 
-        editor = self.editor
-
-        # Raise NotImplementedError: Repeat Count  # TODO: till coded
-
-        if editor.skin.arg1:
-
-            return  # return to raise NotImplementedError: Repeat Count
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         # Insert beyond Dent
 
@@ -2375,11 +2375,7 @@ class TerminalEditorVi:
 
         editor = self.editor
 
-        # Raise NotImplementedError: Repeat Count  # TODO: till coded
-
-        if editor.skin.arg1:
-
-            return  # return to raise NotImplementedError: Repeat Count
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         # Insert an empty Line before this Line, but land in front of it
 
@@ -2400,11 +2396,7 @@ class TerminalEditorVi:
         column = editor.column
         columns = editor.count_columns_in_row()
 
-        # Raise NotImplementedError: Repeat Count  # TODO: till coded
-
-        if editor.skin.arg1:
-
-            return  # return to raise NotImplementedError: Repeat Count
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         # Insert beyond this Char
 
@@ -2420,11 +2412,7 @@ class TerminalEditorVi:
         editor = self.editor
         ended_lines = editor.ended_lines
 
-        # Raise NotImplementedError: Repeat Count  # TODO: till coded
-
-        if editor.skin.arg1:
-
-            return  # return to raise NotImplementedError: Repeat Count
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         # Insert an empty Line after this Line, but land in front of it
 
@@ -2444,13 +2432,7 @@ class TerminalEditorVi:
     def do_take_inserts(self):  # Vim i
         """Take many keyboard Input Chords as meaning insert Chars, till Esc"""
 
-        editor = self.editor
-
-        # Raise NotImplementedError: Repeat Count  # TODO: till coded
-
-        if editor.skin.arg1:
-
-            return  # return to raise NotImplementedError: Repeat Count
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         # Insert before the Char beneath the Cursor
 
@@ -2466,10 +2448,6 @@ class TerminalEditorVi:
         editor = self.editor
         skin = editor.skin
         keyboard = skin.keyboard
-
-        if skin.arg1:
-
-            return  # return to raise NotImplementedError: Repeat Count
 
         self.vi_print("Press Esc to quit, else type chars to insert")
 
@@ -2651,6 +2629,7 @@ class TerminalEditorVi:
         count = self.get_vi_arg1_int()
 
         self.cut_some_vi_chars(count)
+
         self.take_inserts()
 
     def do_cut_ahead(self):  # Vim x
@@ -2705,6 +2684,7 @@ class TerminalEditorVi:
         count = self.get_vi_arg1_int()
 
         self.chop_some_vi_lines(count)
+
         self.take_inserts()
 
     def do_chop(self):  # Vim D  # TODO: ugly to doc
@@ -2765,6 +2745,7 @@ class TerminalEditorVi:
 
         editor.column = 0
         self.chop_some_vi_lines(count)
+
         self.take_inserts()
 
     def chop_some_vi_lines(self, count):
@@ -5948,6 +5929,9 @@ class TerminalDriver:
 
             stdin = self._pull_stdin()
 
+            if len(stdin) > 1:  # TODO: cope more robustly with ⌃J before '__enter__'
+                stdin = stdin.replace(b"\n", b"\r")
+
             if len(stdin) <= 1:
 
                 return stdin
@@ -6455,8 +6439,6 @@ def str_join_first_paragraph(doc):
 # FIXME: insert/ delete/ replace should trigger re-eval of search spans in lines
 
 # FIXME: cancel the File activities at Next:  the Search, its Highlights, etc as per ⌃C
-
-# FIXME: take "\n" from lookahead before visual mode as "\r"
 
 # FIXME: spell out how much input lost by ZQ
 
