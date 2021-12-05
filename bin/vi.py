@@ -615,9 +615,23 @@ class TerminalEditorVi:
         # Feed Keyboard into Screen, like till SystemExit
 
         try:
+
             editor.run_terminal_with_keyboard(keyboard)  # TerminalKeyboardVi
             assert False  # unreached
+
+        except SystemExit:
+
+            skin = editor.skin
+            if skin:
+                chord_ints_ahead = skin.chord_ints_ahead
+                stdins = b"".join(chr(_).encode() for _ in chord_ints_ahead)
+                if stdins:
+                    stderr_print("vi.py: dropping input: {}".format(repr(stdins)))
+
+            raise
+
         finally:
+
             self.vi_traceback = editor.skin.traceback  # /⌃G⌃CZQ Egg
 
     def get_vi_arg0_chars(self):
@@ -3697,6 +3711,7 @@ class TerminalEditor:
     def run_skin_with_keyboard(self, keyboard):
         """Prompt, take nudge, give reply, repeat till quit"""
 
+        painter = self.painter
         skin = self.skin
 
         chords = skin.chord_ints_ahead  # TODO: works, but clashes types
@@ -3704,8 +3719,23 @@ class TerminalEditor:
         self.skin = TerminalSkin(chords)
 
         try:
+
             self.run_keyboard(keyboard)  # like till SystemExit
+
+        except SystemExit:
+
+            while self.driver.kbhit(timeout=0):
+                chord = painter.take_painter_chord()
+                for chord_int in chord:
+                    self.skin.chord_ints_ahead.append(chord_int)
+
+            raise
+
+            # TODO: solve queued keyboard input Chords surviving '__exit__'
+
         finally:
+
+            skin.chord_ints_ahead = self.skin.chord_ints_ahead
             skin.traceback = self.skin.traceback
 
             self.skin = skin
@@ -6440,10 +6470,6 @@ def str_join_first_paragraph(doc):
 
 # FIXME: cancel the File activities at Next:  the Search, its Highlights, etc as per ⌃C
 
-# FIXME: spell out how much input lost by ZQ
-
-# FIXME: echo £ as itself, not as Â £
-
 # TODO:  find more bugs
 
 
@@ -6502,6 +6528,7 @@ def str_join_first_paragraph(doc):
 # TODO: teach :w! :wn! :wq! to temporarily override PermissionError's from 'chmod -w'
 
 # TODO: insert \u00C7 ç and \u00F1 ñ etc - all the Unicode outside of C0 Controls
+# TODO: echo £ as itself, not as Â £
 
 # TODO: record and replay tests of:  cat bin/vi.py |vi.py - bin/vi.py
 
