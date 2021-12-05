@@ -23,19 +23,19 @@ keyboard cheat sheet:
   0 ^ $ fx tx Fx Tx ; , | h l  => leap to column
   b e w B E W { }  => leap across small word, large word, paragraph
   G 1G H L M - + _ ⌃J ⌃N ⌃P j k  => leap to row, leap to line
-  1234567890 Esc  => repeat, or don't
+  1234567890 ⌃C Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll rows
   ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
-  \n \i \F Esc ⌃G  => toggle line numbers, search case/ regex, show hits
+  \n \i \F ⌃C Esc ⌃G  => toggle line numbers, search case/ regex, show hits
   /... Delete ⌃U ⌃C Return  ?...   * £ # n N  => start search, next, previous
-  :?Return :/Return :g/Return  => search behind, ahead, print all, or new search
-  a i rx o A I O R ⌃O Esc ⌃C  => enter/ suspend-resume/ exit insert/ replace
+  ?Return /Return :g/Return  => search behind, ahead, print last hits, or new search
+  a i rx o A I O R ⌃O ⌃C Esc  => enter/ suspend-resume/ exit insert/ replace
   x X dd D J s S C  => cut chars or lines, join lines, cut & insert
 
 keyboard easter eggs:
-  9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz ?Return /Return :g/Return
-  ⌃C Esc 123⌃C zZZQ 3ZQ A⌃OzZ⌃CZQ f⌃C w*⌃C w*123456n⌃C /⌃G⌃CZQ w*g/⌃M⌃C g/⌃Z
-  Qvi⌃My REsc R⌃Zfg OO⌃O_⌃O^ \Fw*/Up \F/$Return 2⌃G :vi⌃M :n
+  9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz
+  ⌃C Esc zZZQ 3ZQ A⌃V⌃OZQ A⌃OzQ⌃CZQ f⌃C w*⌃C w*123456n⌃C /⌃G⌃CZQ w*g/⌃M⌃C g/⌃Z
+  Qvi⌃My REsc R⌃Zfg OO⌃O_⌃O^ \Fw*/Up \F/$Return ⌃G2⌃G :vi⌃M :n
 
 pipe tests of ZQ vs ZZ:
   ls |bin/vi.py -
@@ -53,6 +53,7 @@ how to get Vi Py again:
 """
 
 # Vi Py also takes the \u0008 ⌃H BS \b chord in place of the \u007F ⌃? DEL chord
+# reserving one Control Char lets us doc the A⌃V⌃OZQ Egg, but we'll be defining ⌃V
 
 
 import argparse
@@ -271,7 +272,7 @@ def main(argv):
 
             sys.exit()
 
-    # Visit each File
+    # Load each File
 
     vi_the_files(files=args.files, plusses=args.plusses)
     emacs_the_files(files=args.files, plusses=args.plusses)
@@ -419,7 +420,7 @@ def do_args_pwnme(branch):
 
 
 def vi_the_files(files, plusses):
-    """Eval the Plusses and then visit each File, in the way of Vim"""
+    """Eval the Plusses and then load each File, in the way of Vim"""
 
     if os.path.basename(sys.argv[0]).startswith("emacs"):
 
@@ -453,7 +454,7 @@ def vi_the_files(files, plusses):
 
 
 def emacs_the_files(files, plusses):
-    """Eval the Plusses and then visit each File, in the way of Emacs"""
+    """Eval the Plusses and then load each File, in the way of Emacs"""
 
     emacs = TerminalEditorEmacs(files)
     _ = plusses  # TODO:  emacs.py --eval EXPR, --execute EXPR
@@ -520,27 +521,33 @@ class TerminalEditorVi:
         self.seeking_more = None  # remembering the Seeking Column into next Nudge
 
     #
-    # Visit each of the Files
+    # Load each of the Files
     #
 
     def do_might_next_vi_file(self):  # Vim :n\r
-        """Halt if touches Not flushed, else visit the next (or first) File"""
+        """Halt if touches Not flushed, else load the next (or first) File"""
+
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         if self.might_keep_changes(alt=":wn"):
 
             return
 
         self.next_vi_file()
-        self.do_say_more()  # TODO: 'self.do_...' can too easily spiral out of control
+        self.say_more()
 
     def do_next_vi_file(self):  # Vim :n!\r
-        """Visit the next (or first) File"""
+        """Load the next (or first) File"""
+
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         self.next_vi_file()
-        self.do_say_more()
+        self.say_more()
 
     def next_vi_file(self):  # Vim :n!\r
-        """Visit the next (or first) File"""
+        """Load the next (or first) File"""
+
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         editor = self.editor
         files_index = self.files_index
@@ -555,7 +562,7 @@ class TerminalEditorVi:
             next_files_index = files_index + 1
             file_path = files[next_files_index]
         else:
-            self.do_quit_vi()
+            self.do_quit_vi()  # TODO: 'self.do_...' can easily spiral out of control
             assert False  # unreached
 
             # Vi Py :n quits after last File
@@ -572,12 +579,14 @@ class TerminalEditorVi:
             if not sys.stdin.isatty():
                 read_path = "/dev/stdin"
 
-        # Visit the chosen File
+        # Load the chosen File
 
         held_file = TerminalFile(path=read_path)
 
         if read_path == "/dev/stdin":
             held_file.touches = len(held_file.iobytes)
+
+        self.do_take_views()  # turn off inserting/ replacing of ⌃O:n\r etc
 
         editor.load_editor_file(held_file)
 
@@ -602,7 +611,7 @@ class TerminalEditorVi:
                 chars = ":" + plus + "\r"
                 chords += chars.encode()
 
-        chords += b":vi\r"  # go with XTerm Alt Screen & Keyboard  => do_resume_editor
+        chords += b":vi\r"  # go with XTerm Alt Screen & Keyboard  => do_resume_vi
         chords += b"\x03"  # welcome warmly with ETX, ⌃C, 3  => do_vi_c0_control_etx
 
         # Form stack
@@ -692,22 +701,32 @@ class TerminalEditorVi:
         count = self.get_vi_arg1_int()
 
         editor = self.editor
+        if editor.finding_line:
+            editor.finding_highlights = True
+
+        self.say_more(count)
+
+        # Vim ⌃G quirk doesn't turn Search highlights back on, Vi Py ⌃G does
+
+    def say_more(self, count=0):
+        """Reply once with some details often left unmentioned"""
+
+        editor = self.editor
         showing_lag = editor.showing_lag
 
         held_file = self.held_file
         write_path = held_file.write_path
 
-        # Choose how to mention the Write Path of the File
+        # Mention the full Path only if asked
 
         homepath = os_path_homepath(write_path)
         nickname = held_file.pick_nickname()
 
-        enough_path = homepath if (count > 1) else nickname
+        enough_path = homepath if (count > 1) else nickname  # ⌃G2⌃G Egg
 
-        # Mention the Search in progress
+        # Mention the Search in progress only if it's highlit
 
-        if editor.finding_line:
-            editor.finding_highlights = True
+        if editor.finding_highlights:
             editor.reply_with_finding()
 
         # Mention injecting Lag
@@ -730,8 +749,6 @@ class TerminalEditorVi:
 
         more_status = "  ".join(joins)
         editor.editor_print(more_status)  # such as "'bin/vi.py'  less lag"
-
-        # Vim ⌃G doesn't turn Search highlights back on
 
     def do_vi_c0_control_etx(self):  # Vim ⌃C  # Vi Py Init
         """Cancel Digits Prefix, or close Insert/ Replace, or suggest ZZ to quit Vi Py"""
@@ -774,11 +791,11 @@ class TerminalEditorVi:
             count = editor.format_touch_count()
             self.vi_print("{} after {} inserted".format(verbed, count))
 
-            skin.doing_traceback = skin.traceback
+            skin.doing_traceback = skin.traceback  # ⌃C of A⌃OzQ⌃CZQ Egg
 
         elif editor.intake_beyond == "replacing":  # R then Esc or ⌃C
 
-            skin.doing_traceback = skin.traceback
+            skin.doing_traceback = skin.traceback  # ⌃C of R⌃OzQ⌃CZQ Egg
 
             self.do_take_views()
             count = editor.format_touch_count()
@@ -791,18 +808,20 @@ class TerminalEditorVi:
 
         else:  # ⌃C Egg, Esc Egg
 
-            pressable = "Press ZQ to lose changes"
+            press = "Press ZQ to lose changes"
             if verbed == "Escaped":
-                pressable = "Press ZZ to save changes"
+                press = "Press ZZ to save changes"
 
             self.vi_print(
-                "{!r}  Press {} and quit Vi Py  {}".format(nickname, pressable, version)
+                "{!r}  {} and quit Vi Py  {}".format(nickname, press, version)
             )
 
     def do_continue_vi(self):  # Vim Q v i Return  # Vim b"Qvi\r"  # not Ex mode
         """Accept Q v i Return, without ringing the Terminal bell"""
 
         editor = self.editor
+
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         self.vi_ask("Would you like to play a game? (y/n)")
 
@@ -831,6 +850,15 @@ class TerminalEditorVi:
         ex = TerminalEditorEx(editor, vi_reply=vi_reply)
         ex.flush_ex_status()
 
+    def do_resume_vi(self):  # Vim :vi\r
+        """Set up XTerm Alt Screen & Keyboard, till Painter Exit"""
+
+        editor = self.editor
+
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
+
+        editor.do_resume_editor()
+
     def do_vi_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
@@ -846,6 +874,9 @@ class TerminalEditorVi:
     #
 
     def do_might_flush_next_vi(self):  # Vim :wn\r
+        """Write this File and load Next File, with less force"""
+
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         self.do_flush_next_vi()  # TODO: distinguish :wn from :wn!
 
@@ -853,8 +884,11 @@ class TerminalEditorVi:
         # Vim :wn quirk chokes over no more Files chosen, after last File
 
     def do_flush_next_vi(self):  # Vim :wn!\r
+        """Write this File and load Next File, with more force"""
 
-        self.do_flush_vi()
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
+
+        self.flush_vi()
         self.next_vi_file()
 
         # Vi Py :wn! quits after last File
@@ -864,7 +898,7 @@ class TerminalEditorVi:
         # Vim quirks in :wn and :wn! announce the Next, and not the Write
 
     def do_might_flush_quit_vi(self):  # Vim :wq\r
-        """Write the File and quit, except only write without quit if more Files"""
+        """Write the File and quit Vi, except only write without quit if more Files"""
 
         if self.might_keep_files(alt=":wn"):
 
@@ -884,18 +918,25 @@ class TerminalEditorVi:
 
         editor.skin.traceback = None
 
-        self.do_flush_vi()
+        self.flush_vi()
         self.do_quit_vi()
 
         # Vi Py ZZ and :wq! do quit, despite more Files chosen than fetched
         # Vim ZZ quirk doesn't, but Vim ZZ ZZ and :wq! quirks do quit, despite more
 
     def do_might_flush_vi(self):  # Vim :w\r
-        """Write the File but do not quit Vi"""
+        """Write the File and do Not quit it, with less force"""
 
-        self.do_flush_vi()  # TODO: distinguish :w from :w!
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
+        self.flush_vi()  # TODO: distinguish :w from :w!
 
     def do_flush_vi(self):  # Vim :w!\r
+        """Write the File and do Not quit it, with more force"""
+
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
+        self.flush_vi()
+
+    def flush_vi(self):
         """Write the File"""
 
         editor = self.editor
@@ -970,7 +1011,7 @@ class TerminalEditorVi:
         return False
 
     def do_quit_vi(self):  # Vim ZQ  # Vim :q!\r
-        """Lose last changes and quit"""
+        """Lose last changes and quit Vi"""
 
         returncode = self.get_vi_arg1_int(default=None)
 
@@ -1142,7 +1183,7 @@ class TerminalEditorVi:
         # Vi Py / echoes its Search Key as Status, at /, at /Up, at :g/Up, etc
         # Vim / quirk echoes its Search Key as Status, only if ahead on same screen
 
-    def do_find_all_vi_line(self):  # Vim :g/   # Vim :g?  # Vi Py :g/, :g?, g/, g?
+    def do_find_trailing_vi_lines(self):  # Vim :g/   # Vi Py :g/, g/
         """Across all the File, print each Line containing 1 or More Matches"""
 
         editor = self.editor
@@ -1170,7 +1211,7 @@ class TerminalEditorVi:
 
             editor.print_some_found_spans(stale_status)
 
-            self.vi_print(  # "{}/{} Found {} chars"  # :g/, :g?, g/, g? Eggs
+            self.vi_print(  # "{}/{} Found {} chars"  # :g/, g/ Eggs
                 "{}/{} Found {} chars".format(
                     len(iobytespans),
                     len(iobytespans),
@@ -1181,7 +1222,7 @@ class TerminalEditorVi:
         # Vi Py :g/ lands the Cursor on the last Hit in File
         # Vim :g/ quirk kicks the Cursor to the first non-blank Column in Line of Hit
 
-        # FIXME: Vi Py :g? lands the Cursor on the first Hit in File
+        # Vi Py :g? lands the Cursor on the first Hit in File  # TODO
         # Vim :g? quirk takes it as an alias of Vim :g/
 
         # Vi Py shares one Search Key input history across * # / ? g/ g? :g/ :g?
@@ -1229,8 +1270,11 @@ class TerminalEditorVi:
 
                 return False
 
-            if not editor.finding_line:  # Vim Return
-                self.vi_print("Press one of / ? * # to enter a Search Key")  # n Egg
+            if not editor.finding_line:  # Vim Return  # /Return Egg, ?Return Egg
+                if slip < 0:  # ?Return Egg
+                    self.vi_print("Press one of ? / # £ * to enter a Search Key")
+                else:  # /Return Egg
+                    self.vi_print("Press one of / ? * # £ to enter a Search Key")
 
                 return False
 
@@ -1277,7 +1321,7 @@ class TerminalEditorVi:
         # Take up an old Search Key
 
         if editor.finding_line is None:
-            self.vi_print("Press ? or # to enter a Search Key")  # N Egg
+            self.vi_print("Press one of ? / # £ * to enter a Search Key")  # N Egg
 
             return
 
@@ -1302,7 +1346,7 @@ class TerminalEditorVi:
         # Take up an old Search Key
 
         if editor.finding_line is None:
-            self.vi_print("Press / or * to enter a Search Key")  # n Egg
+            self.vi_print("Press one of / ? * # £ to enter a Search Key")  # n Egg
 
             return
 
@@ -2217,7 +2261,7 @@ class TerminalEditorVi:
         editor = self.editor
 
         if self.slip_choice is None:
-            self.vi_print("Do you mean fx;")  # ; Egg
+            self.vi_print("Do you mean fx ;")  # ; Egg
 
             return
 
@@ -2255,7 +2299,7 @@ class TerminalEditorVi:
         editor = self.editor
 
         if self.slip_choice is None:
-            self.vi_print("Do you mean Fx,")  # , Egg
+            self.vi_print("Do you mean Fx ,")  # , Egg
 
             return
 
@@ -2482,13 +2526,16 @@ class TerminalEditorVi:
         skin = editor.skin
         keyboard = skin.keyboard
 
-        skin.cursor_style = _VIEW_CURSOR_STYLE_
-        keyboard.intake_chords_set = set()
-        keyboard.intake_func = None
+        if editor.intake_beyond:
 
-        editor.intake_beyond = ""
-        if editor.column:
-            editor.column -= 1
+            editor.intake_beyond = ""
+
+            skin.cursor_style = _VIEW_CURSOR_STYLE_
+            keyboard.intake_chords_set = set()
+            keyboard.intake_func = None
+
+            if editor.column:
+                editor.column -= 1
 
     def do_vi_c0_control_si(self):
         """Define ⌃O during AIO aio R, but not yet otherwise"""
@@ -2533,7 +2580,7 @@ class TerminalEditorVi:
 
         self.vi_print("Type one command")
 
-        skin.doing_traceback = skin.traceback
+        skin.doing_traceback = skin.traceback  # A⌃V⌃OZQ Egg
 
     def do_insert_per_chord(self):
         """Insert a copy of the Input Char, else insert a Line"""
@@ -2944,13 +2991,13 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_correcting_many_chords(b":/", corrections=b"/")
         self._init_correcting_many_chords(b":?", corrections=b"?")
 
-        self._init_func_by_many_chords(b":g?", func=vi.do_find_all_vi_line)
-        self._init_func_by_many_chords(b":g/", func=vi.do_find_all_vi_line)
+        # self._init_func_by_many_chords(b":g?", func=vi.do_find_leading_vi_lines)
+        self._init_func_by_many_chords(b":g/", func=vi.do_find_trailing_vi_lines)
         self._init_func_by_many_chords(b":n\r", func=vi.do_might_next_vi_file)
         self._init_func_by_many_chords(b":n!\r", func=vi.do_next_vi_file)
         self._init_func_by_many_chords(b":q\r", func=vi.do_might_quit_vi)
         self._init_func_by_many_chords(b":q!\r", func=vi.do_quit_vi)
-        self._init_func_by_many_chords(b":vi\r", func=editor.do_resume_editor)
+        self._init_func_by_many_chords(b":vi\r", func=vi.do_resume_vi)
         self._init_func_by_many_chords(b":w\r", func=vi.do_might_flush_vi)
         self._init_func_by_many_chords(b":w!\r", func=vi.do_flush_vi)
         self._init_func_by_many_chords(b":wn\r", func=vi.do_might_flush_next_vi)
@@ -3175,7 +3222,7 @@ class TerminalEditorEx:
             sys.exit()
 
     def do_quit_ex(self):  # Vim Ex ⌃C
-        """Lose all input and quit"""
+        """Lose all input and quit Ex"""
 
         self.ex_line = None
 
@@ -3595,6 +3642,8 @@ class TerminalSkin:
         self.doing_done = None  # count the Repetition's completed before now
         self.doing_traceback = None  # retain a Python Traceback till after more Chords
 
+        # TODO: mutable namespaces for doing_, etc
+
 
 #
 # Define the Editors above in terms of Inputs, Outputs, & Spans of Chars
@@ -3641,7 +3690,7 @@ class TerminalEditor:
 
         self.load_editor_file(TerminalFile())
 
-        # TODO: mutable namespaces for self.finding_, argv_, doing_, etc
+        # TODO: mutable namespaces for self.finding_, etc
 
     def load_editor_file(self, held_file):
         """Swap in a new File of Lines"""
@@ -3655,7 +3704,9 @@ class TerminalEditor:
         self.top_row = 0  # scroll through more Lines than fit on Screen
 
         self.iobytespans = list()  # cache the spans in file
+
         self.reopen_found_spans()
+        self.finding_highlights = None
 
     #
     # Stack Skin's with Keyboard's on top of a Terminal I/O Stack
@@ -3733,11 +3784,11 @@ class TerminalEditor:
         finally:
 
             skin.chord_ints_ahead = self.skin.chord_ints_ahead
-            skin.traceback = self.skin.traceback
+            skin.traceback = self.skin.traceback  # ZQ of A⌃OzQ⌃CZQ Egg
 
             self.skin = skin
 
-        # FIXME: reconceive 'run_skin_with_keyboard' as one of .intake_beyond
+        # TODO: reconceive 'run_skin_with_keyboard' as one of .intake_beyond
 
     def run_keyboard(self, keyboard):
         """Prompt, take nudge, give reply, repeat till quit"""
@@ -3808,6 +3859,7 @@ class TerminalEditor:
 
     def format_exc(self, exc):
         """Mention an Exception, but try not to Abs Path the "~" Home"""
+        # pylint: disable=no-self-use
 
         name = type(exc).__name__
 
@@ -3819,7 +3871,7 @@ class TerminalEditor:
         return line
 
     def do_resume_editor(self):
-        """Set up XTerm Alt Screen & Keyboard, till 'self.painter.__exit__'"""
+        """Set up XTerm Alt Screen & Keyboard, till Painter Exit"""
 
         self.painter.__enter__()
         self.reopen_terminal()
@@ -6463,9 +6515,8 @@ def str_join_first_paragraph(doc):
 
 # -- bugs --
 
+# FIXME: define Backspace and Delete differently for insert/ replace
 # FIXME: insert/ delete/ replace should trigger re-eval of search spans in lines
-
-# FIXME: cancel the File activities at Next:  the Search, its Highlights, etc as per ⌃C
 
 # TODO:  find more bugs
 
@@ -6522,21 +6573,24 @@ def str_join_first_paragraph(doc):
 
 # -- future improvements --
 
+# TODO: record and replay tests of:  cat bin/vi.py |vi.py - bin/vi.py
+
 # TODO: teach :w! :wn! :wq! to temporarily override PermissionError's from 'chmod -w'
 
 # TODO: insert \u00C7 ç and \u00F1 ñ etc - all the Unicode outside of C0 Controls
 # TODO: echo £ as itself, not as Â £
 
-# TODO: record and replay tests of:  cat bin/vi.py |vi.py - bin/vi.py
-
-# TODO: recover :g/ Status when ⌃L has given us :set _lag_ of >1 Screen of Hits
+# TODO: Vim \ n somehow doesn't disrupt the 'keep_up_vi_column_seek' of $
 
 # TODO: name errors for undefined keys inside Ex of / ? etc
 
-# TODO: Vim \ n somehow doesn't disrupt the 'keep_up_vi_column_seek' of $
-
 
 # -- future features --
+
+# TODO: trace how much input lost at Stdin at Exit, when Stdin Not Tty
+
+# TODO: show just the leading screen of hits and land on the first for g? :g?
+# TODO: recover :g/ Status when ⌃L has given us :set _lag_ of >1 Screen of Hits
 
 # TODO: ⌃I ⌃O walk the Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
 # TODO: despite Doc, to match Vim, include in the Jump List the * # forms of / ?
