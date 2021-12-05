@@ -613,7 +613,7 @@ alias -- -gcofrlqv='--git-checkout-fetch-rebase-log-quiet-verbose'
 # TODO: help with
 # git push origin HEAD:people/jqdoe/project/1234
 # git checkout -b people/jqdoe/project/1234 origin/people/jqdoe/project/1234
-# git push origin --delete people/jqdoe/project/12345
+# git push origin --delete people/jqdoe/project/12345
 # git branch -D people/jqdoe/project/12345
 #
 
@@ -858,7 +858,7 @@ alias -- -v='--exec-echo-xe vim'
 
 function -eg () {
     echo 'emacs -nw --no-splash $(git show --name-only --pretty=)' "$@" >&2
-    vim       $(git show --name-only --pretty=) "$@"
+    emacs       -nw --no-splash $(git show --name-only --pretty=)  "$@"
 }
 function -vg () {
     echo 'vim $(git show --name-only --pretty=)' "$@" >&2

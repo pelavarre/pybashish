@@ -1,0 +1,16 @@
+usage:  bin/doctestbash.py -vv tests/brief.typescript
+
+copy of "2.37 ) Tr" test from Dec/2021 "tests/pybashish.typescript" =>
+
+    $ bin/cat.py $(git ls-files |grep -v '^tests/') |bin/tr.py |awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
+
+     !"#$%&'()*+,-./
+    0123456789:;<=>?@
+    ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`
+    abcdefghijklmnopqrstuvwxyz{|}~
+    £«¬µ»Âåçéîñøüαμπ–—’“”•′″‴←↑→↓⇒⇥⇧∀∃∈∎∧∨≠≡≤≥⊆⋮⌃⌘⌥⌫⎋⏎␢␣⟨⟩💔💥😊😠😢
+    $
+
+    "µ" is "\u00B5" micro-sign
+    "μ" is "\u03BC" greek small-letter-mu
+    etc

@@ -26,6 +26,7 @@ examples:
 
 see also:  python "import doctest"
 """
+
 # FIXME: defer failing the test till after all its output prints
 # FIXME: work up how to take all their changes from the code
 
@@ -34,6 +35,7 @@ see also:  python "import doctest"
 # FIXME: walk for exts
 # FIXME: rip Bash paste distinguished only by repeated prompt ending in '$' or '#'
 # FIXME: rip Python '>>>' paste, and Makefile paste, and Zsh '%' paste, not just Bash paste
+
 # FIXME: think harder when no files chosen
 
 
@@ -47,39 +49,45 @@ import argdoc
 
 
 def main(argv):
+    """Run from the Command Line"""
 
     # Parse args
 
     args = argdoc.parse_args()
     args.vq = (args.verbose if args.verbose else 0) - (args.quiet if args.quiet else 0)
 
-    if args.files != ["tests/"]:
-        stderr_print("usage: doctestbash.py [-h] [-b] [-q] [-v] tests/")
-        stderr_print("doctestbash.py: error: more arbitrary arguments not implemented")
-        sys.exit(2)  # exit 2 from rejecting usage
-
     main.args = args
 
-    # Test the one well known file
+    # Require one or more args
 
-    assert args.files == ["tests/"]
+    if not args.files:
+        stderr_print(
+            "doctestbash.py: error: the following arguments are required: FILE"
+        )
+        sys.exit(2)
 
-    file_dir = os.path.split(__file__)[0]
-    tests_dir = os.path.join(file_dir, os.pardir, "tests")
-    tests_path = os.path.join(tests_dir, "pybashish.typescript")
-    path = os.path.relpath(tests_path)  # abbreviate as relpath for tracing later
+    # Work each arg in order
+
+    for args_file in args.files:
+        if not os.path.isdir(args_file):
+            _run_typescript_file(args, path=args_file)
+        else:
+            for (root, _, hits) in os.walk(args_file):
+                for hit in hits:
+                    path = os.path.join(root, hit)
+                    if os.path.splitext(path)[-1] == ".typescript":
+                        _run_typescript_file(args, path=path)
+
+
+def _run_typescript_file(args, path):
+    """Run with one TypeScript File"""
 
     with open(path) as incoming:
         passes = _run_bash_test_doc(incoming, path=path)
+        if not args.rip_bash_paste:
+            stderr_print("doctestbash.py: {} tests passed at:  {}".format(passes, path))
 
-    # Declare success
-
-    if not args.rip_bash_paste:
-        stderr_print("doctestbash.py: {} tests passed at:  {}".format(passes, path))
-
-    # Call one Python Doc Test, just to help people reviewing the code find that precedent
-
-    _show_doctest_result()
+    _show_doctest_result()  # end with a demo of the Python DocTest precedent
 
 
 def _show_doctest_result(want="2.718"):
@@ -288,7 +296,6 @@ def require_test_passed(path, passes, gots, dent, wants):
     vv_print()
 
     vv_print("wants ......: {}".format(repr(tail_wants)))
-    vv_print()
     vv_print("but gots ...: {}".format(repr(tail_gots)))
     vv_print()
     vv_print()
@@ -310,7 +317,7 @@ def require_test_passed(path, passes, gots, dent, wants):
     reasons.append("unexpected output after {} tests:".format(passes))
     if main.args.vq < len("vv"):
         reasons.append("try again with -vv")
-    reasons.append("fix the code, and/or fix the test at:  vim {}".format(path))
+    reasons.append("fix the code, else the test:  vim {}".format(path))  # or both
 
     for reason in reasons:
         stderr_print("doctestbash.py: error: {}".format(reason))
