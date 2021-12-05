@@ -699,15 +699,8 @@ class TerminalEditorVi:
 
         # Choose how to mention the Write Path of the File
 
-        nickname = None
-        assert held_file
-        if held_file:
-            write_path = held_file.write_path
-            nickname = os.path.basename(write_path)
-            if write_path.startswith("/dev/"):
-                nickname = write_path
-
         homepath = os_path_homepath(write_path)
+        nickname = held_file.pick_nickname()
 
         enough_path = homepath if (count > 1) else nickname
 
@@ -765,13 +758,7 @@ class TerminalEditorVi:
         keyboard = skin.keyboard
 
         held_file = self.held_file
-
-        nickname = None
-        if held_file:
-            write_path = held_file.write_path
-            nickname = os.path.basename(write_path)
-            if write_path.startswith("/dev/"):
-                nickname = write_path
+        nickname = held_file.pick_nickname()
 
         if count is not None:  # 123 ⌃C Egg, 123 Esc Egg, etc
 
@@ -3398,7 +3385,6 @@ class TerminalReplyOut(argparse.Namespace):
             assert (self.bell is None) or isinstance(self.bell, bool)
 
 
-# FIXME: shuffle much of Nickname down into TerminalFile
 class TerminalFile(argparse.Namespace):
     """Hold a copy of the Bytes of a File awhile"""
 
@@ -3418,6 +3404,17 @@ class TerminalFile(argparse.Namespace):
 
         if path is not None:
             self._load_file_(path)
+
+    def pick_nickname(self):
+        """Sketch the Write Path concisely"""
+
+        write_path = self.write_path
+
+        nickname = os.path.basename(write_path)
+        if write_path.startswith("/dev/"):
+            nickname = write_path
+
+        return nickname
 
     def _load_file_(self, path):
         """Read the Bytes of the File, decode as Chars, split as Lines"""
