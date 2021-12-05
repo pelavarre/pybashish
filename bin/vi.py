@@ -77,6 +77,8 @@ import tty
 
 subprocess_run = subprocess.run  # evade Linters who freak over "shell=True"
 
+ENV_HOME = os.environ["HOME"]
+
 
 # Name some Terminal Input magic
 
@@ -3777,11 +3779,7 @@ class TerminalEditor:
             except Exception as exc:  # pylint: disable=broad-except
                 self.skin.reply = TerminalReplyOut()
 
-                name = type(exc).__name__
-                str_exc = str(exc)
-                line = "{}: {}".format(name, str_exc) if str_exc else name
-                # Egg of NotImplementedError, etc
-
+                line = self.format_exc(exc)  # Egg of NotImplementedError, etc
                 self.editor_print(line)  # "{exc_type}: {str_exc}"
                 self.reply_with_bell()
                 # self.skin.chord_ints_ahead = list()
@@ -3799,6 +3797,18 @@ class TerminalEditor:
             self.skin.nudge = TerminalNudgeIn()  # consume the whole Nudge
 
         # TODO: shuffle away 'run_keyboard', 'choose_chords_func', 'call_chords_func'
+
+    def format_exc(self, exc):
+        """Mention an Exception, but try not to Abs Path the "~" Home"""
+
+        name = type(exc).__name__
+
+        str_exc = str(exc)
+        str_exc = str_exc.replace(ENV_HOME + os.sep, "~" + os.sep)
+
+        line = "{}: {}".format(name, str_exc) if str_exc else name
+
+        return line
 
     def do_resume_editor(self):
         """Set up XTerm Alt Screen & Keyboard, till 'self.painter.__exit__'"""
@@ -6442,11 +6452,11 @@ def str_join_first_paragraph(doc):
 
 # -- bugs --
 
-# FIXME: abbreviate paths in PermissionError
-
 # FIXME: insert/ delete/ replace should trigger re-eval of search spans in lines
 
-# FIXME: announce Nth of K Files, after each :n
+# FIXME: cancel the File activities at Next:  the Search, its Highlights, etc as per ⌃C
+
+# FIXME: take "\n" from lookahead before visual mode as "\r"
 
 # FIXME: spell out how much input lost by ZQ
 
@@ -6506,6 +6516,8 @@ def str_join_first_paragraph(doc):
 
 
 # -- future improvements --
+
+# TODO: teach :w! :wn! :wq! to temporarily override PermissionError's from 'chmod -w'
 
 # TODO: insert \u00C7 ç and \u00F1 ñ etc - all the Unicode outside of C0 Controls
 
