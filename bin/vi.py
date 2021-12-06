@@ -17,8 +17,9 @@ optional arguments:
 
 quirks:
   works as pipe filter, pipe source, or pipe drain, like the pipe drain:  ls |vi -
-  defaults to '-u /dev/null', not Vim quirk of '-u ~/.vimrc'
+  defaults to '-u /dev/null', not the Vim quirk of '-u ~/.vimrc'
   searches for Python Regular Expressions, not Vim Regular Expressions
+  mostly doesn't ring bell, but does ring bell when search wraps
 
 keyboard cheat sheet:
   ZQ ZZ ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wn!⌃M :wq!⌃M :n⌃M :q⌃M  => how to quit Vi Py
@@ -949,6 +950,8 @@ class TerminalVi:
 
         more_status = "  ".join(joins)
         editor.editor_print(more_status)  # such as "'bin/vi.py'  less lag"
+
+    # FIXME: explore Vim quirk of scrolling and pausing to make room for wide pathnames
 
     def do_vi_c0_control_etx(self):  # Vim ⌃C  # Vi Py Init
         """Cancel Digits Prefix, or close Insert/ Replace, or suggest ZZ to quit Vi Py"""
@@ -3566,6 +3569,10 @@ class TerminalEm:
         finally:
             self.vi_traceback = vi.vi_traceback  # Esc⌃G⌃X⌃C Egg
 
+    #
+    # Define Control Chords
+    #
+
     def do_em_keyboard_quit(self):  # Emacs ⌃G  # Em Py Init
         """Cancel stuff, and eventually prompt to quit Em Py"""
 
@@ -3607,6 +3614,15 @@ class TerminalEm:
 
         skin.doing_traceback = skin.traceback  # ⌃X⌃C of the ...⌃X⌃C Eggs
         vi.quit_vi()
+
+    #
+    # Insert Chords as Chars
+    #
+
+    def do_em_self_insert_command(self):  # Emacs Bypass Vim View to Insert
+        """Insert the Chord as one Char"""
+
+        self.vi.do_insert_per_chord()
 
 
 class TerminalKeyboardEm(TerminalKeyboard):
@@ -3685,7 +3701,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # Define the BASIC_LATIN_STDINS
 
         # self.intake_chords_set = set(BASIC_LATIN_STDINS)
-        # self.intake_func = vi.do_insert_per_chord
+        # self.intake_func = em.do_em_self_insert_command
 
 
 #
@@ -5146,24 +5162,27 @@ class TerminalEditor:
         here1 = TerminalPin(row=-1, column=-1)  # before any Pin of File
         heres = (here0, here1)
 
-        how0 = "{}/{}  Found {} chars ahead as:  {}"
-        how1 = "{}/{}  Found {} chars after start, none found ahead, as:  {}"
-        hows = (how0, how1)
+        vague_how0 = "{}/{}  Found {} chars ahead as:  {}"
+        vague_how1 = "{}/{}  Found {} chars after start, none found ahead, as:  {}"
+        vague_hows = (vague_how0, vague_how1)
 
-        for (here, how) in zip(heres, hows):
+        for (here, vague_how) in zip(heres, vague_hows):
             for (index, span) in enumerate(spans):
                 len_chars = span.beyond - span.column
                 there = self.span_to_pin_on_char(span)
 
                 if here < there:
 
-                    how_ = how
-                    if there == here0:
-                        how_ = "{}/{}  Found {} chars, only here, as {}"
+                    how = vague_how
+                    if len(spans) == 1:  # so often 'there == here0', but not always
+                        how = "{}/{}  Found {} chars, only here, as {}"
 
                     self.editor_print(  # "{}/{}  Found ...
-                        how_.format(1 + index, len(spans), len_chars, rep_line)
+                        how.format(1 + index, len(spans), len_chars, rep_line)
                     )
+
+                    if "none found" in how:
+                        self.reply_with_bell()
 
                     (self.row, self.column) = there
 
@@ -5194,11 +5213,11 @@ class TerminalEditor:
         here1 = TerminalPin(row=rows, column=0)  # after any Pin of File
         heres = (here0, here1)
 
-        how0 = "{}/{}  Found {} chars behind as:  {}"
-        how1 = "{}/{}  Found {} chars before end, none found behind, as:  {}"
-        hows = (how0, how1)
+        vague_how0 = "{}/{}  Found {} chars behind as:  {}"
+        vague_how1 = "{}/{}  Found {} chars before end, none found behind, as:  {}"
+        vague_hows = (vague_how0, vague_how1)
 
-        for (here, how) in zip(heres, hows):
+        for (here, vague_how) in zip(heres, vague_hows):
             for (reverse_index, span) in enumerate(reversed(spans)):
                 index = len(spans) - 1 - reverse_index
                 len_chars = span.beyond - span.column
@@ -5206,13 +5225,16 @@ class TerminalEditor:
 
                 if there < here:
 
-                    how_ = how
-                    if there == here0:
-                        how_ = "{}/{}  Found {} chars, only here, as:  {}"
+                    how = vague_how
+                    if len(spans) == 1:  # so often 'there == here0', but not always
+                        how = "{}/{}  Found {} chars, only here, as:  {}"
 
                     self.editor_print(  # "{}/{}  Found ...
-                        how_.format(1 + index, len(spans), len_chars, rep_line)
+                        how.format(1 + index, len(spans), len_chars, rep_line)
                     )
+
+                    if "none found" in how:
+                        self.reply_with_bell()
 
                     (self.row, self.column) = there
 
