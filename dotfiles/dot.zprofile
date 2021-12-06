@@ -803,14 +803,22 @@ function --pylint () {
     ~/.venvs/pylint/bin/pylint \
         --rcfile=/dev/null --reports=n --score=n --disable=locally-disabled \
         -d R1734,R1735 -d C0103,C0201,C0209,C0302,C0325,C0411 -d W1514 \
+        -d W1515 \
         "$@"
+
+    # (forgotten-debug-statement)
+    # W1515: Leaving functions creating breakpoints in production code
+    #   is not recommended
+    # yes, but bots near me fear what they do not understand, they deny me my right to
+    #   locally disable  # pylint: disable=forgotten-debug-statement
+
 }
 
 
 #
 # (inconsistent-return-statements)
 # R1710: Either all return statements in a function
-# should return an expression, or none of them should.
+#   should return an expression, or none of them should.
 # yes, except when we should all read falling off the end as meaning Return None
 #
 # R1734: Consider using [] instead of list() (use-list-literal)
@@ -819,8 +827,8 @@ function --pylint () {
 #
 
 #
-# C0103: Variable name "..." doesn... conform to snake_case naming style
 # (invalid-name)
+# C0103: Variable name "..." doesn... conform to snake_case naming style
 # nope, my one and two letter variable names do have a place, albeit only rarely
 #
 # (consider-iterating-dictionary)
@@ -843,7 +851,7 @@ function --pylint () {
 # C0411: standard import "import ..." should be placed before "import __main__"
 # nope, i give the win to Flake8
 #
-#  (import-outside-toplevel)
+# (import-outside-toplevel)
 # C0415: Import outside toplevel (...
 # ok, i'll disable it explicitly in source when paid to work with it
 #

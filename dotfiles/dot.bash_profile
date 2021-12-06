@@ -769,7 +769,15 @@ function --pylint () {
     ~/.venvs/pylint/bin/pylint \
         --rcfile=/dev/null --reports=n --score=n --disable=locally-disabled \
         -d R1734,R1735 -d C0103,C0201,C0209,C0302,C0325,C0411 -d W1514 \
+        -d W1515 \
         "$@"
+
+    # (forgotten-debug-statement)
+    # W1515: Leaving functions creating breakpoints in production code
+    #   is not recommended
+    # yes, but bots near me fear what they do not understand, they deny me my right to
+    #   locally disable  # pylint: disable=forgotten-debug-statement
+
 }
 
 
