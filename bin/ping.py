@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # give time since start
 # give time between kinds of output
 

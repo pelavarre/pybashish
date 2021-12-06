@@ -12,7 +12,14 @@ _DOT_BASH_PROFILE_=~/.bash_profile  # don't export, to say if this file has been
 #
 
 
-alias -- '::'="(echo '⌃ ⌥ ⇧ ⌘ ⎋ ⇥ ⋮' |tee >(pbcopy))"
+alias -- '::'=--colon-colon
+function --colon-colon () {
+    if which pbcopy >/dev/null; then
+        (echo '⌃ ⌥ ⇧ ⌘ ⎋ ⇥ ⋮ #' |tee >(pbcopy))
+    else
+        echo '⌃ ⌥ ⇧ ⌘ ⎋ ⇥ ⋮ #'
+    fi
+}
 
 
 #
@@ -523,13 +530,13 @@ alias -- -gco='--exec-echo-xe git checkout'  # especially:  gco -
 alias -- -gcp='--exec-echo-xe git cherry-pick'
 alias -- -gdh=--git-diff-head
 alias -- -gfp='--exec-echo-xe git fetch --prune'
-alias -- -gfr='--exec-echo-xe "(set -xe; git fetch && git rebase)"'
+alias -- -gfr=--git-fetch-rebase
 alias -- -ggc='--exec-echo-xe git gc'
 alias -- -ggl='--exec-echo-xe git grep -l'  # --files-with-matches
 alias -- -gl1='--exec-echo-xe git log -1 --decorate'
 alias -- -glf=--git-ls-files
 alias -- -glg='--exec-echo-xe git log --no-decorate --oneline --grep'
-alias -- -glq=--git-log-nodecorate-oneline
+alias -- -glq=--git-log-oneline-nodecorate
 alias -- -gls='--exec-echo-xe git log --stat'
 alias -- -grh='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard'
 alias -- -gri=--git-rebase-interactive
@@ -548,7 +555,7 @@ alias -- -gcpc='--exec-echo-xe git cherry-pick --continue'
 alias -- -gdno='--exec-echo-xe git diff --name-only'
 alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
 alias -- -glq1='--exec-echo-xe git log -1 --no-decorate --oneline'
-alias -- -glqv=--git-log-decorate-oneline
+alias -- -glqv=--git-log-oneline-decorate
 alias -- -gpod='--exec-echo-xe-maybe git push origin --delete'
 alias -- -gpoh=--git-push-origin-head-maybe
 alias -- -grhu='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard @{upstream}'
@@ -558,8 +565,11 @@ alias -- -gssn='--exec-echo-xe git shortlog --summary --numbered'
 alias -- -gsun='--exec-echo-xe git status --untracked-files=no'
 
 alias -- -gdno1='--exec-echo-xe git diff --name-only HEAD~1'
+alias -- -gcofr='--git-checkout-fetch-rebase'
 alias -- -glqv0='--exec-echo-xe git log --decorate --oneline'
-alias -- -gpfwl='dirs -p |head -1 && --exec-echo-xe-maybe git push --force-with-lease'
+alias -- -gpfwl=--git-push-force-with-lease
+
+alias -- -gcofrlqv='--git-checkout-fetch-rebase-log-quiet-verbose'
 
 
 # TODO: solve dry run of -gco -  => git log -1 --oneline --decorate @{-1}
@@ -576,12 +586,12 @@ alias -- -gpfwl='dirs -p |head -1 && --exec-echo-xe-maybe git push --force-with-
 # TODO: help with
 # git push origin HEAD:people/jqdoe/project/1234
 # git checkout -b people/jqdoe/project/1234 origin/people/jqdoe/project/1234
-# git push origin --delete people/jqdoe/project/12345
+# git push origin --delete people/jqdoe/project/12345
 # git branch -D people/jqdoe/project/12345
 #
 
 
-function --git () {
+function --git () {  # -g
     : :: 'Git Status for huge Git Repos - as in hulking, large, and slow'
 
     echo + >&2
@@ -604,21 +614,48 @@ function --git () {
     fi
 }
 
-function --git-chdir () {
+function --git-chdir () {  # -gcd
     : :: 'ChDir to root of Git Clone'
     --exec-echo-xe 'cd $(git rev-parse --show-toplevel) && cd ./'$@' && dirs -p |head -1'
 }
 
-function --git-commit () {
-    : :: 'Add and commit all tracked, else less simple, such as:  git commit .'
+function --git-checkout-fetch-rebase () {  # -gcofr
+    : :: 'Pull a fresh View of a chosen Branch'
     if [ $# = 0 ]; then
-        --exec-echo-xe git commit --all
+        echo -gbq "$@" >&2
+        -gbq "$@" >&2
+    else
+        echo -gco "$@" >&2
+        -gco "$@" >&2
+    fi
+    echo -gfr >&2
+    -gfr >&2
+}
+
+function --git-checkout-fetch-rebase-log-quiet-verbose () {  # -gcofrlqv
+    : :: 'Pull a fresh View of a chosen Branch and glance over the Head of it'
+    if [ $# = 0 ]; then
+        echo -gbq "$@" >&2
+        -gbq "$@" >&2
+    else
+        echo -gco "$@" >&2
+        -gco "$@" >&2
+    fi
+    echo -gfr >&2
+    -gfr >&2
+    echo -glqv >&2
+    -glqv >&2
+}
+
+function --git-commit () {  # -gc
+    if [ $# = 0 ]; then
+        --exec-echo-xe git commit --all -m WIP
     else
         --exec-echo-xe git commit "$@"
     fi
 }
 
-function --git-commit-all-fixup () {
+function --git-commit-all-fixup () {  # -gcaf
     : :: 'Add all tracked and commit fixup to Head, else to some Commit'
     if [ $# = 0 ]; then
         --exec-echo-xe git commit --all --fixup HEAD
@@ -627,7 +664,7 @@ function --git-commit-all-fixup () {
     fi
 }
 
-function --git-commit-fixup () {
+function --git-commit-fixup () {  # -gcf
     : :: 'Commit fixup to Head, else to some Commit'
     if [ $# = 0 ]; then
         --exec-echo-xe git commit --fixup HEAD
@@ -636,7 +673,7 @@ function --git-commit-fixup () {
     fi
 }
 
-function --git-diff-head () {
+function --git-diff-head () {  # -gdh
     : :: 'Commit Diff since before Head, else since some Commit'
     if [ $# = 0 ]; then
         --exec-echo-xe git diff HEAD~1
@@ -647,23 +684,30 @@ function --git-diff-head () {
     fi
 }
 
-function --git-log-decorate-oneline () {
+function --git-fetch-rebase () {  # -gfr
+    echo + git fetch >&2
+    git fetch
+    echo + git rebase >&2
+    git rebase
+}
+
+function --git-log-oneline-decorate () {  # -glqv
     if [ $# = 0 ]; then
-        --exec-echo-xe git log --decorate --oneline -19
+        --exec-echo-xe git log --oneline --decorate -19
     else
-        --exec-echo-xe git log --decorate --oneline "$@"
+        --exec-echo-xe git log --oneline --decorate "$@"
     fi
 }
 
-function --git-log-nodecorate-oneline () {
+function --git-log-oneline-nodecorate () {  # -glq
     if [ $# = 0 ]; then
-        --exec-echo-xe git log --no-decorate --oneline -19
+        --exec-echo-xe git log --oneline --no-decorate -19
     else
-        --exec-echo-xe git log --no-decorate --oneline "$@"
+        --exec-echo-xe git log --oneline --no-decorate "$@"
     fi
 }
 
-function --git-ls-files () {
+function --git-ls-files () {  # -glf
     : :: 'Find tracked files at and beneath root of Git Clone, else below some Dir'
     if [ $# = 0 ]; then
         local abs=$(git rev-parse --show-toplevel)
@@ -674,12 +718,24 @@ function --git-ls-files () {
     fi
 }
 
-function --git-push-origin-head-maybe () {  # for '-gpoh'
+function --git-push-force-with-lease () {  # -gpfwl
+    : :: 'Git Push Force With Lease'
+
+    echo '+ dirs -p |head -1' >&2
+    dirs -p |head -1
+
+    echo "+ git branch |grep '[*]'" >&2
+    git branch |grep '[*]'
+
+    --exec-echo-xe-maybe git push --force-with-lease "$@"
+}
+
+function --git-push-origin-head-maybe () {  # -gpoh
     : :: 'Push Origin to Head Colon'
     --exec-echo-xe-maybe git push origin HEAD:"$@"
 }
 
-function --git-rebase-interactive () {
+function --git-rebase-interactive () {  # gri
     : :: 'Rebase Interactive with Auto Squash of the last 19, else of the last N'
     if [ $# = 0 ]; then
         --exec-echo-xe git rebase -i --autosquash @{upstream}
@@ -690,17 +746,79 @@ function --git-rebase-interactive () {
     fi
 }
 
-function --git-show-conflict () {
-    : :: 'Exit loud & nonzero, else Show Conflict Base, else Show choice of Conflict'
-    if [ $# = 1 ]; then
-        --exec-echo-xe git show ":1:$1"
-    elif [ $# = 2 ]; then
-        --exec-echo-xe git show ":$1:$2"
+function --git-show-conflict () {  # -gs1, -gs2, -gs3
+    : :: 'Show Conflict Base of all Files, else whichever of one File, else Help'
+    if [ $# = 2 ]; then
+        --exec-echo-xe git show "$1:$2"
     else
-        echo 'usage: -gs 1|2|3 FILENAME |less  # base | theirs | ours'
+        echo 'usage: -gs1|-gs2|-gs3 FILENAME |less  # base | theirs | ours'
         return 2
     fi
 }
+
+
+#
+# Shut up PyLint enough, so it can begin to speak clearly with us
+#
+
+
+function --pylint () {
+
+    echo + .../pylint ... "$@"
+
+    ~/.venvs/pylint/bin/pylint \
+        --rcfile=/dev/null --reports=n --score=n --disable=locally-disabled \
+        -d R1734,R1735 -d C0103,C0201,C0209,C0302,C0325,C0411 -d W1514 \
+        "$@"
+}
+
+
+#
+# (inconsistent-return-statements)
+# R1710: Either all return statements in a function
+# should return an expression, or none of them should.
+# yes, except when we should all read falling off the end as meaning Return None
+#
+# R1734: Consider using [] instead of list() (use-list-literal)
+# R1735: Consider using {} instead of dict() (use-dict-literal)
+# nope, my old eyes appreciate the louder more explicit 'list()' mark
+#
+
+#
+# C0103: Variable name "..." doesn... conform to snake_case naming style
+# (invalid-name)
+# nope, my one and two letter variable names do have a place, albeit only rarely
+#
+# (consider-iterating-dictionary)
+# C0201: Consider iterating the dictionary directly instead of calling .keys()
+# nope, explicit better than implicit, for keeping part separate from whole
+#
+# (consider-using-f-string)
+# C0209: Formatting a regular string which could be a f-string'
+# nope, going with F Strings always doesn't always make the source more clear
+#
+# (too-many-lines)
+# C0302: Too many lines in module (.../1000)
+# yes, but large files do have a place, albeit only rarely
+#
+# (superfluous-parens)
+# C0325: Unnecessary parens after 'not' keyword
+# nope, i applaud the clarity of 'if not (0 < i <= last):'
+#
+# (wrong-import-order)
+# C0411: standard import "import ..." should be placed before "import __main__"
+# nope, i give the win to Flake8
+#
+#  (import-outside-toplevel)
+# C0415: Import outside toplevel (...
+# ok, i'll disable it explicitly in source when paid to work with it
+#
+
+#
+# (unspecified-encoding)
+# W1514: Using open without explicitly specifying an encoding
+# nope, i keep simply reading text from a file simple, viva default "utf_8"
+#
 
 
 #
@@ -712,12 +830,12 @@ alias -- -e='--exec-echo-xe emacs -nw --no-splash'
 alias -- -v='--exec-echo-xe vim'
 
 function -eg () {
-    echo 'emacs -nw --no-splash $(git show --name-only --pretty=)' >&2
-    vim       $(git show --name-only --pretty=)
+    echo 'emacs -nw --no-splash $(git show --name-only --pretty=)' "$@" >&2
+    emacs       -nw --no-splash $(git show --name-only --pretty=)  "$@"
 }
 function -vg () {
-    echo 'vim $(git show --name-only --pretty=)' >&2
-    vim       $(git show --name-only --pretty=)
+    echo 'vim $(git show --name-only --pretty=)' "$@" >&2
+    vim       $(git show --name-only --pretty=)  "$@"
 }
 
 
@@ -726,6 +844,9 @@ function -p () {
         ( set -xe; python3 -i "$@" ~/.python.py; )
     else
         local F="$1"
+        if [[ "$1" == "bin/em.py" ]]; then  # TODO: un-hackify this?
+            F="bin/vi.py"
+        fi
         (
             set -xe
 

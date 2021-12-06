@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 """
 usage: which.py [-h] VERB
 

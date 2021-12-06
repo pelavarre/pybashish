@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 
 sys.stderr.write("grep.py: error: not implemented\n")

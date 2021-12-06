@@ -2723,6 +2723,15 @@ if __name__ == "__main__":
 # https://jeffreykegler.github.io/personal/timeline_v3
 #
 
+
+# newer bugs =>
+
+# FIXME: Adopt the new [FILE ...] syntax from Python ArgParse for zero or more Args
+# FIXME: Take 'usage: ... FILE ...' to mean require at least one Arg
+
+
+# older bugs =>
+
 # FIXME: Get the /dev/null template to mention the : boom : broken_heart : boom : decode
 
 # FIXME: AssertionError at pos arg of -a A, --aaa A, yah  hmm
