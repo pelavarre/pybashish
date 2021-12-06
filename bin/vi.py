@@ -289,7 +289,7 @@ quirks:
   searches for Python Regular Expressions, not Emacs Regular Expressions
 
 keyboard cheat sheet:
-  ⌃X⌃C  => how to quit Em Py
+  ⌃X⌃C ⌃Zfg  => how to quit Em Py
 
 keyboard easter eggs:
   ⌃G  Esc⌃G⌃X⌃C
@@ -309,6 +309,8 @@ how to get Em Py:
 how to get Em Py again:
   python3 em?py --pwnme
 """
+
+# FIXME: swap this ALT_DOC with the '__main__.__doc__' when first run
 
 
 def main(argv):
@@ -512,7 +514,10 @@ def do_args_version():
     str_hash = module_file_hash()
     str_short_hash = str_hash[:4]  # conveniently fewer nybbles  # good enough?
 
-    print("Vi Py {} hash {} ({})".format(version, str_short_hash, str_hash))
+    got_verb = sys_argv_pick_verb()
+    got_title_py = got_verb.title() + " Py"
+
+    print("{} {} hash {} ({})".format(got_title_py, version, str_short_hash, str_hash))
 
 
 def do_args_pwnme(branch):
@@ -3593,6 +3598,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         func_by_chords = self.func_by_chords
         em = self.em
+        vi = self.vi
 
         # Define the C0_CONTROL_STDINS
 
@@ -3625,7 +3631,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self._init_func(b"\x18\x03", func=em.do_em_save_buffers_kill_terminal)  # ⌃X⌃C
 
         # func_by_chords[b"\x19"] = em.do_em_c0_control_em  # EM, ⌃Y, 25
-        # func_by_chords[b"\x1A"] = em.do_em_c0_control_sub  # SUB, ⌃Z, 26
+        func_by_chords[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
 
         # func_by_chords[b"\x1B"] = em.do_c0_control_esc  # ESC, ⌃[, 27
         func_by_chords[b"\x1B"] = None  # Esc⌃G⌃X⌃C Egg for now
