@@ -461,9 +461,9 @@ def wearing_em():
     """Return True to wear a look like Emacs, else return False"""
 
     verb = sys_argv_pick_verb()
-    wearing_em = "em" in verb
+    em_in_verb = "em" in verb
 
-    return wearing_em
+    return em_in_verb
 
 
 def parser_format_help(parser):
@@ -472,14 +472,14 @@ def parser_format_help(parser):
     doc = parser.format_help()
 
     want_verb = "em" if wearing_em() else "vi"
-    want_py = want_verb + ".py"
-    want_qpy = want_verb + "?py"
+    want_py = want_verb + ".py"  # such as "vi.py"
+    want_qpy = want_verb + "?py"  # such as "vi?py"
     want_title_py = "Em Py" if wearing_em() else "Vi Py"
 
-    got_verb = sys_argv_pick_verb()
-    got_py = got_verb + ".py"
-    got_qpy = got_verb + "?py"
-    got_title_py = got_verb.title() + " Py"
+    got_verb = sys_argv_pick_verb()  # such as "vim"
+    got_py = got_verb + ".py"  # such as "vim.py"
+    got_qpy = got_verb + "?py"  # such as "vim?py"
+    got_title_py = got_verb.title() + " Py"  # such as "Vim Py"
 
     if got_verb != want_verb:
         wider = len(got_py) - len(want_py)
@@ -500,7 +500,7 @@ def parser_format_help(parser):
         doc = doc.replace(want_qpy, got_qpy)
         doc = doc.replace("\n   ", "\n   " + (wider * " "))
 
-        doc = doc.replace(want_title_py, got_title_py)
+        doc = doc.replace(want_title_py, got_title_py)  # such as "Em Py" --> "Emacs Py"
 
     return doc
 
@@ -514,10 +514,10 @@ def do_args_version():
     str_hash = module_file_hash()
     str_short_hash = str_hash[:4]  # conveniently fewer nybbles  # good enough?
 
-    got_verb = sys_argv_pick_verb()
-    got_title_py = got_verb.title() + " Py"
+    verb = sys_argv_pick_verb()
+    title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
 
-    print("{} {} hash {} ({})".format(got_title_py, version, str_short_hash, str_hash))
+    print("{} {} hash {} ({})".format(title_py, version, str_short_hash, str_hash))
 
 
 def do_args_pwnme(branch):
@@ -663,12 +663,13 @@ class TerminalVi:
         self.script = script  # Ex commands to run after Args
         self.evals = evals  # Ex commands to run after Script
 
-        self.files = files  # files to edit
-        self.files_index = None
+        self.files = files  # file paths to read
+        self.files_index = None  # last file path fetched
 
-        self.held_vi_file = None
+        self.held_vi_file = None  # last file fetched
 
-        self.editor = None
+        self.editor = None  # Terminal driver stack
+        self.last_formatted_reply = None  # last TerminalReplyOut formatted by Self
 
         self.slip_choice = None  # find Char in Row
         self.slip_after = None  # slip off by one Column after finding Char
@@ -966,15 +967,11 @@ class TerminalVi:
     def cancel_escape_whatever(self, verbed):
         """Cancel or escape some one thing that is most going on"""
 
-        version = module_file_version_zero()
         count = self.get_vi_arg1_int(default=None)
 
         editor = self.editor
         skin = editor.skin
         keyboard = skin.keyboard
-
-        held_vi_file = self.held_vi_file
-        nickname = held_vi_file.pick_nickname() if held_vi_file else None
 
         if count is not None:  # 123 ⌃C Egg, 123 Esc Egg, etc
 
@@ -1005,15 +1002,30 @@ class TerminalVi:
             self.vi_print("{} Search".format(verbed))
             editor.finding_highlights = None  # Vim ⌃C, Esc quirks leave highlights up
 
-        else:  # ⌃C Egg, Esc Egg
+        elif verbed == "Escaped":
 
-            press = "Press ZQ to lose changes"
-            if verbed == "Escaped":
-                press = "Press ZZ to save changes"
+            self.suggest_quit_vi("Press ZZ to save changes")  # Esc Egg
 
-            self.vi_print(
-                "{!r}  {} and quit Vi Py  {}".format(nickname, press, version)
-            )
+        else:
+
+            self.suggest_quit_vi("Press ZQ to lose changes")  # ⌃C Egg
+
+    def suggest_quit_vi(self, how):
+        """Print how to Quit Vi Py"""
+
+        version = module_file_version_zero()
+
+        held_vi_file = self.held_vi_file
+        nickname = held_vi_file.pick_nickname() if held_vi_file else None
+
+        verb = sys_argv_pick_verb()
+        title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
+
+        self.vi_print(
+            "{!r}  {} and quit {}  {}".format(nickname, how, title_py, version)
+        )
+
+        # such as '/dev/stdout'  Press ZQ to lose changes and quit Vim Py  0.1.23
 
     def do_continue_vi(self):  # Vim Q v i Return  # Vim b"Qvi\r"  # not Ex mode
         """Accept Q v i Return, without ringing the Terminal bell"""
@@ -1021,6 +1033,8 @@ class TerminalVi:
         editor = self.editor
 
         self.check_vi_count()  # raise NotImplementedError: Repeat Count
+
+        # Offer to play a game
 
         self.vi_ask("Would you like to play a game? (y/n)")
 
@@ -1031,8 +1045,13 @@ class TerminalVi:
 
         editor.skin.nudge.suffix = chord
 
+        # Begin game, or don't
+
+        verb = sys_argv_pick_verb()
+        title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
+
         if chord in (b"y", b"Y"):
-            self.vi_print("Ok, now try to quit Vi Py")  # Qvi⌃My Egg
+            self.vi_print("Ok, now try to quit {}".format(title_py))  # Qvi⌃My Egg
         else:
             self.vi_print("Ok")  # Qvi⌃Mn Egg
 
@@ -1066,10 +1085,15 @@ class TerminalVi:
 
         editor = self.editor
 
+        reply = TerminalReplyOut(self.last_formatted_reply)
+        reply.bell = False
+
         editor.do_sig_tstp()
 
         if self.seeking_column is not None:
             self.keep_up_vi_column_seek()
+
+        editor.skin.reply = reply
 
     #
     # Define Chords for entering, pausing, and exiting TerminalVi
@@ -2564,6 +2588,8 @@ class TerminalVi:
     def format_vi_status(self, reply):
         """Format a Status Line of Row:Column, Nudge, and Message"""
 
+        self.last_formatted_reply = TerminalReplyOut(reply)  # capture for Vim ⌃Z
+
         # Format parts, a la Vim ':set showcmd' etc
 
         pin_chars = "{},{}".format(1 + self.editor.row, 1 + self.editor.column)
@@ -3543,11 +3569,19 @@ class TerminalEm:
     def do_em_keyboard_quit(self):  # Emacs ⌃G  # Em Py Init
         """Cancel stuff, and eventually prompt to quit Em Py"""
 
+        # Start up lazily, so as to blink into XTerm Alt Screen only when needed
+
         vi = self.vi
         if not vi.editor.painter.rows:
+
             vi.do_next_vi_file()  # as if Vi Py b":n\r"
             vi.vi_print()  # clear the announce of First File
             vi.do_resume_vi()  # as if Vi Py b":em\r"
+
+        # Cancel stuff, and eventually prompt to quit Em Py
+
+        verb = sys_argv_pick_verb()
+        title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
 
         version = module_file_version_zero()
 
@@ -3555,10 +3589,10 @@ class TerminalEm:
         nickname = held_vi_file.pick_nickname() if held_vi_file else None
 
         vi.vi_print(
-            "{!r}  Press ⌃X⌃C to save changes and quit Em Py  {}".format(
-                nickname, version
+            "{!r}  Press ⌃X⌃C to save changes and quit {}  {}".format(
+                nickname, title_py, version
             )
-        )
+        )  # such as '/dev/stdout'  Press ⌃X⌃C to save changes and quit Emacs Py  0.1.23
 
         # Emacs ⌃G quirk rapidly rings a Bell for each extra ⌃G, Em Py doesn't
 
@@ -4671,7 +4705,7 @@ class TerminalEditor:
 
         # Consume the Reply
 
-        reply_stale_chord = self.skin.reply
+        stale_reply = self.skin.reply
 
         self.skin.reply = TerminalReplyOut()
         self.reply_with_nudge()
@@ -4694,7 +4728,7 @@ class TerminalEditor:
 
         if self.showing_lag is None:
             while True:
-                self.keep_busy(reply=reply_stale_chord)
+                self.keep_busy(reply=stale_reply)
                 if self.driver.kbhit(timeout=0.250):
 
                     break
