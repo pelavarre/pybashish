@@ -302,7 +302,7 @@ pipe tests:
 how to get Em Py:
   R=pelavarre/pybashish/master/bin/vi.py
   curl -sSO --location https://raw.githubusercontent.com/$R
-  echo cp -ip vi_py em_py |tr _ . ||bash
+  echo cp -ip vi_py em_py |tr _ . |bash
   python3 em?py em?py
   ⌃Segg
 
@@ -338,15 +338,20 @@ def parse_vi_argv(argv):
 
     doc = ALT_DOC if wearing_em() else None
 
-    # Declare the Args
+    # Declare the Args,
+    # and choose 'drop_help=True' to let 'parser_format_help' correct the Help Lines
 
-    parser = argparse_compile_argdoc(epi="quirks", doc=doc)
+    parser = argparse_compile_argdoc(epi="quirks", drop_help=True, doc=doc)
 
     parser.add_argument(
         "files",
         metavar="FILE",
         nargs="*",
         help="a file to edit (default: '/dev/stdin')",
+    )
+
+    parser.add_argument(
+        "-h", "--help", action="count", help="show this help message and exit"
     )
 
     if not wearing_em():
@@ -440,20 +445,64 @@ def parse_vi_argv(argv):
                 argv_tail.append("-c")
                 argv_tail.append(arg[len("+") :])
 
-    # Parse the Args
+    # Parse the Args (or print Help Lines to Stdout and Exit 0)
 
     args = parser.parse_args(argv_tail)
+    if args.help:
+        sys.stdout.write(parser_format_help(parser))
+        sys.exit(0)  # return an explicit 0, same as Parser Add Help Parse Args would
 
     return args
 
 
 def wearing_em():
-    """Say to wear an Emacs look, else don't"""
+    """Return True to wear a look like Emacs, else return False"""
 
-    corename = os.path.basename(sys.argv[0]).split("~")[0]
-    wearing = "em" in corename
+    verb = sys_argv_pick_verb()
+    wearing_em = "em" in verb
 
-    return wearing
+    return wearing_em
+
+
+def parser_format_help(parser):
+    """Patch around bugs in Python ArgParse formatting Help Lines"""
+
+    doc = parser.format_help()
+
+    want_verb = "em" if wearing_em() else "vi"
+    want_py = want_verb + ".py"
+    want_qpy = want_verb + "?py"
+    want_title_py = "Em Py" if wearing_em() else "Vi Py"
+
+    got_verb = sys_argv_pick_verb()
+    got_py = got_verb + ".py"
+    got_qpy = got_verb + "?py"
+    got_title_py = got_verb.title() + " Py"
+
+    if got_verb != want_verb:
+        wider = len(got_py) - len(want_py)
+        assert wider >= 0, (got_verb, want_verb)
+
+        want_cp_line = "  echo cp -ip vi_py em_py |tr _ . |bash"
+        got_cp_line = want_cp_line.replace("em_py", got_py.replace(".", "_"))
+
+        python3_line = "  python3 vi?py vi?py"
+        if want_cp_line in doc:
+            doc = doc.replace(want_cp_line, got_cp_line)
+        else:
+            doc = doc.replace(
+                "\n" + python3_line, "\n" + got_cp_line + "\n" + python3_line
+            )
+
+        doc = doc.replace(want_py, got_py)
+        doc = doc.replace(want_qpy, got_qpy)
+        doc = doc.replace("\n   ", "\n   " + (wider * " "))
+
+        doc = doc.replace(want_title_py, got_title_py)
+
+    return doc
+
+    # TODO: stop bypassing 'argparse_exit_unless_doc_eq' here
 
 
 def do_args_version():
@@ -6559,6 +6608,7 @@ def argparse_exit_unless_doc_eq(parser, doc=None):
         sys.exit(1)  # trust caller to log SystemExit exceptions well
 
 
+# deffed in many files  # missing from docs.python.org
 def argparse_stderr_print_diffs(
     alt_module_doc, alt_parser_doc, alt_module_file, alt_parser_file
 ):
@@ -6753,7 +6803,7 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
-# deffed in many files
+# deffed in many files  # missing from docs.python.org
 def str_join_first_paragraph(doc):
     """Join by single spaces all the leading lines up to the first empty line"""
 
@@ -6763,6 +6813,17 @@ def str_join_first_paragraph(doc):
     alt = chars + doc[index:]
 
     return alt
+
+
+# deffed in many files  # missing from docs.python.org
+def sys_argv_pick_verb():
+    """Return the File Basename part that means which look to wear"""
+
+    basename = os.path.basename(sys.argv[0])
+    name = os.path.splitext(basename)[0]
+    corename = name.split("~")[0]
+
+    return corename  # such as "vim" from "bin/vim~1205pl2108~.py"
 
 
 # Cite some Terminal Doc's and Git-track experience of Terminal Output magic
