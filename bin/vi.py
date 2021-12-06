@@ -1,21 +1,24 @@
-#!/usr/bin/env python3
+#!usr/bin/env python3
 
 r"""
-usage: vi.py [-h] [+PLUS] [--pwnme [BRANCH]] [--version] [FILE ...]
+usage: vi.py [-h] [-u SCRIPT] [-c COMMAND] [--pwnme [BRANCH]] [--version] [FILE ...]
 
-read files, accept edits, write files
+read files, accept edits, write files, in the way of classical vim
 
 positional arguments:
   FILE              a file to edit (default: '/dev/stdin')
 
 optional arguments:
   -h, --help        show this help message and exit
-  +PLUS             next Ex command to run, just after loading first File
-  --pwnme [BRANCH]  update and run this Code, don't just run it
-  --version         print a hash of this Code (its Md5Sum)
+  -u SCRIPT         file of ex commands to run after args
+  -c COMMAND        another ex command to run after args and after '-u'
+  --pwnme [BRANCH]  update and run this code, don't just run it
+  --version         print a hash of this code (its md5sum)
 
 quirks:
   works as pipe filter, pipe source, or pipe drain, like the pipe drain:  ls |vi -
+  defaults to '-u /dev/null', not Vim quirk of '-u ~/.vimrc'
+  searches for Python Regular Expressions, not Vim Regular Expressions
 
 keyboard cheat sheet:
   ZQ ZZ ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wn!⌃M :wq!⌃M :n⌃M :q⌃M  => how to quit Vi Py
@@ -52,10 +55,14 @@ how to get Vi Py again:
   python3 vi?py --pwnme
 """
 
+# Vim quirkily takes '+...' as an arg in place of '-c "..."', and Vi Py does too
+# Vim quirkily blinks the screen for '+q' without '+vi', but Vi Py doesn't
+
 # Vi Py also takes the \u0008 ⌃H BS \b chord in place of the \u007F ⌃? DEL chord
 # reserving one Control Char lets us doc the A⌃V⌃OZQ Egg, but we'll be defining ⌃V
 
 
+import __main__
 import argparse
 import collections
 import datetime as dt
@@ -255,6 +262,52 @@ class TerminalWriter(argparse.Namespace):
 #
 
 
+ALT_DOC = r"""
+usage: em.py [-h] [-nw] [-Q] [--no-splash] [-q] [--script SCRIPT] [--eval COMMAND]
+             [--pwnme [BRANCH]] [--version]
+             [FILE ...]
+
+read files, accept edits, write files, in the way of classical emacs
+
+positional arguments:
+  FILE                a file to edit (default: '/dev/stdin')
+
+optional arguments:
+  -h, --help          show this help message and exit
+  -nw                 stay inside this terminal, don't open another terminal
+  -Q, --quick         run as if --no-splash and --no-init-file
+  --no-splash         start with an empty file, not a file of help
+  -q, --no-init-file  don't default to run '~/.emacs' after args
+  --script SCRIPT     file of elisp commands to run after args
+  --eval COMMAND      another elisp command to run after args and after --script
+  --pwnme [BRANCH]    update and run this code, don't just run it
+  --version           print a hash of this code (its md5sum)
+
+quirks:
+  works as pipe filter, pipe source, or pipe drain
+  defaults to -Q --eval '(menu-bar-mode - 1)', not Emacs quirk of '--script ~/.emacs'
+  searches for Python Regular Expressions, not Emacs Regular Expressions
+
+keyboard cheat sheet:
+  ⌃X⌃C  => how to quit Em Py
+
+pipe tests:
+  ls |bin/em.py -
+  cat bin/em.py |bin/em.py
+  cat bin/em.py |bin/em.py |grep import
+
+how to get Em Py:
+  R=pelavarre/pybashish/master/bin/vi.py
+  curl -sSO --location https://raw.githubusercontent.com/$R
+  echo cp -ip vi_py em_py |tr _ . ||bash
+  python3 em?py em?py
+  /egg
+
+how to get Em Py again:
+  python3 em?py --pwnme
+"""
+
+
 def main(argv):
     """Run from the Command Line"""
 
@@ -268,20 +321,23 @@ def main(argv):
 
     if args.version:
         do_args_version()
-        if not (args.files or args.plusses):
+        if not (args.files or args.evals):
 
             sys.exit()
 
     # Load each File
 
-    vi_the_files(files=args.files, plusses=args.plusses)
-    emacs_the_files(files=args.files, plusses=args.plusses)
+    edit_the_files(files=args.files, script=args.script, evals=args.evals)
 
 
 def parse_vi_argv(argv):
     """Convert a Vi Sys ArgV to an Args Namespace, or print some Help and quit"""
 
-    parser = compile_argdoc(epi="quirks", drop_help=True)
+    doc = ALT_DOC if wearing_em() else None
+
+    # Declare the Args
+
+    parser = argparse_compile_argdoc(epi="quirks", drop_help=True, doc=doc)
 
     parser.add_argument(
         "files",
@@ -290,48 +346,111 @@ def parse_vi_argv(argv):
         help="a file to edit (default: '/dev/stdin')",
     )
 
-    parser.add_argument(
-        "-h", "--help", action="count", help="show this help message and exit"
-    )
+    if not wearing_em():
 
-    parser.add_argument(
-        "--plus",  # Vim +ex_command
-        metavar="PLUS",
-        dest="plusses",
-        action="append",  # 'man vim' says <= 10 commands
-        help="next Ex command to run, just after loading first File",
-    )
+        parser.add_argument(
+            "-u",
+            metavar="SCRIPT",
+            dest="script",
+            help="file of ex commands to run after args",
+        )
+
+        parser.add_argument(
+            "-c",
+            metavar="COMMAND",
+            dest="evals",
+            action="append",  # 'man vim' says <= 10 commands
+            help="another ex command to run after args and after '-u'",
+        )
+
+    if wearing_em():
+
+        parser.add_argument(
+            "-nw",
+            action="count",
+            help="stay inside this terminal, don't open another terminal",
+        )
+
+        parser.add_argument(
+            "-Q",
+            "--quick",
+            action="count",
+            help="run as if --no-splash and --no-init-file",
+        )
+
+        parser.add_argument(
+            "--no-splash",
+            action="count",
+            help="start with an empty file, not a file of help",
+        )
+
+        parser.add_argument(
+            "-q",
+            "--no-init-file",
+            action="count",
+            help="don't default to run '~/.emacs' after args",
+        )
+
+        parser.add_argument(
+            "--script",
+            metavar="SCRIPT",
+            help="file of elisp commands to run after args",
+        )
+
+        parser.add_argument(
+            "--eval",
+            metavar="COMMAND",
+            dest="evals",
+            action="append",  # 'man vim' says <= 10 commands
+            help="another elisp command to run after args and after --script",
+        )
 
     parser.add_argument(
         "--pwnme",  # Vim quirkily doesn't do software-update-in-place
         metavar="BRANCH",
         nargs="?",
         default=False,
-        help="update and run this Code, don't just run it",
+        help="update and run this code, don't just run it",
     )
 
     parser.add_argument(
         "--version",
         action="count",
-        help="print a hash of this Code (its Md5Sum)",
+        help="print a hash of this code (its md5sum)",
     )
 
-    exit_unless_doc_eq(parser)
+    argparse_exit_unless_doc_eq(parser, doc=doc)
 
-    argv_tail = list()
-    for arg in argv[1:]:
-        if not arg.startswith("+"):
-            argv_tail.append(arg)
-        else:
-            argv_tail.append("--plus=" + arg[len("+") :])
+    # Auto-correct the Args
+
+    if wearing_em():
+
+        argv_tail = argv[1:]
+
+    else:
+
+        argv_tail = list()
+        for arg in argv[1:]:
+            if not arg.startswith("+"):
+                argv_tail.append(arg)
+            else:
+                argv_tail.append("-c")
+                argv_tail.append(arg[len("+") :])
+
+    # Parse the Args
 
     args = parser.parse_args(argv_tail)
-    if args.help:
-        sys.stdout.write(parser_format_help(parser))
-
-        sys.exit()
 
     return args
+
+
+def wearing_em():
+    """Say to wear an Emacs look, else don't"""
+
+    corename = os.path.basename(sys.argv[0]).split("~")[0]
+    wearing = "em" in corename
+
+    return wearing
 
 
 def do_args_version():
@@ -419,14 +538,13 @@ def do_args_pwnme(branch):
     sys.exit()  # exit old Self, after calling new Self once or twice
 
 
-def vi_the_files(files, plusses):
-    """Eval the Plusses and then load each File, in the way of Vim"""
+def edit_the_files(files, script, evals):
+    """Load the first File and then execute Script then Evals, in the way of Vim"""
 
-    if os.path.basename(sys.argv[0]).startswith("emacs"):
-
-        return
-
-    vi = TerminalEditorVi(files, plusses=plusses)
+    if wearing_em():
+        vi = TerminalEmacs(files, script=script, evals=evals)
+    else:
+        vi = TerminalVi(files, script=script, evals=evals)
 
     returncode = None
     try:
@@ -467,37 +585,6 @@ def vi_the_files(files, plusses):
     assert False  # unreached
 
 
-def emacs_the_files(files, plusses):
-    """Eval the Plusses and then load each File, in the way of Emacs"""
-
-    emacs = TerminalEditorEmacs(files)
-    _ = plusses  # TODO:  emacs.py --eval EXPR, --execute EXPR
-
-    returncode = None
-    try:
-
-        emacs.run_emacs_terminal()  # like till SystemExit
-        assert False  # unreached
-
-    except OSError as exc:
-
-        stderr_print("{}: {}".format(type(exc).__name__, exc))
-
-        sys.exit(1)
-
-    except SystemExit as exc:
-
-        returncode = exc.code
-        if emacs.emacs_traceback:
-            stderr_print(emacs.emacs_traceback)
-
-        # TODO: log keystrokes interpreted before Emacs exit, or dropped by Emacs exit
-
-    # Exit
-
-    sys.exit(returncode)
-
-
 #
 # Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim
 #
@@ -507,17 +594,18 @@ VI_BLANK_SET = set(" \t")
 VI_SYMBOLIC_SET = set(string.ascii_letters + string.digits + "_")  # r"[A-Za-z0-9_]"
 
 
-class TerminalEditorVi:
+class TerminalVi:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Vim"""
 
     # pylint: disable=too-many-public-methods
     # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, files, plusses):
+    def __init__(self, files, script, evals):
 
         self.vi_traceback = None  # capture Python Tracebacks
 
-        self.plusses = plusses  # Ex commands to run after
+        self.script = script  # Ex commands to run after Args
+        self.evals = evals  # Ex commands to run after Script
 
         self.files = files  # files to edit
         self.files_index = None
@@ -613,24 +701,17 @@ class TerminalEditorVi:
     def run_vi_terminal(self):
         """Enter Terminal Driver, then run Vi Keyboard, then exit Terminal Driver"""
 
-        plusses = self.plusses  # Vim quirk starts with lines of '~/.vimrc'
+        script = self.script  # Vim quirk falls back to lines of '~/.vimrc'
+        evals = self.evals
 
-        # Choose how to start up
-
-        chords = b""
-        chords += b":n\r"  # autoload the first file => do_next_vi_file
-
-        if plusses:
-            for plus in plusses:
-                chars = ":" + plus + "\r"
-                chords += chars.encode()
-
-        chords += b":vi\r"  # go with XTerm Alt Screen & Keyboard  => do_resume_vi
-        chords += b"\x03"  # welcome warmly with ETX, ⌃C, 3  => do_vi_c0_control_etx
+        first_chords = self.fabricate_first_vi_chords(
+            script=script,
+            evals=evals,
+        )
 
         # Form stack
 
-        editor = TerminalEditor(chords=chords)
+        editor = TerminalEditor(chords=first_chords)
         self.editor = editor
 
         keyboard = TerminalKeyboardVi(vi=self)
@@ -672,6 +753,35 @@ class TerminalEditorVi:
 
             self.vi_traceback = editor.skin.traceback  # /⌃G⌃CZQ Egg
 
+    def fabricate_first_vi_chords(self, script, evals):
+        """Merge the first Chords from the Command Line with basic Vi Py Startup"""
+
+        chords = b""
+
+        chords += b":n\r"  # autoload the first file => do_next_vi_file
+
+        if script:
+            with open(script) as reading:
+                chars = reading.read()
+            for line in chars.splitlines():
+                ended_line = ":" + line + "\r"
+                chords += ended_line.encode()
+
+        if evals:
+            for evalling in evals:
+                ended_line = ":" + evalling + "\r"
+                chords += ended_line.encode()
+
+        if wearing_em():
+            chords += b":em\r"  # go with XTerm Alt Screen  => do_resume_vi
+# FIXME:    chords += b"\x07"  # welcome with BEL, ⌃G, 7 \a  => do_emacs_c0_control_bel
+            chords += b"\x03"  # welcome with ETX, ⌃C, 3  => do_vi_c0_control_etx
+        else:
+            chords += b":vi\r"  # go with XTerm Alt Screen  => do_resume_vi
+            chords += b"\x03"  # welcome with ETX, ⌃C, 3  => do_vi_c0_control_etx
+
+        return chords
+
     def get_vi_arg0_chars(self):
         """Get the Chars of the Chords pressed to call this Func"""
 
@@ -693,7 +803,7 @@ class TerminalEditorVi:
         self.editor.editor_print(*args)  # 'def vi_print' calling
 
     #
-    # Layer thinly under the rest of TerminalEditorVi
+    # Layer thinly under the rest of TerminalVi
     #
 
     def check_vi_count(self):
@@ -721,7 +831,7 @@ class TerminalEditorVi:
         self.seeking_more = True
 
     #
-    # Define Chords for pausing TerminalEditorVi
+    # Define Chords for pausing TerminalVi
     #
 
     def do_say_more(self):  # Vim ⌃G
@@ -749,7 +859,7 @@ class TerminalEditorVi:
         # Mention the full Path only if asked
 
         homepath = os_path_homepath(write_path)
-        nickname = held_vi_file.pick_nickname()
+        nickname = held_vi_file.pick_nickname() if held_vi_file else None
 
         enough_path = homepath if (count > 1) else nickname  # ⌃G2⌃G Egg
 
@@ -804,7 +914,7 @@ class TerminalEditorVi:
         keyboard = skin.keyboard
 
         held_vi_file = self.held_vi_file
-        nickname = held_vi_file.pick_nickname()
+        nickname = held_vi_file.pick_nickname() if held_vi_file else None
 
         if count is not None:  # 123 ⌃C Egg, 123 Esc Egg, etc
 
@@ -879,7 +989,7 @@ class TerminalEditorVi:
         ex = TerminalEditorEx(editor, vi_reply=vi_reply)
         ex.flush_ex_status()
 
-    def do_resume_vi(self):  # Vim :vi\r
+    def do_resume_vi(self):  # Vim :vi\r  # Vi Py :em\r
         """Set up XTerm Alt Screen & Keyboard, till Painter Exit"""
 
         editor = self.editor
@@ -887,6 +997,9 @@ class TerminalEditorVi:
         self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         editor.do_resume_editor()
+
+        # Vi Py defines ":em" without arg to mean switch into running like Em Py
+        # Vim quirkily defines ":em" only with an arg
 
     def do_vi_sig_tstp(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
@@ -899,7 +1012,7 @@ class TerminalEditorVi:
             self.keep_up_vi_column_seek()
 
     #
-    # Define Chords for entering, pausing, and exiting TerminalEditorVi
+    # Define Chords for entering, pausing, and exiting TerminalVi
     #
 
     def do_might_flush_next_vi(self):  # Vim :wn\r
@@ -1556,10 +1669,10 @@ class TerminalEditorVi:
     # Step the Cursor across zero, one, or more Lines of the same File
     #
 
-    def do_step(self):  # Vim G, 1G  # Emacs goto-line
+    def do_step_for_count(self):  # Vim G, 1G  # Emacs goto-line
         """Leap to last Row, else to a chosen Row"""
 
-        count = self.get_vi_arg1_int()
+        count = self.get_vi_arg1_int()  # and refetched below as '.skin.arg1'
 
         editor = self.editor
         last_row = editor.spot_last_row()
@@ -2553,9 +2666,7 @@ class TerminalEditorVi:
         skin = editor.skin
         keyboard = skin.keyboard
 
-        if skin.arg1:
-
-            return  # return to raise NotImplementedError: Repeat Count
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         self.vi_print("Press Esc to quit, else type chars to spill over")
 
@@ -3036,19 +3147,20 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_correcting_many_chords(b":/", corrections=b"/")
         self._init_correcting_many_chords(b":?", corrections=b"?")
 
+        self._init_func_by_many_chords(b":em\r", func=vi.do_resume_vi)
         # self._init_func_by_many_chords(b":g?", func=vi.do_find_leading_vi_lines)
         self._init_func_by_many_chords(b":g/", func=vi.do_find_trailing_vi_lines)
-        self._init_func_by_many_chords(b":n\r", func=vi.do_might_next_vi_file)
         self._init_func_by_many_chords(b":n!\r", func=vi.do_next_vi_file)
-        self._init_func_by_many_chords(b":q\r", func=vi.do_might_quit_vi)
+        self._init_func_by_many_chords(b":n\r", func=vi.do_might_next_vi_file)
         self._init_func_by_many_chords(b":q!\r", func=vi.do_quit_vi)
+        self._init_func_by_many_chords(b":q\r", func=vi.do_might_quit_vi)
         self._init_func_by_many_chords(b":vi\r", func=vi.do_resume_vi)
-        self._init_func_by_many_chords(b":w\r", func=vi.do_might_flush_vi)
         self._init_func_by_many_chords(b":w!\r", func=vi.do_flush_vi)
-        self._init_func_by_many_chords(b":wn\r", func=vi.do_might_flush_next_vi)
+        self._init_func_by_many_chords(b":w\r", func=vi.do_might_flush_vi)
         self._init_func_by_many_chords(b":wn!\r", func=vi.do_flush_next_vi)
-        self._init_func_by_many_chords(b":wq\r", func=vi.do_might_flush_quit_vi)
+        self._init_func_by_many_chords(b":wn\r", func=vi.do_might_flush_next_vi)
         self._init_func_by_many_chords(b":wq!\r", func=vi.do_flush_quit_vi)
+        self._init_func_by_many_chords(b":wq\r", func=vi.do_might_flush_quit_vi)
 
         func_by_chords[b";"] = vi.do_slip_redo
         # func_by_chords[b"<"]  # TODO: dedent
@@ -3065,7 +3177,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         self._init_suffix_func(b"F", func=vi.do_slip_rindex_choice)
 
-        func_by_chords[b"G"] = vi.do_step
+        func_by_chords[b"G"] = vi.do_step_for_count
         func_by_chords[b"H"] = vi.do_step_max_high
         func_by_chords[b"I"] = vi.do_slip_dent_take_inserts
         func_by_chords[b"J"] = vi.do_slip_last_join_right
@@ -3348,67 +3460,32 @@ class TerminalKeyboardEx(TerminalKeyboard):
 
 
 #
-# Carry an Alt Doc inside the Main Doc
+# Carry an Em Py for Emacs inside this Vi Py for Vim
 #
 
 
-ALT_DOC = r"""
-usage: emacs.py [-h] [-nw] [--no-splash] [--pwnme [BRANCH]] [--version] [FILE ...]
-
-read files, accept edits, write files
-
-positional arguments:
-  FILE                     a file to edit (default: '/dev/stdin')
-
-optional arguments:
-  -h, --help               show this help message and exit
-  -nw, --no-window-system  stay inside this Terminal
-  --no-splash              start with an empty file
-  --pwnme [BRANCH]         update and run this Code, don't just run it
-  --version                print a hash of this Code (its Md5Sum)
-
-quirks:
-  works as pipe filter, pipe source, or pipe drain, like the pipe drain:  ls |vi -
-
-keyboard cheat sheet:
-  ⌃X⌃C  => how to quit Emacs Py
-
-pipe tests:
-  ls |bin/emacs.py -
-  cat bin/emacs.py |bin/emacs.py
-  cat bin/emacs.py |bin/emacs.py |grep import
-
-how to get Emacs Py:
-  R=pelavarre/pybashish/master/bin/emacs.py
-  curl -sSO --location https://raw.githubusercontent.com/$R
-  python3 emacs?py emacs?py
-  /egg
-
-how to get Emacs Py again:
-  python3 emacs?py --pwnme
-"""
-
-
-#
-# Carry an Emacs Py inside the Vi Py
-#
-
-
-class TerminalEditorEmacs:
+class TerminalEmacs:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Emacs"""
 
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, files):
+    def __init__(self, files, script, evals):
 
-        _ = files
+        self.vi_traceback = None  # TODO: Egg of well known fail then ⌃X⌃C
 
-        self.emacs_traceback = None  # TODO: Egg of well known fail then ⌃X⌃C
+        vi = TerminalVi(files, script=script, evals=evals)
+        self.vi = vi
 
-    def run_emacs_terminal(self):
+    def run_vi_terminal(self):  # TODO: scrub the Vi mentions out of Emacs
         """Enter Terminal Driver, then run Emacs Keyboard, then exit Terminal Driver"""
 
-        raise NotImplementedError()
+        vi = self.vi
+        vi.run_vi_terminal()
+
+    def do_emacs_c0_control_bel(self):  # Vim ⌃G  # Em Py Init
+        """Cancel stuff"""
+
+        # Emacs ⌃G quirk rapidly rings a Bell for each extra ⌃G, Em Py doesn't
 
 
 #
@@ -6281,14 +6358,11 @@ class KwArgsException(Exception):
 
 
 # deffed in many files  # missing from docs.python.org
-def compile_argdoc(epi, drop_help=None):
+def argparse_compile_argdoc(epi, drop_help=None, doc=None):
     """Construct the 'argparse.ArgumentParser' with Epilog but without Arguments"""
 
-    # Find the Doc of caller, even when not Main, and when:  __main__ is None
-
     f = inspect.currentframe()
-    module = inspect.getmodule(f.f_back)
-    module_doc = module.__doc__
+    (module_doc, module_file) = argparse_module_doc_and_file(doc=doc, f=f)
 
     # Pick the ArgParse Prog, Description, & Epilog out of the Main Arg Doc
 
@@ -6307,7 +6381,7 @@ def compile_argdoc(epi, drop_help=None):
     parser = argparse.ArgumentParser(
         prog=prog,
         description=description,
-        add_help=not drop_help,
+        add_help=True,
         formatter_class=argparse.RawTextHelpFormatter,
         epilog=epilog,
     )
@@ -6316,23 +6390,18 @@ def compile_argdoc(epi, drop_help=None):
 
 
 # deffed in many files  # missing from docs.python.org
-def exit_unless_doc_eq(parser):
+def argparse_exit_unless_doc_eq(parser, doc=None):
     """Exit nonzero, unless __main__.__doc__ equals 'parser.format_help()'"""
 
-    # Find the Doc and File of caller, even when not Main, and when:  __main__ is None
-
     f = inspect.currentframe()
-    module = inspect.getmodule(f.f_back)
-
-    module_doc = module.__doc__
-    module_file = f.f_back.f_code.co_filename  # more available than 'module.__file__'
+    (module_doc, module_file) = argparse_module_doc_and_file(doc=doc, f=f)
 
     # Fetch the two docs
 
     with_columns = os.getenv("COLUMNS")
     os.environ["COLUMNS"] = str(89)  # Black promotes 89 columns per line
     try:
-        parser_doc = parser_format_help(parser)
+        parser_doc = parser.format_help()
     finally:
         if with_columns is None:
             os.environ.pop("COLUMNS")
@@ -6353,31 +6422,72 @@ def exit_unless_doc_eq(parser):
             alt_parser_doc = alt_parser_doc.replace("[FILE [FILE ...]]", "[FILE ...]")
             # older Python needed this accomodation, such as Feb/2015 Python 3.4.3
 
-    # Count significant differences
+    # Sketch where the Doc's came from
 
     alt_module_file = module_file
     alt_module_file = os.path.split(alt_module_file)[-1]
-    alt_module_file = "./{} --help".format(alt_module_file)
+    alt_module_file = "{} --help".format(alt_module_file)
 
     alt_parser_file = "argparse.ArgumentParser(..."
 
-    diff_lines = list(
-        difflib.unified_diff(
-            a=alt_module_doc.splitlines(),
-            b=alt_parser_doc.splitlines(),
-            fromfile=alt_module_file,
-            tofile=alt_parser_file,
+    # Count significant differences
+
+    for diff_precision in range(2):
+
+        a_lines = alt_module_doc.splitlines()
+        b_lines = alt_parser_doc.splitlines()
+
+        # First count differences ignoring blank space between Words,
+        # but end by counting even the smallest differences in Chars
+
+        if not diff_precision:
+
+            a_words_by_index = list()
+            for (index, a_line) in enumerate(a_lines):
+                a_words = " ".join(a_line.split())
+                a_words_by_index.append(a_words)
+
+            for (index, b_line) in enumerate(b_lines):
+                b_words = " ".join(b_line.split())
+                if b_words in a_words_by_index:
+                    a_index = a_words_by_index.index(b_words)
+                    a_line = a_lines[a_index]
+
+                    b_lines[index] = a_line
+
+        diff_lines = list(
+            difflib.unified_diff(
+                a=a_lines,
+                b=b_lines,
+                fromfile=alt_module_file,
+                tofile=alt_parser_file,
+            )
         )
-    )
 
-    # Exit if significant differences, but print them first
+        # Exit if significant differences, but print them first
 
-    if diff_lines:  # TODO: ugly contingent '.rstrip()'
+        if diff_lines:  # TODO: ugly contingent '.rstrip()'
 
-        lines = list((_.rstrip() if _.endswith("\n") else _) for _ in diff_lines)
-        stderr_print("\n".join(lines))
+            lines = list((_.rstrip() if _.endswith("\n") else _) for _ in diff_lines)
+            stderr_print("\n".join(lines))
 
-        sys.exit(1)  # trust caller to log SystemExit exceptions well
+            sys.exit(1)  # trust caller to log SystemExit exceptions well
+
+
+# deffed in many files  # missing from docs.python.org
+def argparse_module_doc_and_file(doc, f):
+    """Take the Doc as from Main File, else pick the Doc out of the Calling Module"""
+
+    module_doc = doc
+    module_file = __main__.__file__
+
+    if doc is None:
+        module = inspect.getmodule(f.f_back)
+
+        module_doc = module.__doc__
+        module_file = f.f_back.f_code.co_filename
+
+    return (module_doc, module_file)
 
 
 # deffed in many files  # missing from docs.python.org
@@ -6421,21 +6531,6 @@ def module_file_version_zero():
     version = "{}.{}.{}".format(major, minor, micro)
 
     return version
-
-
-# deffed in many files  # missing from docs.python.org
-def parser_format_help(parser):
-    """Patch around Python ArgParse misreading declarations of "+" optional args"""
-
-    doc = parser.format_help()
-
-    doc = doc.replace(" [--plus PLUS]", " [+PLUS]")
-    doc = doc.replace(
-        "  --plus PLUS  ",
-        "  +PLUS        ",
-    )
-
-    return doc
 
 
 # deffed in many files  # missing from docs.python.org
@@ -6580,10 +6675,6 @@ def str_join_first_paragraph(doc):
 
 
 # -- future inventions --
-
-
-# TODO: Generate an Emacs Py from Vi Py, and a Vi Py from Emacs Py
-# TODO: Choose the Doc and Main Code differently when named as "emacs~.py"
 
 
 # TODO: ⌃O for Search Key input, not just Replace/ Insert input

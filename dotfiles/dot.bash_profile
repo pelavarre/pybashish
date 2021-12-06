@@ -12,7 +12,14 @@ _DOT_BASH_PROFILE_=~/.bash_profile  # don't export, to say if this file has been
 #
 
 
-alias -- '::'="(echo '⌃ ⌥ ⇧ ⌘ ⎋ ⇥ ⋮' |tee >(pbcopy))"
+alias -- '::'=--colon-colon
+function --colon-colon () {
+    if which pbcopy >/dev/null; then
+        (echo '⌃ ⌥ ⇧ ⌘ ⎋ ⇥ ⋮ #' |tee >(pbcopy))
+    else
+        echo '⌃ ⌥ ⇧ ⌘ ⎋ ⇥ ⋮ #'
+    fi
+}
 
 
 #
@@ -837,6 +844,9 @@ function -p () {
         ( set -xe; python3 -i "$@" ~/.python.py; )
     else
         local F="$1"
+        if [[ "$1" == "bin/em.py" ]]; then  # TODO: un-hackify this?
+            F="bin/vi.py"
+        fi
         (
             set -xe
 

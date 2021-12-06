@@ -124,10 +124,10 @@ PyBashIsh does a few things much much better, some things just as well, and many
     Next try one of:
 
         -  ..  argdoc  base64  bash  bind  cal  cat  cd  chmod  clear  column  cp  cspsh
-        date  dd  doctestbash  echo  emacs  exit  expand  find  fmt  grep  gunzip  gzip
+        date  dd  doctestbash  echo  em  emacs  exit  expand  find  fmt  grep  gunzip  gzip
         head  hearme-3  help  hexdump  history  hostname  ls  make  mkdir  mv  paste  pbcopy
         pbpaste  perl  ping  pwd  pyish  read  rm  scp  sleep  sort  sponge  ssh  strings
-        subsh  subsh2  tabs  tail  tar  tar2  touch  tr  unalias  vi  watch  wc  which
+        subsh  subsh2  tabs  tail  tar  tar2  touch  tr  unalias  vi  vim  watch  wc  which
         xargs  zcat  zsh
 
     Note: The "#" hash mark means ignore the following chars in the line
