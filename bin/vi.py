@@ -850,6 +850,34 @@ class TerminalVi:
 
         # TODO: Em Py to Load File before Script before Evals
 
+    def do_vi_prefix_chord(self, chord):
+        """Intercept r"[1-9][0-9]+"s as a Prefix to more Chords"""
+
+        editor = self.editor
+
+        prefix = editor.skin.nudge.prefix
+        chords = editor.skin.nudge.chords
+
+        keyboard = editor.skin.keyboard
+        intake_chords_set = keyboard.choose_intake_chords_set()
+
+        # Take this Chord as the digit of a positive Prefix to more Chords
+
+        prefix_chords = b"123456789"
+        more_prefix_chords = b"0123456789"
+
+        if (not chords) and (chord not in intake_chords_set):
+            if (chord in prefix_chords) or (prefix and chord in more_prefix_chords):
+
+                prefix_plus = chord if (prefix is None) else (prefix + chord)
+                editor.skin.nudge.prefix = prefix_plus
+
+                return True
+
+        # Or tell the Caller to interpret this Chord
+
+        return False
+
     def get_vi_arg0_chars(self):
         """Get the Chars of the Chords pressed to call this Func"""
 
@@ -3085,18 +3113,17 @@ class TerminalKeyboard:
         self.format_status_func = lambda reply: None
         self.place_cursor_func = lambda: None
 
-        self.enter_do_func = lambda: None
         self.intake_bypass = ""
         self.intake_chords_set = set()
         self.intake_func = None
-        self.exit_do_func = lambda: None
-
-        self.prefix_chords = b""
-        self.more_prefix_chords = b""
+        self.do_prefix_chord_func = lambda chord: None
 
         self.corrections_by_chords = dict()
         self.func_by_chords = dict()
         self.suffixes_by_chords = dict()
+
+        self.enter_do_func = lambda: None
+        self.exit_do_func = lambda: None
 
     def _init_corrector(self, chords, corrections):
         """Map one sequence of keyboard Input Chords to another"""
@@ -3137,6 +3164,15 @@ class TerminalKeyboard:
             assert suffixes, chords
             suffixes_by_chords[chords] = suffixes
 
+    def choose_intake_chords_set(self):
+        """Choose the Chords to route into Intake Chords Func, else an empty Set"""
+
+        chords_set = set()
+        if not self.intake_bypass:
+            chords_set = self.intake_chords_set
+
+        return chords_set
+
 
 class TerminalKeyboardVi(TerminalKeyboard):
     """Map Keyboard Inputs to Code, for when feeling like Vi"""
@@ -3152,13 +3188,13 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
-        self.enter_do_func = vi.enter_do_vi
-        self.exit_do_func = vi.exit_do_vi
 
-        self.prefix_chords = b"123456789"
-        self.more_prefix_chords = b"1234567890"
+        self.do_prefix_chord_func = vi.do_vi_prefix_chord
 
         self._init_by_vi_chords_()
+
+        self.enter_do_func = vi.enter_do_vi
+        self.exit_do_func = vi.exit_do_vi
 
     def _init_by_vi_chords_(self):
         # pylint: disable=too-many-statements
@@ -4369,31 +4405,21 @@ class TerminalEditor:
 
         chord_ints_ahead = self.skin.chord_ints_ahead
         chords = self.skin.nudge.chords
-        keyboard = self.skin.keyboard
         prefix = self.skin.nudge.prefix
 
-        prefix_chords = keyboard.prefix_chords
-        more_prefix_chords = keyboard.more_prefix_chords
+        keyboard = self.skin.keyboard
+        do_prefix_chord_func = keyboard.do_prefix_chord_func
         corrections_by_chords = keyboard.corrections_by_chords
-
-        intake_chords_set = set()
-        if not keyboard.intake_bypass:
-            intake_chords_set = keyboard.intake_chords_set
+        intake_chords_set = keyboard.choose_intake_chords_set()
 
         assert self.skin.nudge.suffix is None, (chords, chord)  # one Chord only
 
         # Take more decimal Digits, while nothing but decimal Digits given
 
-        if (not chords) and (chord not in intake_chords_set):
-            if (chord in prefix_chords) or (prefix and chord in more_prefix_chords):
+        if do_prefix_chord_func(chord):
+            self.editor_print()  # echo Prefix
 
-                prefix_plus = chord if (prefix is None) else (prefix + chord)
-                self.skin.nudge.prefix = prefix_plus
-                self.editor_print()  # echo Prefix
-
-                # Ask for more Prefix, else for main Chords
-
-                return None  # ask for more Prefix, or for other Chords
+            return None  # ask for more Prefix, or for other Chords
 
         self.skin.arg1 = int(prefix) if prefix else None
         assert self.get_arg1_int() >= 1
@@ -4474,10 +4500,7 @@ class TerminalEditor:
 
         func_by_chords = keyboard.func_by_chords
         intake_func = keyboard.intake_func
-
-        intake_chords_set = set()
-        if not keyboard.intake_bypass:
-            intake_chords_set = keyboard.intake_chords_set
+        intake_chords_set = keyboard.choose_intake_chords_set()
 
         chords_func = None
         if chords:
