@@ -22,13 +22,13 @@ quirks:
   mostly doesn't ring bell, but does ring bell when search wraps
 
 keyboard cheat sheet:
-  ZQ ZZ ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wn!⌃M :wq!⌃M :n⌃M :q⌃M  => how to quit Vi Py
-  ⌃C Up Down Right Left Space Delete Return  => natural enough
+  ZQ ZZ  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wn!⌃M :wq!⌃M :n⌃M :q⌃M  ⌃C Esc  => how to quit Vi Py
+  Up Down Right Left Space Delete Return  => conventional enough
   0 ^ $ fx tx Fx Tx ; , | h l  => leap to column
   b e w B E W { }  => leap across small word, large word, paragraph
-  G 1G H L M - + _ ⌃J ⌃N ⌃P j k  => leap to row, leap to line
+  G 1G H L M - + _ ⌃J ⌃N ⌃P j k  => leap to screen row, leap to line
   1234567890 ⌃C Esc  => repeat, or don't
-  ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll rows
+  ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll screen rows
   ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
   \n \i \F ⌃C Esc ⌃G  => toggle line numbers, search case/ regex, show hits
   /... Delete ⌃U ⌃C Return  ?...   * £ # n N  => start search, next, previous
@@ -290,10 +290,13 @@ quirks:
   searches for Python Regular Expressions, not Emacs Regular Expressions
 
 keyboard cheat sheet:
-  ⌃X⌃C ⌃Zfg  => how to quit Em Py
+  ⌃X⌃C  ⌃Zfg  ⌃G Esc  => how to quit Em Py
+  Up Down  => conventional enough
+  ⌃A ⌃E  => leap to column
+  ⌃N ⌃P  => leap to line
 
 keyboard easter eggs:
-  ⌃G  Esc⌃G⌃X⌃C
+  ⌃G  ⌃X⌃G⌃X⌃C
 
 pipe tests:
   ls |bin/em.py -
@@ -310,6 +313,9 @@ how to get Em Py:
 how to get Em Py again:
   python3 em?py --pwnme
 """
+
+# FIXME: Em of Vim  0 ^ $ fx tx Fx Tx ; , | h l  => leap to column
+# FIXME: Em of Vim  G 1G H L M - + _ ⌃J ⌃N ⌃P j k  => leap to screen row, leap to line
 
 # FIXME: swap this ALT_DOC with the '__main__.__doc__' when first run
 
@@ -3567,7 +3573,7 @@ class TerminalEm:
         try:
             vi.run_vi_terminal(em=self)
         finally:
-            self.vi_traceback = vi.vi_traceback  # Esc⌃G⌃X⌃C Egg
+            self.vi_traceback = vi.vi_traceback  # ⌃X⌃G⌃X⌃C Egg
 
     #
     # Define Control Chords
@@ -3616,6 +3622,38 @@ class TerminalEm:
         vi.quit_vi()
 
     #
+    # Slip the Cursor to a Column, or step it to a Row
+    #
+
+    def do_em_move_beginning_of_line(self):  # Emacs ⌃A
+
+        editor = self.vi.editor
+        editor.column = 0
+
+        # FIXME: implement ⌃U Arg1
+
+    def do_em_move_end_of_line(self):  # Emacs ⌃E
+
+        editor = self.vi.editor
+        editor.column = editor.spot_max_column()
+
+        # FIXME: implement ⌃U Arg1
+
+    def do_em_next_line(self):  # Emacs ⌃N, Down
+
+        editor = self.vi.editor
+        editor.row += 1
+
+        # FIXME: implement ⌃U Arg1 and Bounds Checks
+
+    def do_em_previous_line(self):  # Emacs ⌃P, Up
+
+        editor = self.vi.editor
+        editor.row -= 1
+
+        # FIXME: implement ⌃U Arg1 and Bounds Checks
+
+    #
     # Insert Chords as Chars
     #
 
@@ -3653,11 +3691,11 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # Define the C0_CONTROL_STDINS
 
         # func_by_chords[b"\x00"] = em.do_em_c0_control_nul  # NUL, ⌃@, 0
-        # func_by_chords[b"\x01"] = em.do_em_c0_control_soh  # SOH, ⌃A, 1
+        func_by_chords[b"\x01"] = em.do_em_move_beginning_of_line  # SOH, ⌃A, 1
         # func_by_chords[b"\x02"] = em.do_em_c0_control_stx  # STX, ⌃B, 2
         # func_by_chords[b"\x03"] = em.do_em_c0_control_etx  # ETX, ⌃C, 3
         # func_by_chords[b"\x04"] = em.do_em_c0_control_eot  # EOT, ⌃D, 4
-        # func_by_chords[b"\x05"] = em.do_em_c0_control_enq  # ENQ, ⌃E, 5
+        func_by_chords[b"\x05"] = em.do_em_move_end_of_line  # ENQ, ⌃E, 5
         # func_by_chords[b"\x06"] = em.do_em_c0_control_ack  # ACK, ⌃F, 6
         func_by_chords[b"\x07"] = em.do_em_keyboard_quit  # BEL, ⌃G, 7 \a
         # func_by_chords[b"\x08"] = em.do_em_c0_control_bs  # BS, ⌃H, 8 \b
@@ -3666,9 +3704,9 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # func_by_chords[b"\x0B"] = em.do_em_c0_control_vt  # VT, ⌃K, 11 \v
         # func_by_chords[b"\x0C"] = em.do_em_c0_control_ff  # FF, ⌃L, 12 \f
         # func_by_chords[b"\x0D"] = em.do_em_c0_control_cr  # CR, ⌃M, 13 \r
-        # func_by_chords[b"\x0E"] = em.do_em_c0_control_so  # SO, ⌃N, 14
+        func_by_chords[b"\x0E"] = em.do_em_next_line  # SO, ⌃N, 14
         # func_by_chords[b"\x0F"] = em.do_em_c0_control_si  # SI, ⌃O, 15
-        # func_by_chords[b"\x10"] = em.do_em_c0_control_dle  # DLE, ⌃P, 16
+        func_by_chords[b"\x10"] = em.do_em_previous_line  # DLE, ⌃P, 16
         # func_by_chords[b"\x11"] = em.do_em_c0_control_dc1  # DC1, XON, ⌃Q, 17
         # func_by_chords[b"\x12"] = em.do_em_c0_control_dc2  # DC2, ⌃R, 18
         # func_by_chords[b"\x13"] = em.do_em_c0_control_dc3  # DC3, XOFF, ⌃S, 19
@@ -3684,10 +3722,9 @@ class TerminalKeyboardEm(TerminalKeyboard):
         func_by_chords[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
 
         # func_by_chords[b"\x1B"] = em.do_c0_control_esc  # ESC, ⌃[, 27
-        func_by_chords[b"\x1B"] = None  # Esc⌃G⌃X⌃C Egg for now
 
-        # func_by_chords[b"\x1B[A"] = None  # ↑ Up Arrow
-        # func_by_chords[b"\x1B[B"] = None  # ↓ Down Arrow
+        func_by_chords[b"\x1B[A"] = em.do_em_previous_line  # ↑ Up Arrow
+        func_by_chords[b"\x1B[B"] = em.do_em_next_line  # ↓ Down Arrow
         # func_by_chords[b"\x1B[C"] = None  # → Right Arrow
         # func_by_chords[b"\x1B[D"] = None  # ← Left Arrow
 
@@ -3700,8 +3737,8 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         # Define the BASIC_LATIN_STDINS
 
-        # self.intake_chords_set = set(BASIC_LATIN_STDINS)
-        # self.intake_func = em.do_em_self_insert_command
+        self.intake_chords_set = set(BASIC_LATIN_STDINS)
+        self.intake_func = em.do_em_self_insert_command
 
 
 #
