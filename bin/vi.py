@@ -1047,10 +1047,7 @@ class TerminalVi:
 
         self.vi_ask("Would you like to play a game? (y/n)")
 
-        try:
-            chord = editor.take_editor_chord()
-        except KeyboardInterrupt:
-            chord = b"\x03"  # ETX, ⌃C, 3
+        chord = editor.take_editor_chord()
 
         editor.skin.nudge.suffix = chord
 
@@ -4181,17 +4178,16 @@ class TerminalEditor:
 
             # Scroll and prompt
 
-            if self.painter.rows:
-                self.scroll_cursor_into_screen()
-                self.flush_editor(keyboard, reply=self.skin.reply)  # for 'run_keyboard'
-                self.skin.reply.bell = False  # ring the Bell at most once per ask
+            chord = self.peek_editor_chord()
+            if chord is None:
+                if self.painter.rows:
+                    self.scroll_cursor_into_screen()
+                    self.flush_editor(keyboard, reply=self.skin.reply)  # for prompt
+                    self.skin.reply.bell = False  # ring the Bell at most once per ask
 
             # Take one Chord in, or next Chord, or cancel Chords to start again
 
-            try:
-                chord = self.take_editor_chord()
-            except KeyboardInterrupt:
-                chord = b"\x03"  # ETX, ⌃C, 3
+            chord = self.take_editor_chord()
 
             chords_func = self.choose_chords_func(chord)
             if chords_func is None:
@@ -4539,7 +4535,12 @@ class TerminalEditor:
                 skin.doing_done += 1
                 if skin.doing_done < self.get_arg1_int():
 
-                    _ = self.peek_editor_chord()  # raise KeyboardInterrupt at ⌃C
+                    # Raise KeyboardInterrupt at ⌃C
+
+                    chord = self.peek_editor_chord()
+                    if chord == b"\x03":  # ETX, ⌃C, 3
+
+                        raise KeyboardInterrupt()
 
                     skin.reply = TerminalReplyOut()  # clear pending Status
 
@@ -4709,7 +4710,7 @@ class TerminalEditor:
         self.skin.reply.bell = True
 
     def peek_editor_chord(self):
-        """Reveal the next keyboard input Chord, or raise KeyboardInterrupt at ⌃"""
+        """Reveal the next keyboard input Chord"""
 
         chord_ints_ahead = self.skin.chord_ints_ahead
         painter = self.painter
@@ -4720,10 +4721,6 @@ class TerminalEditor:
 
             chord_int = chord_ints_ahead[0]  # copy, do Not consume
             chord = chr(chord_int).encode()
-
-            if chord == b"\x03":  # ETX, ⌃C, 3
-
-                raise KeyboardInterrupt()
 
             return chord
 
@@ -4739,9 +4736,6 @@ class TerminalEditor:
             self.keep_busy(reply=self.skin.reply)  # give 1 Time Slice for this Chord
 
         chord = painter.take_painter_chord()
-        if chord == b"\x03":  # ETX, ⌃C, 3
-
-            raise KeyboardInterrupt()
 
         # Else defer this first keyboard input Chord for later, but return a copy now
 
@@ -4751,7 +4745,7 @@ class TerminalEditor:
         return chord
 
     def take_editor_chord(self):
-        """Block Self till next keyboard input Chord, or raise KeyboardInterrupt"""
+        """Block Self till next keyboard input Chord"""
 
         chord_ints_ahead = self.skin.chord_ints_ahead
         painter = self.painter
@@ -4770,10 +4764,6 @@ class TerminalEditor:
             chord_int = chord_ints_ahead.pop(0)  # consume, do Not copy
             chord = chr(chord_int).encode()
 
-            if chord == b"\x03":  # ETX, ⌃C, 3
-
-                raise KeyboardInterrupt()
-
             return chord
 
         # Block to take and return the next keyboard input Chord,
@@ -4787,10 +4777,6 @@ class TerminalEditor:
                     break
 
         chord = painter.take_painter_chord()
-
-        if chord == b"\x03":  # ETX, ⌃C, 3
-
-            raise KeyboardInterrupt()
 
         return chord
 
