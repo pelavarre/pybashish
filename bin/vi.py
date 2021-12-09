@@ -276,7 +276,7 @@ positional arguments:
 optional arguments:
   -h, --help          show this help message and exit
   -nw                 stay inside this terminal, don't open another terminal
-  -Q, --quick         run as if --no-splash and --no-init-file
+  -Q, --quick         run as if --no-splash and --no-init-file (but slow after crash)
   --no-splash         start with an empty file, not a file of help
   -q, --no-init-file  don't default to run '~/.emacs' after args
   --script SCRIPT     file of elisp commands to run after args
@@ -296,7 +296,7 @@ keyboard cheat sheet:
   ⌃N ⌃P  => leap to line
 
 keyboard easter eggs:
-  ⌃G  ⌃X⌃G⌃X⌃C
+  ⌃G  ⌃X⌃G⌃X⌃C  ⌃U-0 ⌃U009⌃Z
 
 pipe tests:
   ls |bin/em.py -
@@ -392,7 +392,7 @@ def parse_vi_argv(argv):
             "-Q",
             "--quick",
             action="count",
-            help="run as if --no-splash and --no-init-file",
+            help="run as if --no-splash and --no-init-file (but slow after crash)",
         )
 
         parser.add_argument(
@@ -850,8 +850,12 @@ class TerminalVi:
 
         # TODO: Em Py to Load File before Script before Evals
 
+    #
+    # Layer thinly under the rest of TerminalVi
+    #
+
     def do_vi_prefix_chord(self, chord):
-        """Intercept r"[1-9][0-9]+"s as a Prefix to more Chords"""
+        """Take r"[1-9][0-9]+"s as a Prefix to more Chords"""
 
         editor = self.editor
 
@@ -861,22 +865,34 @@ class TerminalVi:
         keyboard = editor.skin.keyboard
         intake_chords_set = keyboard.choose_intake_chords_set()
 
-        # Take this Chord as the digit of a positive Prefix to more Chords
+        prefix_plus = chord if (prefix is None) else (prefix + chord)
+
+        # Don't take more Prefix Chords after the first of the Chords to Call
+
+        if chords or (chord in intake_chords_set):
+
+            return False
+
+        # Take this Chord as part of a Prefix before the Chords to Call
+        # Else tell the Caller to take this Chord
 
         prefix_chords = b"123456789"
         more_prefix_chords = b"0123456789"
 
-        if (not chords) and (chord not in intake_chords_set):
-            if (chord in prefix_chords) or (prefix and chord in more_prefix_chords):
+        if (chord in prefix_chords) or (prefix and chord in more_prefix_chords):
+            editor.skin.nudge.prefix = prefix_plus
 
-                prefix_plus = chord if (prefix is None) else (prefix + chord)
-                editor.skin.nudge.prefix = prefix_plus
-
-                return True
-
-        # Or tell the Caller to interpret this Chord
+            return True
 
         return False
+
+    def eval_vi_prefix(self, prefix):
+        """Take the Chords before the Called Chords as a positive Int Prefix"""
+
+        evalled = int(prefix) if prefix else None
+        assert (evalled is None) or (evalled >= 1)
+
+        return evalled
 
     def get_vi_arg0_chars(self):
         """Get the Chars of the Chords pressed to call this Func"""
@@ -898,19 +914,10 @@ class TerminalVi:
 
         self.editor.editor_print(*args)  # 'def vi_print' calling
 
-    #
-    # Layer thinly under the rest of TerminalVi
-    #
-
     def check_vi_count(self):
-        """Raise NotImplementedError for Repeat Count, while it's Not coded"""
+        """Raise the Arg 0 and its Arg 1 Repeat Count as a NotImplementedError"""
 
-        editor = self.editor
-
-        arg1 = editor.get_arg1_int(default=None)
-        if arg1 is not None:
-
-            raise NotImplementedError("Repeat Count {}".format(arg1))
+        self.editor.check_repeat_count()
 
     def check_vi_index(self, truthy):
         """Fail fast, else proceed"""
@@ -1118,6 +1125,8 @@ class TerminalVi:
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
         editor = self.editor
+
+        self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         reply = TerminalReplyOut(self.last_formatted_reply)
         reply.bell = False
@@ -2627,14 +2636,9 @@ class TerminalVi:
         # Format parts, a la Vim ':set showcmd' etc
 
         pin_chars = "{},{}".format(1 + self.editor.row, 1 + self.editor.column)
-
         flags_chars = str(reply.flags) if reply.flags else ""
-
-        nudge_bytes = b"" if (reply.nudge is None) else reply.nudge.join_bytes()
-        nudge_chars = format(repr_vi_nudge_bytes(nudge_bytes)) if nudge_bytes else ""
-
+        nudge_chars = "" if (reply.nudge is None) else reply.nudge.to_chars()
         message_chars = str(reply.message) if reply.message else ""
-
         bell_chars = "?" if reply.bell else ""
 
         # Join parts
@@ -3028,6 +3032,8 @@ class TerminalVi:
 
         # Cut N - 1 Lines below & Chars to right in Line, and land Cursor in Line
 
+        self.check_vi_index(column)  # Vim D quirk doesn't beep when failing to delete
+
         self.chop_some_vi_lines(count)
         self.slip_back_into_vi_line()
 
@@ -3116,7 +3122,9 @@ class TerminalKeyboard:
         self.intake_bypass = ""
         self.intake_chords_set = set()
         self.intake_func = None
-        self.do_prefix_chord_func = lambda chord: None
+
+        self.do_prefix_chord_func = lambda chord: False
+        self.eval_prefix_func = lambda prefix: None
 
         self.corrections_by_chords = dict()
         self.func_by_chords = dict()
@@ -3190,6 +3198,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self.place_cursor_func = vi.place_vi_cursor
 
         self.do_prefix_chord_func = vi.do_vi_prefix_chord
+        self.eval_prefix_func = vi.eval_vi_prefix
 
         self._init_by_vi_chords_()
 
@@ -3608,6 +3617,93 @@ class TerminalEm:
         finally:
             self.vi_traceback = vi.vi_traceback  # ⌃X⌃G⌃X⌃C Egg
 
+    def do_em_prefix_chord(self, chord):  # Emacs ⌃U Universal-Argument
+        """Take ⌃U { ⌃U } [ "-" ] { "0123456789" } [ ⌃U ] as a Prefix to more Chords"""
+
+        editor = self.vi.editor
+
+        prefix = editor.skin.nudge.prefix
+        chords = editor.skin.nudge.chords
+
+        keyboard = editor.skin.keyboard
+        intake_chords_set = keyboard.choose_intake_chords_set()
+
+        prefix_plus = chord if (prefix is None) else (prefix + chord)
+
+        # Don't take more Prefix Chords after the first of the Chords to Call
+
+        if chords:
+
+            return False
+
+        assert b"\x15" not in intake_chords_set
+
+        # Start with one or more ⌃U, close with ⌃U, or start over with next ⌃U
+
+        if chord == b"\x15":
+
+            if not prefix:
+                editor.skin.nudge.prefix = prefix_plus
+            elif set(prefix) == set(b"\x15"):
+                editor.skin.nudge.prefix = prefix_plus
+            elif not prefix.endswith(b"\x15"):
+                editor.skin.nudge.prefix = prefix_plus
+            else:
+                editor.skin.nudge.prefix = chord
+
+            return True
+
+        # Take no more Chords after closing ⌃U (except for a next ⌃U above)
+
+        if prefix:
+
+            opening = set(prefix) == set(b"\x15")
+            closed = prefix.endswith(b"\x15")
+
+            if opening or not closed:
+
+                if (chord == b"-") and opening:
+                    editor.skin.nudge.prefix = b"\x15" + prefix_plus.lstrip(b"\x15")
+
+                    return True
+
+                if (chord == b"0") and not prefix.endswith(b"-"):
+                    editor.skin.nudge.prefix = b"\x15" + prefix_plus.lstrip(b"\x15")
+
+                    return True
+
+                if chord in b"123456789":
+                    editor.skin.nudge.prefix = b"\x15" + prefix_plus.lstrip(b"\x15")
+
+                    return True
+
+        # Else declare Prefix complete
+
+        return False
+
+        # Em Py takes ⌃U - 0 and ⌃U 0 0 as complete, and echoes ⌃U 0's before 1..9
+        # Emacs quirkily disappears 0's after ⌃U if after -, after 0, or before 1..9
+
+    def eval_em_prefix(self, prefix):
+        """Take the Chords of a Signed Int Prefix before the Called Chords"""
+
+        evalled = None
+        if prefix is not None:  # then drop the ⌃U's and eval the Digits
+
+            prefix_digits = prefix.decode()
+            prefix_digits = "".join(_ for _ in prefix_digits if _ in "-0123456789")
+
+            if prefix_digits == "-":  # except take "-" alone as -1
+                prefix_digits = "-1"
+            elif prefix and not prefix_digits:  # and take ⌃U's alone as powers of 4
+                prefix_digits = str(4 ** len(prefix)).encode()
+
+            evalled = int(prefix_digits) if prefix_digits else None
+
+        return evalled  # may be negative, zero, or positive int
+
+        # Emacs quirkily takes ⌃U's alone as powers of 4, Em Py does too
+
     #
     # Define Control Chords
     #
@@ -3712,6 +3808,9 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self.format_status_func = vi.format_vi_status
         self.place_cursor_func = vi.place_vi_cursor
 
+        self.do_prefix_chord_func = em.do_em_prefix_chord
+        self.eval_prefix_func = em.eval_em_prefix
+
         self._init_by_em_chords_()
 
     def _init_by_em_chords_(self):
@@ -3803,19 +3902,78 @@ class TerminalNudgeIn(argparse.Namespace):
             assert (self.suffix is None) or isinstance(self.suffix, bytes)
             assert (self.epilog is None) or isinstance(self.epilog, bytes)
 
-    def join_bytes(self):
-        """Echo all the Chords of this one Input, in order"""
+    def to_chars(self):
+        """Echo keyboard input without asking people to memorise b'\a\b\t\n\v\f\r'"""
 
-        echo = b""
-
+        nudge_bytes = b""
         if self.prefix is not None:
-            echo += self.prefix
+            nudge_bytes += self.prefix
         if self.chords is not None:
-            echo += self.chords
+            nudge_bytes += self.chords
         if self.suffix is not None:
-            echo += self.suffix
+            nudge_bytes += self.suffix
         if self.epilog is not None:
-            echo += self.epilog
+            nudge_bytes += self.epilog
+
+        nudge_chars = nudge_bytes.decode(errors="surrogateescape")
+
+        prefix = self.prefix
+        prefix_bytes = b"" if (prefix is None) else prefix
+        prefix_chars = prefix_bytes.decode(errors="surrogateescape")
+
+        echo = self._to_echoed_chars(prefix_chars, nudge_chars=nudge_chars)
+
+        echo = echo.replace("Esc [ A", "Up")  # ↑ \u2191 Upwards Arrow
+        echo = echo.replace("Esc [ B", "Down")  # ↓ \u2193 Downwards Arrow
+        echo = echo.replace("Esc [ C", "Right")  # → \u2192 Rightwards Arrow
+        echo = echo.replace("Esc [ D", "Left")  # ← \u2190 Leftwards Arrows
+
+        echo = echo.strip()
+
+        return echo
+
+        # such as '⌃L' at FF, ⌃L, 12, '\f'
+        # such as echo the single Char '  £  ' in place of its Byte encoding '  Â £  '
+
+    def _to_echoed_chars(self, prefix_chars, nudge_chars):
+        """Form the Chars of Echo for the Called Chords + Suffix + Epilog"""
+
+        echo = ""
+
+        for (index, ch) in enumerate(nudge_chars):
+
+            if ch == chr(9):
+                # echo += " ⇥"  # ⇥ \u21E5 Rightward Arrows to Bar
+                echo += " Tab"
+            elif ch == chr(13):
+                # echo += " ⏎"  # ⏎ \u23CE Return Symbol
+                echo += " Return"
+            elif ch == chr(27):
+                # echo += " ⎋"  # ⎋ \u238B Broken Circle With Northwest Arrow
+                # echo += " Escape"
+                echo += " Esc"
+            elif ch == chr(127):
+                # echo += " ⌫"  # ⌫ \u232B Erase To The Left
+                echo += " Delete"
+
+            elif ch == " ":
+                # echo += " ␢"  # ␢ \u2422 Blank Symbol
+                # echo += " ␣"  # ␣ \u2423 Open Box
+                echo += " Space"
+
+            elif ch.encode() in C0_CONTROL_STDINS:  # iobyte_int in 0x00..0x1F,0x7F
+                alt = chr(ord(ch) ^ 0x40)
+                assert alt.encode() in BASIC_LATIN_STDINS, (ch, alt)
+                echo += " ⌃" + alt
+
+            elif index < len(prefix_chars):
+                if echo and (echo[-1] in "+-.0123456789") and (ch in "0123456789"):
+                    echo += ch
+                else:
+                    echo += " " + ch
+
+            else:  # default to echo each Char as one Space and one Glyph
+                echo += " " + ch
 
         return echo
 
@@ -4409,20 +4567,20 @@ class TerminalEditor:
 
         keyboard = self.skin.keyboard
         do_prefix_chord_func = keyboard.do_prefix_chord_func
+        eval_prefix_func = keyboard.eval_prefix_func
         corrections_by_chords = keyboard.corrections_by_chords
         intake_chords_set = keyboard.choose_intake_chords_set()
 
         assert self.skin.nudge.suffix is None, (chords, chord)  # one Chord only
 
-        # Take more decimal Digits, while nothing but decimal Digits given
+        # Callback to build a Prefix before the Chords to Call
 
         if do_prefix_chord_func(chord):
             self.editor_print()  # echo Prefix
 
             return None  # ask for more Prefix, or for other Chords
 
-        self.skin.arg1 = int(prefix) if prefix else None
-        assert self.get_arg1_int() >= 1
+        self.skin.arg1 = eval_prefix_func(prefix)
 
         # At KeyboardInterrupt, cancel these keyboard Input Chords and start over
 
@@ -4626,10 +4784,33 @@ class TerminalEditor:
         # Blame the Func when Repeat Count given but Not taken
 
         if self.skin.doing_less:
-            arg1 = self.get_arg1_int(default=None)
-            if arg1 is not None:
+            self.check_repeat_count()
 
-                raise NotImplementedError("Repeat Count {}".format(arg1))
+    def check_repeat_count(self):
+        """Raise the Arg 0 and its Arg 1 Repeat Count as a NotImplementedError"""
+
+        arg1_int = self.get_arg1_int(default=None)
+        nudge = TerminalNudgeIn(self.skin.nudge)
+        if arg1_int is not None:
+
+            nudge = TerminalNudgeIn(self.skin.nudge)
+
+            if wearing_em():
+
+                nudge.prefix = b"\x15" + str(arg1_int).encode()
+                if nudge.chords is not None:
+                    if nudge.chords[0] in b"0123456789":
+                        nudge.prefix += b"\x15"
+
+            exc_arg = "{} Repeat Count".format(nudge.to_chars())
+
+            raise NotImplementedError(exc_arg)
+
+        # Vi Py raises not-implemented Repeat Count Prefixes
+        # Vim quirkily loses not-implemented Repeat Count Prefixes
+
+        # Em Py raises not-implemented ⌃U - as ⌃U -1, and ⌃U ⌃U as ⌃U 16, and so on
+        # Emacs quirkily loses not-implemented ⌃U args at ⌃J, ⌃S, ⌃R, ⌃Z, etc
 
     def keep_cursor_on_file(self):
         """Fail faster, like when some Bug shoves the Cursor off of Buffer of File"""
@@ -4991,17 +5172,12 @@ class TerminalEditor:
     def do_raise_name_error(self):  # Vim Zz  # Vim zZ  # etc
         """Reply to meaningless Keyboard Input"""
 
-        nudge = self.skin.nudge
+        nudge = TerminalNudgeIn(self.skin.nudge)
+        nudge.prefix = None
 
-        nudge_bytes = nudge.join_bytes()  # often same as 'self.skin.arg0_chords'
+        exc_arg = nudge.to_chars()
 
-        nudge_escapes = ""
-        for nudge_byte_int in nudge_bytes:
-            nudge_escapes += r"\x{:02X}".format(nudge_byte_int)
-
-        arg = "b'{}'".format(nudge_escapes)
-
-        raise NameError(arg)
+        raise NameError(exc_arg)
 
     def do_redraw(self):  # Vim ⌃L
         """Toggle between more and less Lag"""
@@ -6478,57 +6654,6 @@ class TerminalDriver:
 
         if self.lag:
             time.sleep(self.lag)
-
-
-def repr_vi_nudge_bytes(iobytes):
-    """Echo keyboard input without asking people to memorise b'\a\b\t\n\v\f\r'"""
-
-    iochars = iobytes.decode(errors="surrogateescape")
-
-    rep = ""
-
-    for ch in iochars:
-
-        if ch == chr(9):
-            # rep += " ⇥"  # ⇥ \u21E5 Rightward Arrows to Bar
-            rep += " Tab"
-        elif ch == chr(13):
-            # rep += " ⏎"  # ⏎ \u23CE Return Symbol
-            rep += " Return"
-        elif ch == chr(27):
-            # rep += " ⎋"  # ⎋ \u238B Broken Circle With Northwest Arrow
-            # rep += " Escape"
-            rep += " Esc"
-        elif ch == chr(127):
-            # rep += " ⌫"  # ⌫ \u232B Erase To The Left
-            rep += " Delete"
-
-        elif ch == " ":
-            # rep += " ␢"  # ␢ \u2422 Blank Symbol
-            # rep += " ␣"  # ␣ \u2423 Open Box
-            rep += " Space"
-
-        elif ch.encode() in C0_CONTROL_STDINS:  # iobyte_int in 0x00..0x1F,0x7F
-            alt = chr(ord(ch) ^ 0x40)
-            assert alt.encode() in BASIC_LATIN_STDINS, (ch, alt)
-            rep += " ⌃" + alt
-
-        elif rep and (rep[-1] in "0123456789") and (ch in "0123456789"):
-            rep += ch  # no Space between Digits in Prefix or Chords or Suffix
-
-        else:  # default to echo each Char as one Space and one Glyph
-            rep += " " + ch
-
-    rep = rep.replace("Esc [ A", "Up")  # ↑ \u2191 Upwards Arrow
-    rep = rep.replace("Esc [ B", "Down")  # ↓ \u2193 Downwards Arrow
-    rep = rep.replace("Esc [ C", "Right")  # → \u2192 Rightwards Arrow
-    rep = rep.replace("Esc [ D", "Left")  # ← \u2190 Leftwards Arrows
-
-    rep = rep.strip()
-
-    return rep  # such as '⌃L' at FF, ⌃L, 12, '\f'
-
-    # such as echo the single Char '  £  ' in place of its Byte encoding '  Â £  '
 
 
 #
