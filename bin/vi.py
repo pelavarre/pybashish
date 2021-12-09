@@ -290,10 +290,11 @@ quirks:
   searches for Python Regular Expressions, not Emacs Regular Expressions
 
 keyboard cheat sheet:
-  ⌃X⌃C  ⌃Zfg  ⌃G Esc  => how to quit Em Py
+  ⌃X⌃C  ⌃Zfg  ⌃G  => how to quit Em Py
   Up Down  => conventional enough
   ⌃A ⌃E  => leap to column
   ⌃N ⌃P  => leap to line
+  ⌃U ⌃U -0123456789 ⌃U ⌃G  => repeat, or don't
 
 keyboard easter eggs:
   ⌃G  ⌃X⌃G⌃X⌃C  ⌃U-0 ⌃U009⌃Z
