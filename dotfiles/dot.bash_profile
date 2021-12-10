@@ -765,10 +765,13 @@ function --git-show-conflict () {  # -gs1, -gs2, -gs3
 
 
 function --pylint1 () {
-    ~/.venvs/pylint/bin/pylint \
-        --rcfile=/dev/null --reports=n --score=n --disable=locally-disabled \
-        -d W1514 -d R1734,R1735 -d C0103,C0201,C0209,C0302,C0325,C0411 \
-        "$@"
+    (
+        set -xe
+        ~/.venvs/pylint/bin/pylint \
+            --rcfile=/dev/null --reports=n --score=n --disable=locally-disabled \
+            -d W1514 -d R1734,R1735 -d C0103,C0201,C0209,C0302,C0325,C0411 \
+            "$@"
+    )
 }
 
     #
@@ -778,19 +781,14 @@ function --pylint1 () {
     #
 
     #
-    # (inconsistent-return-statements)
-    # R1710: Either all return statements in a function
-    # should return an expression, or none of them should.
-    # yes, except when we should all read falling off the end as meaning Return None
-    #
     # R1734: Consider using [] instead of list() (use-list-literal)
     # R1735: Consider using {} instead of dict() (use-dict-literal)
     # nope, my old eyes appreciate the louder more explicit 'list()' mark
     #
 
     #
-    # C0103: Variable name "..." doesn... conform to snake_case naming style
     # (invalid-name)
+    # C0103: Variable name "..." doesn... conform to snake_case naming style
     # nope, my one and two letter variable names do have a place, albeit only rarely
     #
     # (consider-iterating-dictionary)
@@ -813,10 +811,6 @@ function --pylint1 () {
     # C0411: standard import "import ..." should be placed before "import __main__"
     # nope, i give the win to Flake8
     #
-    #  (import-outside-toplevel)
-    # C0415: Import outside toplevel (...
-    # ok, i'll disable it explicitly in source when paid to work with it
-    #
 
 function --pylint2 () {
     --pylint1 \
@@ -825,7 +819,7 @@ function --pylint2 () {
 }
 
     # (fixme)
-    # W0511: FIXME
+    # W0511: FIXME, TODO
 
     # (too-many-arguments)
     # R0913: Too many arguments
