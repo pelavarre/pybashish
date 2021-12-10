@@ -37,8 +37,8 @@ keyboard cheat sheet:
   x X dd D J s S C  => cut chars or lines, join lines, cut & insert
 
 keyboard easter eggs:
-  9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz
-  ⌃C Esc zZZQ 3ZQ 512ZQ A⌃V⌃OZQ A⌃OzQ⌃CZQ f⌃C w*⌃C w*123456n⌃C /⌃G⌃CZQ w*g/⌃M⌃C g/⌃Z
+  9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz  3ZQ 512ZQ
+  ⌃C Esc 123Esc zZZQ A⌃V⌃OZQ A⌃OzQ⌃CZQ f⌃C w*⌃C w*123456n⌃C /⌃G⌃CZQ w*g/⌃M⌃C g/⌃Z
   Qvi⌃My REsc R⌃Zfg OO⌃O_⌃O^ \Fw*/Up \F/$Return ⌃G2⌃G :vi⌃M :n
 
 pipe tests of ZQ vs ZZ:
@@ -297,7 +297,7 @@ keyboard cheat sheet:
   ⌃U ⌃U -0123456789 ⌃U ⌃G  => repeat, or don't
 
 keyboard easter eggs:
-  ⌃G  ⌃X⌃G⌃X⌃C  ⌃U-0 ⌃U009⌃Z
+  ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
 
 pipe tests:
   ls |bin/em.py -
@@ -460,6 +460,7 @@ def parse_vi_argv(argv):
     args = parser.parse_args(argv_tail)
     if args.help:
         sys.stdout.write(parser_format_help(parser))
+
         sys.exit(0)  # return an explicit 0, same as Parser Add Help Parse Args would
 
     return args
@@ -1018,7 +1019,7 @@ class TerminalVi:
         skin = editor.skin
         keyboard = skin.keyboard
 
-        if count is not None:  # 123 ⌃C Egg, 123 Esc Egg, etc
+        if count is not None:  # 123⌃C Egg, 123Esc Egg, etc
 
             self.vi_print("{} Repeat Count".format(verbed))
 
@@ -3126,6 +3127,7 @@ class TerminalKeyboard:
 
         self.do_prefix_chord_func = lambda chord: False
         self.eval_prefix_func = lambda prefix: None
+        self.uneval_prefix_func = lambda prefix: prefix
 
         self.corrections_by_chords = dict()
         self.func_by_chords = dict()
@@ -3618,7 +3620,8 @@ class TerminalEm:
         finally:
             self.vi_traceback = vi.vi_traceback  # ⌃X⌃G⌃X⌃C Egg
 
-    def do_em_prefix_chord(self, chord):  # Emacs ⌃U Universal-Argument
+    # Emacs ⌃U Universal-Argument
+    def do_em_prefix_chord(self, chord):  # TODO  # noqa C901 too complex
         """Take ⌃U { ⌃U } [ "-" ] { "0123456789" } [ ⌃U ] as a Prefix to more Chords"""
 
         editor = self.vi.editor
@@ -3630,6 +3633,7 @@ class TerminalEm:
         intake_chords_set = keyboard.choose_intake_chords_set()
 
         prefix_plus = chord if (prefix is None) else (prefix + chord)
+        prefix_opened = b"\x15" + prefix_plus.lstrip(b"\x15")
 
         # Don't take more Prefix Chords after the first of the Chords to Call
 
@@ -3659,22 +3663,22 @@ class TerminalEm:
         if prefix:
 
             opening = set(prefix) == set(b"\x15")
-            closed = prefix.endswith(b"\x15")
+            closed = prefix.endswith(b"\x15") or (prefix.lstrip(b"\x15") == b"0")
 
             if opening or not closed:
 
                 if (chord == b"-") and opening:
-                    editor.skin.nudge.prefix = b"\x15" + prefix_plus.lstrip(b"\x15")
+                    editor.skin.nudge.prefix = prefix_opened
 
                     return True
 
                 if (chord == b"0") and not prefix.endswith(b"-"):
-                    editor.skin.nudge.prefix = b"\x15" + prefix_plus.lstrip(b"\x15")
+                    editor.skin.nudge.prefix = prefix_opened
 
                     return True
 
                 if chord in b"123456789":
-                    editor.skin.nudge.prefix = b"\x15" + prefix_plus.lstrip(b"\x15")
+                    editor.skin.nudge.prefix = prefix_opened
 
                     return True
 
@@ -3682,7 +3686,7 @@ class TerminalEm:
 
         return False
 
-        # Em Py takes ⌃U - 0 and ⌃U 0 0 as complete, and echoes ⌃U 0's before 1..9
+        # Em Py takes ⌃U - 0 and ⌃U 0 0..9 as complete
         # Emacs quirkily disappears 0's after ⌃U if after -, after 0, or before 1..9
 
     def eval_em_prefix(self, prefix):
@@ -3705,6 +3709,40 @@ class TerminalEm:
 
         # Emacs quirkily takes ⌃U's alone as powers of 4, Em Py does too
 
+    def uneval_em_prefix(self, prefix):
+        """Rewrite history to make the Prefix Chords more explicit"""
+
+        _ = prefix
+
+        nudge = self.vi.editor.skin.nudge
+
+        lead_chord = nudge.chords[0] if nudge.chords else b"\x07"  # TODO: ugly b"\x07"
+
+        # Echo no Prefix as no Prefix
+
+        arg1 = self.vi.editor.skin.arg1
+        if arg1 is None:
+
+            return None
+
+        # Echo Decimal Digits before Other Chords, with or without a leading Minus Sign
+
+        prefix = b"\x15" + str(arg1).encode()
+        if arg1 == -1:
+            prefix = b"\x15" + b"-"
+
+        if (lead_chord not in b"123456789") or (arg1 == 0):
+
+            return prefix
+
+        # Close the Prefix with ⌃U to separate from a Decimal Digit Chord
+
+        prefix += b"\x15"
+
+        return prefix
+
+        # Em Py echoes the Evalled Prefix, Emacs quirkily does Not
+
     #
     # Define Control Chords
     #
@@ -3723,19 +3761,27 @@ class TerminalEm:
 
         # Cancel stuff, and eventually prompt to quit Em Py
 
-        verb = sys_argv_pick_verb()
-        title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
+        count = self.vi.editor.get_arg1_int(default=None)
+        if count is not None:  # ⌃U 123 ⌃G Egg
 
-        version = module_file_version_zero()
+            self.vi.editor.editor_print("Quit Repeat Count")
 
-        held_vi_file = vi.held_vi_file
-        nickname = held_vi_file.pick_nickname() if held_vi_file else None
+        else:
 
-        vi.vi_print(
-            "{!r}  Press ⌃X⌃C to save changes and quit {}  {}".format(
-                nickname, title_py, version
+            verb = sys_argv_pick_verb()
+            title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
+
+            version = module_file_version_zero()
+
+            held_vi_file = vi.held_vi_file
+            nickname = held_vi_file.pick_nickname() if held_vi_file else None
+
+            vi.vi_print(
+                "{!r}  Press ⌃X⌃C to save changes and quit {}  {}".format(
+                    nickname, title_py, version
+                )
             )
-        )  # such as '/dev/stdout'  Press ⌃X⌃C to save changes and quit Emacs Py  0.1.23
+            # such as '/dev/stdout'  Press ⌃X⌃C to save changes and quit Emacs Py  0.1.2
 
         # Emacs ⌃G quirk rapidly rings a Bell for each extra ⌃G, Em Py doesn't
 
@@ -3811,6 +3857,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         self.do_prefix_chord_func = em.do_em_prefix_chord
         self.eval_prefix_func = em.eval_em_prefix
+        self.uneval_prefix_func = em.uneval_em_prefix
 
         self._init_by_em_chords_()
 
@@ -4048,6 +4095,7 @@ class TerminalFile(argparse.Namespace):
                 self.iobytes = reading.read()
             except KeyboardInterrupt:  # Egg at:  bin/vi.py -
                 stderr_print()
+
                 sys.exit(1)
 
         self.iochars = self.iobytes.decode(errors="surrogateescape")
@@ -4567,8 +4615,11 @@ class TerminalEditor:
         prefix = self.skin.nudge.prefix
 
         keyboard = self.skin.keyboard
+
         do_prefix_chord_func = keyboard.do_prefix_chord_func
         eval_prefix_func = keyboard.eval_prefix_func
+        uneval_prefix_func = keyboard.uneval_prefix_func
+
         corrections_by_chords = keyboard.corrections_by_chords
         intake_chords_set = keyboard.choose_intake_chords_set()
 
@@ -4583,6 +4634,11 @@ class TerminalEditor:
 
         self.skin.arg1 = eval_prefix_func(prefix)
 
+        # Echo the Evalled Prefix + Chords + Suffix
+
+        self.skin.nudge.prefix = uneval_prefix_func(self.skin.nudge.prefix)
+        self.editor_print()
+
         # At KeyboardInterrupt, cancel these keyboard Input Chords and start over
 
         chords_plus = chord if (chords is None) else (chords + chord)
@@ -4590,7 +4646,8 @@ class TerminalEditor:
         if not wearing_em():
             if prefix or chords:
                 if chord == b"\x03":  # ETX, ⌃C, 3
-                    self.skin.nudge.chords = chords_plus
+                    self.skin.nudge.epilog = chords_plus
+                    self.editor_print()  # echo Prefix + Chords
 
                     return self.do_little
 
@@ -4671,7 +4728,7 @@ class TerminalEditor:
 
         return chords_func
 
-    def call_chords_func(self, chords_func):  # TODO  # noqa C901
+    def call_chords_func(self, chords_func):  # TODO  # noqa C901 too complex
         """Call the Func once or more, in reply to one Terminal Nudge In"""
 
         skin = self.skin
@@ -4790,19 +4847,10 @@ class TerminalEditor:
     def check_repeat_count(self):
         """Raise the Arg 0 and its Arg 1 Repeat Count as a NotImplementedError"""
 
+        nudge = self.skin.nudge
+
         arg1_int = self.get_arg1_int(default=None)
-        nudge = TerminalNudgeIn(self.skin.nudge)
         if arg1_int is not None:
-
-            nudge = TerminalNudgeIn(self.skin.nudge)
-
-            if wearing_em():
-
-                nudge.prefix = b"\x15" + str(arg1_int).encode()
-                if nudge.chords is not None:
-                    if nudge.chords[0] in b"0123456789":
-                        nudge.prefix += b"\x15"
-
             exc_arg = "{} Repeat Count".format(nudge.to_chars())
 
             raise NotImplementedError(exc_arg)
@@ -6839,6 +6887,7 @@ def argparse_exit_unless_doc_eq(parser, doc=None):
     )
 
     if got_diffs:
+
         sys.exit(1)  # trust caller to log SystemExit exceptions well
 
 
@@ -7161,6 +7210,7 @@ def sys_argv_pick_verb():
 # TODO: teach :w! :wn! :wq! to temporarily override PermissionError's from 'chmod -w'
 
 # TODO: insert \u00C7 ç and \u00F1 ñ etc - all the Unicode outside of C0 Controls
+# TODO: #åçéîñøü←↑→↓⇧⋮⌃⌘⌥⎋💔💥😊😠😢
 
 # TODO: Vim \ n somehow doesn't disrupt the 'keep_up_vi_column_seek' of $
 
