@@ -40,8 +40,8 @@ examples:
   echo -n $'\xC0\x80' |expand |hexdump  # Linux happy, Mac 'illegal byte sequence'
   echo -n $'\xC0\x80' |expand.py |hexdump.py  # uFFFD = Unicode Replacement Char
   echo -n $'t\tr\rn\n' |expand.py |cat.py -etv  # same as classic
-  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' |expand.py  # no change
-  echo 'åéîøü←↑→↓⇧⋮⌃⌘⌥💔💥😊😠😢' |expand.py --repr  # "\u22EE" for "⋮" etc
+  echo '#£åçéîñøü←↑→↓⇧⋮⌃⌘⌥⎋💔💥😊😠😢' |expand.py  # no change
+  echo '#£åçéîñøü←↑→↓⇧⋮⌃⌘⌥⎋💔💥😊😠😢' |expand.py --repr  # "\u22EE" for "⋮" etc
   echo -n $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' |expand.py |cat.py -tv  # 'smart' chars
   echo 'import sys$if sys.stdout.isatty():$    print("isatty")$' |tr '$' '\n' |expand.py --wiki
 """
