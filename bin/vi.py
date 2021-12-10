@@ -890,6 +890,7 @@ class TerminalVi:
 
     def eval_vi_prefix(self, prefix):
         """Take the Chords before the Called Chords as a positive Int Prefix"""
+        # pylint: disable=no-self-use
 
         evalled = int(prefix) if prefix else None
         assert (evalled is None) or (evalled >= 1)
@@ -3691,6 +3692,7 @@ class TerminalEm:
 
     def eval_em_prefix(self, prefix):
         """Take the Chords of a Signed Int Prefix before the Called Chords"""
+        # pylint: disable=no-self-use
 
         evalled = None
         if prefix is not None:  # then drop the ⌃U's and eval the Digits
@@ -3802,6 +3804,7 @@ class TerminalEm:
     #
 
     def do_em_move_beginning_of_line(self):  # Emacs ⌃A
+        """FIXME"""
 
         editor = self.vi.editor
         editor.column = 0
@@ -3809,6 +3812,7 @@ class TerminalEm:
         # FIXME: implement ⌃U Arg1
 
     def do_em_move_end_of_line(self):  # Emacs ⌃E
+        """FIXME"""
 
         editor = self.vi.editor
         editor.column = editor.spot_max_column()
@@ -3816,6 +3820,7 @@ class TerminalEm:
         # FIXME: implement ⌃U Arg1
 
     def do_em_next_line(self):  # Emacs ⌃N, Down
+        """FIXME"""
 
         editor = self.vi.editor
         editor.row += 1
@@ -3823,6 +3828,7 @@ class TerminalEm:
         # FIXME: implement ⌃U Arg1 and Bounds Checks
 
     def do_em_previous_line(self):  # Emacs ⌃P, Up
+        """FIXME"""
 
         editor = self.vi.editor
         editor.row -= 1
@@ -3985,6 +3991,7 @@ class TerminalNudgeIn(argparse.Namespace):
 
     def _to_echoed_chars(self, prefix_chars, nudge_chars):
         """Form the Chars of Echo for the Called Chords + Suffix + Epilog"""
+        # pylint: disable=no-self-use
 
         echo = ""
 
@@ -4101,6 +4108,9 @@ class TerminalFile(argparse.Namespace):
         self.iochars = self.iobytes.decode(errors="surrogateescape")
 
         self.ended_lines = self.iochars.splitlines(keepends=True)
+        if not lines_last_has_no_end(self.ended_lines):
+            if wearing_em():
+                self.ended_lines.append("")
 
         self.write_path = "/dev/stdout" if (path == "/dev/stdin") else read_path
 
@@ -4450,18 +4460,19 @@ class TerminalEditor:
 
                 self.editor_print("Interrupted")
                 self.reply_with_bell()
-                # self.skin.chord_ints_ahead = list()
+                # self.skin.chord_ints_ahead = list()  # TODO: cancel Input at Exc
 
                 self.skin.traceback = traceback.format_exc()
 
             except Exception as exc:  # pylint: disable=broad-except
                 self.skin.reply = TerminalReplyOut()
 
+                # TODO: file_print(traceback.format_exc())
+
                 line = self.format_exc(exc)  # Egg of NotImplementedError, etc
-                # file_print(line)
                 self.editor_print(line)  # "{exc_type}: {str_exc}"
                 self.reply_with_bell()
-                # self.skin.chord_ints_ahead = list()
+                # self.skin.chord_ints_ahead = list()  # TODO: cancel Input at Exc
 
                 self.skin.traceback = traceback.format_exc()
                 if not self.painter.rows:
@@ -5064,7 +5075,7 @@ class TerminalEditor:
             raise IndexError(row)
 
         ended_line = ended_lines[row_]
-        line = ended_line.splitlines()[0]
+        line = str_remove_line_end(ended_line)
 
         columns = len(line)
 
@@ -5083,7 +5094,7 @@ class TerminalEditor:
         column_ = self.column if (column is None) else column
 
         ended_line = self.ended_lines[self.row]
-        line = ended_line.splitlines()[0]
+        line = str_remove_line_end(ended_line)
 
         ch = line[column_] if (column_ < len(line)) else default
 
@@ -5095,7 +5106,7 @@ class TerminalEditor:
         row_ = self.row if (row is None) else row
 
         ended_line = self.ended_lines[row_] if self.ended_lines else _EOL_
-        line = ended_line.splitlines()[0]
+        line = str_remove_line_end(ended_line)
 
         return line
 
@@ -5105,7 +5116,7 @@ class TerminalEditor:
         row_ = self.row if (row is None) else row
 
         ended_line = self.ended_lines[row_] if self.ended_lines else _EOL_
-        line = ended_line.splitlines()[0]
+        line = str_remove_line_end(ended_line)
         line_end = ended_line[len(line) :]
 
         return line_end
@@ -5188,7 +5199,7 @@ class TerminalEditor:
             raise IndexError(row)
 
         ended_line = ended_lines[row_]
-        line = ended_line.splitlines()[0]
+        line = str_remove_line_end(ended_line)
 
         columns = len(line)
         last_column = (columns - 1) if columns else 0
@@ -5571,7 +5582,7 @@ class TerminalEditor:
     def insert_some_chars(self, chars):
         """Insert some Chars inside a Line"""
 
-        assert chars.splitlines()[0] == chars
+        assert str_remove_line_end(chars) == chars
 
         ended_lines = self.ended_lines
         column = self.column
@@ -5606,7 +5617,7 @@ class TerminalEditor:
         row = self.row
 
         (head, _, ended_tail) = self.split_row_line_for_chars(chars=None)
-        tail = ended_tail.splitlines()[0]
+        tail = str_remove_line_end(ended_tail)
         line_end = ended_tail[len(tail) :]  # may be empty
 
         chars_dropped = tail[:count]
@@ -5671,11 +5682,11 @@ class TerminalEditor:
             # Copy the next Line into this Line, as if dented by a single Space
 
             ended_line = ended_lines[row]
-            line = ended_line.splitlines()[0]
+            line = str_remove_line_end(ended_line)
             sep = " " if (line and (line.rstrip() == line)) else ""
 
             ended_line_below = ended_lines[row_below]
-            line_below = ended_line_below.splitlines()[0]
+            line_below = str_remove_line_end(ended_line_below)
             line_end_below = ended_line_below[len(line_below) :]
 
             # Delete the copied Line
@@ -5696,7 +5707,7 @@ class TerminalEditor:
         self.intake_pins.append(pin_plus)
 
         ended_line = ended_lines[row] if ended_lines else _EOL_
-        columns = len(ended_line.splitlines()[0])
+        columns = len(str_remove_line_end(ended_line))
         line_end = ended_line[columns:]
 
         rows = len(ended_lines)
@@ -5854,30 +5865,12 @@ class TerminalPainter:
         (row, column) = self.spot_nearby_cursor(cursor.row, column=cursor.column)
 
         columns = self.columns
-        scrolling_rows = self.scrolling_rows
         terminal = self.terminal
 
         # Fill the Screen with Lines of "~" past the last Line of File
 
-        lines = list(_.splitlines()[0] for _ in ended_lines)
-
-        while len(lines) < scrolling_rows:
-            if wearing_em():
-                lines.append("")
-            else:
-                lines.append("~")
-
-                # Vi Py shows an empty File as occupying no space
-                # Vim quirk presents empty File same as a File of 1 Blank Line
-
-        assert len(lines) == scrolling_rows, (len(lines), scrolling_rows)
-
-        # Number the Scrolling Lines of the Screen
-
-        for (index, line) in enumerate(lines):
-            str_line_number = self.format_as_line_number(index)
-            numbered_and_chopped = (str_line_number + line)[:columns]
-            lines[index] = numbered_and_chopped
+        viewing = cursor_style == _VIEW_CURSOR_STYLE_
+        lines = self._format_screen_lines(ended_lines, viewing)
 
         # Write the formatted chars
 
@@ -5916,6 +5909,62 @@ class TerminalPainter:
 
         if bell:
             terminal.write("\a")
+
+        # Vi Py ends with . ~ ~ ~ ... when the File ends without a Line-End
+        # Vim quirkily shows the last Lines the same, no matter ended by Line-End
+
+        # TODO: invent ways for Vi Py and Em Py to edit the Line-End's
+
+    def _format_screen_lines(self, ended_lines, viewing):
+        """Choose a Screen of Lines to show many Columns of these Ended Lines"""
+
+        columns = self.columns
+        scrolling_rows = self.scrolling_rows
+
+        # Drop the Line End's
+
+        texts = list(str_remove_line_end(_) for _ in ended_lines)
+
+        # Pick out the Vi Py case of inserting or replacing into an Empty File
+        # and lead with an empty Filler Line in that case
+
+        if not texts:
+            if not viewing:
+                if not wearing_em():
+                    texts.append("")
+
+        # Pick out the Vi Py case of a File whose Last Line has no Line End,
+        # and lead with a Filler Line of a single "." Dot in that case
+
+        if len(texts) < scrolling_rows:
+            if lines_last_has_no_end(ended_lines):
+                if not wearing_em():
+                    texts.append(".")
+
+        # Complete the screen, with "~" for Vi Py or with "" for Em Py
+
+        while len(texts) < scrolling_rows:
+            if wearing_em():
+                texts.append("")
+            else:
+                texts.append("~")
+
+                # Vi Py shows an empty File as occupying no space
+                # Vim quirk presents empty File same as a File of 1 Blank Line
+
+        # Assert Screen completed
+
+        assert len(texts) == scrolling_rows, (len(texts), scrolling_rows)
+
+        # Number the Scrolling Lines of the Screen
+
+        rows = list()
+        for (index, text) in enumerate(texts):
+            str_line_number = self.format_as_line_number(index)
+            row = (str_line_number + text)[:columns]
+            rows.append(row)
+
+        return rows
 
     def spot_nearby_cursor(self, row, column):
         """Choose a Row:Column to stand for a Row:Column on or off Screen"""
@@ -7013,6 +7062,23 @@ def file_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 
 # deffed in many files  # missing from docs.python.org
+def lines_last_has_no_end(lines):
+    """True iff the last Line exists without Line End"""
+
+    if lines:
+
+        last_ended_line = lines[-1]
+        last_line = str_remove_line_end(last_ended_line)
+
+        last_line_end = last_ended_line[len(last_line) :]
+        if not last_line_end:
+
+            return True
+
+    return False
+
+
+# deffed in many files  # missing from docs.python.org
 def os_path_homepath(path):
     """Return the ~/... RelPath of a File or Dir of the Home, else the AbsPath"""
 
@@ -7096,6 +7162,15 @@ def str_join_first_paragraph(doc):
     alt = chars + doc[index:]
 
     return alt
+
+
+# deffed in many files  # missing from docs.python.org
+def str_remove_line_end(chars):
+    """Remove one Line End from the end of the Chars if they end with a Line End"""
+
+    line = (chars + "\n").splitlines()[0]
+
+    return line
 
 
 # deffed in many files  # missing from docs.python.org
