@@ -3022,6 +3022,9 @@ class TerminalVi:
         editor = self.editor
 
         column = editor.column
+        row = editor.row
+
+        last_row = editor.spot_last_row()
         line = editor.fetch_row_line()
 
         # If N > 1 and at or left of Dent, then delete N Lines and Slip to Dent
@@ -3029,6 +3032,8 @@ class TerminalVi:
         len_dent = len(line) - len(line.lstrip())
         if count > 1:
             if column <= len_dent:
+
+                self.check_vi_index(row < last_row)
                 self.chop_down(count)
 
                 return
@@ -3052,11 +3057,9 @@ class TerminalVi:
 
         editor = self.editor
 
-        last_row = editor.spot_last_row()
         row = editor.row
         rows = editor.count_rows_in_file()
 
-        self.check_vi_index(row < last_row)
         down = min(rows - row, count)
 
         touches = editor.delete_some_lines(count=down)
@@ -5639,13 +5642,16 @@ class TerminalEditor:
         row = self.row
         rows = self.count_rows_in_file()
 
+        assert row < rows, (row, rows)
+
         # Fall back to delete 0 Rows
 
         touches = 0
 
-        # Delete between 1 and N Lines
-
         if row < rows:
+
+            # Delete between 1 and N Lines
+
             row_below = min(rows, row + count)
             ended_lines[row:] = ended_lines[row_below:]
 
@@ -5707,15 +5713,9 @@ class TerminalEditor:
         self.intake_pins.append(pin_plus)
 
         ended_line = ended_lines[row] if ended_lines else _EOL_
-        columns = len(str_remove_line_end(ended_line))
-        line_end = ended_line[columns:]
-
-        rows = len(ended_lines)
-        if row < rows:
-            assert line_end, row
 
         (head, ended_tail) = (ended_line[:column], ended_line[column:])
-        ended_head = head + line_end
+        ended_head = head + "\n"
 
         return (head, ended_head, ended_tail)
 
