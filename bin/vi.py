@@ -290,7 +290,7 @@ quirks:
   searches for Python Regular Expressions, not Emacs Regular Expressions
 
 keyboard cheat sheet:
-  ⌃X⌃C  ⌃Zfg  ⌃G  => how to quit Em Py
+  ⌃X⌃C  ⌃Zfg  ⌃X⌃S  ⌃G  => how to quit Em Py
   Up Down  => conventional enough
   ⌃A ⌃E  => leap to column
   ⌃N ⌃P  => leap to line
@@ -669,6 +669,7 @@ class TerminalVi:
 
         self.vi_traceback = None  # capture Python Tracebacks
 
+        self.em = None
         self.script = script  # Ex commands to run after Args
         self.evals = evals  # Ex commands to run after Script
 
@@ -754,7 +755,8 @@ class TerminalVi:
         if read_path == "/dev/stdin":
             held_vi_file.touches = len(held_vi_file.iobytes)
 
-        self.take_views()  # turn off inserting/ replacing of ⌃O:n\r etc
+        if not wearing_em():
+            self.take_vi_views()  # turn off inserting/ replacing of ⌃O:n\r etc
 
         editor.load_editor_file(held_vi_file)
 
@@ -766,6 +768,8 @@ class TerminalVi:
 
     def run_vi_terminal(self, em=None):
         """Enter Terminal Driver, then run Vi Keyboard, then exit Terminal Driver"""
+
+        self.em = em
 
         script = self.script  # Vim quirk falls back to lines of '~/.vimrc'
         evals = self.evals
@@ -780,10 +784,11 @@ class TerminalVi:
         editor = TerminalEditor(chords=first_chords)
         self.editor = editor
 
-        if em:
-            keyboard = TerminalKeyboardEm(em=em, vi=self)
-        else:
+        if not em:
             keyboard = TerminalKeyboardVi(vi=self)
+        else:
+            keyboard = TerminalKeyboardEm(em=em, vi=self)
+            em.take_em_inserts()
 
         # Feed Keyboard into Screen, like till SystemExit
 
@@ -1030,7 +1035,7 @@ class TerminalVi:
 
         elif editor.intake_beyond == "inserting":  # AIO aio then Esc ⌃C
 
-            self.take_views()
+            self.take_vi_views()
             count = editor.format_touch_count()
             self.vi_print("{} after {} inserted".format(verbed, count))
 
@@ -1040,7 +1045,7 @@ class TerminalVi:
 
             skin.doing_traceback = skin.traceback  # ⌃C of R⌃OzQ⌃CZQ Egg
 
-            self.take_views()
+            self.take_vi_views()
             count = editor.format_touch_count()
             self.vi_print("{} after {} replaced".format(verbed, count))
 
@@ -2680,7 +2685,7 @@ class TerminalVi:
         else:
             editor.column = columns
 
-        self.take_inserts()
+        self.take_vi_inserts()
 
     def do_slip_dent_take_inserts(self):  # Vim I
         """Take Input Chords after the Dent of the Line"""
@@ -2691,7 +2696,7 @@ class TerminalVi:
 
         self.slip_dent()
 
-        self.take_inserts()
+        self.take_vi_inserts()
 
     def do_slip_first_split_take_inserts(self):  # Vim O
         """Insert an empty Line before this Line, and take Input Chords into it"""
@@ -2709,7 +2714,7 @@ class TerminalVi:
 
         # Take Input Chords into the new empty Line
 
-        self.take_inserts()
+        self.take_vi_inserts()
 
     def do_slip_take_inserts(self):  # Vim a
         """Take Input Chords after the Char Beneath the Cursor"""
@@ -2727,7 +2732,7 @@ class TerminalVi:
             if column <= columns:
                 editor.column = column + 1
 
-        self.take_inserts()
+        self.take_vi_inserts()
 
     def do_slip_last_split_take_inserts(self):  # Vim o
         """Insert an empty Line after this Line, and take Input Chords into it"""
@@ -2750,7 +2755,7 @@ class TerminalVi:
 
         # Take Input Chords into the new empty Line
 
-        self.take_inserts()
+        self.take_vi_inserts()
 
     def do_take_inserts(self):  # Vim i
         """Take many keyboard Input Chords as meaning insert Chars, till Esc"""
@@ -2759,13 +2764,13 @@ class TerminalVi:
 
         # Insert before the Char beneath the Cursor
 
-        self.take_inserts()
+        self.take_vi_inserts()
 
     #
     # Switch Keyboards
     #
 
-    def take_inserts(self):
+    def take_vi_inserts(self):
         """Take keyboard Input Chords to mean insert Chars, till Esc"""
 
         editor = self.editor
@@ -2773,8 +2778,8 @@ class TerminalVi:
         keyboard = skin.keyboard
 
         self.vi_print("Press Esc to quit, else type chars to insert")
-
         skin.cursor_style = _INSERT_CURSOR_STYLE_
+
         keyboard.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
         keyboard.intake_func = self.do_insert_per_chord
         editor.intake_beyond = "inserting"
@@ -2789,13 +2794,13 @@ class TerminalVi:
         self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
         self.vi_print("Press Esc to quit, else type chars to spill over")
-
         skin.cursor_style = _REPLACE_CURSOR_STYLE_
+
         keyboard.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
         keyboard.intake_func = self.do_replace_per_chord
         editor.intake_beyond = "replacing"
 
-    def take_views(self):
+    def take_vi_views(self):
         """Stop taking keyboard Input Chords to mean replace/ insert Chars"""
 
         editor = self.editor
@@ -2805,8 +2810,8 @@ class TerminalVi:
         if editor.intake_beyond:
 
             editor.intake_beyond = ""
-
             skin.cursor_style = _VIEW_CURSOR_STYLE_
+
             keyboard.intake_chords_set = set()
             keyboard.intake_func = None
 
@@ -2956,7 +2961,7 @@ class TerminalVi:
 
         self.cut_some_vi_chars(count)
 
-        self.take_inserts()
+        self.take_vi_inserts()
 
     def do_cut_ahead(self):  # Vim x
         """Cut as many as the count of Chars ahead, but land the Cursor in the Line"""
@@ -3011,7 +3016,7 @@ class TerminalVi:
 
         self.chop_some_vi_lines(count)
 
-        self.take_inserts()
+        self.take_vi_inserts()
 
     def do_chop(self):  # Vim D  # TODO: ugly to doc
         """Cut N - 1 Lines below & Chars to right in Line, and land Cursor in Line"""
@@ -3077,7 +3082,7 @@ class TerminalVi:
         editor.column = 0
         self.chop_some_vi_lines(count)
 
-        self.take_inserts()
+        self.take_vi_inserts()
 
     def chop_some_vi_lines(self, count):
         """Cut N - 1 Lines below & Chars to right in Line"""
@@ -3624,9 +3629,15 @@ class TerminalEm:
         finally:
             self.vi_traceback = vi.vi_traceback  # ⌃X⌃G⌃X⌃C Egg
 
-    # Emacs ⌃U Universal-Argument
+    def take_em_inserts(self):
+        """Take keyboard Input Chords to mean insert Chars"""
+
+        editor = self.vi.editor
+        editor.intake_beyond = "inserting"
+
     def do_em_prefix_chord(self, chord):  # TODO  # noqa C901 too complex
         """Take ⌃U { ⌃U } [ "-" ] { "0123456789" } [ ⌃U ] as a Prefix to more Chords"""
+        # Emacs ⌃U Universal-Argument
 
         editor = self.vi.editor
 
@@ -3790,6 +3801,12 @@ class TerminalEm:
 
         # Emacs ⌃G quirk rapidly rings a Bell for each extra ⌃G, Em Py doesn't
 
+    def do_em_save_buffer(self):  # Emacs ⌃X⌃S
+        """Write the File"""
+
+        vi = self.vi
+        vi.flush_vi()
+
     def do_em_save_buffers_kill_terminal(self):  # Emacs ⌃X⌃C
         """Write the File and quit Em"""
 
@@ -3805,6 +3822,8 @@ class TerminalEm:
     #
     # Slip the Cursor to a Column, or step it to a Row
     #
+    # FIXME: code up ⌃U Arg1 and Bounds Checks
+    #
 
     def do_em_move_beginning_of_line(self):  # Emacs ⌃A
         """FIXME"""
@@ -3812,15 +3831,11 @@ class TerminalEm:
         editor = self.vi.editor
         editor.column = 0
 
-        # FIXME: implement ⌃U Arg1
-
     def do_em_move_end_of_line(self):  # Emacs ⌃E
         """FIXME"""
 
         editor = self.vi.editor
         editor.column = editor.spot_max_column()
-
-        # FIXME: implement ⌃U Arg1
 
     def do_em_next_line(self):  # Emacs ⌃N, Down
         """FIXME"""
@@ -3828,15 +3843,11 @@ class TerminalEm:
         editor = self.vi.editor
         editor.row += 1
 
-        # FIXME: implement ⌃U Arg1 and Bounds Checks
-
     def do_em_previous_line(self):  # Emacs ⌃P, Up
         """FIXME"""
 
         editor = self.vi.editor
         editor.row -= 1
-
-        # FIXME: implement ⌃U Arg1 and Bounds Checks
 
     #
     # Insert Chords as Chars
@@ -3906,6 +3917,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # func_by_chords[b"\x18"] = em.do_em_c0_control_can  # CAN, ⌃X , 24
 
         self._init_func(b"\x18\x03", func=em.do_em_save_buffers_kill_terminal)  # ⌃X⌃C
+        self._init_func(b"\x18\x13", func=em.do_em_save_buffer)  # ⌃X⌃S
 
         # func_by_chords[b"\x19"] = em.do_em_c0_control_em  # EM, ⌃Y, 25
         func_by_chords[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
