@@ -23,7 +23,7 @@ quirks:
 
 keyboard cheat sheet:
   ZQ ZZ  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wn!⌃M :wq!⌃M :n⌃M :q⌃M  ⌃C Esc  => how to quit Vi Py
-  Up Down Right Left Space Delete Return  => conventional enough
+  Down Up Right Left Space Delete Return  => conventional enough
   0 ^ $ fx tx Fx Tx ; , | h l  => leap to column
   b e w B E W { }  => leap across small word, large word, paragraph
   G 1G H L M - + _ ⌃J ⌃N ⌃P j k  => leap to screen row, leap to line
@@ -291,9 +291,9 @@ quirks:
 
 keyboard cheat sheet:
   ⌃X⌃C  ⌃Zfg  ⌃X⌃S  ⌃G  => how to quit Em Py
-  Up Down  => conventional enough
-  ⌃A ⌃E  => leap to column
-  ⌃N ⌃P  => leap to line
+  Down Up Right Left  => conventional enough
+  ⌃E ⌃A ⌃F ⌃B ⌥M  => leap to column
+  ⌃N ⌃P ⌥GG  => leap to line
   ⌃U ⌃U -0123456789 ⌃U ⌃G  => repeat, or don't
 
 keyboard easter eggs:
@@ -1801,16 +1801,14 @@ class TerminalVi:
     # Step the Cursor across zero, one, or more Lines of the same File
     #
 
-    def do_step_for_count(self):  # Vim G, 1G  # Emacs goto-line
+    def do_step_for_count(self):  # Vim G, 1G
         """Leap to last Row, else to a chosen Row"""
-
-        count = self.get_vi_arg1_int()  # and refetched below as '.skin.arg1'
 
         editor = self.editor
         last_row = editor.spot_last_row()
 
+        count = self.get_vi_arg1_int(default=(last_row + 1))
         row = min(last_row, count - 1)
-        row = last_row if (editor.skin.arg1 is None) else row
 
         editor.row = row
         self.slip_dent()
@@ -3825,6 +3823,33 @@ class TerminalEm:
     # FIXME: code up ⌃U Arg1 and Bounds Checks
     #
 
+    def do_em_back_to_indentation(self):  # Emacs ⌥M
+        """Leap to the Column after the Indent"""
+
+        self.vi.slip_dent()
+
+    def do_em_backward_char(self):  # Emacs ⌃B
+        """FIXME"""
+
+        self.vi.slip_behind_one()
+
+    def do_em_forward_char(self):  # Emacs ⌃F
+        """FIXME"""
+
+        self.vi.slip_ahead_one()
+
+    def do_em_goto_line(self):  # Emacs ⌥GG
+        """FIXME"""
+
+        editor = self.vi.editor
+        last_row = editor.spot_last_row()
+
+        count = editor.get_arg1_int(default=(last_row + 1))
+        row = min(last_row, count - 1)
+
+        editor.row = row
+        editor.column = 0
+
     def do_em_move_beginning_of_line(self):  # Emacs ⌃A
         """FIXME"""
 
@@ -3892,11 +3917,11 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         # func_by_chords[b"\x00"] = em.do_em_c0_control_nul  # NUL, ⌃@, 0
         func_by_chords[b"\x01"] = em.do_em_move_beginning_of_line  # SOH, ⌃A, 1
-        # func_by_chords[b"\x02"] = em.do_em_c0_control_stx  # STX, ⌃B, 2
+        func_by_chords[b"\x02"] = em.do_em_backward_char  # STX, ⌃B, 2
         # func_by_chords[b"\x03"] = em.do_em_c0_control_etx  # ETX, ⌃C, 3
         # func_by_chords[b"\x04"] = em.do_em_c0_control_eot  # EOT, ⌃D, 4
         func_by_chords[b"\x05"] = em.do_em_move_end_of_line  # ENQ, ⌃E, 5
-        # func_by_chords[b"\x06"] = em.do_em_c0_control_ack  # ACK, ⌃F, 6
+        func_by_chords[b"\x06"] = em.do_em_forward_char  # ACK, ⌃F, 6
         func_by_chords[b"\x07"] = em.do_em_keyboard_quit  # BEL, ⌃G, 7 \a
         # func_by_chords[b"\x08"] = em.do_em_c0_control_bs  # BS, ⌃H, 8 \b
         # func_by_chords[b"\x09"] = em.do_em_c0_control_tab  # TAB, ⌃I, 9 \t
@@ -3916,6 +3941,11 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # func_by_chords[b"\x17"] = em.do_em_c0_control_etb  # ETB, ⌃W, 23
         # func_by_chords[b"\x18"] = em.do_em_c0_control_can  # CAN, ⌃X , 24
 
+        func_by_chords[b"\x1B"] = None
+        func_by_chords[b"\x1Bg"] = None
+        func_by_chords[b"\x1Bgg"] = em.do_em_goto_line  # ⌥GG
+        func_by_chords[b"\x1Bm"] = em.do_em_back_to_indentation  # ⌥M
+
         self._init_func(b"\x18\x03", func=em.do_em_save_buffers_kill_terminal)  # ⌃X⌃C
         self._init_func(b"\x18\x13", func=em.do_em_save_buffer)  # ⌃X⌃S
 
@@ -3926,8 +3956,8 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         func_by_chords[b"\x1B[A"] = em.do_em_previous_line  # ↑ Up Arrow
         func_by_chords[b"\x1B[B"] = em.do_em_next_line  # ↓ Down Arrow
-        # func_by_chords[b"\x1B[C"] = None  # → Right Arrow
-        # func_by_chords[b"\x1B[D"] = None  # ← Left Arrow
+        func_by_chords[b"\x1B[C"] = em.do_em_forward_char  # → Right Arrow
+        func_by_chords[b"\x1B[D"] = em.do_em_backward_char  # ← Left Arrow
 
         # func_by_chords[b"\x1C"] = em.do_em_eval_em_line   # FS, ⌃\, 28
         # func_by_chords[b"\x1D"] = em.do_em_c0_control_gs  # GS, ⌃], 29
