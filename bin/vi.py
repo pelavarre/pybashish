@@ -19,6 +19,7 @@ quirks:
   mostly doesn't ring bell, and does ring bell when search wraps
   works as pipe filter, source, or drain, like the vim quirk of drain only:  ls |vi -
   defaults to '-u /dev/null', not the vim quirk of '-u ~/.vimrc'
+  loses all your input when it crashes, chokes over input of most c0-control bytes
 
 keyboard cheat sheet:
   ZQ ZZ  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wn!⌃M :wq!⌃M :n⌃M :q⌃M  ⌃C Esc  => how to quit Vi Py
@@ -287,10 +288,11 @@ quirks:
   works in Mac Terminal, not only inside its UseOptionAsMetaKey < Keyboard < Profiles
   works as pipe filter, source, or drain, like the vim quirk of drain only:  ls |vi -
   defaults to -Q --eval '(menu-bar-mode -1)', not the emacs quirk of '--script ~/.emacs'
+  loses all your input when it crashes, chokes over input of bytes outside basic latin
 
 keyboard cheat sheet:
   ⌃X⌃C  ⌃Zfg  ⌃X⌃S  ⌃G  => how to quit Em Py
-  Down Up Right Left  => conventional enough
+  Down Up Right Left Space Return  => conventional enough
   ⌃E ⌃A ⌃F ⌃B ⌥M  => leap to column
   ⌃N ⌃P ⌥Gg  => leap to line
   ⌃U ⌃U -0123456789 ⌃U ⌃G  => repeat, or don't
@@ -815,7 +817,9 @@ class TerminalVi:
             skin = editor.skin
             if skin:
                 chord_ints_ahead = skin.chord_ints_ahead
-                stdins = b"".join(chr(_).encode() for _ in chord_ints_ahead)
+                stdins = b"".join(
+                    chr(_).encode(errors="surrogateescape") for _ in chord_ints_ahead
+                )
 
                 if stdins:
                     stderr_print("vi.py: dropping input: {}".format(repr(stdins)))
@@ -969,7 +973,7 @@ class TerminalVi:
         # Mention the full Path only if asked
 
         homepath = os_path_homepath(write_path)
-        nickname = held_vi_file.pick_nickname() if held_vi_file else None
+        nickname = held_vi_file.pick_file_nickname() if held_vi_file else None
 
         enough_path = homepath if (count > 1) else nickname  # ⌃G2⌃G Egg
 
@@ -1067,7 +1071,7 @@ class TerminalVi:
         version = module_file_version_zero()
 
         held_vi_file = self.held_vi_file
-        nickname = held_vi_file.pick_nickname() if held_vi_file else None
+        nickname = held_vi_file.pick_file_nickname() if held_vi_file else None
 
         verb = sys_argv_pick_verb()
         title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
@@ -1219,12 +1223,12 @@ class TerminalVi:
         painter = editor.painter
 
         if held_vi_file.write_path == held_vi_file.read_path:
-            held_vi_file.flush()
+            held_vi_file.flush_file()
         else:
             exc_info = (None, None, None)  # commonly equal to 'sys.exc_info()' here
             painter.__exit__(*exc_info)
             try:
-                held_vi_file.flush()
+                held_vi_file.flush_file()
                 time.sleep(0.001)  # TODO: wout this, fails 1 of 10:  ls |vi.py |cat -n
             finally:
                 painter.__enter__()
@@ -2780,8 +2784,14 @@ class TerminalVi:
         keyboard.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
         keyboard.intake_func = self.do_insert_per_chord
         editor.intake_beyond = "inserting"
+        editor.intake_taken = False
 
     def do_take_replaces(self):  # Vim R
+        """Take keyboard Input Chords to mean replace Chars, till Esc"""
+
+        self.take_vi_replaces()
+
+    def take_vi_replaces(self):
         """Take keyboard Input Chords to mean replace Chars, till Esc"""
 
         editor = self.editor
@@ -2796,6 +2806,7 @@ class TerminalVi:
         keyboard.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
         keyboard.intake_func = self.do_replace_per_chord
         editor.intake_beyond = "replacing"
+        editor.intake_taken = False
 
     def take_vi_views(self):
         """Stop taking keyboard Input Chords to mean replace/ insert Chars"""
@@ -2862,8 +2873,15 @@ class TerminalVi:
 
     def do_insert_per_chord(self):  # Vim Bypass View to Insert
         """Insert a copy of the Input Char, else insert a Line"""
+        # Emacs Self-Insert-Command outside of 'overwrite-mode'
+
+        editor = self.editor
 
         chars = self.get_vi_arg0_chars()
+
+        if (len(chars) == 1) and (ord(chars) > 0x7F):
+            editor.intake_taken = True
+
         if chars == CR_CHAR:
             self.do_insert_one_line()
         else:
@@ -2911,6 +2929,12 @@ class TerminalVi:
 
     def do_replace_per_chord(self):  # Vim Bypass View to Replace
         """Replace one Char with the Input Chars"""
+        # Emacs Self-Insert-Command inside of 'overwrite-mode'
+
+        editor = self.editor
+
+        if (len(chars) == 1) and (ord(chars) > 0x7F):
+            editor.intake_taken = True
 
         chars = self.get_vi_arg0_chars()
         if chars == CR_CHAR:
@@ -3787,7 +3811,7 @@ class TerminalEm:
             version = module_file_version_zero()
 
             held_vi_file = vi.held_vi_file
-            nickname = held_vi_file.pick_nickname() if held_vi_file else None
+            nickname = held_vi_file.pick_file_nickname() if held_vi_file else None
 
             vi.vi_print(
                 "{!r}  Press ⌃X⌃C to save changes and quit {}  {}".format(
@@ -3971,7 +3995,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         # Define the BASIC_LATIN_STDINS
 
-        self.intake_chords_set = set(BASIC_LATIN_STDINS)
+        self.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
         self.intake_func = em.do_em_self_insert_command
 
 
@@ -4138,9 +4162,9 @@ class TerminalFile(argparse.Namespace):
         # reinit by loading the File, if some File chosen
 
         if path is not None:
-            self._load_file_(path)
+            self.load_file(path)
 
-    def pick_nickname(self):
+    def pick_file_nickname(self):
         """Sketch the Write Path concisely"""
 
         write_path = self.write_path
@@ -4151,7 +4175,7 @@ class TerminalFile(argparse.Namespace):
 
         return nickname
 
-    def _load_file_(self, path):
+    def load_file(self, path):
         """Read the Bytes of the File, decode as Chars, split as Lines"""
 
         read_path = os.path.abspath(path)
@@ -4176,7 +4200,7 @@ class TerminalFile(argparse.Namespace):
 
         self.write_path = "/dev/stdout" if (path == "/dev/stdin") else read_path
 
-    def decode(self):
+    def decode_file(self):
         """Re-decode the File after changes"""
 
         if not self.ended_lines:
@@ -4190,7 +4214,7 @@ class TerminalFile(argparse.Namespace):
 
         # TODO: stop re-decode'ing while 'self.ended_lines' unchanged
 
-    def encode(self):
+    def encode_file(self):
         """Re-encode the File after changes"""
 
         if not self.ended_lines:
@@ -4204,12 +4228,12 @@ class TerminalFile(argparse.Namespace):
 
         # TODO: stop re-encode'ing while 'self.ended_lines' unchanged
 
-    def flush(self):
+    def flush_file(self):
         """Store the File"""
 
         write_path = self.write_path
 
-        iobytes = self.encode()
+        iobytes = self.encode_file()
         with open(write_path, "wb") as writing:
             writing.write(iobytes)
 
@@ -4363,6 +4387,7 @@ class TerminalEditor:
         self.showing_lag = None  # inject None or 0s or more Lag
 
         self.intake_beyond = ""  # take input from Cursor past Last Char, or don't
+        self.intake_taken = False
         self.intake_column = None  # struggle to snap Cursor past Last Char, or don't
         self.intake_pins = list()  # collect a TerminalPinPlus per edit
 
@@ -4729,6 +4754,8 @@ class TerminalEditor:
         chords_func = self.editor_func_by_chords(chords)
         chords_plus_func = self.editor_func_by_chords(chords=chords_plus)
 
+        self.intake_taken = False
+
         chords_plus_want_suffix = False
         if chords_plus not in intake_chords_set:
             chords_plus_want_suffix = chords_plus in keyboard.suffixes_by_chords.keys()
@@ -4785,19 +4812,44 @@ class TerminalEditor:
     def editor_func_by_chords(self, chords):
         """Choose the Func for some Chords"""
 
+        chars = chords.decode(errors="surrogateescape") if chords else ""
+        intake_ish = (len(chars) == 1) and (ord(chars) > 0x7F)
+
         keyboard = self.skin.keyboard
 
         funcs = keyboard.func_by_chords
         intake_func = keyboard.intake_func
         intake_chords_set = keyboard.choose_intake_chords_set()
 
+        # Ask first for one Chord
+
         chords_func = None
         if chords:
+
+            # Take simple Chords as Input Chars on demand
+
             chords_func = intake_func
             if chords not in intake_chords_set:
+
+                # Accept Chords that do name Funcs
+
                 chords_func = self.do_raise_name_error
                 if chords in funcs.keys():
+
                     chords_func = funcs[chords]
+
+                    # Except take ambiguous Chords to mean Intake after Intake
+
+                    if self.intake_taken and intake_chords_set:
+                        if intake_ish and intake_func:
+
+                            chords_func = intake_func
+
+                # Accept Chords that more likely name Symbols than Funcs
+
+                elif intake_ish and intake_func:
+
+                    chords_func = intake_func
 
         return chords_func
 
@@ -5065,7 +5117,7 @@ class TerminalEditor:
 
         # Else defer this first keyboard input Chord for later, but return a copy now
 
-        chord_int = ord(chord)
+        chord_int = ord(chord.decode(errors="surrogateescape"))
         chord_ints_ahead.insert(0, chord_int)
 
         return chord
@@ -5088,7 +5140,7 @@ class TerminalEditor:
         if chord_ints_ahead:
 
             chord_int = chord_ints_ahead.pop(0)  # consume, do Not copy
-            chord = chr(chord_int).encode()
+            chord = chr(chord_int).encode(errors="surrogateescape")
 
             return chord
 
@@ -5379,7 +5431,7 @@ class TerminalEditor:
 
         iobytespans = self.iobytespans
 
-        iochars = self.held_vi_file.decode()
+        iochars = self.held_vi_file.decode_file()
 
         # Cancel the old Spans
 
@@ -6766,7 +6818,7 @@ class TerminalDriver:
         # Fetch next whole Char of Paste, such as
         # ⌃ ⌥ ⇧ ⌘ ← → ↓ ↑  # Control Option Alt Shift Command, Left Right Down Up Arrows
 
-        stdin = inputs[:1].encode()
+        stdin = inputs[:1].encode(errors="surrogateescape")
         self.inputs = inputs[1:]
 
         return stdin
@@ -6786,8 +6838,14 @@ class TerminalDriver:
         calls = 1
         while stdin and (b"\r" not in stdin) and (b"\n" not in stdin):
 
+            lag = 0
+            try:
+                _ = stdin.decode()
+            except UnicodeDecodeError:
+                lag = 0.333  # 2021-12-11 failures at 0, 100, and 250ms
+
             if self.with_termios:
-                if not self.kbhit(timeout=0):
+                if not self.kbhit(timeout=lag):
 
                     break
 
