@@ -3,7 +3,7 @@
 #
 
 emacs --version
-emacs -nw --no-splash  # free-text glass-terminal
+emacs -nw --no-splash --eval '(menu-bar-mode -1)'  # free-text glass-terminal
 emacs -nw ~/.emacs
 
 #

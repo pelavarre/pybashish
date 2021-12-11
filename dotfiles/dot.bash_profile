@@ -833,16 +833,21 @@ function --pylint2 () {
 #
 
 
-alias -- -e='--exec-echo-xe emacs -nw --no-splash'
+alias -- -e="--exec-echo-xe \"emacs -nw --no-splash --eval '(menu-bar-mode -1)'\""
 alias -- -v='--exec-echo-xe vim'
 
 function -eg () {
-    echo 'emacs -nw --no-splash $(git show --name-only --pretty=)' "$@" >&2
-    emacs       -nw --no-splash $(git show --name-only --pretty=)  "$@"
+    local opts="-nw --no-splash"
+    local arg='(menu-bar-mode -1)'
+    local paths=$(set -xe; git show --name-only --pretty=)
+    echo "emacs -nw --no-splash --eval '(menu-bar-mode -1)'" $paths "$@"
+    emacs       -nw --no-splash --eval '(menu-bar-mode -1)' $paths "$@"
 }
+
 function -vg () {
-    echo 'vim $(git show --name-only --pretty=)' "$@" >&2
-    vim       $(git show --name-only --pretty=)  "$@"
+    local paths=$(set -xe; git show --name-only --pretty=)
+    echo vim $paths "$@" >&2
+    vim $paths "$@" >&2
 }
 
 
@@ -869,7 +874,6 @@ function -p () {
         )
     fi
 }
-
 
 function -p3 () {
     ( set -xe; python3 -i "$@" ~/.python.py 'print(sys.version.split()[0])'; )

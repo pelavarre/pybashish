@@ -37,11 +37,12 @@
 
 ;; Turn off enough of macOS to run Emacs
 
-; macOS Terminal > Preferences > Profile > Use Option as Meta Key
-; ; or press Esc in place of Meta
+; press Esc to mean Meta, or run Emacs Py in place of Emacs, or else
+;   macOS Terminal > Preferences > Profiles > Keyboard > Use Option as Meta Key
 
-; macOS System Preferences > Keyboard > Input Sources > Shortcuts > Previous Source
-; ; or press ⌃⇧2 to reach C-@ to mean C-SPC 'set-mark-command
+; press ⌃⇧2 or ⌃Space and hope it comes out as C-@ or C-SPC to mean 'set-mark-command
+;   even though older macOS needed you to turn off System Preferences > Keyboard >
+;   Input Sources > Shortcuts > Select The Previous Input Source  ⌃Space
 
 
 ; copied from:  git clone https://github.com/pelavarre/pybashish.git
