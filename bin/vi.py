@@ -292,7 +292,7 @@ keyboard cheat sheet:
   ⌃X⌃C  ⌃Zfg  ⌃X⌃S  ⌃G  => how to quit Em Py
   Down Up Right Left  => conventional enough
   ⌃E ⌃A ⌃F ⌃B ⌥M  => leap to column
-  ⌃N ⌃P ⌥GG  => leap to line
+  ⌃N ⌃P ⌥Gg  => leap to line
   ⌃U ⌃U -0123456789 ⌃U ⌃G  => repeat, or don't
 
 keyboard easter eggs:
@@ -3837,7 +3837,7 @@ class TerminalEm:
 
         self.vi.slip_ahead_one()
 
-    def do_em_goto_line(self):  # Emacs ⌥GG
+    def do_em_goto_line(self):  # Emacs ⌥Gg
         """FIXME"""
 
         editor = self.vi.editor
@@ -3942,11 +3942,11 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         funcs[b"\x1B"] = None
         funcs[b"\x1Bg"] = None
-        funcs[b"\x1Bgg"] = em.do_em_goto_line  # ⌥GG
+        funcs[b"\x1Bgg"] = em.do_em_goto_line  # ⌥Gg
         funcs[b"\x1Bm"] = em.do_em_back_to_indentation  # ⌥M
 
         funcs["\u00A9".encode()] = None  # ⌥G, CopyrightSign
-        funcs["\u00A9g".encode()] = em.do_em_goto_line  # ⌥GG, CopyrightSign G
+        funcs["\u00A9g".encode()] = em.do_em_goto_line  # ⌥Gg, CopyrightSign g
         funcs["\u00B5".encode()] = em.do_em_back_to_indentation  # ⌥M, MicroSign
 
         self._init_func(b"\x18\x03", func=em.do_em_save_buffers_kill_terminal)  # ⌃X⌃C
@@ -3985,6 +3985,21 @@ class TerminalNudgeIn(argparse.Namespace):
 
     # pylint: disable=too-few-public-methods
 
+    NAME_BY_CHAR = {
+        "\x09": "Tab",  # kin to ⇥ U21E5 Rightward Arrows to Bar
+        "\x0D": "Return",  # kin to ⏎ U23CE Return Symbol
+        "\x1B": "Esc",  # kin to ⎋ U238B Broken Circle With Northwest Arrow
+        " ": "Space",  # kin to ␢ U2422 Blank Symbol, ␣ U2423 Open Box
+        "\x7F": "Delete",  # kin to ⌫ U232B Erase To The Left
+        "\u00A8": "⌥U⌥U",  # U00A8
+        "\u00A9": "⌥G",  # U00A9 CopyrightSign
+        "\u00B4": "⌥E⌥E",  # U00B4
+        "\u00B5": "⌥M",  # U00B5 MicroSign
+    }
+
+    # MacOS UK/USA Keyboards reserve ⌥E, ⌥I, ⌥N, ⌥U for adding diacritical marks
+    # and they alias X5E ^ at ⌥I⌥I, and X7E ~ at ⌥N⌥N
+
     def __init__(self, nudge=None):
         # pylint: disable=super-init-not-called
 
@@ -3992,6 +4007,20 @@ class TerminalNudgeIn(argparse.Namespace):
         self.chords = None  # such as b"Qvi\r" Vi Chords
         self.suffix = None  # such as b"x" of b"fx" to Find Char "x" in Vi
         self.epilog = None  # such as b"⌃C" of b"f⌃C" to cancel b"f"
+
+        # Map the many of the ⌥A..⌥Z to themselves, and all of the ^@..^~,~?
+
+        name_by_char = TerminalNudgeIn.NAME_BY_CHAR
+        for chord in C0_CONTROL_STDINS:  # for ord(chord) in 0x00..0x1F and 0x7F
+            name = "⌃" + chr(ord(chord) ^ 0x40)  # ⌃ U2303 UpArrowhead
+            assert name[len("⌃") :].encode() in BASIC_LATIN_STDINS, (chord, name)
+            ch = chord.decode()
+            if ch not in name_by_char.keys():
+                name_by_char[ch] = name
+
+            # ⌃@, ⌃A, ⌃B, ... ⌃Z, ⌃[, ⌃\, ⌃], ⌃^, ⌃_, and ⌃?
+
+        self.name_by_char = name_by_char
 
         # Remake Self into a 'copy.deepcopy' of 'nudge'
 
@@ -4025,10 +4054,10 @@ class TerminalNudgeIn(argparse.Namespace):
 
         echo = self._to_echoed_chars(prefix_chars, nudge_chars=nudge_chars)
 
-        echo = echo.replace("Esc [ A", "Up")  # ↑ \u2191 Upwards Arrow
-        echo = echo.replace("Esc [ B", "Down")  # ↓ \u2193 Downwards Arrow
-        echo = echo.replace("Esc [ C", "Right")  # → \u2192 Rightwards Arrow
-        echo = echo.replace("Esc [ D", "Left")  # ← \u2190 Leftwards Arrows
+        echo = echo.replace("Esc [ A", "Up")  # ↑ U2191 Upwards Arrow
+        echo = echo.replace("Esc [ B", "Down")  # ↓ U2193 Downwards Arrow
+        echo = echo.replace("Esc [ C", "Right")  # → U2192 Rightwards Arrow
+        echo = echo.replace("Esc [ D", "Left")  # ← U2190 Leftwards Arrows
 
         echo = echo.strip()
 
@@ -4041,42 +4070,27 @@ class TerminalNudgeIn(argparse.Namespace):
         """Form the Chars of Echo for the Called Chords + Suffix + Epilog"""
         # pylint: disable=no-self-use
 
+        name_by_char = self.name_by_char
+
         echo = ""
 
         for (index, ch) in enumerate(nudge_chars):
+            name = ch
+            if ch in name_by_char.keys():
+                name = name_by_char[ch]
 
-            if ch == chr(9):
-                # echo += " ⇥"  # ⇥ \u21E5 Rightward Arrows to Bar
-                echo += " Tab"
-            elif ch == chr(13):
-                # echo += " ⏎"  # ⏎ \u23CE Return Symbol
-                echo += " Return"
-            elif ch == chr(27):
-                # echo += " ⎋"  # ⎋ \u238B Broken Circle With Northwest Arrow
-                # echo += " Escape"
-                echo += " Esc"
-            elif ch == chr(127):
-                # echo += " ⌫"  # ⌫ \u232B Erase To The Left
-                echo += " Delete"
+            # Show each Prefix Chord without Spaces in between them
 
-            elif ch == " ":
-                # echo += " ␢"  # ␢ \u2422 Blank Symbol
-                # echo += " ␣"  # ␣ \u2423 Open Box
-                echo += " Space"
-
-            elif ch.encode() in C0_CONTROL_STDINS:  # iobyte_int in 0x00..0x1F,0x7F
-                alt = chr(ord(ch) ^ 0x40)
-                assert alt.encode() in BASIC_LATIN_STDINS, (ch, alt)
-                echo += " ⌃" + alt
-
-            elif index < len(prefix_chars):
+            if index < len(prefix_chars):
                 if echo and (echo[-1] in "+-.0123456789") and (ch in "0123456789"):
-                    echo += ch
-                else:
-                    echo += " " + ch
 
-            else:  # default to echo each Char as one Space and one Glyph
-                echo += " " + ch
+                    echo += ch  # such as after ⌃U of Em Py
+
+                    continue
+
+            # Show most Chords as named or as themselves
+
+            echo += " " + name
 
         return echo
 
@@ -7378,7 +7392,7 @@ def sys_argv_pick_verb():
 # TODO: revive the last Match of r"$" out there
 # TODO: show, delete, and insert the Eol of the last line
 # TODO: test Eol encodings of b"\r\n" and b"\r", apart from b"\n" in File
-# TODO: test chars outside  and far outside the basic "\u0000".."\u00FF" in File
+# TODO: test chars outside  and far outside the basic U0000..U00FF in File
 # TODO: test SurrogateEscape's in File
 
 
@@ -7395,7 +7409,7 @@ def sys_argv_pick_verb():
 
 # TODO: teach :w! :wn! :wq! to temporarily override PermissionError's from 'chmod -w'
 
-# TODO: insert \u00C7 ç and \u00F1 ñ etc - all the Unicode outside of C0 Controls
+# TODO: insert U00C7 ç and U00F1 ñ etc - all the Unicode outside of C0 Controls
 # TODO: #åçéîñøü←↑→↓⇧⋮⌃⌘⌥⎋💔💥😊😠😢
 
 # TODO: Vim \ n somehow doesn't disrupt the 'keep_up_vi_column_seek' of $
