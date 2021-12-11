@@ -3158,7 +3158,7 @@ class TerminalKeyboard:
     def _init_func(self, chords, func, suffixes=None):
         """Map a sequence of keyboard Input Chords"""
 
-        func_by_chords = self.func_by_chords
+        funcs = self.func_by_chords
         suffixes_by_chords = self.suffixes_by_chords
 
         # Ask for more Chords while holding some, but not all, of these Chords
@@ -3166,14 +3166,14 @@ class TerminalKeyboard:
         for some in range(1, len(chords)):
             some_chords = chords[:some]
 
-            if some_chords not in func_by_chords.keys():
-                func_by_chords[some_chords] = None
+            if some_chords not in funcs.keys():
+                funcs[some_chords] = None
             else:
-                assert func_by_chords[some_chords] is None, chords
+                assert funcs[some_chords] is None, chords
 
         # Call this Func after collecting all these Chords
 
-        func_by_chords[chords] = func  # may be init, may be mutate
+        funcs[chords] = func  # may be init, may be mutate
 
         # Except first ask for 1 Suffix Chord, if wanted
 
@@ -3218,72 +3218,72 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # pylint: disable=too-many-statements
 
         editor = self.editor
-        func_by_chords = self.func_by_chords
+        funcs = self.func_by_chords
         vi = self.vi
 
         # Define the C0_CONTROL_STDINS
 
-        # func_by_chords[b"\x00"] = vi.do_c0_control_nul  # NUL, ⌃@, 0
-        # func_by_chords[b"\x01"] = vi.do_c0_control_soh  # SOH, ⌃A, 1
-        func_by_chords[b"\x02"] = vi.do_scroll_behind_much  # STX, ⌃B, 2
-        func_by_chords[b"\x03"] = vi.do_vi_c0_control_etx  # ETX, ⌃C, 3
-        # func_by_chords[b"\x04"] = vi.do_scroll_ahead_some  # EOT, ⌃D, 4
-        func_by_chords[b"\x05"] = vi.do_scroll_ahead_one  # ENQ, ⌃E, 5
-        func_by_chords[b"\x06"] = vi.do_scroll_ahead_much  # ACK, ⌃F, 6
-        func_by_chords[b"\x07"] = vi.do_say_more  # BEL, ⌃G, 7 \a
-        func_by_chords[b"\x08"] = vi.do_slip_behind  # BS, ⌃H, 8 \b
-        # func_by_chords[b"\x09"] = vi.do_c0_control_tab  # TAB, ⌃I, 9 \t
-        func_by_chords[b"\x0A"] = vi.do_step_down_seek  # LF, ⌃J, 10 \n
-        # func_by_chords[b"\x0B"] = vi.do_c0_control_vt  # VT, ⌃K, 11 \v
-        func_by_chords[b"\x0C"] = editor.do_redraw  # FF, ⌃L, 12 \f
-        func_by_chords[b"\x0D"] = vi.do_step_down_dent  # CR, ⌃M, 13 \r
-        func_by_chords[b"\x0E"] = vi.do_step_down_seek  # SO, ⌃N, 14
-        func_by_chords[b"\x0F"] = vi.do_vi_c0_control_si  # SI, ⌃O, 15
-        func_by_chords[b"\x10"] = vi.do_step_up_seek  # DLE, ⌃P, 16
-        # func_by_chords[b"\x11"] = vi.do_c0_control_dc1  # DC1, XON, ⌃Q, 17
-        # func_by_chords[b"\x12"] = vi.do_c0_control_dc2  # DC2, ⌃R, 18
-        # func_by_chords[b"\x13"] = vi.do_c0_control_dc3  # DC3, XOFF, ⌃S, 19
-        # func_by_chords[b"\x14"] = vi.do_c0_control_dc4  # DC4, ⌃T, 20
-        # func_by_chords[b"\x15"] = vi.do_scroll_behind_some  # NAK, ⌃U, 21
-        # func_by_chords[b"\x16"] = vi.do_c0_control_syn  # SYN, ⌃V, 22
-        # func_by_chords[b"\x17"] = vi.do_c0_control_etb  # ETB, ⌃W, 23
-        # func_by_chords[b"\x18"] = vi.do_c0_control_can  # CAN, ⌃X , 24
-        func_by_chords[b"\x19"] = vi.do_scroll_behind_one  # EM, ⌃Y, 25
-        func_by_chords[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
+        # funcs[b"\x00"] = vi.do_c0_control_nul  # NUL, ⌃@, 0
+        # funcs[b"\x01"] = vi.do_c0_control_soh  # SOH, ⌃A, 1
+        funcs[b"\x02"] = vi.do_scroll_behind_much  # STX, ⌃B, 2
+        funcs[b"\x03"] = vi.do_vi_c0_control_etx  # ETX, ⌃C, 3
+        # funcs[b"\x04"] = vi.do_scroll_ahead_some  # EOT, ⌃D, 4
+        funcs[b"\x05"] = vi.do_scroll_ahead_one  # ENQ, ⌃E, 5
+        funcs[b"\x06"] = vi.do_scroll_ahead_much  # ACK, ⌃F, 6
+        funcs[b"\x07"] = vi.do_say_more  # BEL, ⌃G, 7 \a
+        funcs[b"\x08"] = vi.do_slip_behind  # BS, ⌃H, 8 \b
+        # funcs[b"\x09"] = vi.do_c0_control_tab  # TAB, ⌃I, 9 \t
+        funcs[b"\x0A"] = vi.do_step_down_seek  # LF, ⌃J, 10 \n
+        # funcs[b"\x0B"] = vi.do_c0_control_vt  # VT, ⌃K, 11 \v
+        funcs[b"\x0C"] = editor.do_redraw  # FF, ⌃L, 12 \f
+        funcs[b"\x0D"] = vi.do_step_down_dent  # CR, ⌃M, 13 \r
+        funcs[b"\x0E"] = vi.do_step_down_seek  # SO, ⌃N, 14
+        funcs[b"\x0F"] = vi.do_vi_c0_control_si  # SI, ⌃O, 15
+        funcs[b"\x10"] = vi.do_step_up_seek  # DLE, ⌃P, 16
+        # funcs[b"\x11"] = vi.do_c0_control_dc1  # DC1, XON, ⌃Q, 17
+        # funcs[b"\x12"] = vi.do_c0_control_dc2  # DC2, ⌃R, 18
+        # funcs[b"\x13"] = vi.do_c0_control_dc3  # DC3, XOFF, ⌃S, 19
+        # funcs[b"\x14"] = vi.do_c0_control_dc4  # DC4, ⌃T, 20
+        # funcs[b"\x15"] = vi.do_scroll_behind_some  # NAK, ⌃U, 21
+        # funcs[b"\x16"] = vi.do_c0_control_syn  # SYN, ⌃V, 22
+        # funcs[b"\x17"] = vi.do_c0_control_etb  # ETB, ⌃W, 23
+        # funcs[b"\x18"] = vi.do_c0_control_can  # CAN, ⌃X , 24
+        funcs[b"\x19"] = vi.do_scroll_behind_one  # EM, ⌃Y, 25
+        funcs[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
 
-        func_by_chords[b"\x1B"] = vi.do_vi_c0_control_esc  # ESC, ⌃[, 27
+        funcs[b"\x1B"] = vi.do_vi_c0_control_esc  # ESC, ⌃[, 27
         # TODO: corrections_by_chords[b"\x1B3"] = b"#"
-        func_by_chords[b"\x1B[A"] = vi.do_step_up_seek  # ↑ Up Arrow
-        func_by_chords[b"\x1B[B"] = vi.do_step_down_seek  # ↓ Down Arrow
-        func_by_chords[b"\x1B[C"] = vi.do_slip_right  # → Right Arrow
-        func_by_chords[b"\x1B[D"] = vi.do_slip_left  # ← Left Arrow
+        funcs[b"\x1B[A"] = vi.do_step_up_seek  # ↑ Up Arrow
+        funcs[b"\x1B[B"] = vi.do_step_down_seek  # ↓ Down Arrow
+        funcs[b"\x1B[C"] = vi.do_slip_right  # → Right Arrow
+        funcs[b"\x1B[D"] = vi.do_slip_left  # ← Left Arrow
 
-        # func_by_chords[b"\x1C"] = vi.do_eval_vi_line   # FS, ⌃\, 28
-        # func_by_chords[b"\x1D"] = vi.do_c0_control_gs  # GS, ⌃], 29
-        # func_by_chords[b"\x1E"] = vi.do_c0_control_rs  # RS, ⌃^, 30
-        # func_by_chords[b"\x1F"] = vi.do_c0_control_us  # US, ⌃_, 31
+        # funcs[b"\x1C"] = vi.do_eval_vi_line   # FS, ⌃\, 28
+        # funcs[b"\x1D"] = vi.do_c0_control_gs  # GS, ⌃], 29
+        # funcs[b"\x1E"] = vi.do_c0_control_rs  # RS, ⌃^, 30
+        # funcs[b"\x1F"] = vi.do_c0_control_us  # US, ⌃_, 31
 
-        func_by_chords[b"\x7F"] = vi.do_slip_behind  # DEL, ⌃?, 127
+        funcs[b"\x7F"] = vi.do_slip_behind  # DEL, ⌃?, 127
 
         # Define the BASIC_LATIN_STDINS
 
-        func_by_chords[b" "] = vi.do_slip_ahead
-        # func_by_chords[b"!"] = vi.do_pipe
-        # func_by_chords[b'"'] = vi.do_arg
-        func_by_chords[b"#"] = vi.do_find_behind_vi_this
-        func_by_chords[b"$"] = vi.do_slip_max_seek
-        # func_by_chords[b"%"]  # TODO: leap to match
-        # func_by_chords[b"&"]  # TODO: & and && for repeating substitution
-        # func_by_chords[b"'"]  # TODO: leap to pin
-        # func_by_chords[b"("]  # TODO: sentence behind
-        # func_by_chords[b")"]  # TODO: sentence ahead
-        func_by_chords[b"*"] = vi.do_find_ahead_vi_this
-        func_by_chords[b"+"] = vi.do_step_down_dent
-        func_by_chords[b","] = vi.do_slip_undo
-        func_by_chords[b"-"] = vi.do_step_up_dent
-        func_by_chords[b"/"] = vi.do_find_ahead_vi_line
+        funcs[b" "] = vi.do_slip_ahead
+        # funcs[b"!"] = vi.do_pipe
+        # funcs[b'"'] = vi.do_arg
+        funcs[b"#"] = vi.do_find_behind_vi_this
+        funcs[b"$"] = vi.do_slip_max_seek
+        # funcs[b"%"]  # TODO: leap to match
+        # funcs[b"&"]  # TODO: & and && for repeating substitution
+        # funcs[b"'"]  # TODO: leap to pin
+        # funcs[b"("]  # TODO: sentence behind
+        # funcs[b")"]  # TODO: sentence ahead
+        funcs[b"*"] = vi.do_find_ahead_vi_this
+        funcs[b"+"] = vi.do_step_down_dent
+        funcs[b","] = vi.do_slip_undo
+        funcs[b"-"] = vi.do_step_up_dent
+        funcs[b"/"] = vi.do_find_ahead_vi_line
 
-        func_by_chords[b"0"] = vi.do_slip_first
+        funcs[b"0"] = vi.do_slip_first
 
         self._init_corrector(b":/", corrections=b"/")
         self._init_corrector(b":?", corrections=b"?")
@@ -3303,44 +3303,44 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func(b":wq!\r", func=vi.do_flush_quit_vi)
         self._init_func(b":wq\r", func=vi.do_might_flush_quit_vi)
 
-        func_by_chords[b";"] = vi.do_slip_redo
-        # func_by_chords[b"<"]  # TODO: dedent
-        # func_by_chords[b"="]  # TODO: dent after
-        # func_by_chords[b">"]  # TODO: indent
-        func_by_chords[b"?"] = vi.do_find_behind_vi_line
-        # func_by_chords[b"@"] = vi.do_replay_input
+        funcs[b";"] = vi.do_slip_redo
+        # funcs[b"<"]  # TODO: dedent
+        # funcs[b"="]  # TODO: dent after
+        # funcs[b">"]  # TODO: indent
+        funcs[b"?"] = vi.do_find_behind_vi_line
+        # funcs[b"@"] = vi.do_replay_input
 
-        func_by_chords[b"A"] = vi.do_slip_beyond_last_take_inserts
-        func_by_chords[b"B"] = vi.do_big_word_start_behind
-        func_by_chords[b"C"] = vi.do_chop_take_inserts
-        func_by_chords[b"D"] = vi.do_chop
-        func_by_chords[b"E"] = vi.do_big_word_end_ahead
+        funcs[b"A"] = vi.do_slip_beyond_last_take_inserts
+        funcs[b"B"] = vi.do_big_word_start_behind
+        funcs[b"C"] = vi.do_chop_take_inserts
+        funcs[b"D"] = vi.do_chop
+        funcs[b"E"] = vi.do_big_word_end_ahead
 
         self._init_suffix_func(b"F", func=vi.do_slip_rindex_choice)
 
-        func_by_chords[b"G"] = vi.do_step_for_count
-        func_by_chords[b"H"] = vi.do_step_max_high
-        func_by_chords[b"I"] = vi.do_slip_dent_take_inserts
-        func_by_chords[b"J"] = vi.do_slip_last_join_right
-        # func_by_chords[b"K"] = vi.do_lookup
-        func_by_chords[b"L"] = vi.do_step_max_low
-        func_by_chords[b"M"] = vi.do_step_to_middle
-        func_by_chords[b"N"] = vi.do_vi_find_earlier
-        func_by_chords[b"O"] = vi.do_slip_first_split_take_inserts
-        # func_by_chords[b"P"] = vi.do_paste_behind
+        funcs[b"G"] = vi.do_step_for_count
+        funcs[b"H"] = vi.do_step_max_high
+        funcs[b"I"] = vi.do_slip_dent_take_inserts
+        funcs[b"J"] = vi.do_slip_last_join_right
+        # funcs[b"K"] = vi.do_lookup
+        funcs[b"L"] = vi.do_step_max_low
+        funcs[b"M"] = vi.do_step_to_middle
+        funcs[b"N"] = vi.do_vi_find_earlier
+        funcs[b"O"] = vi.do_slip_first_split_take_inserts
+        # funcs[b"P"] = vi.do_paste_behind
 
         self._init_func(b"Qvi\r", func=vi.do_continue_vi)
 
-        func_by_chords[b"R"] = vi.do_take_replaces
-        func_by_chords[b"S"] = vi.do_slip_first_chop_take_inserts
+        funcs[b"R"] = vi.do_take_replaces
+        funcs[b"S"] = vi.do_slip_first_chop_take_inserts
 
         self._init_suffix_func(b"T", func=vi.do_slip_rindex_plus_choice)
 
-        # func_by_chords[b"U"] = vi.do_row_undo
-        # func_by_chords[b"V"] = vi.do_gloss_rows
-        func_by_chords[b"W"] = vi.do_big_word_start_ahead
-        func_by_chords[b"X"] = vi.do_cut_behind
-        # func_by_chords[b"Y"] = vi.do_copy_row
+        # funcs[b"U"] = vi.do_row_undo
+        # funcs[b"V"] = vi.do_gloss_rows
+        funcs[b"W"] = vi.do_big_word_start_ahead
+        funcs[b"X"] = vi.do_cut_behind
+        # funcs[b"Y"] = vi.do_copy_row
 
         self._init_corrector(b"QZ", corrections=b"Z")
         # TODO: stop commandeering the personal QZ Chord Sequence
@@ -3348,7 +3348,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func(b"ZQ", func=vi.do_quit_vi)
         self._init_func(b"ZZ", func=vi.do_flush_quit_vi)
 
-        # func_by_chords[b"["]  # TODO: b"["
+        # funcs[b"["]  # TODO: b"["
 
         self._init_func(b"\\F", func=editor.do_set_invregex)
         self._init_func(b"\\i", func=editor.do_set_invignorecase)
@@ -3356,19 +3356,19 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         # TODO: stop commandeering the personal \Esc \F \i \n Chord Sequences
 
-        # func_by_chords[b"]"]  # TODO: b"]"
-        func_by_chords[b"^"] = vi.do_slip_dent
-        func_by_chords[b"_"] = vi.do_step_down_minus_dent
-        # func_by_chords[b"`"]  # TODO: close to b"'"
+        # funcs[b"]"]  # TODO: b"]"
+        funcs[b"^"] = vi.do_slip_dent
+        funcs[b"_"] = vi.do_step_down_minus_dent
+        # funcs[b"`"]  # TODO: close to b"'"
 
-        func_by_chords[b"a"] = vi.do_slip_take_inserts
-        func_by_chords[b"b"] = vi.do_lil_word_start_behind
-        # func_by_chords[b"c"] = vi.do_chop_after_take_inserts
-        # func_by_chords[b"d"] = vi.do_chop_after
+        funcs[b"a"] = vi.do_slip_take_inserts
+        funcs[b"b"] = vi.do_lil_word_start_behind
+        # funcs[b"c"] = vi.do_chop_after_take_inserts
+        # funcs[b"d"] = vi.do_chop_after
 
         self._init_func(b"dd", func=vi.do_chop_down)
 
-        func_by_chords[b"e"] = vi.do_lil_word_end_ahead
+        funcs[b"e"] = vi.do_lil_word_end_ahead
 
         self._init_suffix_func(b"f", func=vi.do_slip_index_choice)
 
@@ -3376,45 +3376,45 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_corrector(b"g?", corrections=b":g?")
         # TODO: stop commandeering the personal g/ g? Chord Sequences
 
-        # func_by_chords[b"g"]
-        func_by_chords[b"h"] = vi.do_slip_left
-        func_by_chords[b"i"] = vi.do_take_inserts
-        func_by_chords[b"j"] = vi.do_step_down_seek
-        func_by_chords[b"k"] = vi.do_step_up_seek
-        func_by_chords[b"l"] = vi.do_slip_right
+        # funcs[b"g"]
+        funcs[b"h"] = vi.do_slip_left
+        funcs[b"i"] = vi.do_take_inserts
+        funcs[b"j"] = vi.do_step_down_seek
+        funcs[b"k"] = vi.do_step_up_seek
+        funcs[b"l"] = vi.do_slip_right
 
         # self._init_suffix_func(b"m", func=vi.do_drop_pin)
 
-        func_by_chords[b"n"] = vi.do_vi_find_later
-        func_by_chords[b"o"] = vi.do_slip_last_split_take_inserts
+        funcs[b"n"] = vi.do_vi_find_later
+        funcs[b"o"] = vi.do_slip_last_split_take_inserts
 
-        # func_by_chords[b"p"] = vi.do_paste_ahead
-        # func_by_chords[b"q"] = vi.do_record_input
+        # funcs[b"p"] = vi.do_paste_ahead
+        # funcs[b"q"] = vi.do_record_input
 
         self._init_suffix_func(b"r", func=vi.do_replace_per_choice)
 
-        func_by_chords[b"s"] = vi.do_cut_ahead_take_inserts
+        funcs[b"s"] = vi.do_cut_ahead_take_inserts
 
         self._init_suffix_func(b"t", func=vi.do_slip_index_minus_choice)
 
-        # func_by_chords[b"u"] = vi.do_undo
-        # func_by_chords[b"v"] = vi.do_gloss_chars
-        func_by_chords[b"w"] = vi.do_lil_word_start_ahead
-        func_by_chords[b"x"] = vi.do_cut_ahead
-        # func_by_chords[b"y"] = vi.do_copy_after
+        # funcs[b"u"] = vi.do_undo
+        # funcs[b"v"] = vi.do_gloss_chars
+        funcs[b"w"] = vi.do_lil_word_start_ahead
+        funcs[b"x"] = vi.do_cut_ahead
+        # funcs[b"y"] = vi.do_copy_after
 
         self._init_func(b"zb", func=vi.do_scroll_till_bottom)
         self._init_func(b"zt", func=vi.do_scroll_till_top)
         self._init_func(b"zz", func=vi.do_scroll_till_middle)
 
-        func_by_chords[b"{"] = vi.do_paragraph_behind
-        func_by_chords[b"|"] = vi.do_slip
-        func_by_chords[b"}"] = vi.do_paragraph_ahead
-        # func_by_chords[b"~"] = vi.do_flip_char_case
+        funcs[b"{"] = vi.do_paragraph_behind
+        funcs[b"|"] = vi.do_slip
+        funcs[b"}"] = vi.do_paragraph_ahead
+        # funcs[b"~"] = vi.do_flip_char_case
 
         # Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
 
-        func_by_chords["£".encode()] = vi.do_find_behind_vi_this
+        funcs["£".encode()] = vi.do_find_behind_vi_this
 
 
 #
@@ -3563,35 +3563,35 @@ class TerminalKeyboardEx(TerminalKeyboard):
     def _init_by_ex_chords_(self):
 
         ex = self.ex
-        func_by_chords = self.func_by_chords
+        funcs = self.func_by_chords
         editor = self.editor
 
         # Define the C0_CONTROL_STDINS
 
         for chords in C0_CONTROL_STDINS:
-            func_by_chords[chords] = editor.do_raise_name_error
+            funcs[chords] = editor.do_raise_name_error
 
         # Mutate the C0_CONTROL_STDINS definitions
 
-        func_by_chords[b"\x03"] = ex.do_quit_ex  # ETX, ⌃C, 3
-        func_by_chords[b"\x08"] = ex.do_undo_append_char  # BS, ⌃H, 8 \b
-        func_by_chords[b"\x0D"] = editor.do_sys_exit  # CR, ⌃M, 13 \r
-        func_by_chords[b"\x10"] = ex.do_copy_down  # DLE, ⌃P, 16
-        func_by_chords[b"\x1A"] = editor.do_sig_tstp  # SUB, ⌃Z, 26
-        func_by_chords[b"\x15"] = ex.do_clear_chars  # NAK, ⌃U, 21
+        funcs[b"\x03"] = ex.do_quit_ex  # ETX, ⌃C, 3
+        funcs[b"\x08"] = ex.do_undo_append_char  # BS, ⌃H, 8 \b
+        funcs[b"\x0D"] = editor.do_sys_exit  # CR, ⌃M, 13 \r
+        funcs[b"\x10"] = ex.do_copy_down  # DLE, ⌃P, 16
+        funcs[b"\x1A"] = editor.do_sig_tstp  # SUB, ⌃Z, 26
+        funcs[b"\x15"] = ex.do_clear_chars  # NAK, ⌃U, 21
 
         self._init_suffix_func(b"\x16", func=ex.do_append_suffix)  # SYN, ⌃V, 22
 
-        func_by_chords[b"\x1B[A"] = ex.do_copy_down  # ↑ Up Arrow
+        funcs[b"\x1B[A"] = ex.do_copy_down  # ↑ Up Arrow
 
-        func_by_chords[b"\x7F"] = ex.do_undo_append_char  # DEL, ⌃?, 127
+        funcs[b"\x7F"] = ex.do_undo_append_char  # DEL, ⌃?, 127
 
         # Define the BASIC_LATIN_STDINS
 
         for chords in BASIC_LATIN_STDINS:
-            func_by_chords[chords] = ex.do_append_char
+            funcs[chords] = ex.do_append_char
 
-        func_by_chords["£".encode()] = ex.do_append_char
+        funcs["£".encode()] = ex.do_append_char
 
         # TODO: input Search Keys containing more than BASIC_LATIN_STDINS and #
         # TODO: Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
@@ -3908,68 +3908,66 @@ class TerminalKeyboardEm(TerminalKeyboard):
     def _init_by_em_chords_(self):
         # pylint: disable=too-many-statements
 
-        func_by_chords = self.func_by_chords
+        funcs = self.func_by_chords
         em = self.em
         vi = self.vi
 
         # Define the C0_CONTROL_STDINS
 
-        # func_by_chords[b"\x00"] = em.do_em_c0_control_nul  # NUL, ⌃@, 0
-        func_by_chords[b"\x01"] = em.do_em_move_beginning_of_line  # SOH, ⌃A, 1
-        func_by_chords[b"\x02"] = em.do_em_backward_char  # STX, ⌃B, 2
-        # func_by_chords[b"\x03"] = em.do_em_c0_control_etx  # ETX, ⌃C, 3
-        # func_by_chords[b"\x04"] = em.do_em_c0_control_eot  # EOT, ⌃D, 4
-        func_by_chords[b"\x05"] = em.do_em_move_end_of_line  # ENQ, ⌃E, 5
-        func_by_chords[b"\x06"] = em.do_em_forward_char  # ACK, ⌃F, 6
-        func_by_chords[b"\x07"] = em.do_em_keyboard_quit  # BEL, ⌃G, 7 \a
-        # func_by_chords[b"\x08"] = em.do_em_c0_control_bs  # BS, ⌃H, 8 \b
-        # func_by_chords[b"\x09"] = em.do_em_c0_control_tab  # TAB, ⌃I, 9 \t
-        # func_by_chords[b"\x0A"] = em.do_em_c0_control_lf  # LF, ⌃J, 10 \n
-        # func_by_chords[b"\x0B"] = em.do_em_c0_control_vt  # VT, ⌃K, 11 \v
-        # func_by_chords[b"\x0C"] = em.do_em_c0_control_ff  # FF, ⌃L, 12 \f
-        # func_by_chords[b"\x0D"] = em.do_em_c0_control_cr  # CR, ⌃M, 13 \r
-        func_by_chords[b"\x0E"] = em.do_em_next_line  # SO, ⌃N, 14
-        # func_by_chords[b"\x0F"] = em.do_em_c0_control_si  # SI, ⌃O, 15
-        func_by_chords[b"\x10"] = em.do_em_previous_line  # DLE, ⌃P, 16
-        # func_by_chords[b"\x11"] = em.do_em_c0_control_dc1  # DC1, XON, ⌃Q, 17
-        # func_by_chords[b"\x12"] = em.do_em_c0_control_dc2  # DC2, ⌃R, 18
-        # func_by_chords[b"\x13"] = em.do_em_c0_control_dc3  # DC3, XOFF, ⌃S, 19
-        # func_by_chords[b"\x14"] = em.do_em_c0_control_dc4  # DC4, ⌃T, 20
-        # func_by_chords[b"\x15"] = em.do_em_scroll_behind_some  # NAK, ⌃U, 21
-        # func_by_chords[b"\x16"] = em.do_em_c0_control_syn  # SYN, ⌃V, 22
-        # func_by_chords[b"\x17"] = em.do_em_c0_control_etb  # ETB, ⌃W, 23
-        # func_by_chords[b"\x18"] = em.do_em_c0_control_can  # CAN, ⌃X , 24
+        # funcs[b"\x00"] = em.do_em_c0_control_nul  # NUL, ⌃@, 0
+        funcs[b"\x01"] = em.do_em_move_beginning_of_line  # SOH, ⌃A, 1
+        funcs[b"\x02"] = em.do_em_backward_char  # STX, ⌃B, 2
+        # funcs[b"\x03"] = em.do_em_c0_control_etx  # ETX, ⌃C, 3
+        # funcs[b"\x04"] = em.do_em_c0_control_eot  # EOT, ⌃D, 4
+        funcs[b"\x05"] = em.do_em_move_end_of_line  # ENQ, ⌃E, 5
+        funcs[b"\x06"] = em.do_em_forward_char  # ACK, ⌃F, 6
+        funcs[b"\x07"] = em.do_em_keyboard_quit  # BEL, ⌃G, 7 \a
+        # funcs[b"\x08"] = em.do_em_c0_control_bs  # BS, ⌃H, 8 \b
+        # funcs[b"\x09"] = em.do_em_c0_control_tab  # TAB, ⌃I, 9 \t
+        # funcs[b"\x0A"] = em.do_em_c0_control_lf  # LF, ⌃J, 10 \n
+        # funcs[b"\x0B"] = em.do_em_c0_control_vt  # VT, ⌃K, 11 \v
+        # funcs[b"\x0C"] = em.do_em_c0_control_ff  # FF, ⌃L, 12 \f
+        # funcs[b"\x0D"] = em.do_em_c0_control_cr  # CR, ⌃M, 13 \r
+        funcs[b"\x0E"] = em.do_em_next_line  # SO, ⌃N, 14
+        # funcs[b"\x0F"] = em.do_em_c0_control_si  # SI, ⌃O, 15
+        funcs[b"\x10"] = em.do_em_previous_line  # DLE, ⌃P, 16
+        # funcs[b"\x11"] = em.do_em_c0_control_dc1  # DC1, XON, ⌃Q, 17
+        # funcs[b"\x12"] = em.do_em_c0_control_dc2  # DC2, ⌃R, 18
+        # funcs[b"\x13"] = em.do_em_c0_control_dc3  # DC3, XOFF, ⌃S, 19
+        # funcs[b"\x14"] = em.do_em_c0_control_dc4  # DC4, ⌃T, 20
+        # funcs[b"\x15"] = em.do_em_scroll_behind_some  # NAK, ⌃U, 21
+        # funcs[b"\x16"] = em.do_em_c0_control_syn  # SYN, ⌃V, 22
+        # funcs[b"\x17"] = em.do_em_c0_control_etb  # ETB, ⌃W, 23
+        # funcs[b"\x18"] = em.do_em_c0_control_can  # CAN, ⌃X , 24
 
-        func_by_chords[b"\x1B"] = None
-        func_by_chords[b"\x1Bg"] = None
-        func_by_chords[b"\x1Bgg"] = em.do_em_goto_line  # ⌥GG
-        func_by_chords[b"\x1Bm"] = em.do_em_back_to_indentation  # ⌥M
+        funcs[b"\x1B"] = None
+        funcs[b"\x1Bg"] = None
+        funcs[b"\x1Bgg"] = em.do_em_goto_line  # ⌥GG
+        funcs[b"\x1Bm"] = em.do_em_back_to_indentation  # ⌥M
 
-        # FIXME - funcs["\u00A9".encode()]
-        func_by_chords["©".encode()] = em.do_em_goto_line  # ⌥GG at u00A9 CopyrightSign
-        func_by_chords[
-            "µ".encode()
-        ] = em.do_em_back_to_indentation  # ⌥M at 00B5 MicroSign
+        funcs["\u00A9".encode()] = None  # ⌥G, CopyrightSign
+        funcs["\u00A9g".encode()] = em.do_em_goto_line  # ⌥GG, CopyrightSign G
+        funcs["\u00B5".encode()] = em.do_em_back_to_indentation  # ⌥M, MicroSign
 
         self._init_func(b"\x18\x03", func=em.do_em_save_buffers_kill_terminal)  # ⌃X⌃C
         self._init_func(b"\x18\x13", func=em.do_em_save_buffer)  # ⌃X⌃S
 
-        # func_by_chords[b"\x19"] = em.do_em_c0_control_em  # EM, ⌃Y, 25
-        func_by_chords[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
+        # funcs[b"\x19"] = em.do_em_c0_control_em  # EM, ⌃Y, 25
+        funcs[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
 
-        # func_by_chords[b"\x1B"] = em.do_c0_control_esc  # ESC, ⌃[, 27
+        # funcs[b"\x1B"] = em.do_c0_control_esc  # ESC, ⌃[, 27
 
-        func_by_chords[b"\x1B[A"] = em.do_em_previous_line  # ↑ Up Arrow
-        func_by_chords[b"\x1B[B"] = em.do_em_next_line  # ↓ Down Arrow
-        func_by_chords[b"\x1B[C"] = em.do_em_forward_char  # → Right Arrow
-        func_by_chords[b"\x1B[D"] = em.do_em_backward_char  # ← Left Arrow
+        funcs[b"\x1B[A"] = em.do_em_previous_line  # ↑ Up Arrow
+        funcs[b"\x1B[B"] = em.do_em_next_line  # ↓ Down Arrow
+        funcs[b"\x1B[C"] = em.do_em_forward_char  # → Right Arrow
+        funcs[b"\x1B[D"] = em.do_em_backward_char  # ← Left Arrow
 
-        # func_by_chords[b"\x1C"] = em.do_em_eval_em_line   # FS, ⌃\, 28
-        # func_by_chords[b"\x1D"] = em.do_em_c0_control_gs  # GS, ⌃], 29
-        # func_by_chords[b"\x1E"] = em.do_em_c0_control_rs  # RS, ⌃^, 30
-        # func_by_chords[b"\x1F"] = em.do_em_c0_control_us  # US, ⌃_, 31
+        # funcs[b"\x1C"] = em.do_em_eval_em_line   # FS, ⌃\, 28
+        # funcs[b"\x1D"] = em.do_em_c0_control_gs  # GS, ⌃], 29
+        # funcs[b"\x1E"] = em.do_em_c0_control_rs  # RS, ⌃^, 30
+        # funcs[b"\x1F"] = em.do_em_c0_control_us  # US, ⌃_, 31
 
-        # func_by_chords[b"\x7F"] = em.do_em_c0_control_del  # DEL, ⌃?, 127
+        # funcs[b"\x7F"] = em.do_em_c0_control_del  # DEL, ⌃?, 127
 
         # Define the BASIC_LATIN_STDINS
 
@@ -4775,7 +4773,7 @@ class TerminalEditor:
 
         keyboard = self.skin.keyboard
 
-        func_by_chords = keyboard.func_by_chords
+        funcs = keyboard.func_by_chords
         intake_func = keyboard.intake_func
         intake_chords_set = keyboard.choose_intake_chords_set()
 
@@ -4784,8 +4782,8 @@ class TerminalEditor:
             chords_func = intake_func
             if chords not in intake_chords_set:
                 chords_func = self.do_raise_name_error
-                if chords in func_by_chords.keys():
-                    chords_func = func_by_chords[chords]
+                if chords in funcs.keys():
+                    chords_func = funcs[chords]
 
         return chords_func
 
