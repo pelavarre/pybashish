@@ -16,10 +16,9 @@ optional arguments:
   --version         print a hash of this code (its md5sum)
 
 quirks:
-  works as pipe filter, pipe source, or pipe drain, like the pipe drain:  ls |vi -
-  defaults to '-u /dev/null', not the Vim quirk of '-u ~/.vimrc'
-  searches for Python Regular Expressions, not Vim Regular Expressions
-  mostly doesn't ring bell, but does ring bell when search wraps
+  mostly doesn't ring bell, and does ring bell when search wraps
+  works as pipe filter, source, or drain, like the vim quirk of drain only:  ls |vi -
+  defaults to '-u /dev/null', not the vim quirk of '-u ~/.vimrc'
 
 keyboard cheat sheet:
   ZQ ZZ  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wn!⌃M :wq!⌃M :n⌃M :q⌃M  ⌃C Esc  => how to quit Vi Py
@@ -59,7 +58,7 @@ how to get Vi Py again:
 # Vim quirkily takes '+...' as an arg in place of '-c "..."', and Vi Py does too
 # Vim quirkily blinks the screen for '+q' without '+vi', but Vi Py doesn't
 
-# Vi Py also takes the \u0008 ⌃H BS \b chord in place of the \u007F ⌃? DEL chord
+# Vi Py also takes the U0008 ⌃H BS \b chord in place of the U007F ⌃? DEL chord
 # reserving one Control Char lets us doc the A⌃V⌃OZQ Egg, but we'll be defining ⌃V
 
 
@@ -285,9 +284,9 @@ optional arguments:
   --version           print a hash of this code (its md5sum)
 
 quirks:
-  works as pipe filter, pipe source, or pipe drain
-  defaults to -Q --eval '(menu-bar-mode -1)', not Emacs quirk of '--script ~/.emacs'
-  searches for Python Regular Expressions, not Emacs Regular Expressions
+  works in Mac Terminal, not only inside its UseOptionAsMetaKey < Keyboard < Profiles
+  works as pipe filter, source, or drain, like the vim quirk of drain only:  ls |vi -
+  defaults to -Q --eval '(menu-bar-mode -1)', not the emacs quirk of '--script ~/.emacs'
 
 keyboard cheat sheet:
   ⌃X⌃C  ⌃Zfg  ⌃X⌃S  ⌃G  => how to quit Em Py
@@ -3497,7 +3496,7 @@ class TerminalEditorEx:
         editor = self.editor
         chars = editor.get_arg0_chars()
 
-        if chars == "£":  # TODO: accept \u00A3 £ Pound Sign into Search Keys
+        if chars == "£":  # TODO: accept U00A3 £ PoundSign into Search Keys
             self.ex_line += "#"  # a la Vim :abbrev £ #
         else:
             self.ex_line += chars
@@ -3596,7 +3595,7 @@ class TerminalKeyboardEx(TerminalKeyboard):
 
         # TODO: input Search Keys containing more than BASIC_LATIN_STDINS and #
         # TODO: Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
-        # TODO: such as \u00A3 £ Pound Sign
+        # TODO: such as U00A3 £ PoundSign
 
         # TODO: define Esc to replace live Regex punctuation with calmer r"."
 
@@ -3945,6 +3944,12 @@ class TerminalKeyboardEm(TerminalKeyboard):
         func_by_chords[b"\x1Bg"] = None
         func_by_chords[b"\x1Bgg"] = em.do_em_goto_line  # ⌥GG
         func_by_chords[b"\x1Bm"] = em.do_em_back_to_indentation  # ⌥M
+
+        # FIXME - funcs["\u00A9".encode()]
+        func_by_chords["©".encode()] = em.do_em_goto_line  # ⌥GG at u00A9 CopyrightSign
+        func_by_chords[
+            "µ".encode()
+        ] = em.do_em_back_to_indentation  # ⌥M at 00B5 MicroSign
 
         self._init_func(b"\x18\x03", func=em.do_em_save_buffers_kill_terminal)  # ⌃X⌃C
         self._init_func(b"\x18\x13", func=em.do_em_save_buffer)  # ⌃X⌃S
@@ -6801,7 +6806,9 @@ class TerminalDriver:
 # especially after backing up or removing your history at:  -rw------- ~/.viminfo
 #
 
-_VIMRC_ = r"""
+_DOT_VIMRC_ = r"""
+
+
 " ~/.vimrc
 
 
@@ -6871,6 +6878,70 @@ endfun
 :xmap <Esc>3 #
 
 " copied from:  git clone https://github.com/pelavarre/pybashish.git
+
+
+"""
+
+
+#
+# Track how to configure Emacs to feel like Em Py,
+#
+
+_DOT_EMACS_ = r"""
+
+
+
+; ~/.emacs
+
+
+;; Configure Emacs
+
+(setq-default indent-tabs-mode nil)  ; indent with Spaces not Tabs
+(setq-default tab-width 4)  ; count out columns of C-x TAB S-LEFT/S-RIGHT
+
+(when (fboundp 'global-superword-mode) (global-superword-mode 't))  ; accelerate M-f M-b
+
+
+;; Add keys (without redefining keys)
+;; (as dry run by M-x execute-extended-command, M-: eval-expression)
+
+(global-set-key (kbd "C-c %") 'query-replace-regexp)  ; for when C-M-% unavailable
+(global-set-key (kbd "C-c -") 'undo)  ; for when C-- alias of C-_ unavailable
+(global-set-key (kbd "C-c b") 'ibuffer)  ; for ? m Q I O multi-buffer replace
+(global-set-key (kbd "C-c m") 'xterm-mouse-mode)  ; toggle between move and select
+(global-set-key (kbd "C-c O") 'overwrite-mode)  ; aka toggle Insert
+(global-set-key (kbd "C-c o") 'occur)
+(global-set-key (kbd "C-c r") 'revert-buffer)
+(global-set-key (kbd "C-c s") 'superword-mode)  ; toggle accelerate of M-f M-b
+(global-set-key (kbd "C-c w") 'whitespace-cleanup)
+
+
+;; Def C-c | = M-h C-u 1 M-| = Mark-Paragraph Universal-Argument Shell-Command-On-Region
+
+(global-set-key (kbd "C-c |") 'like-shell-command-on-region)
+(defun like-shell-command-on-region ()
+    (interactive)
+    (unless (mark) (mark-paragraph))
+    (setq string (read-from-minibuffer
+        "Shell command on region: " nil nil nil (quote shell-command-history)))
+    (shell-command-on-region (region-beginning) (region-end) string nil 'replace)
+    )
+
+
+;; Turn off enough of macOS to run Emacs
+
+; press Esc to mean Meta, or run Emacs Py in place of Emacs, or else
+;   macOS Terminal > Preferences > Profiles > Keyboard > Use Option as Meta Key
+
+; press ⌃⇧2 or ⌃Space and hope it comes out as C-@ or C-SPC to mean 'set-mark-command
+;   even though older macOS needed you to turn off System Preferences > Keyboard >
+;   Input Sources > Shortcuts > Select The Previous Input Source  ⌃Space
+
+
+; copied from:  git clone https://github.com/pelavarre/pybashish.git
+
+
+
 """
 
 
