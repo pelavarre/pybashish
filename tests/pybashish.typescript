@@ -1144,7 +1144,7 @@ Clean up
 
 ## 2.37 ) Tr
 
-    $ bin/cat.py $(git ls-files |grep -v '^tests/') |bin/tr.py |awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
+    $ bin/cat.py $(git ls-files |grep '[.]py$') |bin/tr.py |awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
 
      !"#$%&'()*+,-./
     0123456789:;<=>?@
