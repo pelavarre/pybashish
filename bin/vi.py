@@ -294,7 +294,7 @@ keyboard cheat sheet:
   ⌃X⌃C  ⌃Zfg  ⌃X⌃S  ⌃G  => how to quit Em Py
   Down Up Right Left Space Return  => conventional enough
   ⌃E ⌃A ⌃F ⌃B ⌥M  => leap to column
-  ⌃N ⌃P ⌥Gg  => leap to line
+  ⌃N ⌃P ⌥< ⌥> ⌃U99⌥G⌥G U⌃L ⌃L  => leap to line, scroll screen rows
   ⌃U ⌃U -0123456789 ⌃U ⌃G  => repeat, or don't
   ⌃Q  => take ⌥ as input, not command
 
@@ -316,9 +316,6 @@ how to get Em Py:
 how to get Em Py again:
   python3 em?py --pwnme
 """
-
-# FIXME: Em of Vim  0 ^ $ fx tx Fx Tx ; , | h l  => leap to column
-# FIXME: Em of Vim  G 1G H L M - + _ ⌃J ⌃N ⌃P j k  => leap to screen row, leap to line
 
 # FIXME: swap this ALT_DOC with the '__main__.__doc__' when first run
 
@@ -1141,7 +1138,7 @@ class TerminalVi:
         self.vi_print(message)  # 'def vi_ask' calling
 
         vi_reply = self.format_vi_status(self.editor.skin.reply)
-        ex = TerminalEditorEx(editor, vi_reply=vi_reply)
+        ex = TerminalEx(editor, vi_reply=vi_reply)
         ex.flush_ex_status()
 
     def do_resume_vi(self):  # Vim :vi\r  # Vi Py :em\r
@@ -1260,7 +1257,7 @@ class TerminalVi:
             # TODO: shuffle this code down into TerminalEditor
 
         self.vi_print(
-            "wrote {} lines as {} bytes".format(
+            "wrote {:_} lines as {:_} bytes".format(
                 len(held_vi_file.ended_lines), len(held_vi_file.iobytes)
             )
         )
@@ -1615,7 +1612,7 @@ class TerminalVi:
         editor = self.editor
 
         vi_reply = self.format_vi_status(self.editor.skin.reply)
-        ex = TerminalEditorEx(editor, vi_reply=vi_reply)
+        ex = TerminalEx(editor, vi_reply=vi_reply)
         line = ex.read_ex_line()
 
         return line
@@ -2143,7 +2140,7 @@ class TerminalVi:
         editor.continue_do_loop()
 
     #
-    # Scroll to move Cursor on Screen
+    # Scroll Rows of the Screen
     #
 
     def do_scroll_till_top(self):  # Vim zt
@@ -2157,6 +2154,8 @@ class TerminalVi:
 
         editor.top_row = row
 
+        self.vi_print("Cursor is in top row")
+
     def do_scroll_till_middle(self):  # Vim zz  # not to be confused with Vim ZZ
         """Scroll up or down till Cursor Row lands in Middle Row of Screen"""
 
@@ -2165,6 +2164,7 @@ class TerminalVi:
         scrolling_rows = painter.scrolling_rows
 
         assert scrolling_rows
+        half_screen = scrolling_rows // 2
 
         row_plus = self.get_vi_arg1_int(default=(editor.row + 1))
         row = row_plus - 1
@@ -2174,6 +2174,11 @@ class TerminalVi:
         top_row = (row - up) if (row >= up) else 0
 
         editor.top_row = top_row
+
+        if row < half_screen:
+            self.vi_print("Cursor is above the middle row")
+        else:
+            self.vi_print("Cursor is in middle row")
 
     def do_scroll_till_bottom(self):  # Vim zb
         """Scroll up or down till Cursor Row lands in Bottom Row of Screen"""
@@ -2192,6 +2197,11 @@ class TerminalVi:
         top_row = (row - up) if (row >= up) else 0
 
         editor.top_row = top_row
+
+        if row < (scrolling_rows - 1):
+            self.vi_print("Cursor is above the bottom row")
+        else:
+            self.vi_print("Cursor is in bottom row")
 
     #
     # Search ahead for an Empty Line (while ignoring Blank Lines)
@@ -3475,7 +3485,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
 #
 
 
-class TerminalEditorEx:
+class TerminalEx:
     """Feed Keyboard into Line at Bottom of Screen of Scrolling Rows, a la Ex"""
 
     def __init__(self, editor, vi_reply):
@@ -3660,6 +3670,8 @@ class TerminalEm:
 
         vi = TerminalVi(files, script=script, evals=evals)
         self.vi = vi
+
+        self.recenter_positions = list()
 
     def run_vi_terminal(self):
         """Enter Terminal Driver, then run Emacs Keyboard, then exit Terminal Driver"""
@@ -3877,50 +3889,96 @@ class TerminalEm:
         self.vi.slip_dent()
 
     def do_em_backward_char(self):  # Emacs ⌃B
-        """FIXME"""
+        """Slip left or up"""
 
         self.vi.slip_behind_one()
 
-    def do_em_forward_char(self):  # Emacs ⌃F
-        """FIXME"""
+    def do_em_beginning_of_buffer(self):  # Emacs ⌥<
+        """Leap to the first Column of the first Line"""
 
-        self.vi.slip_ahead_one()
+        editor = self.vi.editor
 
-    def do_em_goto_line(self):  # Emacs ⌥Gg
-        """FIXME"""
+        editor.row = 0
+        editor.column = 0
+
+    def do_em_end_of_buffer(self):  # Emacs ⌥>
+        """Leap to the last Column of the last Line"""
 
         editor = self.vi.editor
         last_row = editor.spot_last_row()
 
-        count = editor.get_arg1_int(default=(last_row + 1))
+        editor.row = last_row
+        editor.column = editor.spot_max_column()
+
+    def do_em_forward_char(self):  # Emacs ⌃F
+        """Slip right or down"""
+
+        self.vi.slip_ahead_one()
+
+    def do_em_goto_line(self):  # Emacs ⌥Gg
+        """Leap to the first Column of the chosen Line"""
+
+        editor = self.vi.editor
+        last_row = editor.spot_last_row()
+
+        self.vi.check_vi_index(editor.skin.arg1)
+
+        count = editor.get_arg1_int(default=None)
         row = min(last_row, count - 1)
 
         editor.row = row
         editor.column = 0
 
     def do_em_move_beginning_of_line(self):  # Emacs ⌃A
-        """FIXME"""
+        """Leap to the first Column in Row"""
 
         editor = self.vi.editor
         editor.column = 0
 
     def do_em_move_end_of_line(self):  # Emacs ⌃E
-        """FIXME"""
+        """Leap to just beyond the last Column in Row"""
 
         editor = self.vi.editor
         editor.column = editor.spot_max_column()
 
     def do_em_next_line(self):  # Emacs ⌃N, Down
-        """FIXME"""
+        """Step to the next Row below"""
 
         editor = self.vi.editor
         editor.row += 1
 
     def do_em_previous_line(self):  # Emacs ⌃P, Up
-        """FIXME"""
+        """Step to the next Row above"""
 
         editor = self.vi.editor
         editor.row -= 1
+
+    #
+    # Scroll Rows of the Screen
+    #
+
+    def do_em_recenter_top_bottom(self):  # Emacs ⌃U⌃L, Emacs ⌃L
+        """Scroll up or down till Cursor Row lands on Middle/ Top/ Bottom Row"""
+
+        recenter_positions = self.recenter_positions
+        vi = self.vi
+
+        # Start again when needed, or on demand
+
+        arg1 = vi.editor.skin.arg1
+        if (not recenter_positions) or (arg1 is not None):
+
+            recenter_positions[::] = [
+                vi.do_scroll_till_bottom,  # 3rd
+                vi.do_scroll_till_top,  # 2nd
+                vi.do_scroll_till_middle,  # 1st
+            ]
+
+        # Take the next position
+
+        vi.editor.skin.arg1 = None  # TODO: ugly mutate
+        func = recenter_positions.pop()
+        func()
 
     #
     # Insert Chords as Chars
@@ -3975,7 +4033,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # funcs[b"\x09"] = em.do_em_c0_control_tab  # TAB, ⌃I, 9 \t
         # funcs[b"\x0A"] = em.do_em_c0_control_lf  # LF, ⌃J, 10 \n
         # funcs[b"\x0B"] = em.do_em_c0_control_vt  # VT, ⌃K, 11 \v
-        # funcs[b"\x0C"] = em.do_em_c0_control_ff  # FF, ⌃L, 12 \f
+        funcs[b"\x0C"] = em.do_em_recenter_top_bottom  # FF, ⌃L, 12 \f
         # funcs[b"\x0D"] = em.do_em_c0_control_cr  # CR, ⌃M, 13 \r
         funcs[b"\x0E"] = em.do_em_next_line  # SO, ⌃N, 14
         # funcs[b"\x0F"] = em.do_em_c0_control_si  # SI, ⌃O, 15
@@ -3988,26 +4046,20 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # funcs[b"\x15"] = em.do_em_scroll_behind_some  # NAK, ⌃U, 21
         # funcs[b"\x16"] = em.do_em_c0_control_syn  # SYN, ⌃V, 22
         # funcs[b"\x17"] = em.do_em_c0_control_etb  # ETB, ⌃W, 23
+
         # funcs[b"\x18"] = em.do_em_c0_control_can  # CAN, ⌃X , 24
-
-        funcs[b"\x1B"] = None
-        funcs[b"\x1Bg"] = None
-        funcs[b"\x1Bgg"] = em.do_em_goto_line  # ⌥Gg
-        funcs[b"\x1Bg\x1Bg"] = em.do_em_goto_line  # ⌥G⌥G
-        funcs[b"\x1Bm"] = em.do_em_back_to_indentation  # ⌥M
-
-        funcs["\u00A9".encode()] = None  # ⌥G, CopyrightSign
-        funcs["\u00A9g".encode()] = em.do_em_goto_line  # ⌥Gg, CopyrightSign g
-        funcs["\u00A9\u00A9".encode()] = em.do_em_goto_line  # ⌥G⌥G, 2x CopyrightSign
-        funcs["\u00B5".encode()] = em.do_em_back_to_indentation  # ⌥M, MicroSign
-
         self._init_func(b"\x18\x03", func=em.do_em_save_buffers_kill_terminal)  # ⌃X⌃C
         self._init_func(b"\x18\x13", func=em.do_em_save_buffer)  # ⌃X⌃S
 
         # funcs[b"\x19"] = em.do_em_c0_control_em  # EM, ⌃Y, 25
+
         funcs[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
 
-        # funcs[b"\x1B"] = em.do_c0_control_esc  # ESC, ⌃[, 27
+        self._init_func(b"\x1B<", em.do_em_beginning_of_buffer)  # ⌥<
+        self._init_func(b"\x1B>", em.do_em_end_of_buffer)  # ⌥>
+        self._init_func(b"\x1Bgg", em.do_em_goto_line)  # ⌥Gg
+        self._init_func(b"\x1Bg\x1Bg", em.do_em_goto_line)  # ⌥G⌥G
+        self._init_func(b"\x1Bm", em.do_em_back_to_indentation)  # ⌥M
 
         funcs[b"\x1B[A"] = em.do_em_previous_line  # ↑ Up Arrow
         funcs[b"\x1B[B"] = em.do_em_next_line  # ↓ Down Arrow
@@ -4025,6 +4077,16 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         self.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
         self.intake_func = em.do_em_self_insert_command
+
+        # Define Keyboard Input Chords of the macOS Terminal Option Key
+
+        funcs["\u00A9".encode()] = None  # ⌥G, CopyrightSign
+        self._init_func("\u00A9g".encode(), em.do_em_goto_line)  # ⌥Gg, CopyrightSign g
+        self._init_func("\u00A9\u00A9".encode(), em.do_em_goto_line)  # ⌥G⌥G
+        funcs["\u00AF".encode()] = em.do_em_beginning_of_buffer  # ⌥<, Macron
+        funcs["\u00B5".encode()] = em.do_em_back_to_indentation  # ⌥M, MicroSign
+
+        funcs["\u02D8".encode()] = em.do_em_end_of_buffer  # ⌥>, Breve
 
 
 #
@@ -7008,7 +7070,6 @@ endfun
 _DOT_EMACS_ = r"""
 
 
-
 ; ~/.emacs
 
 
@@ -7057,7 +7118,6 @@ _DOT_EMACS_ = r"""
 
 
 ; copied from:  git clone https://github.com/pelavarre/pybashish.git
-
 
 
 """
