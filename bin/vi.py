@@ -33,7 +33,7 @@ keyboard cheat sheet:
   \n \i \F ⌃C Esc ⌃G  => toggle line numbers, search case/ regex, show hits
   /... Delete ⌃U ⌃C Return  ?...   * £ # n N  => start search, next, previous
   ?Return /Return :g/Return  => search behind, ahead, print last hits, or new search
-  a i rx o A I O R ⌃O ⌃C Esc  => enter/ suspend-resume/ exit insert/ replace
+  a i rx o A I O R ⌃V ⌃O ⌃C Esc  => enter/ suspend-resume/ exit insert/ replace
   x X dd D J s S C  => cut chars or lines, join lines, cut & insert
 
 keyboard easter eggs:
@@ -296,6 +296,7 @@ keyboard cheat sheet:
   ⌃E ⌃A ⌃F ⌃B ⌥M  => leap to column
   ⌃N ⌃P ⌥Gg  => leap to line
   ⌃U ⌃U -0123456789 ⌃U ⌃G  => repeat, or don't
+  ⌃Q  => take ⌥ as input, not command
 
 keyboard easter eggs:
   ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
@@ -904,6 +905,29 @@ class TerminalVi:
         assert (evalled is None) or (evalled >= 1)
 
         return evalled
+
+    def do_vi_c0_control_syn(self):
+        """Define ⌃V during AIO aio R, but not yet otherwise"""
+
+        editor = self.editor
+        if editor.intake_beyond:
+            self.do_quote_one_intake()
+        else:
+            editor.do_raise_name_error()
+
+    def do_quote_one_intake(self):  # Vim ⌃V inside AIOR aio
+        """Take the next Input Keyboard Chord to insert or replace, not as Control"""
+
+        editor = self.editor
+        keyboard = editor.skin.keyboard
+
+        if editor.intake_beyond == "inserting":  # AIO aio then ⌃V
+            self.vi_print("Type one char to insert")
+        else:
+            assert editor.intake_beyond == "replacing"  # R then ⌃V
+            self.vi_print("Type one char to replace")
+
+        keyboard.intake_ish = True
 
     def get_vi_arg0_chars(self):
         """Get the Chars of the Chords pressed to call this Func"""
@@ -2781,7 +2805,9 @@ class TerminalVi:
         self.vi_print("Press Esc to quit, else type chars to insert")
         skin.cursor_style = _INSERT_CURSOR_STYLE_
 
-        keyboard.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
+        chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN]) | set(["£".encode()])
+        keyboard.intake_chords_set = chords_set
+
         keyboard.intake_func = self.do_insert_per_chord
         editor.intake_beyond = "inserting"
         editor.intake_taken = False
@@ -2800,10 +2826,12 @@ class TerminalVi:
 
         self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
-        self.vi_print("Press Esc to quit, else type chars to spill over")
+        self.vi_print("Press Esc to quit, else type chars to write over")
         skin.cursor_style = _REPLACE_CURSOR_STYLE_
 
-        keyboard.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
+        chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN]) | set(["£".encode()])
+        keyboard.intake_chords_set = chords_set
+
         keyboard.intake_func = self.do_replace_per_chord
         editor.intake_beyond = "replacing"
         editor.intake_taken = False
@@ -2875,13 +2903,7 @@ class TerminalVi:
         """Insert a copy of the Input Char, else insert a Line"""
         # Emacs Self-Insert-Command outside of 'overwrite-mode'
 
-        editor = self.editor
-
         chars = self.get_vi_arg0_chars()
-
-        if (len(chars) == 1) and (ord(chars) > 0x7F):
-            editor.intake_taken = True
-
         if chars == CR_CHAR:
             self.do_insert_one_line()
         else:
@@ -2903,6 +2925,10 @@ class TerminalVi:
         editor = self.editor
 
         chars = self.get_vi_arg0_chars()
+        if (len(chars) == 1) and (ord(chars) >= 0x80):
+
+            editor.intake_taken = True
+
         editor.insert_some_chars(chars)  # insert as inserting itself
 
         self.held_vi_file.touches += 1
@@ -2927,14 +2953,12 @@ class TerminalVi:
 
         editor.continue_do_loop()
 
+        # Vi Py defines ⌃V after FT ftr identically  # TODO: make it work
+        # Vim quirk defines ⌃V after AIOR aior as quoting, but not after FT ft
+
     def do_replace_per_chord(self):  # Vim Bypass View to Replace
         """Replace one Char with the Input Chars"""
         # Emacs Self-Insert-Command inside of 'overwrite-mode'
-
-        editor = self.editor
-
-        if (len(chars) == 1) and (ord(chars) > 0x7F):
-            editor.intake_taken = True
 
         chars = self.get_vi_arg0_chars()
         if chars == CR_CHAR:
@@ -2950,6 +2974,10 @@ class TerminalVi:
         columns = editor.count_columns_in_row()
 
         chars = self.get_vi_arg0_chars()
+        if (len(chars) == 1) and (ord(chars) >= 0x80):
+
+            editor.intake_taken = True
+
         editor.replace_some_chars(chars)
         self.held_vi_file.touches += 1
 
@@ -3154,6 +3182,7 @@ class TerminalKeyboard:
         self.intake_bypass = ""
         self.intake_chords_set = set()
         self.intake_func = None
+        self.intake_ish = False
 
         self.do_prefix_chord_func = lambda chord: False
         self.eval_prefix_func = lambda prefix: None
@@ -3269,7 +3298,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # funcs[b"\x13"] = vi.do_c0_control_dc3  # DC3, XOFF, ⌃S, 19
         # funcs[b"\x14"] = vi.do_c0_control_dc4  # DC4, ⌃T, 20
         # funcs[b"\x15"] = vi.do_scroll_behind_some  # NAK, ⌃U, 21
-        # funcs[b"\x16"] = vi.do_c0_control_syn  # SYN, ⌃V, 22
+        funcs[b"\x16"] = vi.do_vi_c0_control_syn  # SYN, ⌃V, 22
         # funcs[b"\x17"] = vi.do_c0_control_etb  # ETB, ⌃W, 23
         # funcs[b"\x18"] = vi.do_c0_control_can  # CAN, ⌃X , 24
         funcs[b"\x19"] = vi.do_scroll_behind_one  # EM, ⌃Y, 25
@@ -3509,7 +3538,7 @@ class TerminalEditorEx:
 
         return TerminalPin(row, column=column)
 
-    def do_clear_chars(self):  # Vim Ex ⌃U
+    def do_clear_chars(self):  # Ex ⌃U in Vim
         """Undo all the Append Chars, if any Not undone already"""
 
         self.ex_line = ""
@@ -3525,13 +3554,6 @@ class TerminalEditorEx:
         else:
             self.ex_line += chars
 
-    def do_append_suffix(self):  # Vim Ex ⌃V
-        """Append the Suffix Chord to the Input Line"""
-
-        chars = self.editor.skin.arg2_chords
-
-        raise NotImplementedError("⌃V", repr(chars))
-
     def do_undo_append_char(self):
         """Undo the last Append Char, else Quit Ex"""
 
@@ -3543,14 +3565,14 @@ class TerminalEditorEx:
 
             sys.exit()
 
-    def do_quit_ex(self):  # Vim Ex ⌃C
+    def do_quit_ex(self):  # Ex ⌃C in Vim
         """Lose all input and quit Ex"""
 
         self.ex_line = None
 
         sys.exit()
 
-    def do_copy_down(self):  # Vim Ex ⌃P, ↑ Up Arrow
+    def do_copy_down(self):  # Ex ⌃P, ↑ Up Arrow, in Vim
         """Recall last input line"""
 
         editor = self.editor
@@ -3603,8 +3625,6 @@ class TerminalKeyboardEx(TerminalKeyboard):
         funcs[b"\x10"] = ex.do_copy_down  # DLE, ⌃P, 16
         funcs[b"\x1A"] = editor.do_sig_tstp  # SUB, ⌃Z, 26
         funcs[b"\x15"] = ex.do_clear_chars  # NAK, ⌃U, 21
-
-        self._init_suffix_func(b"\x16", func=ex.do_append_suffix)  # SYN, ⌃V, 22
 
         funcs[b"\x1B[A"] = ex.do_copy_down  # ↑ Up Arrow
 
@@ -3779,6 +3799,11 @@ class TerminalEm:
         return prefix
 
         # Em Py echoes the Evalled Prefix, Emacs quirkily does Not
+
+    def do_em_quoted_insert(self):  # Emacs ⌃Q
+        """Take the next Input Keyboard Chord to insert or replace, not as Control"""
+
+        self.vi.do_quote_one_intake()
 
     #
     # Define Control Chords
@@ -3956,6 +3981,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # funcs[b"\x0F"] = em.do_em_c0_control_si  # SI, ⌃O, 15
         funcs[b"\x10"] = em.do_em_previous_line  # DLE, ⌃P, 16
         # funcs[b"\x11"] = em.do_em_c0_control_dc1  # DC1, XON, ⌃Q, 17
+        funcs[b"\x11"] = em.do_em_quoted_insert  # DC1, XON, ⌃Q, 17
         # funcs[b"\x12"] = em.do_em_c0_control_dc2  # DC2, ⌃R, 18
         # funcs[b"\x13"] = em.do_em_c0_control_dc3  # DC3, XOFF, ⌃S, 19
         # funcs[b"\x14"] = em.do_em_c0_control_dc4  # DC4, ⌃T, 20
@@ -3967,10 +3993,12 @@ class TerminalKeyboardEm(TerminalKeyboard):
         funcs[b"\x1B"] = None
         funcs[b"\x1Bg"] = None
         funcs[b"\x1Bgg"] = em.do_em_goto_line  # ⌥Gg
+        funcs[b"\x1Bg\x1Bg"] = em.do_em_goto_line  # ⌥G⌥G
         funcs[b"\x1Bm"] = em.do_em_back_to_indentation  # ⌥M
 
         funcs["\u00A9".encode()] = None  # ⌥G, CopyrightSign
         funcs["\u00A9g".encode()] = em.do_em_goto_line  # ⌥Gg, CopyrightSign g
+        funcs["\u00A9\u00A9".encode()] = em.do_em_goto_line  # ⌥G⌥G, 2x CopyrightSign
         funcs["\u00B5".encode()] = em.do_em_back_to_indentation  # ⌥M, MicroSign
 
         self._init_func(b"\x18\x03", func=em.do_em_save_buffers_kill_terminal)  # ⌃X⌃C
@@ -4754,6 +4782,7 @@ class TerminalEditor:
         chords_func = self.editor_func_by_chords(chords)
         chords_plus_func = self.editor_func_by_chords(chords=chords_plus)
 
+        keyboard.intake_ish = False
         self.intake_taken = False
 
         chords_plus_want_suffix = False
@@ -4812,14 +4841,36 @@ class TerminalEditor:
     def editor_func_by_chords(self, chords):
         """Choose the Func for some Chords"""
 
+        intake_taken = self.intake_taken
+
         chars = chords.decode(errors="surrogateescape") if chords else ""
-        intake_ish = (len(chars) == 1) and (ord(chars) > 0x7F)
+        chars_intake_ish = (len(chars) == 1) and (ord(chars) >= 0x80)
 
         keyboard = self.skin.keyboard
+        keyboard_intake_ish = keyboard.intake_ish
 
         funcs = keyboard.func_by_chords
         intake_func = keyboard.intake_func
         intake_chords_set = keyboard.choose_intake_chords_set()
+
+        # Pick out when to take the first Input Keyboard Chord for insert or replace
+
+        intake_ish = False
+
+        if chords and intake_func:
+            if chords in intake_chords_set:
+
+                intake_ish = True
+
+            elif chords not in C0_CONTROL_STDINS:
+                if keyboard_intake_ish:
+
+                    intake_ish = True
+
+                elif chars_intake_ish:
+                    if intake_taken or (chords not in funcs.keys()):
+
+                        intake_ish = True
 
         # Ask first for one Chord
 
@@ -4829,7 +4880,7 @@ class TerminalEditor:
             # Take simple Chords as Input Chars on demand
 
             chords_func = intake_func
-            if chords not in intake_chords_set:
+            if not intake_ish:
 
                 # Accept Chords that do name Funcs
 
@@ -4837,19 +4888,6 @@ class TerminalEditor:
                 if chords in funcs.keys():
 
                     chords_func = funcs[chords]
-
-                    # Except take ambiguous Chords to mean Intake after Intake
-
-                    if self.intake_taken and intake_chords_set:
-                        if intake_ish and intake_func:
-
-                            chords_func = intake_func
-
-                # Accept Chords that more likely name Symbols than Funcs
-
-                elif intake_ish and intake_func:
-
-                    chords_func = intake_func
 
         return chords_func
 
@@ -6001,8 +6039,18 @@ class TerminalPainter:
         # but don't write over the Lower Right Char  # TODO: test vs xterm autoscroll
 
         str_status = "" if (status is None) else str(status)
+
         status_columns = columns - 1
         status_line = str_status[:status_columns].ljust(status_columns)
+        for chord in sorted(C0_CONTROL_STDINS):
+            if chord.decode() in status_line:
+
+                status_line = repr(status_line)[:status_columns].ljust(status_columns)
+
+                assert False  # unreached
+
+                break
+
         terminal.write(status_line)
 
         # Style the cursor
