@@ -10,57 +10,56 @@ positional arguments:
 
 optional arguments:
   -h, --help        show this help message and exit
-  -u SCRIPT         file of ex commands to run after args
+  -u SCRIPT         file of ex commands to run after args (default: '/dev/null')
   -c COMMAND        another ex command to run after args and after '-u'
   --pwnme [BRANCH]  update and run this code, don't just run it
   --version         print a hash of this code (its md5sum)
 
 quirks:
-  mostly doesn't ring bell, and does ring bell when search wraps
-  works as pipe filter, source, or drain, like the vim quirk of drain only:  ls |vi -
-  defaults to '-u /dev/null', not the vim quirk of '-u ~/.vimrc'
-  loses all your input when it crashes, chokes over input of most c0-control bytes
+  works as pipe filter, source, or drain, a la the vim drain:  ls |vi -
+  loses input at crashes, and input of C0 Control bytes, except after ⌃V
 
 keyboard cheat sheet:
-  ZQ ZZ  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M :wn!⌃M :wq!⌃M :n⌃M :q⌃M  ⌃C Esc  => how to quit Vi Py
+  ZQ ZZ  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M  ⌃C Esc  => how to quit Vi Py
   Down Up Right Left Space Delete Return  => conventional enough
   0 ^ $ fx tx Fx Tx ; , | h l  => leap to column
   b e w B E W { }  => leap across small word, large word, paragraph
   G 1G H L M - + _ ⌃J ⌃N ⌃P j k  => leap to screen row, leap to line
   1234567890 ⌃C Esc  => repeat, or don't
-  ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll screen rows
+  ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll screen
   ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
   \n \i \F ⌃C Esc ⌃G  => toggle line numbers, search case/ regex, show hits
-  /... Delete ⌃U ⌃C Return  ?...   * £ # n N  => start search, next, previous
-  ?Return /Return :g/Return  => search behind, ahead, print last hits, or new search
-  a i rx o A I O R ⌃V ⌃O ⌃C Esc  => enter/ suspend-resume/ exit insert/ replace
-  x X dd D J s S C  => cut chars or lines, join lines, cut & insert
+  /... Delete ⌃U ⌃C Return  ?...   * £ # n N  => search ahead, behind, next
+  /Return ?Return :g/Return  => search ahead, behind, lots
+  a i rx o A I O R ⌃V ⌃O ⌃C Esc  => insert, replace, & view, once or awhile
+  x X dd D J s S C  => cut chars or lines, join lines, insert after cut
 
 keyboard easter eggs:
   9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz  3ZQ 512ZQ
-  ⌃C Esc 123Esc zZZQ A⌃V⌃OZQ A⌃OzQ⌃CZQ f⌃C w*⌃C w*123456n⌃C /⌃G⌃CZQ w*g/⌃M⌃C g/⌃Z
+  ⌃C Esc  123Esc zZZQ A⌃OzZ⌃OZQ /⌃G⌃CZQ f⌃C w*⌃C w*123456n⌃C w*g/⌃M⌃C g/⌃Z
   Qvi⌃My REsc R⌃Zfg OO⌃O_⌃O^ \Fw*/Up \F/$Return ⌃G2⌃G :vi⌃M :n
 
 pipe tests of ZQ vs ZZ:
-  ls |bin/vi.py -
-  cat bin/vi.py |bin/vi.py
-  cat bin/vi.py |bin/vi.py |grep import
+  ls |bin/vi.py -  # pipe drain
+  cat bin/vi.py |bin/vi.py |grep import  # pipe filter
 
 how to get Vi Py:
   R=pelavarre/pybashish/master/bin/vi.py
   curl -sSO --location https://raw.githubusercontent.com/$R
-  python3 vi?py vi?py
+  python3 vi.py vi.py  # with updates at:  python3 vi.py --pwnme
   /egg
-
-how to get Vi Py again:
-  python3 vi?py --pwnme
 """
 
-# Vim quirkily takes '+...' as an arg in place of '-c "..."', and Vi Py does too
-# Vim quirkily blinks the screen for '+q' without '+vi', but Vi Py doesn't
-
-# Vi Py also takes the U0008 ⌃H BS \b chord in place of the U007F ⌃? DEL chord
-# reserving one Control Char lets us doc the A⌃V⌃OZQ Egg, but we'll be defining ⌃V
+#
+# quirkily enough, Vim and Vi Py both
+#   take '+...' as an arg in place of '-c "..."', and Vi Py
+#   take the U0008 ⌃H BS \b chord in place of the U007F ⌃? DEL chord
+#
+# unlike Vi Py, Vim quirkily
+#   runs only as a pipe drain, declines to run as a pipe source or filter
+#   does blink the screen for '+q' without '+vi'
+#   does not name some chords it keeps undefined, such as Vi Py's zZ and Em Py's ⌃X⌃G
+#
 
 
 import __main__
@@ -279,22 +278,22 @@ optional arguments:
   -Q, --quick         run as if --no-splash and --no-init-file (but slow after crash)
   --no-splash         start with an empty file, not a file of help
   -q, --no-init-file  don't default to run '~/.emacs' after args
-  --script SCRIPT     file of elisp commands to run after args
+  --script SCRIPT     file of elisp commands to run after args (default: '/dev/null')
   --eval COMMAND      another elisp command to run after args and after --script
   --pwnme [BRANCH]    update and run this code, don't just run it
   --version           print a hash of this code (its md5sum)
 
 quirks:
-  works in Mac Terminal, not only inside its UseOptionAsMetaKey < Keyboard < Profiles
-  works as pipe filter, source, or drain, like the vim quirk of drain only:  ls |vi -
-  defaults to -Q --eval '(menu-bar-mode -1)', not the emacs quirk of '--script ~/.emacs'
-  loses all your input when it crashes, chokes over input of bytes outside basic latin
+  works in Mac Terminal, even without UseOptionAsMetaKey < Keyboard < Profiles
+  works as pipe filter, source, or drain, a la the vim drain:  ls |vi -
+  defaults to -Q --eval '(menu-bar-mode -1)', not the quirky '--script ~/.emacs'
+  loses input at crashes, and input outside Basic Latin bytes, except after ⌃Q
 
 keyboard cheat sheet:
-  ⌃X⌃C  ⌃Zfg  ⌃X⌃S  ⌃G  => how to quit Em Py
+  ⌃X⌃C  ⌃X⌃S  ⌃Zfg  ⌃G  => how to quit Em Py
   Down Up Right Left Space Return  => conventional enough
-  ⌃E ⌃A ⌃F ⌃B ⌥M  => leap to column
-  ⌃N ⌃P ⌥< ⌥> ⌃U99⌥G⌥G U⌃L ⌃L  => leap to line, scroll screen rows
+  ⌃E ⌃A ⌃F ⌃B ⌥M ⌃U⌥GTab  => leap to column
+  ⌃N ⌃P ⌃R⌃R⌃R ⌥< ⌥> ⌃U99⌥G⌥G ⌃L⌃L⌃L ⌃U⌃L  => leap to line, scroll screen
   ⌃U ⌃U -0123456789 ⌃U ⌃G  => repeat, or don't
   ⌃Q  => take ⌥ as input, not command
 
@@ -302,22 +301,30 @@ keyboard easter eggs:
   ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
 
 pipe tests:
-  ls |bin/em.py -
-  cat bin/em.py |bin/em.py
-  cat bin/em.py |bin/em.py |grep import
+  ls |bin/em.py -  # pipe drain
+  cat bin/em.py |bin/em.py |grep import  # pipe filter
 
 how to get Em Py:
   R=pelavarre/pybashish/master/bin/vi.py
   curl -sSO --location https://raw.githubusercontent.com/$R
   echo cp -ip vi_py em_py |tr _ . |bash
-  python3 em?py em?py
+  python3 em.py em.py  # with updates at:  python3 em.py --pwnme
   ⌃Segg
-
-how to get Em Py again:
-  python3 em?py --pwnme
 """
 
-# FIXME: swap this ALT_DOC with the '__main__.__doc__' when first run
+#
+# quirkily enough, Emacs and Em Py both
+#   misread a pasted Return to mean add the indentation of the line above  # TODO
+#   take the U0008 ⌃H BS \b chord in place of the U007F ⌃? DEL chord
+#
+# unlike Vi Py, Emacs quirkily
+#   declines to run as pipe drain, source, or filter
+#   does blink the screen for '+q' without '+vi'
+#   does not name some chords it keeps undefined, such as Vi Py's zZ and Em Py's ⌃X⌃G
+#
+
+
+
 
 
 def main(argv):
@@ -340,6 +347,8 @@ def main(argv):
     # Load each File
 
     edit_the_files(files=args.files, script=args.script, evals=args.evals)
+
+    # FIXME: swap the '__main__.__doc__' with ALT_DOC, when "--help" sees it's not there
 
 
 def parse_vi_argv(argv):
@@ -369,7 +378,7 @@ def parse_vi_argv(argv):
             "-u",
             metavar="SCRIPT",
             dest="script",
-            help="file of ex commands to run after args",
+            help="file of ex commands to run after args (default: '/dev/null')",
         )
 
         parser.add_argument(
@@ -411,7 +420,7 @@ def parse_vi_argv(argv):
         parser.add_argument(
             "--script",
             metavar="SCRIPT",
-            help="file of elisp commands to run after args",
+            help="file of elisp commands to run after args (default: '/dev/null')",
         )
 
         parser.add_argument(
@@ -2907,7 +2916,7 @@ class TerminalVi:
 
         self.vi_print("Type one command")
 
-        skin.doing_traceback = skin.traceback  # A⌃V⌃OZQ Egg
+        skin.doing_traceback = skin.traceback  # A⌃OzZ⌃OZQ Egg
 
     def do_insert_per_chord(self):  # Vim Bypass View to Insert
         """Insert a copy of the Input Char, else insert a Line"""
@@ -3416,7 +3425,6 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func(b"\\F", func=editor.do_set_invregex)
         self._init_func(b"\\i", func=editor.do_set_invignorecase)
         self._init_func(b"\\n", func=editor.do_set_invnumber)
-
         # TODO: stop commandeering the personal \Esc \F \i \n Chord Sequences
 
         # funcs[b"]"]  # TODO: b"]"
@@ -3858,6 +3866,7 @@ class TerminalEm:
             # such as '/dev/stdout'  Press ⌃X⌃C to save changes and quit Emacs Py  0.1.2
 
         # Emacs ⌃G quirk rapidly rings a Bell for each extra ⌃G, Em Py doesn't
+        # FIXME: ⌃U⌃X⌃C should mean Exit 1, not Exit 4
 
     def do_em_save_buffer(self):  # Emacs ⌃X⌃S
         """Write the File"""
@@ -3915,7 +3924,7 @@ class TerminalEm:
 
         self.vi.slip_ahead_one()
 
-    def do_em_goto_line(self):  # Emacs ⌥Gg
+    def do_em_goto_line(self):  # Emacs ⌥GG
         """Leap to the first Column of the chosen Line"""
 
         editor = self.vi.editor
@@ -4057,7 +4066,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         self._init_func(b"\x1B<", em.do_em_beginning_of_buffer)  # ⌥<
         self._init_func(b"\x1B>", em.do_em_end_of_buffer)  # ⌥>
-        self._init_func(b"\x1Bgg", em.do_em_goto_line)  # ⌥Gg
+        self._init_func(b"\x1Bgg", em.do_em_goto_line)  # ⌥GG
         self._init_func(b"\x1Bg\x1Bg", em.do_em_goto_line)  # ⌥G⌥G
         self._init_func(b"\x1Bm", em.do_em_back_to_indentation)  # ⌥M
 
@@ -4081,7 +4090,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # Define Keyboard Input Chords of the macOS Terminal Option Key
 
         funcs["\u00A9".encode()] = None  # ⌥G, CopyrightSign
-        self._init_func("\u00A9g".encode(), em.do_em_goto_line)  # ⌥Gg, CopyrightSign g
+        self._init_func("\u00A9g".encode(), em.do_em_goto_line)  # ⌥GG, CopyrightSign G
         self._init_func("\u00A9\u00A9".encode(), em.do_em_goto_line)  # ⌥G⌥G
         funcs["\u00AF".encode()] = em.do_em_beginning_of_buffer  # ⌥<, Macron
         funcs["\u00B5".encode()] = em.do_em_back_to_indentation  # ⌥M, MicroSign
@@ -7080,6 +7089,8 @@ _DOT_EMACS_ = r"""
 
 (when (fboundp 'global-superword-mode) (global-superword-mode 't))  ; accelerate M-f M-b
 
+(column-number-mode)  ; show column number up from 0, not just line number up from 1
+
 
 ;; Add keys (without redefining keys)
 ;; (as dry run by M-x execute-extended-command, M-: eval-expression)
@@ -7088,11 +7099,14 @@ _DOT_EMACS_ = r"""
 (global-set-key (kbd "C-c -") 'undo)  ; for when C-- alias of C-_ unavailable
 (global-set-key (kbd "C-c b") 'ibuffer)  ; for ? m Q I O multi-buffer replace
 (global-set-key (kbd "C-c m") 'xterm-mouse-mode)  ; toggle between move and select
+(global-set-key (kbd "C-c n") 'display-line-numbers-mode)  ; toggle line numbers
 (global-set-key (kbd "C-c O") 'overwrite-mode)  ; aka toggle Insert
 (global-set-key (kbd "C-c o") 'occur)
 (global-set-key (kbd "C-c r") 'revert-buffer)
 (global-set-key (kbd "C-c s") 'superword-mode)  ; toggle accelerate of M-f M-b
 (global-set-key (kbd "C-c w") 'whitespace-cleanup)
+
+(global-set-key (kbd "M-3") (lambda () (interactive) (insert-char #x23)))  ; # / C-u 3
 
 
 ;; Def C-c | = M-h C-u 1 M-| = Mark-Paragraph Universal-Argument Shell-Command-On-Region
