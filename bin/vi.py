@@ -51,7 +51,7 @@ how to get Vi Py:
 """
 
 #
-# quirkily enough, Vim and Vi Py both
+# Vim and Vi Py both
 #   take '+...' as an arg in place of '-c "..."', and Vi Py
 #   take the U0008 ⌃H BS \b chord in place of the U007F ⌃? DEL chord
 #
@@ -98,6 +98,9 @@ assert len(C0_CONTROL_STDINS) == 33 == (128 - 95) == ((0x20 - 0x00) + 1)
 ORD_CR = 0x0D  # CR, ⌃M, 13 \r  # the Return key on a Mac Keyboard
 CR_CHAR = chr(ORD_CR)
 CR_STDIN = CR_CHAR.encode()
+
+ORD_LF = 0x0A  # LF, ⌃J, 10 \n
+LF_CHAR = chr(ORD_LF)
 
 ORD_ESC = 0x1B  # ESC, ⌃[, 27
 ESC_CHAR = chr(ORD_ESC)
@@ -291,15 +294,15 @@ quirks:
 
 keyboard cheat sheet:
   ⌃X⌃C  ⌃X⌃S  ⌃Zfg  ⌃G  => how to quit Em Py
-  Down Up Right Left Space Return  => conventional enough
+  Down Up Right Left Space  => conventional enough
   ⌃E ⌃A ⌃F ⌃B ⌥M ⌃U⌥GTab  => leap to column
-  ⌃N ⌃P ⌃R⌃R⌃R ⌥< ⌥> ⌃U99⌥G⌥G ⌃L⌃L⌃L ⌃U⌃L  => leap to line, scroll screen
-  ⌃U ⌃U -0123456789 ⌃U ⌃G  => repeat, or don't
-  ⌃Q  => take ⌥ as input, not command
+  ⌃N ⌃P ⌥R⌥R⌥R ⌥< ⌥> ⌃U99⌥G⌥G ⌃L⌃L⌃L ⌃U⌃L  => leap to line, scroll screen
+  ⌃U ⌃U -0123456789 ⌃U ⌥-⌥0..⌥9 ⌃G  => repeat, or don't
+  ⌃Q⌃J  => take ⌃ and ⌥ as input, not as command
 
 keyboard easter eggs:
   ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
-  ⌃CN⌃U999⌥G⌥G⌃U⌃L⌃L⌃L⌃U1⌥V
+  ⌥>⌃V ⌥<⌥V ⌃CN⌃U99⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
 
 pipe tests:
   ls |bin/em.py -  # pipe drain
@@ -313,19 +316,21 @@ how to get Em Py:
   ⌃Segg
 """
 
+# FIXME: make ⌃L and ⌥R agree over which row is Middle Row
+
+# TODO: ⌃S ⌃R ⌥% ⌃XI ...
+# TODO: ⌃X⌃X ...
+
 #
-# quirkily enough, Emacs and Em Py both
+# Emacs and Em Py both
 #   misread a pasted Return to mean add the indentation of the line above  # TODO
-#   take the U0008 ⌃H BS \b chord in place of the U007F ⌃? DEL chord
 #
-# unlike Vi Py, Emacs quirkily
+# unlike Em Py, Emacs quirkily
 #   declines to run as pipe drain, source, or filter
-#   does blink the screen for '+q' without '+vi'
-#   does not name some chords it keeps undefined, such as Vi Py's zZ and Em Py's ⌃X⌃G
+#   declines to take Mac ⌥ Keystrokes of A..Z (minus EINU) as Meta Keyboard Chords
+#   neglects to keep ⌃X⌃G undefined
+#   neglects to tab-complete incremental searchs  # TODO
 #
-
-
-
 
 
 def main(argv):
@@ -349,7 +354,7 @@ def main(argv):
 
     edit_the_files(files=args.files, script=args.script, evals=args.evals)
 
-    # FIXME: swap the '__main__.__doc__' with ALT_DOC, when "--help" sees it's not there
+    # TODO: swap the '__main__.__doc__' with ALT_DOC, when "--help" sees it's not there
 
 
 def parse_vi_argv(argv):
@@ -1034,7 +1039,7 @@ class TerminalVi:
         more_status = "  ".join(joins)
         editor.editor_print(more_status)  # such as "'bin/vi.py'  less lag"
 
-    # FIXME: explore Vim quirk of scrolling and pausing to make room for wide pathnames
+    # TODO: explore Vim quirk of scrolling and pausing to make room for wide pathnames
 
     def do_vi_c0_control_etx(self):  # Vim ⌃C  # Vi Py Init
         """Cancel Digits Prefix, or close Insert/ Replace, or suggest ZZ to quit Vi Py"""
@@ -1685,7 +1690,7 @@ class TerminalVi:
     # Slip the Cursor into place, in some other Column of the same Row
     #
 
-    def do_slip(self):  # Vim |  # Emacs goto-char
+    def do_slip(self):  # Vim |
         """Leap to first Column, else to a chosen Column"""
 
         count = self.get_vi_arg1_int()
@@ -1710,23 +1715,12 @@ class TerminalVi:
         if False:  # pylint: disable=using-constant-test
             editor.clear_intake_bypass()  # OO⌃O_⌃O^ Egg
 
-        self.slip_dent()
+        editor.slip_dent()
 
         # Vim ⌃O quirk past a Line of 1 Dented Char snaps back after _ but not after ^
         # Vi Py could, and does Not, repro this quirk
 
-    def slip_dent(self):
-        """Leap to the Column after the Indent"""
-
-        editor = self.editor
-
-        line = editor.fetch_row_line()
-        lstripped = line.lstrip()
-        column = len(line) - len(lstripped)
-
-        editor.column = column
-
-    def do_slip_first(self):  # Vim 0  # Emacs move-beginning-of-line
+    def do_slip_first(self):  # Vim 0
         """Leap to the first Column in Row"""
 
         editor = self.editor
@@ -1735,7 +1729,7 @@ class TerminalVi:
 
         editor.column = 0
 
-    def do_slip_left(self):  # Vim h, ← Left Arrow  # Emacs left-char, backward-char
+    def do_slip_left(self):  # Vim h, ← Left Arrow
         """Slip left one Column or more"""
 
         count = self.get_vi_arg1_int()
@@ -1747,7 +1741,7 @@ class TerminalVi:
         left = min(editor.column, count)
         editor.column -= left
 
-    def do_slip_right(self):  # Vim l, → Right Arrow  #  emacs right-char, forward-char
+    def do_slip_right(self):  # Vim l, → Right Arrow
         """Slip Right one Column or more"""
 
         count = self.get_vi_arg1_int()
@@ -1841,17 +1835,13 @@ class TerminalVi:
         editor = self.editor
         last_row = editor.spot_last_row()
 
-        count = self.get_vi_arg1_int(default=(last_row + 1))
-        row = min(last_row, count - 1)
-
-        editor.row = row
-        self.slip_dent()
+        editor.step_for_count_slip_to_dent(default=(last_row + 1))
 
     def do_step_down_dent(self):  # Vim +, Return
         """Step down a Row or more, but land just past the Indent"""
 
         self.step_down_for_count()
-        self.slip_dent()
+        self.editor.slip_dent()
 
     def step_down_for_count(self):
         """Step down one Row or more"""
@@ -1871,7 +1861,7 @@ class TerminalVi:
         """Leap to just past the Indent, but first Step Down if Arg"""
 
         self.step_down_for_count_minus()
-        self.slip_dent()
+        self.editor.slip_dent()
 
     def step_down_for_count_minus(self):
         """Step down zero or more Rows, not one or more Rows"""
@@ -1888,27 +1878,27 @@ class TerminalVi:
 
         editor = self.editor
         editor.row = editor.spot_bottom_row()
-        self.slip_dent()
+        editor.slip_dent()
 
     def do_step_max_high(self):  # Vim H
         """Leap to first Word of Top Row on Screen"""
 
         editor = self.editor
         editor.row = editor.top_row
-        self.slip_dent()
+        editor.slip_dent()
 
     def do_step_to_middle(self):  # Vim M
         """Leap to first Word of Middle Row on Screen"""
 
         editor = self.editor
         editor.row = editor.spot_middle_row()
-        self.slip_dent()
+        editor.slip_dent()
 
     def do_step_up_dent(self):  # Vim -
         """Step up a Row or more, but land just past the Indent"""
 
         self.step_up_for_count()
-        self.slip_dent()
+        self.editor.slip_dent()
 
     def step_up_for_count(self):
         """Step up one Row or more"""
@@ -1925,7 +1915,7 @@ class TerminalVi:
     # Step the Cursor up and down between Rows, while holding on to the Column
     #
 
-    def do_slip_max_seek(self):  # Vim $  # Emacs move-end-of-line
+    def do_slip_max_seek(self):  # Vim $
         """Leap to the last Column in Row, and keep seeking last Columns"""
 
         editor = self.editor
@@ -1937,7 +1927,7 @@ class TerminalVi:
         editor.column = self.seek_vi_column()
         self.keep_up_vi_column_seek()
 
-    def do_step_down_seek(self):  # Vim j, ⌃J, ⌃N, ↓ Down Arrow  # Emacs next-line
+    def do_step_down_seek(self):  # Vim j, ⌃J, ⌃N, ↓ Down Arrow
         """Step down one Row or more, but seek the current Column"""
 
         editor = self.editor
@@ -1950,7 +1940,7 @@ class TerminalVi:
         editor.column = self.seek_vi_column()
         self.keep_up_vi_column_seek()
 
-    def do_step_up_seek(self):  # Vim k, ⌃P, ↑ Up Arrow  # Emacs previous-line
+    def do_step_up_seek(self):  # Vim k, ⌃P, ↑ Up Arrow
         """Step up a Row or more, but seek the current Column"""
 
         editor = self.editor
@@ -2028,7 +2018,7 @@ class TerminalVi:
 
         editor.row = row
 
-        self.slip_dent()
+        editor.slip_dent()
 
         editor.continue_do_loop()
 
@@ -2076,7 +2066,7 @@ class TerminalVi:
         if row > bottom_row:  # pylint: disable=consider-using-min-builtin
             editor.row = bottom_row
 
-        self.slip_dent()
+        editor.slip_dent()
 
         editor.continue_do_loop()
 
@@ -2084,8 +2074,8 @@ class TerminalVi:
     # Scroll ahead or behind one Row of Screen
     #
 
-    def do_scroll_ahead_one(self):  # Vim ⌃E
-        """Show the next Row of Screen"""
+    def do_scroll_ahead_one(self):  # Vim ⌃E Line Down
+        """Scroll to show the next Row of Screen"""
 
         editor = self.editor
 
@@ -2103,7 +2093,7 @@ class TerminalVi:
 
             return
 
-        # Scroll ahead one
+        # Scroll ahead one, but keep Cursor on Screen
 
         if top_row < last_row:
             top_row += 1
@@ -2113,12 +2103,12 @@ class TerminalVi:
         editor.top_row = top_row  # always different Top Row
 
         editor.row = row  # same or different Row
-        self.slip_dent()  # same or different Column
+        editor.slip_dent()  # same or different Column
 
         editor.continue_do_loop()
 
-    def do_scroll_behind_one(self):  # Vim ⌃Y
-        """Show the previous Row of Screen"""
+    def do_scroll_behind_one(self):  # Vim ⌃Y Line Up
+        """Scroll to show the previous Row of Screen"""
 
         editor = self.editor
 
@@ -2133,7 +2123,7 @@ class TerminalVi:
 
             return
 
-        # Scroll behind one
+        # Scroll behind one, but keep Cursor on Screen
 
         if top_row:
             top_row -= 1
@@ -2145,7 +2135,7 @@ class TerminalVi:
         editor.top_row = top_row  # always different Top Row
 
         editor.row = row  # same or different Row
-        self.slip_dent()  # same or different Column
+        editor.slip_dent()  # same or different Column
 
         editor.continue_do_loop()
 
@@ -2157,61 +2147,22 @@ class TerminalVi:
         """Scroll up or down till Cursor Row lands in Top Row of Screen"""
 
         editor = self.editor
-
-        row_plus = self.get_vi_arg1_int(default=(editor.row + 1))
-        row = row_plus - 1
-        editor.row = row
-
-        editor.top_row = row
-
-        self.vi_print("Cursor is in top row")
+        editor.step_for_count_slip_to_dent(default=(editor.row + 1))
+        editor.scroll_till_top()
 
     def do_scroll_till_middle(self):  # Vim zz  # not to be confused with Vim ZZ
         """Scroll up or down till Cursor Row lands in Middle Row of Screen"""
 
         editor = self.editor
-        painter = editor.painter
-        scrolling_rows = painter.scrolling_rows
-
-        assert scrolling_rows
-        half_screen = scrolling_rows // 2
-
-        row_plus = self.get_vi_arg1_int(default=(editor.row + 1))
-        row = row_plus - 1
-        editor.row = row
-
-        up = scrolling_rows // 2
-        top_row = (row - up) if (row >= up) else 0
-
-        editor.top_row = top_row
-
-        if row < half_screen:
-            self.vi_print("Cursor is above the middle row")
-        else:
-            self.vi_print("Cursor is in middle row")
+        editor.step_for_count_slip_to_dent(default=(editor.row + 1))
+        editor.scroll_till_middle()
 
     def do_scroll_till_bottom(self):  # Vim zb
         """Scroll up or down till Cursor Row lands in Bottom Row of Screen"""
 
         editor = self.editor
-        painter = editor.painter
-        scrolling_rows = painter.scrolling_rows
-
-        assert scrolling_rows
-
-        row_plus = self.get_vi_arg1_int(default=(editor.row + 1))
-        row = row_plus - 1
-        editor.row = row
-
-        up = scrolling_rows - 1
-        top_row = (row - up) if (row >= up) else 0
-
-        editor.top_row = top_row
-
-        if row < (scrolling_rows - 1):
-            self.vi_print("Cursor is above the bottom row")
-        else:
-            self.vi_print("Cursor is in bottom row")
+        editor.step_for_count_slip_to_dent(default=(editor.row + 1))
+        editor.scroll_till_bottom()
 
     #
     # Search ahead for an Empty Line (while ignoring Blank Lines)
@@ -2739,8 +2690,7 @@ class TerminalVi:
 
         # Insert beyond Dent
 
-        self.slip_dent()
-
+        self.editor.slip_dent()
         self.take_vi_inserts()
 
     def do_slip_first_split_take_inserts(self):  # Vim O
@@ -3139,7 +3089,7 @@ class TerminalVi:
         touches = editor.delete_some_lines(count=down)
         self.held_vi_file.touches += touches
 
-        self.slip_dent()
+        editor.slip_dent()
 
     def do_slip_first_chop_take_inserts(self):  # Vim S
         """Cut N - 1 Lines below & all Chars of this Line, and take Chords as Inserts"""
@@ -3680,8 +3630,6 @@ class TerminalEm:
         vi = TerminalVi(files, script=script, evals=evals)
         self.vi = vi
 
-        self.recenter_positions = list()
-
     def run_vi_terminal(self):
         """Enter Terminal Driver, then run Emacs Keyboard, then exit Terminal Driver"""
 
@@ -3821,6 +3769,69 @@ class TerminalEm:
 
         # Em Py echoes the Evalled Prefix, Emacs quirkily does Not
 
+    def do_em_negative_argument(self):  # Emacs ⌥-
+        """Mostly work like ⌃U -"""
+
+        skin = self.vi.editor.skin
+        arg1 = skin.arg1
+
+        chars_ahead = "\x15"  # NAK, ⌃U, 21
+        if arg1 is None:
+            chars_ahead += "-"
+        else:
+            chars_ahead += str(-arg1)
+
+        skin.chord_ints_ahead = list(chars_ahead.encode())
+
+    def do_em_digit_argument(self):  # Emacs ⌥0, ⌥1, ⌥2, ⌥3, ⌥4, ⌥5, ⌥6, ⌥7, ⌥8, ⌥9
+        """Mostly work like ⌃U 0, 1, 2, 3, 4, 5, 6, 7, 8, 9"""
+
+        editor = self.vi.editor
+        skin = self.vi.editor.skin
+        arg1 = skin.arg1
+
+        chars = editor.get_arg0_chars()
+
+        #
+
+        esc_chars = r"\e0 \e1 \e2 \e3 \e4 \e5 \e6 \e7 \e8 \e9".replace(r"\e", "\x1B")
+        esc_digits = esc_chars.split()
+
+        metadigits = "⌥0 ⌥1 ⌥2 ⌥3 ⌥4 ⌥5 ⌥6 ⌥7 ⌥8 ⌥9".split()
+
+        #
+
+        metachars = chars
+
+        if chars not in esc_digits:
+            if chars not in metadigits:
+
+                metachars = None
+
+                items = TerminalNudgeIn.UNICHARS_BY_METACHARS.items()
+                for (key, unichars) in items:
+                    if chars == unichars:
+
+                        metachars = key
+
+                        break
+
+                assert metachars in metadigits, (chars, metachars)
+
+        str_digit = metachars[-1]
+
+        assert str_digit in "0123456789", (chars, metachars)
+
+        #
+
+        chars_ahead = "\x15"  # NAK, ⌃U, 21
+        if arg1 is None:
+            chars_ahead += str_digit
+        else:
+            chars_ahead += str(arg1) + str_digit
+
+        skin.chord_ints_ahead = list(chars_ahead.encode())
+
     def do_em_quoted_insert(self):  # Emacs ⌃Q
         """Take the next Input Keyboard Chord to insert or replace, not as Control"""
 
@@ -3847,7 +3858,7 @@ class TerminalEm:
         count = self.vi.editor.get_arg1_int(default=None)
         if count is not None:  # ⌃U 123 ⌃G Egg
 
-            self.vi.editor.editor_print("Quit Repeat Count")
+            self.vi.vi_print("Quit Repeat Count")
 
         else:
 
@@ -3887,6 +3898,16 @@ class TerminalEm:
         skin.doing_traceback = skin.traceback  # ⌃X⌃C of the ...⌃X⌃C Eggs
         vi.quit_vi()
 
+    def do_em_suspend_frame(self):  # Emacs ⌃Z
+        """Don't save changes now, do stop Em Py process, till like Bash 'fg'"""
+
+        self.vi.do_vi_sig_tstp()
+
+    def do_em_display_line_numbers_mode(self):  # Em Py ⌃CN Egg
+        """Show Line Numbers or not, but without rerunning Search"""
+
+        self.vi.editor.do_set_invnumber()
+
     #
     # Slip the Cursor to a Column, or step it to a Row
     #
@@ -3896,7 +3917,7 @@ class TerminalEm:
     def do_em_back_to_indentation(self):  # Emacs ⌥M
         """Leap to the Column after the Indent"""
 
-        self.vi.slip_dent()
+        self.vi.editor.slip_dent()
 
     def do_em_backward_char(self):  # Emacs ⌃B
         """Slip left or up"""
@@ -3925,19 +3946,24 @@ class TerminalEm:
 
         self.vi.slip_ahead_one()
 
-    def do_em_goto_line(self):  # Emacs ⌥GG
+    def do_em_goto_line(self):  # Emacs ⌥G⌥G  # Emacs ⌥GG
         """Leap to the first Column of the chosen Line"""
 
         editor = self.vi.editor
         last_row = editor.spot_last_row()
 
-        self.vi.check_vi_index(editor.skin.arg1)
+        self.vi.check_vi_index(editor.skin.arg1 is not None)
+        self.vi.check_vi_index(editor.skin.arg1 > 0)
+        # TODO: Emacs prompt "Goto line:"
 
         count = editor.get_arg1_int(default=None)
         row = min(last_row, count - 1)
 
         editor.row = row
         editor.column = 0
+
+        # Em Py rejects zero and negative Row Indices
+        # Emacs quirkily takes zero and negative Row Indices as aliases of 1
 
     def do_em_move_beginning_of_line(self):  # Emacs ⌃A
         """Leap to the first Column in Row"""
@@ -3957,6 +3983,24 @@ class TerminalEm:
         editor = self.vi.editor
         editor.row += 1
 
+    def do_em_move_to_column(self):  # Emacs ⌥GTab
+        """Leap to the chosen Column up from zero"""
+
+        editor = self.vi.editor
+        max_column = editor.spot_max_column()
+
+        self.vi.check_vi_index(editor.skin.arg1 is not None)
+        self.vi.check_vi_index(editor.skin.arg1 > 0)
+        # TODO: Emacs prompt "Move to column:"
+
+        count = editor.get_arg1_int(default=None)
+        column = min(max_column, count - 1)
+
+        editor.column = column
+
+        # Emacs and Em Py reject a negative Column Index
+        # Emacs quirkily counts Columns up from 0, whereas Em Py counts up from 1
+
     def do_em_previous_line(self):  # Emacs ⌃P, Up
         """Step to the next Row above"""
 
@@ -3967,28 +4011,122 @@ class TerminalEm:
     # Scroll Rows of the Screen
     #
 
+    def do_em_move_to_window_line_top_bottom(self):  # ⌥R
+        """Step Cursor to Middle/ Top/ Bottom Row"""
+
+        editor = self.vi.editor
+        count = len(editor.skin.doing_funcs[1:]) % 3
+
+        if count == 0:
+            editor.row = editor.spot_middle_row()
+        elif count == 1:
+            editor.row = editor.top_row
+        else:
+            assert count == 2
+            editor.row = editor.spot_bottom_row()
+
     def do_em_recenter_top_bottom(self):  # Emacs ⌃U⌃L, Emacs ⌃L
         """Scroll up or down till Cursor Row lands on Middle/ Top/ Bottom Row"""
 
-        recenter_positions = self.recenter_positions
+        editor = self.vi.editor
+        count = len(editor.skin.doing_funcs[1:]) % 3
+
+        if count == 0:
+            editor.scroll_till_middle()
+        elif count == 1:
+            editor.scroll_till_top()
+        else:
+            assert count == 2
+            editor.scroll_till_bottom()
+
+        # Emacs quirkily blinks the screen & flashes the cursor left at first call
+        # Em Py doesn't
+
+    def do_em_scroll_up_command(self):  # Emacs ⌃V Page Down
+        """Scroll to show the next Rows of Screen"""
+
         vi = self.vi
+        editor = vi.editor
+        painter = editor.painter
+        scrolling_rows = painter.scrolling_rows
 
-        # Start again when needed, or on demand
+        assert scrolling_rows >= 3
+        default_count = scrolling_rows - 2
 
-        arg1 = vi.editor.skin.arg1
-        if (not recenter_positions) or (arg1 is not None):
+        count = editor.get_arg1_int(default=default_count)
+        for index in range(count):
 
-            recenter_positions[::] = [
-                vi.do_scroll_till_bottom,  # 3rd
-                vi.do_scroll_till_top,  # 2nd
-                vi.do_scroll_till_middle,  # 1st
-            ]
+            row = editor.row
+            top_row = editor.top_row
+            last_row = editor.spot_last_row()
 
-        # Take the next position
+            # Quit at last Row
 
-        vi.editor.skin.arg1 = None  # TODO: ugly mutate
-        func = recenter_positions.pop()
-        func()
+            if editor.top_row == last_row:
+                if not index:
+                    vi.vi_print("Do you mean ⌃U1⌥V")  # ⌥>⌃V Egg
+
+                return
+
+            # Scroll ahead one, but keep Cursor on Screen
+
+            if top_row < last_row:
+                top_row += 1
+                if row < top_row:  # pylint: disable=consider-using-max-builtin
+                    row = top_row
+
+            editor.top_row = top_row  # always different Top Row
+
+            editor.row = row  # same or different Row
+            editor.column = 0  # same or different Column
+
+    def do_em_scroll_down_command(self):  # Emacs ⌥V Page Up
+        """Page Up"""
+
+        vi = self.vi
+        editor = vi.editor
+        painter = editor.painter
+        scrolling_rows = painter.scrolling_rows
+
+        assert scrolling_rows >= 3
+        default_count = scrolling_rows - 2
+
+        count = editor.get_arg1_int(default=default_count)
+        for index in range(count):
+
+            row = editor.row
+            top_row = editor.top_row
+
+            # Quit at top Row
+
+            if not top_row:
+                if not editor.skin.doing_done:
+                    vi.vi_print("Do you mean ⌃U1⌃V")  # ⌥<⌥V Egg
+
+                return
+
+            # Scroll behind one, but keep Cursor on Screen
+
+            if top_row:
+                top_row -= 1
+
+                bottom_row = editor.spot_bottom_row(top_row)
+                if row > bottom_row:  # pylint: disable=consider-using-min-builtin
+                    row = bottom_row
+
+            editor.top_row = top_row  # always different Top Row
+
+            editor.row = row  # same or different Row
+            editor.column = 0  # same or different Column
+
+    #
+    # Search for Hits
+    #
+
+    def do_em_query_replace(self):  # Emacs ⌥%
+        """Walk Hits and ask:  y Space . Y, or n Delete N, or q Return, etc"""
+
+        raise NotImplementedError()
 
     #
     # Insert Chords as Chars
@@ -3997,7 +4135,26 @@ class TerminalEm:
     def do_em_self_insert_command(self):  # Emacs Bypass Vim View to Insert
         """Insert the Chord as one Char"""
 
-        self.vi.do_insert_per_chord()
+        vi = self.vi
+        editor = vi.editor
+
+        chars = editor.get_arg0_chars()
+        if chars == LF_CHAR:  # Emacs ⌃Q⌃J
+            vi.do_insert_one_line()
+        else:
+            vi.do_insert_one_char()
+
+    def do_em_newline(self):  # Emacs Return
+        """Open a new indented Line below"""
+
+        vi = self.vi
+
+        vi.vi_print("Do you mean ⌃Q⌃J")
+
+    def do_em_shell_command_on_region(self):  # ⌥|
+        """Pipe some Chars out, or out and back in again"""
+
+        raise NotImplementedError()  # TODO: code up ⌥| 'shell_command_on_region'
 
 
 class TerminalKeyboardEm(TerminalKeyboard):
@@ -4027,9 +4184,6 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         funcs = self.func_by_chords
         em = self.em
-        vi = self.vi
-
-        editor = vi.editor
 
         # Define the C0_CONTROL_STDINS
 
@@ -4037,7 +4191,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         funcs[b"\x01"] = em.do_em_move_beginning_of_line  # SOH, ⌃A, 1
         funcs[b"\x02"] = em.do_em_backward_char  # STX, ⌃B, 2
 
-        self._init_func(b"\x03n", func=em.display_line_numbers_mode) ⌃CN
+        self._init_func(b"\x03n", func=em.do_em_display_line_numbers_mode)  # ⌃CN
         # TODO: stop commandeering the personal ⌃CN Chord Sequence
 
         # funcs[b"\x04"] = em.do_em_c0_control_eot  # EOT, ⌃D, 4
@@ -4049,7 +4203,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # funcs[b"\x0A"] = em.do_em_c0_control_lf  # LF, ⌃J, 10 \n
         # funcs[b"\x0B"] = em.do_em_c0_control_vt  # VT, ⌃K, 11 \v
         funcs[b"\x0C"] = em.do_em_recenter_top_bottom  # FF, ⌃L, 12 \f
-        # funcs[b"\x0D"] = em.do_em_c0_control_cr  # CR, ⌃M, 13 \r
+        funcs[b"\x0D"] = em.do_em_newline  # CR, ⌃M, 13 \r
         funcs[b"\x0E"] = em.do_em_next_line  # SO, ⌃N, 14
         # funcs[b"\x0F"] = em.do_em_c0_control_si  # SI, ⌃O, 15
         funcs[b"\x10"] = em.do_em_previous_line  # DLE, ⌃P, 16
@@ -4059,7 +4213,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # funcs[b"\x13"] = em.do_em_c0_control_dc3  # DC3, XOFF, ⌃S, 19
         # funcs[b"\x14"] = em.do_em_c0_control_dc4  # DC4, ⌃T, 20
         # funcs[b"\x15"] = em.do_em_scroll_behind_some  # NAK, ⌃U, 21
-        # funcs[b"\x16"] = em.do_em_c0_control_syn  # SYN, ⌃V, 22
+        funcs[b"\x16"] = em.do_em_scroll_up_command  # SYN, ⌃V, 22
         # funcs[b"\x17"] = em.do_em_c0_control_etb  # ETB, ⌃W, 23
 
         # funcs[b"\x18"] = em.do_em_c0_control_can  # CAN, ⌃X , 24
@@ -4068,13 +4222,8 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         # funcs[b"\x19"] = em.do_em_c0_control_em  # EM, ⌃Y, 25
 
-        funcs[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
-
-        self._init_func(b"\x1B<", em.do_em_beginning_of_buffer)  # ⌥<
-        self._init_func(b"\x1B>", em.do_em_end_of_buffer)  # ⌥>
-        self._init_func(b"\x1Bgg", em.do_em_goto_line)  # ⌥GG
-        self._init_func(b"\x1Bg\x1Bg", em.do_em_goto_line)  # ⌥G⌥G
-        self._init_func(b"\x1Bm", em.do_em_back_to_indentation)  # ⌥M
+        funcs[b"\x1A"] = em.do_em_suspend_frame  # SUB, ⌃Z, 26
+        # funcs[b"\x1B"] = ...  # ESC, ⌃[, 27  # taken below by Use Option as Meta Key
 
         funcs[b"\x1B[A"] = em.do_em_previous_line  # ↑ Up Arrow
         funcs[b"\x1B[B"] = em.do_em_next_line  # ↓ Down Arrow
@@ -4088,20 +4237,76 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         # funcs[b"\x7F"] = em.do_em_c0_control_del  # DEL, ⌃?, 127
 
-        # Define the BASIC_LATIN_STDINS
+        # Define the BASIC_LATIN_STDINS (without defining the CR_STDIN outside)
 
-        self.intake_chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
+        self.intake_chords_set = set(BASIC_LATIN_STDINS)
         self.intake_func = em.do_em_self_insert_command
 
-        # Define Keyboard Input Chords of the macOS Terminal Option Key
+        # Define the Esc Keyboard Input Chords
+        # found at Keyboard > Use Option as Meta Key = Yes
+        # inside macOS Terminal > Preferences > Profiles
 
-        funcs["\u00A9".encode()] = None  # ⌥G, CopyrightSign
-        self._init_func("\u00A9g".encode(), em.do_em_goto_line)  # ⌥GG, CopyrightSign G
-        self._init_func("\u00A9\u00A9".encode(), em.do_em_goto_line)  # ⌥G⌥G
-        funcs["\u00AF".encode()] = em.do_em_beginning_of_buffer  # ⌥<, Macron
-        funcs["\u00B5".encode()] = em.do_em_back_to_indentation  # ⌥M, MicroSign
+        self._init_func(b"\x1B%", em.do_em_query_replace)  # ⌥%
+        self._init_func(b"\x1B-", em.do_em_negative_argument)  # ⌥-
 
-        funcs["\u02D8".encode()] = em.do_em_end_of_buffer  # ⌥>, Breve
+        self._init_func(b"\x1B0", em.do_em_digit_argument)  # ⌥0
+        self._init_func(b"\x1B1", em.do_em_digit_argument)  # ⌥1
+        self._init_func(b"\x1B2", em.do_em_digit_argument)  # ⌥2
+        self._init_func(b"\x1B3", em.do_em_digit_argument)  # ⌥3
+        self._init_func(b"\x1B4", em.do_em_digit_argument)  # ⌥4
+        self._init_func(b"\x1B5", em.do_em_digit_argument)  # ⌥5
+        self._init_func(b"\x1B6", em.do_em_digit_argument)  # ⌥6
+        self._init_func(b"\x1B7", em.do_em_digit_argument)  # ⌥7
+        self._init_func(b"\x1B8", em.do_em_digit_argument)  # ⌥8
+        self._init_func(b"\x1B9", em.do_em_digit_argument)  # ⌥9
+
+        self._init_func(b"\x1B<", em.do_em_beginning_of_buffer)  # ⌥<
+        self._init_func(b"\x1B>", em.do_em_end_of_buffer)  # ⌥>
+        self._init_func(b"\x1Bg\x09", em.do_em_move_to_column)  # ⌥GTab
+        self._init_func(b"\x1Bg\x1Bg", em.do_em_goto_line)  # ⌥G⌥G
+        self._init_func(b"\x1Bgg", em.do_em_goto_line)  # ⌥GG
+        self._init_func(b"\x1Bm", em.do_em_back_to_indentation)  # ⌥M
+        self._init_func(b"\x1Br", em.do_em_move_to_window_line_top_bottom)  # ⌥R
+        self._init_func(b"\x1Bv", em.do_em_scroll_down_command)  # ⌥V
+        self._init_func(b"\x1B|", em.do_em_shell_command_on_region)  # ⌥|
+
+        # Define Esc Keyboard Input Chords, other than ⌥E ⌥I ⌥N ⌥U,
+        # found at Keyboard > Use Option as Meta Key = No
+        # inside macOS Terminal > Preferences > Profiles
+
+        for (metachars, unichars) in TerminalNudgeIn.UNICHARS_BY_METACHARS.items():
+            self._init_meta(metachars, from_chars=unichars)
+
+    def _init_meta(self, to_chars, from_chars):
+        """Let people type the From Chars in place of the To Chars"""
+
+        funcs = self.func_by_chords
+
+        # Pick out the Keyboard Input Chords we get
+
+        from_chords = from_chars.encode()
+
+        # Pick out the Keyboard Input Chords we want
+
+        assert to_chars[0] == "⌥"
+        to_chords = b"\x1B"
+
+        assert to_chars[1] == to_chars[1].upper()
+        to_chords += to_chars[1].lower().encode()
+
+        to_tail = to_chars[2:]
+        if to_tail:
+            if to_tail == "G":
+                to_chords += "g".encode()
+            elif to_tail == "Tab":
+                to_chords += b"\x09"
+            elif to_tail == "⌥G":
+                to_chords += b"\x1B" + "g".encode()
+
+        # Say to take the Keyboard Input Chords we get as the Func
+
+        to_func = funcs[to_chords]
+        self._init_func(from_chords, to_func)
 
 
 #
@@ -4125,6 +4330,38 @@ class TerminalNudgeIn(argparse.Namespace):
         "\u00B4": "⌥E⌥E",  # U00B4
         "\u00B5": "⌥M",  # U00B5 MicroSign
     }
+
+    # Striking Meta + Key produces a Unichar
+    # when struck inside Keyboard > Use Option as Meta Key = No
+    # inside macOS Terminal > Preferences > Profiles
+
+    UNICHARS_BY_METACHARS = {
+        "⌥<": "\u00AF",  # Macron
+        "⌥>": "\u02D8",  # Breve
+        "⌥G": "\u00A9",  # CopyrightSign
+        "⌥GG": "\u00A9g",  # CopyrightSign G
+        "⌥GTab": "\u00A9\x09",  # CopyrightSign Tab
+        "⌥G⌥G": "\u00A9\u00A9",  # 2x CopyrightSign
+        "⌥M": "\u00B5",  # MicroSign
+        "⌥R": "\u00AE",  # RegisteredSign
+        "⌥V": "\u221A",  # SquareRoot
+        "⌥|": "\u00BB",  # RightPointingDoubleAngleQuotationMark
+        "⌥%": "\uFB01",  # LatinSmallLigatureFI
+        "⌥-": "\u2013",  # EnDash
+        "⌥0": "\u00BA",  # MasculineOrdinalIndicator
+        "⌥1": "\u00A1",  # InvertedExclamationMark
+        "⌥2": "\u20AC",  # EuroSign
+        "⌥3": "\u00A3",  # PoundSign
+        "⌥4": "\u00A2",  # CentSign
+        "⌥5": "\u221E",  # Infinity
+        "⌥6": "\u00A7",  # SectionSign
+        "⌥7": "\u00B6",  # PilcrowSign
+        "⌥8": "\u2022",  # Bullet [Pearl]
+        "⌥9": "\u00AA",  # FeminineOrdinalIndicator
+    }
+
+    _META_UNI_CHARS_VALUES = sorted(UNICHARS_BY_METACHARS.values())
+    assert sorted(set(_META_UNI_CHARS_VALUES)) == sorted(_META_UNI_CHARS_VALUES)
 
     # MacOS UK/USA Keyboards reserve ⌥E, ⌥I, ⌥N, ⌥U for adding diacritical marks
     # and they alias X5E ^ at ⌥I⌥I, and X7E ~ at ⌥N⌥N
@@ -4187,6 +4424,9 @@ class TerminalNudgeIn(argparse.Namespace):
         echo = echo.replace("Esc [ B", "Down")  # ↓ U2193 Downwards Arrow
         echo = echo.replace("Esc [ C", "Right")  # → U2192 Rightwards Arrow
         echo = echo.replace("Esc [ D", "Left")  # ← U2190 Leftwards Arrows
+
+        # FIXME: render Esc g as ⌥G, and render Esc G as ⇧⌥G
+        # FIXME: fix the Vim commentary of AIOR aior etc over to ⇧A⇧I⇧O⇧R AIOR etc
 
         echo = echo.strip()
 
@@ -4461,6 +4701,7 @@ class TerminalSkin:
         self.doing_less = None  # reject the Arg1 when not explicitly accepted
         self.doing_more = None  # take the Arg1 as a Count of Repetition's
         self.doing_done = None  # count the Repetition's completed before now
+        self.doing_funcs = list()  # count the Call's of the same Func before now
         self.doing_traceback = None  # retain a Python Traceback till after more Chords
 
         # TODO: mutable namespaces for doing_, etc
@@ -4517,7 +4758,7 @@ class TerminalEditor:
     def load_editor_file(self, held_vi_file):
         """Swap in a new File of Lines"""
 
-        self.held_vi_file = held_vi_file
+        self.held_vi_file = held_vi_file  # FIXME: editor.held_vi_file what??
         self.ended_lines = held_vi_file.ended_lines
 
         self.row = 0  # point the Cursor to a Row of File
@@ -4772,7 +5013,7 @@ class TerminalEditor:
         if wearing_em():
             model_line_number = 1 + self.top_row + (painter.scrolling_rows - 1)
             if False:  # pylint: disable=using-constant-test
-                model_line_number += 1  # Egg of ⌃CN⌃U999⌥G⌥G⌃U⌃L⌃L⌃L⌃U1⌥V
+                model_line_number += 1  # Egg of ⌃CN⌃U99⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
 
         painter.top_line_number = 1 + self.top_row
         painter.model_line_number = model_line_number
@@ -4923,7 +5164,7 @@ class TerminalEditor:
 
         return chords_func
 
-    def editor_func_by_chords(self, chords):
+    def editor_func_by_chords(self, chords):  # noqa C901 too complex
         """Choose the Func for some Chords"""
 
         intake_taken = self.intake_taken
@@ -4943,11 +5184,15 @@ class TerminalEditor:
         intake_ish = False
 
         if chords and intake_func:
-            if chords in intake_chords_set:
+            if chords == b"\x0A":  # LF, ⌃J, 10
 
                 intake_ish = True
 
-            elif chords not in C0_CONTROL_STDINS:
+            elif chords in intake_chords_set:
+
+                intake_ish = True
+
+            elif all((_ not in C0_CONTROL_STDINS) for _ in chords):
                 if keyboard_intake_ish:
 
                     intake_ish = True
@@ -4980,12 +5225,18 @@ class TerminalEditor:
         """Call the Func once or more, in reply to one Terminal Nudge In"""
 
         skin = self.skin
+        doing_funcs = skin.doing_funcs
 
         # Setup before first calling the Func
         # TODO: rewrite this work as a chain of 'enter_do_func's
 
         skin.doing_done = 0
+
         skin.doing_less = True
+
+        if doing_funcs and (doing_funcs[-1] is not chords_func):
+            doing_funcs[::] = list()
+        doing_funcs.append(chords_func)
 
         # Call the Func once or more
 
@@ -5511,23 +5762,7 @@ class TerminalEditor:
 
         sys.exit()
 
-    #
-    # Find Spans of Chars
-    #
-
-    def do_set_invignorecase(self):  # \i Egg
-        """Search Upper/Lower Case or not"""
-
-        self.finding_case = not self.finding_case
-
-        self.reopen_found_spans()
-
-        if self.finding_case:
-            self.editor_print(":set noignorecase")
-        else:
-            self.editor_print(":set ignorecase")
-
-    def do_set_invnumber(self):  # \n Egg
+    def do_set_invnumber(self):  # Vi Py \n Egg
         """Show Line Numbers or not, but without rerunning Search"""
 
         self.showing_line_number = not self.showing_line_number
@@ -5543,7 +5778,93 @@ class TerminalEditor:
             else:
                 self.editor_print(":set nonumber")
 
-    def do_set_invregex(self):  # \F Egg
+    #
+    # Move Cursor and scroll Lines
+    #
+
+    def step_for_count_slip_to_dent(self, default):
+        """Step to chosen Row, else to default Row, and slip past Dent"""
+
+        last_row = self.spot_last_row()
+
+        count = self.get_arg1_int(default=default)
+        row = min(last_row, count - 1)
+
+        self.row = row
+        self.slip_dent()
+
+    def slip_dent(self):
+        """Leap to the Column after the Indent"""
+
+        line = self.fetch_row_line()
+        lstripped = line.lstrip()
+        column = len(line) - len(lstripped)
+
+        self.column = column
+
+    def scroll_till_top(self):
+        """Scroll up or down till Cursor Row lands in Top Row of Screen"""
+
+        self.top_row = self.row
+
+        self.editor_print("Cursor is in top row")
+
+    def scroll_till_middle(self):
+        """Scroll up or down till Cursor Row lands in Middle Row of Screen"""
+
+        painter = self.painter
+        row = self.row
+
+        scrolling_rows = painter.scrolling_rows
+        assert scrolling_rows
+        half_screen = scrolling_rows // 2
+
+        up = scrolling_rows // 2
+        top_row = (row - up) if (row >= up) else 0
+
+        self.top_row = top_row
+
+        if row < half_screen:
+            self.editor_print("Cursor is above the middle row")
+        else:
+            self.editor_print("Cursor is in middle row")
+
+    def scroll_till_bottom(self):
+        """Scroll up or down till Cursor Row lands in Bottom Row of Screen"""
+
+        row = self.row
+        painter = self.painter
+
+        scrolling_rows = painter.scrolling_rows
+        assert scrolling_rows
+
+        up = scrolling_rows - 1
+        top_row = (row - up) if (row >= up) else 0
+
+        self.top_row = top_row
+
+        if row < (scrolling_rows - 1):
+            self.editor_print("Cursor is above the bottom row")
+        else:
+            self.editor_print("Cursor is in bottom row")
+
+    #
+    # Find Spans of Chars
+    #
+
+    def do_set_invignorecase(self):  # Vi Py \i Egg
+        """Search Upper/Lower Case or not"""
+
+        self.finding_case = not self.finding_case
+
+        self.reopen_found_spans()
+
+        if self.finding_case:
+            self.editor_print(":set noignorecase")
+        else:
+            self.editor_print(":set ignorecase")
+
+    def do_set_invregex(self):  # Vi Py \F Egg
         """Search as Regex or search as Chars"""
 
         self.finding_regex = not self.finding_regex
@@ -5603,7 +5924,7 @@ class TerminalEditor:
         assert iobytespans
 
         model_line_number = 1 + len(ended_lines)
-        str_model_line_number = "{:3} ".format(model_line_number)   # TODO: em
+        str_model_line_number = "{:3} ".format(model_line_number)  # TODO: em
         model_width = len(str_model_line_number)
 
         # Scroll up the Status Line
@@ -6138,7 +6459,7 @@ class TerminalPainter:
 
                 status_line = repr(status_line)[:status_columns].ljust(status_columns)
 
-                assert False  # unreached
+                assert False, status_line  # unreached
 
                 break
 
@@ -6844,7 +7165,7 @@ class TerminalDriver:
 
     Compare Bash 'bind -p', Zsh 'bindkey', Bash 'stty -a', and Unicode-Org U0000.pdf
 
-    Compare Bash 'vim' and 'less -FIXR'
+    Compare Bash 'vim' and 'less -FIXR', and https://unicode.org/charts/PDF/
     """
 
     def __init__(self, stdio):
@@ -7119,7 +7440,6 @@ _DOT_EMACS_ = r"""
 ;; Add keys (without redefining keys)
 ;; (as dry run by M-x execute-extended-command, M-: eval-expression)
 
-(global-set-key (kbd "C-c %") 'query-replace-regexp)  ; for when C-M-% unavailable
 (global-set-key (kbd "C-c -") 'undo)  ; for when C-- alias of C-_ unavailable
 (global-set-key (kbd "C-c b") 'ibuffer)  ; for ? m Q I O multi-buffer replace
 (global-set-key (kbd "C-c m") 'xterm-mouse-mode)  ; toggle between move and select
@@ -7129,8 +7449,6 @@ _DOT_EMACS_ = r"""
 (global-set-key (kbd "C-c r") 'revert-buffer)
 (global-set-key (kbd "C-c s") 'superword-mode)  ; toggle accelerate of M-f M-b
 (global-set-key (kbd "C-c w") 'whitespace-cleanup)
-
-(global-set-key (kbd "M-3") (lambda () (interactive) (insert-char #x23)))  ; # / C-u 3
 
 
 ;; Def C-c | = M-h C-u 1 M-| = Mark-Paragraph Universal-Argument Shell-Command-On-Region
@@ -7153,6 +7471,15 @@ _DOT_EMACS_ = r"""
 ; press ⌃⇧2 or ⌃Space and hope it comes out as C-@ or C-SPC to mean 'set-mark-command
 ;   even though older macOS needed you to turn off System Preferences > Keyboard >
 ;   Input Sources > Shortcuts > Select The Previous Input Source  ⌃Space
+
+; see also deeper workarounds inside
+;   https://github.com/pelavarre/pybashish/blob/pelavarre-patch-1/dotfiles/dot.emacs
+
+
+;; Sacrifice M-3 to get '# 'self-insert-command at Mac British OptionAsMeta
+
+(global-set-key (kbd "M-3")
+    (lambda () (interactive) (insert-char #x23)))  ; # '#' not '£'
 
 
 ; copied from:  git clone https://github.com/pelavarre/pybashish.git
