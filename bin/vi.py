@@ -299,6 +299,7 @@ keyboard cheat sheet:
 
 keyboard easter eggs:
   ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
+  ⌃CN⌃U999⌥G⌥G⌃U⌃L⌃L⌃L⌃U1⌥V
 
 pipe tests:
   ls |bin/em.py -  # pipe drain
@@ -4028,12 +4029,17 @@ class TerminalKeyboardEm(TerminalKeyboard):
         em = self.em
         vi = self.vi
 
+        editor = vi.editor
+
         # Define the C0_CONTROL_STDINS
 
         # funcs[b"\x00"] = em.do_em_c0_control_nul  # NUL, ⌃@, 0
         funcs[b"\x01"] = em.do_em_move_beginning_of_line  # SOH, ⌃A, 1
         funcs[b"\x02"] = em.do_em_backward_char  # STX, ⌃B, 2
-        # funcs[b"\x03"] = em.do_em_c0_control_etx  # ETX, ⌃C, 3
+
+        self._init_func(b"\x03n", func=em.display_line_numbers_mode) ⌃CN
+        # TODO: stop commandeering the personal ⌃CN Chord Sequence
+
         # funcs[b"\x04"] = em.do_em_c0_control_eot  # EOT, ⌃D, 4
         funcs[b"\x05"] = em.do_em_move_end_of_line  # ENQ, ⌃E, 5
         funcs[b"\x06"] = em.do_em_forward_char  # ACK, ⌃F, 6
@@ -4760,8 +4766,16 @@ class TerminalEditor:
 
         # Paint Screen, Cursor, and Bell
 
+        assert painter.scrolling_rows
+
+        model_line_number = 1 + len(ended_lines)
+        if wearing_em():
+            model_line_number = 1 + self.top_row + (painter.scrolling_rows - 1)
+            if False:  # pylint: disable=using-constant-test
+                model_line_number += 1  # Egg of ⌃CN⌃U999⌥G⌥G⌃U⌃L⌃L⌃L⌃U1⌥V
+
         painter.top_line_number = 1 + self.top_row
-        painter.last_line_number = 1 + len(ended_lines)
+        painter.model_line_number = model_line_number
         painter.painting_line_number = self.showing_line_number
 
         screen_lines = ended_lines[self.top_row :][: painter.scrolling_rows]
@@ -5518,10 +5532,16 @@ class TerminalEditor:
 
         self.showing_line_number = not self.showing_line_number
 
-        if self.showing_line_number:
-            self.editor_print(":set number")
+        if wearing_em():
+            if self.showing_line_number:
+                self.editor_print("⌃U ⌥X display-line-numbers-mode")
+            else:
+                self.editor_print("⌃U - ⌥X display-line-numbers-mode")
         else:
-            self.editor_print(":set nonumber")
+            if self.showing_line_number:
+                self.editor_print(":set number")
+            else:
+                self.editor_print(":set nonumber")
 
     def do_set_invregex(self):  # \F Egg
         """Search as Regex or search as Chars"""
@@ -5582,9 +5602,9 @@ class TerminalEditor:
 
         assert iobytespans
 
-        last_line_number = 1 + len(ended_lines)
-        str_last_line_number = "{:3} ".format(last_line_number)
-        last_width = len(str_last_line_number)
+        model_line_number = 1 + len(ended_lines)
+        str_model_line_number = "{:3} ".format(model_line_number)   # TODO: em
+        model_width = len(str_model_line_number)
 
         # Scroll up the Status Line
 
@@ -5600,7 +5620,7 @@ class TerminalEditor:
             line_number = 1 + found_row
             str_line_number = ""  # TODO: merge with 'format_as_line_number'
             if showing_line_number:
-                str_line_number = "{:3} ".format(line_number).rjust(last_width)
+                str_line_number = "{:3} ".format(line_number).rjust(model_width)
 
             line = self.fetch_row_line(row=found_row)
 
@@ -5989,7 +6009,7 @@ class TerminalPainter:
         self.status_row = None  # index the 1 Status Row at bottom of Screen
 
         self.top_line_number = 1  # number the Scrolling Rows down from First of Screen
-        self.last_line_number = 1  # number all Rows as wide as the Last Row of File
+        self.model_line_number = 1  # right-justify the Line Numbers
         self.painting_line_number = None  # number the Scrolling Rows visibly, or not
 
         # TODO: all = None in TerminalPainter.__init__
@@ -6153,48 +6173,48 @@ class TerminalPainter:
 
         # Drop the Line End's
 
-        texts = list(str_remove_line_end(_) for _ in ended_lines)
+        bare_lines = list(str_remove_line_end(_) for _ in ended_lines)
 
         # Pick out the Vi Py case of inserting or replacing into an Empty File
         # and lead with an empty Filler Line in that case
 
-        if not texts:
+        if not bare_lines:
             if not viewing:
                 if not wearing_em():
-                    texts.append("")
+                    bare_lines.append("")
+
+        # Number the Scrolling Lines of the Screen
+
+        lines = list()
+        for (index, bare_line) in enumerate(bare_lines):
+            str_line_number = self.format_as_line_number(index)
+            line = (str_line_number + bare_line)[:columns]
+            lines.append(line)
 
         # Pick out the Vi Py case of a File whose Last Line has no Line End,
         # and lead with a Filler Line of a single "." Dot in that case
 
-        if len(texts) < scrolling_rows:
+        if len(lines) < scrolling_rows:
             if lines_last_has_no_end(ended_lines):
                 if not wearing_em():
-                    texts.append(".")
+                    lines.append(".")
 
         # Complete the screen, with "~" for Vi Py or with "" for Em Py
 
-        while len(texts) < scrolling_rows:
+        while len(lines) < scrolling_rows:
             if wearing_em():
-                texts.append("")
+                lines.append("")
             else:
-                texts.append("~")
+                lines.append("~")
 
                 # Vi Py shows an empty File as occupying no space
                 # Vim quirk presents empty File same as a File of 1 Blank Line
 
         # Assert Screen completed
 
-        assert len(texts) == scrolling_rows, (len(texts), scrolling_rows)
+        assert len(lines) == scrolling_rows, (len(lines), scrolling_rows)
 
-        # Number the Scrolling Lines of the Screen
-
-        rows = list()
-        for (index, text) in enumerate(texts):
-            str_line_number = self.format_as_line_number(index)
-            row = (str_line_number + text)[:columns]
-            rows.append(row)
-
-        return rows
+        return lines
 
     def spot_nearby_cursor(self, row, column):
         """Choose a Row:Column to stand for a Row:Column on or off Screen"""
@@ -6216,7 +6236,7 @@ class TerminalPainter:
     def spot_left_column(self):
         """Find the leftmost Column occupied by the Chars of the Scrolling Lines"""
 
-        formatted = self.format_as_line_number(row=1)
+        formatted = self.format_as_line_number(row=0)
         left_column = len(formatted)
 
         return left_column
@@ -6228,11 +6248,15 @@ class TerminalPainter:
 
             return ""
 
-        str_last_line_number = "{:3} ".format(self.last_line_number)
-        last_width = len(str_last_line_number)
+        str_model_line_number = "{:3} ".format(self.model_line_number)
+        if wearing_em():
+            str_model_line_number = " {} ".format(self.model_line_number)
+        last_width = len(str_model_line_number)
 
         line_number = self.top_line_number + row
         formatted = "{:3} ".format(line_number).rjust(last_width)
+        if wearing_em():
+            formatted = " {} ".format(line_number).rjust(last_width)
 
         return formatted
 
