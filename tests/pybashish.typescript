@@ -419,13 +419,6 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 
 ## 2.8 ) Cp
 
-    $ bin/cp.py
-    Namespace(file=None, i=0, p=0, R=0)
-    usage: cp.py [-h] [-i] [-p] [-R] [FILE]
-    cp.py: error: not implemented
-    + exit 2
-    $
-
     $ bin/cp.py f.file
     Namespace(file='f.file', i=0, p=0, R=0)
     usage: cp.py [-h] [-i] [-p] [-R] [FILE]
@@ -1196,7 +1189,7 @@ Split words of lines into one word per line
 
 ## 3 ) Additional tests
 
-Show every verb called with no args return exit 0,
+Show every verb called with no args returns exit 0,
 else exit status 2 from rejecting usage,
 else exit status 2 from being stubbed out
 
@@ -1214,8 +1207,13 @@ else exit status 2 from being stubbed out
     + exit 2
     $ bin/column.py </dev/null >/dev/null 2>&1
     + exit 2
+    $
+
+    $ touch it~7~  # TODO: think deeper into trashing the Cwd Dir
     $ bin/cp.py </dev/null >/dev/null 2>&1
-    + exit 2
+    $ rm -fr it~7~
+    $
+
     $ bin/cspsh.py </dev/null >/dev/null 2>&1
     + exit 2
     $

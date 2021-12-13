@@ -25,6 +25,8 @@ examples:
   cp.py itself  # creates backup named "itself~1~", etc
 """
 
+# FIXME: mmm Emacs takes "it~1~" as a read only path
+
 # FIXME: except cp.py from outside this dir should mean cp -ip to this dir
 # FIXME: also copy from (FILE | HOSTNAME:FILE) to here, like Bash "scp" would
 # FIXME: think about "cp SOURCE TARGET" vs "cp TARGET SOURCE" vs line-editor's
@@ -34,17 +36,47 @@ examples:
 # FIXME: spec & test the two arg case of cp: '...' and '...' are the same file
 
 
+import glob
+import shlex
+import subprocess
 import sys
 
 import argdoc
 
 
 def main():
+
     args = argdoc.parse_args()
+
+    if not sys.argv[1:]:
+
+        inc_filename()
+
+        sys.exit()
+
     sys.stderr.write("{}\n".format(args))
     sys.stderr.write("{}\n".format(argdoc.format_usage().rstrip()))
     sys.stderr.write("cp.py: error: not implemented\n")
+
     sys.exit(2)  # exit 2 from rejecting usage
+
+
+def inc_filename():
+
+    paths = sorted(glob.glob("it*"))  # FIXME: wrong to sort ~10~ before ~9~
+    assert paths
+
+    last_path = paths[-1]
+    revision = int(last_path.split("~")[-2])
+
+    next_path = "it~{}~".format(revision + 1)
+
+    shline = "cp -ipR {} {}".format(last_path, next_path)
+    shargv = shlex.split(shline)
+    sys.stderr.write("+ {}\n".format(shline))
+    subprocess.run(shargv, stdin=subprocess.PIPE, check=True)
+
+    print(next_path)
 
 
 if __name__ == "__main__":
