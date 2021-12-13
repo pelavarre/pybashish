@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# To change the defaults, rename this file to:  em.py, emacs.py, vi.py, vim.py
+
+# The __main__.__doc__ of "vi.py" is =>
+
 r"""
 usage: vi.py [-h] [-u SCRIPT] [-c COMMAND] [--pwnme [BRANCH]] [--version] [FILE ...]
 
@@ -55,12 +59,16 @@ how to get Vi Py:
 #   take '+...' as an arg in place of '-c "..."', and Vi Py
 #   take the U0008 ⌃H BS \b chord in place of the U007F ⌃? DEL chord
 #
-# unlike Vi Py, Vim quirkily
+# Unlike Vi Py, Vim quirkily
 #   runs only as a pipe drain, declines to run as a pipe source or filter
 #   does blink the screen for '+q' without '+vi'
 #   does not name some chords it keeps undefined, such as Vi Py's zZ and Em Py's ⌃X⌃G
 #
 
+
+# This code runs on top of basic Python 3, no additional 'pip install's required
+
+# Flake8 feels the Import's must come after the first '__main__.__doc__' =>
 
 import __main__
 import argparse
@@ -88,182 +96,7 @@ subprocess_run = subprocess.run  # evade Linters who freak over "shell=True"
 ENV_HOME = os.environ["HOME"]
 
 
-# Name some Terminal Input magic
-
-C0_CONTROL_STDINS = list(chr(codepoint).encode() for codepoint in range(0x00, 0x20))
-C0_CONTROL_STDINS.append(chr(0x7F).encode())
-
-assert len(C0_CONTROL_STDINS) == 33 == (128 - 95) == ((0x20 - 0x00) + 1)
-
-ORD_CR = 0x0D  # CR, ⌃M, 13 \r  # the Return key on a Mac Keyboard
-CR_CHAR = chr(ORD_CR)
-CR_STDIN = CR_CHAR.encode()
-
-ORD_LF = 0x0A  # LF, ⌃J, 10 \n
-LF_CHAR = chr(ORD_LF)
-
-ORD_ESC = 0x1B  # ESC, ⌃[, 27
-ESC_CHAR = chr(ORD_ESC)
-ESC_STDIN = ESC_CHAR.encode()
-
-BASIC_LATIN_STDINS = list(chr(codepoint).encode() for codepoint in range(0x20, 0x7F))
-
-assert len(BASIC_LATIN_STDINS) == 95 == (128 - 33) == (0x7F - 0x20)
-assert len(C0_CONTROL_STDINS + BASIC_LATIN_STDINS) == 128
-
-X40_CONTROL_MASK = 0x40
-
-X20_LOWER_MASK = 0x20
-X20_UPPER_MASK = 0x20
-
-
-# Name some Terminal Output magic
-
-ESC = "\x1B"  # Esc
-CSI = ESC + "["  # Control Sequence Introducer (CSI)
-
-ED_2 = "\x1B[2J"  # Erase in Display (ED)  # 2 = Whole Screen
-CUP_Y_X = "\x1B[{};{}H"  # Cursor Position (CUP)
-CUP_1_1 = "\x1B[H"  # Cursor Position (CUP)  # (1, 1) = Upper Left
-
-DECSCUSR_N = "\x1B[{} q"  # Set Cursor Style
-DECSCUSR = "\x1B[ q"  # Clear Cursor Style (but doc'ed poorly)
-
-SGR_N = "\x1B[{}m"  # Select Graphic Rendition
-SGR = "\x1B[m"  # SGR > Reset, Normal, All Attributes Off
-
-DECSC = ESC + "7"  # DEC Save Cursor
-DECRC = ESC + "8"  # DEC Restore Cursor
-
-_XTERM_ALT_ = "\x1B[?1049h"  # show Alt Screen
-_XTERM_MAIN_ = "\x1B[?1049l"  # show Main Screen
-
-SMCUP = DECSC + _XTERM_ALT_  # Set-Mode Cursor-Positioning
-RMCUP = ED_2 + _XTERM_MAIN_ + DECRC  # Reset-Mode Cursor-Positioning
-
-
-# Configure some Terminal Output magic
-
-_CURSES_INITSCR_ = SMCUP + ED_2 + CUP_1_1
-_CURSES_ENDWIN_ = RMCUP
-
-_EOL_ = "\n"  # TODO: sometimes "\r\n" Dos, sometimes "\r" Classic Mac
-
-_LIT_OPEN_ = SGR_N.format(7)  # Reverse Video, Invert, overriden by default Cursor
-_LIT_CLOSE_ = SGR
-
-_VIEW_CURSOR_STYLE_ = DECSCUSR_N.format(2)  # Steady Block  # Mac Terminal default
-_REPLACE_CURSOR_STYLE_ = DECSCUSR_N.format(4)  # Steady Underline
-_INSERT_CURSOR_STYLE_ = DECSCUSR_N.format(6)  # Steady Bar
-
-
-# Parse some Terminal Output magic
-
-
-class TerminalOrder(argparse.Namespace):
-    """Split one whole Terminal Output Order into its Parts"""
-
-    # pylint: disable=too-few-public-methods
-    # pylint: disable=too-many-instance-attributes
-
-    TERMINAL_WRITE_REGEX = r"".join(
-        [
-            r"(\x1B\[",  # Control Sequence Introducer (CSI)
-            r"(([0-9?]+)(;([0-9?]+))?)?",  # 0, 1, or 2 Decimal Int or Question Args
-            r"([^A-Z_a-z]*[A-Z_a-z]))",  # any Chars, then Ascii Letter
-            r"|",
-            r"(\x1B.)",  # else one escaped Char
-            r"|",
-            r"(\r\n|[\x00-\x1F\x7F])",  # else one or a few C0_CONTROL Chars
-            r"|",
-            r"([^\x00-\x1F\x7F]+)",  # else literal Chars
-        ]
-    )
-
-    def __init__(self, match):
-        # pylint: disable=super-init-not-called
-
-        self.match = match
-
-        # Name Groups of the Re Match of TERMINAL_WRITE_REGEX
-
-        m = match
-        self.chars = m.string[m.start() : m.end()]
-
-        assert len(m.groups()) == 9
-
-        self.literals = m.group(9)
-        self.controls = m.group(8)
-        self.escape_plus = m.group(7)
-        self.csi_plus = m.group(1)
-
-        groups = (self.literals, self.controls, self.escape_plus, self.csi_plus)
-        assert sum(bool(_) for _ in groups) == 1, (self.chars, groups)
-        assert self.chars in groups, (self.chars, groups)
-
-        self.a = m.group(6)
-        self.x = m.group(5)
-        self.y = m.group(3)
-
-        if not self.csi_plus:
-            assert self.a is self.x is self.y is None, (self.chars, groups)
-        else:
-            assert self.a, (self.chars, groups)
-
-        # Raise ValueError if CSI Order carries an X or Y that is not Decimal Int
-
-        exc_arg = repr(self.chars)
-
-        self.int_x = None
-        if self.x is not None:
-            try:
-                self.int_x = int(self.x)
-            except ValueError:
-
-                raise ValueError(exc_arg) from None
-
-        self.int_y = None
-        if self.y is not None:
-            try:
-                self.int_y = int(self.y)
-            except ValueError:
-                assert False, (self.chars, groups)
-
-        # Raise ValueError if CSI Order started and not ended
-
-        if self.escape_plus and self.escape_plus.endswith(CSI):  # "\x1B["
-            assert self.escape_plus == CSI  # as per TERMINAL_WRITE_REGEX
-
-            raise ValueError(exc_arg)  # incomplete CSI TerminalOrder
-
-        if self.controls and self.controls.endswith(ESC):  # "\x1B"
-
-            raise ValueError(exc_arg)  # incomplete CSI TerminalOrder
-
-
-class TerminalWriter(argparse.Namespace):
-    """Split a mix of C0_CONTROL and other Chars into complete TerminalOrder's"""
-
-    # pylint: disable=too-few-public-methods
-
-    def __init__(self, chars):
-        # pylint: disable=super-init-not-called
-
-        regex = TerminalOrder.TERMINAL_WRITE_REGEX
-
-        orders = list()
-        for match in re.finditer(regex, string=chars):
-            order = TerminalOrder(match)
-
-            orders.append(order)
-
-        self.orders = orders
-
-
-#
-# Run from the Command Line
-#
-
+# The __main__.__doc__ of "em.py" is =>
 
 ALT_DOC = r"""
 usage: em.py [-h] [-nw] [-Q] [--no-splash] [-q] [--script SCRIPT] [--eval COMMAND]
@@ -316,20 +149,25 @@ how to get Em Py:
   ⌃Segg
 """
 
+#
+# Emacs and Em Py both
+#   misread a pasted Return to mean add the indentation of the line above  # TODO
+#
+# Unlike Em Py, Emacs quirkily
+#   declines to run as pipe drain, source, or filter
+#   declines to take Mac ⌥ Keystrokes of A..Z (minus EINU) as Meta Keyboard Chords
+#   neglects to keep ⌃X⌃G undefined
+#   neglects to tab-complete incremental searchs  # TODO
+#
+
 # FIXME: make ⌃L and ⌥R agree over which row is Middle Row
 
 # TODO: ⌃S ⌃R ⌥% ⌃XI ...
 # TODO: ⌃X⌃X ...
 
+
 #
-# Emacs and Em Py both
-#   misread a pasted Return to mean add the indentation of the line above  # TODO
-#
-# unlike Em Py, Emacs quirkily
-#   declines to run as pipe drain, source, or filter
-#   declines to take Mac ⌥ Keystrokes of A..Z (minus EINU) as Meta Keyboard Chords
-#   neglects to keep ⌃X⌃G undefined
-#   neglects to tab-complete incremental searchs  # TODO
+# Run Vi Py or Em Py from the Command Line
 #
 
 
@@ -353,8 +191,6 @@ def main(argv):
     # Load each File
 
     edit_the_files(files=args.files, script=args.script, evals=args.evals)
-
-    # TODO: swap the '__main__.__doc__' with ALT_DOC, when "--help" sees it's not there
 
 
 def parse_vi_argv(argv):
@@ -490,9 +326,11 @@ def wearing_em():
 
 
 def parser_format_help(parser):
-    """Patch around bugs in Python ArgParse formatting Help Lines"""
+    """Patch around bugs in Python ArgParse formatting Help Lines inflexibly"""
 
     doc = parser.format_help()
+
+    # Diff the Vi Py we distribute vs the Em Py, Emacs Py, and Vim Py we also run
 
     want_verb = "em" if wearing_em() else "vi"
     want_py = want_verb + ".py"  # such as "vi.py"
@@ -504,7 +342,12 @@ def parser_format_help(parser):
     got_qpy = got_verb + "?py"  # such as "vim?py"
     got_title_py = got_verb.title() + " Py"  # such as "Vim Py"
 
+    # When the version we run isn't the version we distribute
+
     if got_verb != want_verb:
+
+        # Work out what patch we need
+
         wider = len(got_py) - len(want_py)
         assert wider >= 0, (got_verb, want_verb)
 
@@ -512,6 +355,9 @@ def parser_format_help(parser):
         got_cp_line = want_cp_line.replace("em_py", got_py.replace(".", "_"))
 
         python3_line = "  python3 vi?py vi?py"
+
+        # Apply the patch
+
         if want_cp_line in doc:
             doc = doc.replace(want_cp_line, got_cp_line)
         else:
@@ -616,6 +462,194 @@ def do_args_pwnme(branch):
             sys.exit(exc.returncode)
 
     sys.exit()  # exit old Self, after calling new Self once or twice
+
+
+#
+# Name some Terminal Input magic
+#
+
+
+C0_CONTROL_STDINS = list(chr(codepoint).encode() for codepoint in range(0x00, 0x20))
+C0_CONTROL_STDINS.append(chr(0x7F).encode())
+
+BASIC_LATIN_STDINS = list(chr(codepoint).encode() for codepoint in range(0x20, 0x7F))
+
+assert len(C0_CONTROL_STDINS) == 33 == (128 - 95) == ((0x20 - 0x00) + 1)
+assert len(BASIC_LATIN_STDINS) == 95 == (128 - 33) == (0x7F - 0x20)
+assert len(C0_CONTROL_STDINS + BASIC_LATIN_STDINS) == 128
+
+ORD_LF = 0x0A  # LF, ⌃J, 10 \n
+LF_CHAR = chr(ORD_LF)
+
+ORD_CR = 0x0D  # CR, ⌃M, 13 \r  # the Return key on a Mac Keyboard
+CR_CHAR = chr(ORD_CR)
+CR_STDIN = CR_CHAR.encode()
+
+ORD_ESC = 0x1B  # ESC, ⌃[, 27
+ESC_CHAR = chr(ORD_ESC)
+ESC_STDIN = ESC_CHAR.encode()
+
+X40_CONTROL_MASK = 0x40
+
+X20_LOWER_MASK = 0x20
+X20_UPPER_MASK = 0x20
+
+# FIXME:  shuffle lots of the TerminalNudgeIn to here
+
+
+#
+# Name some Terminal Output magic
+#
+
+ESC = "\x1B"  # Esc
+CSI = ESC + "["  # Control Sequence Introducer (CSI)
+
+ED_2 = "\x1B[2J"  # Erase in Display (ED)  # 2 = Whole Screen
+CUP_Y_X = "\x1B[{};{}H"  # Cursor Position (CUP)
+CUP_1_1 = "\x1B[H"  # Cursor Position (CUP)  # (1, 1) = Upper Left
+
+DECSCUSR_N = "\x1B[{} q"  # Set Cursor Style
+DECSCUSR = "\x1B[ q"  # Clear Cursor Style (but doc'ed poorly)
+
+SGR_N = "\x1B[{}m"  # Select Graphic Rendition
+SGR = "\x1B[m"  # SGR > Reset, Normal, All Attributes Off
+
+DECSC = ESC + "7"  # DEC Save Cursor
+DECRC = ESC + "8"  # DEC Restore Cursor
+
+_XTERM_ALT_ = "\x1B[?1049h"  # show Alt Screen
+_XTERM_MAIN_ = "\x1B[?1049l"  # show Main Screen
+
+SMCUP = DECSC + _XTERM_ALT_  # Set-Mode Cursor-Positioning
+RMCUP = ED_2 + _XTERM_MAIN_ + DECRC  # Reset-Mode Cursor-Positioning
+
+
+#
+# Configure some Terminal Output magic
+#
+
+
+_CURSES_INITSCR_ = SMCUP + ED_2 + CUP_1_1
+_CURSES_ENDWIN_ = RMCUP
+
+_EOL_ = "\n"  # TODO: sometimes "\r\n" Dos, sometimes "\r" Classic Mac
+
+_LIT_OPEN_ = SGR_N.format(7)  # Reverse Video, Invert, overriden by default Cursor
+_LIT_CLOSE_ = SGR
+
+_VIEW_CURSOR_STYLE_ = DECSCUSR_N.format(2)  # Steady Block  # Mac Terminal default
+_REPLACE_CURSOR_STYLE_ = DECSCUSR_N.format(4)  # Steady Underline
+_INSERT_CURSOR_STYLE_ = DECSCUSR_N.format(6)  # Steady Bar
+
+
+#
+# Parse some Terminal Output magic
+#
+
+
+class TerminalWriter(argparse.Namespace):
+    """Split a mix of C0_CONTROL and other Chars into complete TerminalOrder's"""
+
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self, chars):
+        # pylint: disable=super-init-not-called
+
+        regex = TerminalOrder.TERMINAL_WRITE_REGEX
+
+        orders = list()
+        for match in re.finditer(regex, string=chars):
+            order = TerminalOrder(match)
+
+            orders.append(order)
+
+        self.orders = orders
+
+
+class TerminalOrder(argparse.Namespace):
+    """Split one whole Terminal Output Order into its Parts"""
+
+    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-many-instance-attributes
+
+    TERMINAL_WRITE_REGEX = r"".join(
+        [
+            r"(\x1B\[",  # Control Sequence Introducer (CSI)
+            r"(([0-9?]+)(;([0-9?]+))?)?",  # 0, 1, or 2 Decimal Int or Question Args
+            r"([^A-Z_a-z]*[A-Z_a-z]))",  # any Chars, then Ascii Letter
+            r"|",
+            r"(\x1B.)",  # else one escaped Char
+            r"|",
+            r"(\r\n|[\x00-\x1F\x7F])",  # else one or a few C0_CONTROL Chars
+            r"|",
+            r"([^\x00-\x1F\x7F]+)",  # else literal Chars
+        ]
+    )
+
+    def __init__(self, match):
+        # pylint: disable=super-init-not-called
+
+        self.match = match
+
+        # Name Groups of the Re Match of TERMINAL_WRITE_REGEX
+
+        m = match
+        self.chars = m.string[m.start() : m.end()]
+
+        assert len(m.groups()) == 9
+
+        self.literals = m.group(9)
+        self.controls = m.group(8)
+        self.escape_plus = m.group(7)
+        self.csi_plus = m.group(1)
+
+        groups = (self.literals, self.controls, self.escape_plus, self.csi_plus)
+        assert sum(bool(_) for _ in groups) == 1, (self.chars, groups)
+        assert self.chars in groups, (self.chars, groups)
+
+        self.a = m.group(6)
+        self.x = m.group(5)
+        self.y = m.group(3)
+
+        if not self.csi_plus:
+            assert self.a is self.x is self.y is None, (self.chars, groups)
+        else:
+            assert self.a, (self.chars, groups)
+
+        # Raise ValueError if CSI Order carries an X or Y that is not Decimal Int
+
+        exc_arg = repr(self.chars)
+
+        self.int_x = None
+        if self.x is not None:
+            try:
+                self.int_x = int(self.x)
+            except ValueError:
+
+                raise ValueError(exc_arg) from None
+
+        self.int_y = None
+        if self.y is not None:
+            try:
+                self.int_y = int(self.y)
+            except ValueError:
+                assert False, (self.chars, groups)
+
+        # Raise ValueError if CSI Order started and not ended
+
+        if self.escape_plus and self.escape_plus.endswith(CSI):  # "\x1B["
+            assert self.escape_plus == CSI  # as per TERMINAL_WRITE_REGEX
+
+            raise ValueError(exc_arg)  # incomplete CSI TerminalOrder
+
+        if self.controls and self.controls.endswith(ESC):  # "\x1B"
+
+            raise ValueError(exc_arg)  # incomplete CSI TerminalOrder
+
+
+#
+# Run from the Command Line, with Files
+#
 
 
 def edit_the_files(files, script, evals):
