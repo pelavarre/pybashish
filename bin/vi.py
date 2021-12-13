@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# To change the defaults, rename this file to:  em.py, emacs.py, vi.py, vim.py
+# To change defaults, rename this file to:  em.py, emacs.py, vi.py, vim.py
 
 # The __main__.__doc__ of "vi.py" is =>
 
@@ -24,26 +24,26 @@ quirks:
   loses input at crashes, and input of C0 Control bytes, except after ⌃V
 
 keyboard cheat sheet:
-  ZQ ZZ  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M  ⌃C Esc  => how to quit Vi Py
+  ⇧Z⇧Q ⇧Z⇧Z  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M  ⌃C Esc  => how to quit Vi Py
   Down Up Right Left Space Delete Return  => conventional enough
-  0 ^ $ fx tx Fx Tx ; , | h l  => leap to column
-  b e w B E W { }  => leap across small word, large word, paragraph
-  G 1G H L M - + _ ⌃J ⌃N ⌃P j k  => leap to screen row, leap to line
+  0 ^ $ Fx Tx ⇧Fx ⇧Tx ; , | H L  => leap to column
+  B E W ⇧B ⇧E ⇧W { }  => leap across small word, large word, paragraph
+  ⇧G 1⇧G ⇧H ⇧L ⇧M - + _ ⌃J ⌃N ⌃P J K  => leap to screen row, leap to line
   1234567890 ⌃C Esc  => repeat, or don't
-  ⌃F ⌃B ⌃E ⌃Y zb zt zz 99zz  => scroll screen
+  ⌃F ⌃B ⌃E ⌃Y ZB ZT ZZ 99ZZ  => scroll screen
   ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
-  \n \i \F ⌃C Esc ⌃G  => toggle line numbers, search case/ regex, show hits
-  /... Delete ⌃U ⌃C Return  ?...   * £ # n N  => search ahead, behind, next
+  \N \I \⇧F ⌃C Esc ⌃G  => toggle line numbers, search case/ regex, show hits
+  /... Delete ⌃U ⌃C Return  ?...   * £ # N ⇧N  => search ahead, behind, next
   /Return ?Return :g/Return  => search ahead, behind, lots
-  a i rx o A I O R ⌃V ⌃O ⌃C Esc  => insert, replace, & view, once or awhile
-  x X dd D J s S C  => cut chars or lines, join lines, insert after cut
+  Rx A I O ⇧R ⇧A ⇧I ⇧O ⌃V ⌃O ⌃C Esc  => replace, insert, & view, once or awhile
+  X ⇧X DD ⇧D ⇧J s ⇧S ⇧C  => cut chars or lines, join lines, insert after cut
 
 keyboard easter eggs:
-  9^ G⌃F⌃F 1G⌃B G⌃F⌃E 1G⌃Y ; , n N 2G9k \n99zz  3ZQ 512ZQ
-  ⌃C Esc  123Esc zZZQ A⌃OzZ⌃OZQ /⌃G⌃CZQ f⌃C w*⌃C w*123456n⌃C w*g/⌃M⌃C g/⌃Z
-  Qvi⌃My REsc R⌃Zfg OO⌃O_⌃O^ \Fw*/Up \F/$Return ⌃G2⌃G :vi⌃M :n
+  9^ ⇧G⌃F⌃F 1⇧G⌃B G⌃F⌃E 1⇧G⌃Y ; , N ⇧N 2G9k \N99ZZ  3⇧Z⇧Q 512⇧Z⇧Q
+  ⌃C Esc  123Esc Z⇧Q⇧Z⇧Q ⇧A⌃OZ⇧Q⌃O⇧Z⇧Q /⌃G⌃C⇧Z⇧Q F⌃C W*⌃C W*123456N⌃C W*G/⌃M⌃C G/⌃Z
+  ⇧QVI⌃MY ⇧REsc ⇧R⌃Zfg ⇧OO⌃O_⌃O^ \⇧FW*/Up \⇧F/$Return ⌃G2⌃G :vi⌃M :n
 
-pipe tests of ZQ vs ZZ:
+pipe tests of ⇧Z⇧Q vs ⇧Z⇧Z:
   ls |bin/vi.py -  # pipe drain
   cat bin/vi.py |bin/vi.py |grep import  # pipe filter
 
@@ -62,7 +62,7 @@ how to get Vi Py:
 # Unlike Vi Py, Vim quirkily
 #   runs only as a pipe drain, declines to run as a pipe source or filter
 #   does blink the screen for '+q' without '+vi'
-#   does not name some chords it keeps undefined, such as Vi Py's zZ and Em Py's ⌃X⌃G
+#   does not name some chords it keeps undefined, such as Vi Py's Z⇧Q and Em Py's ⌃X⌃G
 #
 
 
@@ -120,7 +120,7 @@ optional arguments:
   --version           print a hash of this code (its md5sum)
 
 quirks:
-  works in Mac Terminal, even without UseOptionAsMetaKey < Keyboard < Profiles
+  works in Mac Terminal, even without Use Option As Meta Key < Keyboard < Profiles
   works as pipe filter, source, or drain, a la the vim drain:  ls |vi -
   defaults to -Q --eval '(menu-bar-mode -1)', not the quirky '--script ~/.emacs'
   loses input at crashes, and input outside Basic Latin bytes, except after ⌃Q
@@ -129,13 +129,13 @@ keyboard cheat sheet:
   ⌃X⌃S⌃X⌃C  ⌃X⌃C  ⌃Zfg  ⌃G  => how to quit Em Py
   Down Up Right Left Space  => conventional enough
   ⌃E ⌃A ⌃F ⌃B ⌥M ⌃U⌥GTab  => leap to column
-  ⌃N ⌃P ⌥R⌥R⌥R ⌥< ⌥> ⌃U99⌥G⌥G ⌃L⌃L⌃L ⌃U⌃L  => leap to line, scroll screen
+  ⌃N ⌃P ⌥R⌥R⌥R ⌥< ⌥> ⌥9⌥9⌥G⌥G ⌃L⌃L⌃L ⌃U⌃L  => leap to line, scroll screen
   ⌃U ⌃U -0123456789 ⌃U ⌥-⌥0..⌥9 ⌃G  => repeat, or don't
   ⌃Q⌃J  => take ⌃ and ⌥ as input, not as command
 
 keyboard easter eggs:
   ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
-  ⌥>⌃V⌃V⌃V ⌥<⌥V ⌃CN⌃U99⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
+  ⌥>⌃V⌃V⌃V ⌥<⌥V ⌃CN⌥9⌥9⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
 
 pipe tests:
   ls |bin/em.py -  # pipe drain
@@ -875,7 +875,7 @@ class TerminalVi:
 
         finally:
 
-            self.main_traceback = editor.skin.traceback  # /⌃G⌃CZQ Egg
+            self.main_traceback = editor.skin.traceback  # /⌃G⌃C⇧Z⇧Q Egg
 
     def fabricate_first_vi_chords(self, script, evals):  # pylint: disable=no-self-use
         """Merge the first Chords from the Command Line with basic Vi Py Startup"""
@@ -952,8 +952,8 @@ class TerminalVi:
 
         return evalled
 
-    def do_vi_c0_control_syn(self):
-        """Define ⌃V during AIO aio R, but not yet otherwise"""
+    def do_vi_c0_control_syn(self):  # Vim ⌃V during ⇧R ⇧A ⇧I ⇧O A I O
+        """Define ⌃V during ⇧R ⇧A ⇧I ⇧O A I O, but not yet otherwise"""
 
         editor = self.editor
         if editor.intake_beyond:
@@ -961,16 +961,16 @@ class TerminalVi:
         else:
             editor.do_raise_name_error()
 
-    def do_quote_one_intake(self):  # Vim ⌃V inside AIOR aio
-        """Take the next Input Keyboard Chord to insert or replace, not as Control"""
+    def do_quote_one_intake(self):  # Vim ⌃V inside ⇧R ⇧A ⇧I ⇧O A I O
+        """Take the next Input Keyboard Chord to replace or insert, not as Control"""
 
         editor = self.editor
         keyboard = editor.skin.keyboard
 
-        if editor.intake_beyond == "inserting":  # AIO aio then ⌃V
+        if editor.intake_beyond == "inserting":  # ⇧A ⇧I ⇧O A I O then ⌃V
             self.vi_print("Type one char to insert")
         else:
-            assert editor.intake_beyond == "replacing"  # R then ⌃V
+            assert editor.intake_beyond == "replacing"  # ⇧R then ⌃V
             self.vi_print("Type one char to replace")
 
         keyboard.intake_ish = True
@@ -1076,14 +1076,14 @@ class TerminalVi:
     # TODO: explore Vim quirk of scrolling and pausing to make room for wide pathnames
 
     def do_vi_c0_control_etx(self):  # Vim ⌃C  # Vi Py Init
-        """Cancel Digits Prefix, or close Insert/ Replace, or suggest ZZ to quit Vi Py"""
+        """Cancel Prefix, or close Replace/ Insert, or suggest ⇧Z⇧Z to quit Vi Py"""
 
         self.cancel_escape_whatever("Cancelled")
 
         # Vim ⌃C quirk rapidly rings a Bell for each extra ⌃C, Vi Py doesn't
 
     def do_vi_c0_control_esc(self):  # Vim Esc
-        """Cancel Digits Prefix, or close Insert/ Replace, or suggest ZZ to quit Vi Py"""
+        """Cancel Prefix, or close Replace/ Insert, or suggest ⇧Z⇧Z to quit Vi Py"""
 
         self.cancel_escape_whatever("Escaped")
 
@@ -1106,17 +1106,17 @@ class TerminalVi:
 
             self.vi_print("{} ⌃O Bypass".format(verbed))
 
-        elif editor.intake_beyond == "inserting":  # AIO aio then Esc ⌃C
+        elif editor.intake_beyond == "inserting":  # ⇧A ⇧I ⇧O A I O then Esc ⌃C
 
             self.take_vi_views()
             count = editor.format_touch_count()
             self.vi_print("{} after {} inserted".format(verbed, count))
 
-            skin.doing_traceback = skin.traceback  # ⌃C of A⌃OzQ⌃CZQ Egg
+            skin.doing_traceback = skin.traceback  # ⌃C of A⌃OZ⇧Q⌃C⇧Z⇧Q Egg
 
-        elif editor.intake_beyond == "replacing":  # R then Esc or ⌃C
+        elif editor.intake_beyond == "replacing":  # ⇧R then Esc or ⌃C
 
-            skin.doing_traceback = skin.traceback  # ⌃C of R⌃OzQ⌃CZQ Egg
+            skin.doing_traceback = skin.traceback  # ⌃C of R⌃OZ⇧Q⌃C⇧Z⇧Q Egg
 
             self.take_vi_views()
             count = editor.format_touch_count()
@@ -1129,11 +1129,11 @@ class TerminalVi:
 
         elif verbed == "Escaped":
 
-            self.suggest_quit_vi("Press ZZ to save changes")  # Esc Egg
+            self.suggest_quit_vi("Press ⇧Z⇧Z to save changes")  # Esc Egg
 
         else:
 
-            self.suggest_quit_vi("Press ZQ to lose changes")  # ⌃C Egg
+            self.suggest_quit_vi("Press ⇧Z⇧Q to lose changes")  # ⌃C Egg
 
     def suggest_quit_vi(self, how):
         """Print how to Quit Vi Py"""
@@ -1150,9 +1150,9 @@ class TerminalVi:
             "{!r}  {} and quit {}  {}".format(nickname, how, title_py, version)
         )
 
-        # such as '/dev/stdout'  Press ZQ to lose changes and quit Vim Py  0.1.23
+        # such as '/dev/stdout'  Press ⇧Z⇧Q to lose changes and quit Vim Py  0.1.23
 
-    def do_continue_vi(self):  # Vim Q v i Return  # Vim b"Qvi\r"  # not Ex mode
+    def do_continue_vi(self):  # Vim ⇧Q V I Return  # not Ex mode
         """Accept Q v i Return, without ringing the Terminal bell"""
 
         editor = self.editor
@@ -1261,7 +1261,7 @@ class TerminalVi:
         # Vim :wq quirk doesn't quit and does write, when more Files chosen than fetched
         # Vim :wq :wq quirk quits, despite more Files chosen than fetched
 
-    def do_flush_quit_vi(self):  # Vim ZZ  # Vim :wq!\r
+    def do_flush_quit_vi(self):  # Vim ⇧Z⇧Z  # Vim :wq!\r
         """Write the File and quit Vi"""
 
         self.flush_vi()
@@ -1269,8 +1269,8 @@ class TerminalVi:
         self.quit_vi()
         assert False  # unreached
 
-        # Vi Py ZZ and :wq! do quit, despite more Files chosen than fetched
-        # Vim ZZ quirk doesn't, but Vim ZZ ZZ and :wq! quirks do quit, despite more
+        # Vi Py ⇧Z⇧Z and :wq! do quit, despite more Files chosen than fetched
+        # Vim ⇧Z⇧Z quirk doesn't, but Vim ⇧Z⇧Z ⇧Z⇧Z and :wq! quirks do quit
 
     def do_might_flush_vi(self):  # Vim :w\r
         """Write the File and do Not quit it, with less force"""
@@ -1358,13 +1358,13 @@ class TerminalVi:
 
         return False
 
-    def do_quit_vi(self):  # Vim ZQ  # Vim :q!\r
+    def do_quit_vi(self):  # Vim ⇧Z⇧Q  # Vim :q!\r
         """Lose last changes, but keep last Python Traceback, and quit Vi"""
 
         editor = self.editor
         skin = editor.skin
 
-        skin.doing_traceback = skin.traceback  # ZQ of the ...ZQ Eggs, such as zZZQ
+        skin.doing_traceback = skin.traceback  # ⇧Z⇧Q of such eggs as Z⇧Q⇧Z⇧Q
         self.quit_vi()
 
     def quit_vi(self):
@@ -1670,7 +1670,7 @@ class TerminalVi:
     # Define Chords to search again for the same old Search Key
     #
 
-    def do_vi_find_earlier(self):  # Vim N
+    def do_vi_find_earlier(self):  # Vim ⇧N
         """Leap to earlier Search Key Match"""
 
         editor = self.editor
@@ -1695,7 +1695,7 @@ class TerminalVi:
 
             editor.continue_do_loop()
 
-    def do_vi_find_later(self):  # Vim n
+    def do_vi_find_later(self):  # Vim N
         """Leap to later Search Key Match"""
 
         editor = self.editor
@@ -1763,7 +1763,7 @@ class TerminalVi:
 
         editor.column = 0
 
-    def do_slip_left(self):  # Vim h, ← Left Arrow
+    def do_slip_left(self):  # Vim H, ← Left Arrow
         """Slip left one Column or more"""
 
         count = self.get_vi_arg1_int()
@@ -1775,7 +1775,7 @@ class TerminalVi:
         left = min(editor.column, count)
         editor.column -= left
 
-    def do_slip_right(self):  # Vim l, → Right Arrow
+    def do_slip_right(self):  # Vim L, → Right Arrow
         """Slip Right one Column or more"""
 
         count = self.get_vi_arg1_int()
@@ -1863,7 +1863,7 @@ class TerminalVi:
     # Step the Cursor across zero, one, or more Lines of the same File
     #
 
-    def do_step_for_count(self):  # Vim G, 1G
+    def do_step_for_count(self):  # Vim ⇧G, 1⇧G
         """Leap to last Row, else to a chosen Row"""
 
         editor = self.editor
@@ -1907,21 +1907,21 @@ class TerminalVi:
             self.editor.skin.arg1 -= 1  # mutate  # ugly
             self.step_down_for_count()
 
-    def do_step_max_low(self):  # Vim L
+    def do_step_max_low(self):  # Vim ⇧L
         """Leap to first Word of Bottom Row on Screen"""
 
         editor = self.editor
         editor.row = editor.spot_bottom_row()
         editor.slip_dent()
 
-    def do_step_max_high(self):  # Vim H
+    def do_step_max_high(self):  # Vim ⇧H
         """Leap to first Word of Top Row on Screen"""
 
         editor = self.editor
         editor.row = editor.top_row
         editor.slip_dent()
 
-    def do_step_to_middle(self):  # Vim M
+    def do_step_to_middle(self):  # Vim ⇧M
         """Leap to first Word of Middle Row on Screen"""
 
         editor = self.editor
@@ -1961,7 +1961,7 @@ class TerminalVi:
         editor.column = self.seek_vi_column()
         self.keep_up_vi_column_seek()
 
-    def do_step_down_seek(self):  # Vim j, ⌃J, ⌃N, ↓ Down Arrow
+    def do_step_down_seek(self):  # Vim J, ⌃J, ⌃N, ↓ Down Arrow
         """Step down one Row or more, but seek the current Column"""
 
         editor = self.editor
@@ -1974,7 +1974,7 @@ class TerminalVi:
         editor.column = self.seek_vi_column()
         self.keep_up_vi_column_seek()
 
-    def do_step_up_seek(self):  # Vim k, ⌃P, ↑ Up Arrow
+    def do_step_up_seek(self):  # Vim K, ⌃P, ↑ Up Arrow
         """Step up a Row or more, but seek the current Column"""
 
         editor = self.editor
@@ -2177,21 +2177,21 @@ class TerminalVi:
     # Scroll Rows of the Screen
     #
 
-    def do_scroll_till_top(self):  # Vim zt
+    def do_scroll_till_top(self):  # Vim Z T
         """Scroll up or down till Cursor Row lands in Top Row of Screen"""
 
         editor = self.editor
         editor.step_for_count_slip_to_dent(default=(editor.row + 1))
         editor.scroll_till_top()
 
-    def do_scroll_till_middle(self):  # Vim zz  # not to be confused with Vim ZZ
+    def do_scroll_till_middle(self):  # Vim Z Z  # not Vim ⇧Z⇧Z
         """Scroll up or down till Cursor Row lands in Middle Row of Screen"""
 
         editor = self.editor
         editor.step_for_count_slip_to_dent(default=(editor.row + 1))
         editor.scroll_till_middle()
 
-    def do_scroll_till_bottom(self):  # Vim zb
+    def do_scroll_till_bottom(self):  # Vim Z B
         """Scroll up or down till Cursor Row lands in Bottom Row of Screen"""
 
         editor = self.editor
@@ -2263,12 +2263,12 @@ class TerminalVi:
     # Step across "Big" Words between Blanks, and "Lil" Words of Symbolic/Not Chars
     #
 
-    def do_big_word_end_ahead(self):  # Vim E
+    def do_big_word_end_ahead(self):  # Vim ⇧E
         """Slip ahead to last Char of this else next Big Word"""
 
         self.word_end_ahead_for_count(VI_BLANK_SET)
 
-    def do_lil_word_end_ahead(self):  # Vim e
+    def do_lil_word_end_ahead(self):  # Vim E
         """Slip ahead to last Char of this else next Lil Word"""
 
         self.word_end_ahead_for_count(VI_BLANK_SET, VI_SYMBOLIC_SET)
@@ -2317,12 +2317,12 @@ class TerminalVi:
             behind = self.slip_behind_one()  # backtrack
             assert behind, (editor.column, editor.count_columns_in_row())
 
-    def do_big_word_start_ahead(self):  # Vim W  # inverse of Vim B
+    def do_big_word_start_ahead(self):  # Vim ⇧W  # inverse of Vim ⇧B
         """Slip ahead to first Char of next Big Word"""
 
         self.word_start_ahead_once(VI_BLANK_SET)
 
-    def do_lil_word_start_ahead(self):  # Vim w  # inverse of Vim b
+    def do_lil_word_start_ahead(self):  # Vim W  # inverse of Vim B
         """Slip ahead to first Char of next Lil Word"""
 
         self.word_start_ahead_for_count(VI_BLANK_SET, VI_SYMBOLIC_SET)
@@ -2373,15 +2373,15 @@ class TerminalVi:
 
                 break
 
-    def do_big_word_start_behind(self):  # Vim B  # inverse of Vim W
+    def do_big_word_start_behind(self):  # Vim ⇧B  # inverse of Vim ⇧W
         """Slip behind to first Char of Big Word"""
 
         self.word_start_behind_for_count(VI_BLANK_SET)
 
-        # TODO: add option for '._' between words, or only '.' between words
-        # TODO: add option for 'b e w' and 'B E W' to swap places
+        # TODO: add option for either of '._' between words, or only '.' between words
+        # TODO: add option for B E W and ⇧B ⇧E ⇧W to swap places
 
-    def do_lil_word_start_behind(self):  # Vim b  # inverse of Vim b
+    def do_lil_word_start_behind(self):  # Vim B  # inverse of Vim W
         """Slip behind first Char of Lil Word"""
 
         self.word_start_behind_for_count(VI_BLANK_SET, VI_SYMBOLIC_SET)
@@ -2437,7 +2437,7 @@ class TerminalVi:
     # Search ahead inside the Row for a single Char
     #
 
-    def do_slip_index_choice(self):  # Vim fx
+    def do_slip_index_choice(self):  # Vim Fx
         """Find Char to right in Row, once or more"""
 
         choice = self.get_vi_arg2_chords()
@@ -2449,12 +2449,12 @@ class TerminalVi:
 
         self.slip_redo()
 
-        # TODO: Vi Py vs Vim f, t, F, T quirks
-        # Vim fEsc quirk means escaped without Bell
-        # Vim f⌃C quirk means cancelled with Bell
-        # Vim f⌃Vx quirk means literally go find a ⌃V char, not go find the X char
+        # TODO: Vi Py vs Vim F, T, ⇧F, ⇧T quirks
+        # Vim F Esc quirk means escaped without Bell
+        # Vim F ⌃C quirk means cancelled with Bell
+        # Vim F ⌃Vx quirk means literally go find a ⌃V char, not go find the X char
 
-    def do_slip_index_minus_choice(self):  # Vim tx
+    def do_slip_index_minus_choice(self):  # Vim Tx
         """Find Char to Right in row, once or more, but then slip left one Column"""
 
         choice = self.get_vi_arg2_chords()
@@ -2509,7 +2509,7 @@ class TerminalVi:
     # Search behind inside the Row for a single Char
     #
 
-    def do_slip_rindex_choice(self):  # Vim Fx
+    def do_slip_rindex_choice(self):  # Vim ⇧Fx
         """Find Char to left in Row, once or more"""
 
         choice = self.get_vi_arg2_chords()
@@ -2521,7 +2521,7 @@ class TerminalVi:
 
         self.slip_redo()
 
-    def do_slip_rindex_plus_choice(self):  # Vim Tx
+    def do_slip_rindex_plus_choice(self):  # Vim ⇧Tx
         """Find Char to left in Row, once or more, but then slip right one Column"""
 
         choice = self.get_vi_arg2_chords()
@@ -2700,7 +2700,7 @@ class TerminalVi:
     # Variations on Switch Keyboards
     #
 
-    def do_slip_beyond_last_take_inserts(self):  # Vim A
+    def do_slip_beyond_last_take_inserts(self):  # Vim ⇧A of ⇧R ⇧A ⇧I ⇧O A I O
         """Take Input Chords after the Last Char of this Line"""
 
         editor = self.editor
@@ -2717,7 +2717,7 @@ class TerminalVi:
 
         self.take_vi_inserts()
 
-    def do_slip_dent_take_inserts(self):  # Vim I
+    def do_slip_dent_take_inserts(self):  # Vim ⇧I of ⇧R ⇧A ⇧I ⇧O A I O
         """Take Input Chords after the Dent of the Line"""
 
         self.check_vi_count()  # raise NotImplementedError: Repeat Count
@@ -2727,7 +2727,7 @@ class TerminalVi:
         self.editor.slip_dent()
         self.take_vi_inserts()
 
-    def do_slip_first_split_take_inserts(self):  # Vim O
+    def do_slip_first_split_take_inserts(self):  # Vim ⇧O of ⇧R ⇧A ⇧I ⇧O A I O
         """Insert an empty Line before this Line, and take Input Chords into it"""
 
         editor = self.editor
@@ -2745,7 +2745,7 @@ class TerminalVi:
 
         self.take_vi_inserts()
 
-    def do_slip_take_inserts(self):  # Vim a
+    def do_slip_take_inserts(self):  # Vim A of ⇧R ⇧A ⇧I ⇧O A I O
         """Take Input Chords after the Char Beneath the Cursor"""
 
         editor = self.editor
@@ -2763,7 +2763,7 @@ class TerminalVi:
 
         self.take_vi_inserts()
 
-    def do_slip_last_split_take_inserts(self):  # Vim o
+    def do_slip_last_split_take_inserts(self):  # Vim O of ⇧R ⇧A ⇧I ⇧O A I O
         """Insert an empty Line after this Line, and take Input Chords into it"""
 
         editor = self.editor
@@ -2786,7 +2786,7 @@ class TerminalVi:
 
         self.take_vi_inserts()
 
-    def do_take_inserts(self):  # Vim i
+    def do_take_inserts(self):  # Vim I of of ⇧R ⇧A ⇧I ⇧O A I O
         """Take many keyboard Input Chords as meaning insert Chars, till Esc"""
 
         self.check_vi_count()  # raise NotImplementedError: Repeat Count
@@ -2816,7 +2816,7 @@ class TerminalVi:
         editor.intake_beyond = "inserting"
         editor.intake_taken = False
 
-    def do_take_replaces(self):  # Vim R
+    def do_take_replaces(self):  # Vim ⇧R of ⇧R ⇧A ⇧I ⇧O A I O
         """Take keyboard Input Chords to mean replace Chars, till Esc"""
 
         self.take_vi_replaces()
@@ -2859,7 +2859,7 @@ class TerminalVi:
                 editor.column -= 1
 
     def do_vi_c0_control_si(self):
-        """Define ⌃O during AIO aio R, but not yet otherwise"""
+        """Define ⌃O during ⇧R ⇧A ⇧I ⇧O A I O, but not yet otherwise"""
 
         editor = self.editor
         if editor.intake_beyond:
@@ -2867,7 +2867,7 @@ class TerminalVi:
         else:
             editor.do_raise_name_error()
 
-    def do_take_one_bypass(self):  # Vim ⌃O during AIO aio R
+    def do_take_one_bypass(self):  # Vim ⌃O during ⇧R ⇧A ⇧I ⇧O A I O
         """Pause taking keyboard Input Chords to mean replace/ insert Chars"""
 
         editor = self.editor
@@ -2901,7 +2901,7 @@ class TerminalVi:
 
         self.vi_print("Type one command")
 
-        skin.doing_traceback = skin.traceback  # A⌃OzZ⌃OZQ Egg
+        skin.doing_traceback = skin.traceback  # A⌃OZ⇧Q⌃O⇧Z⇧Q Egg
 
     def do_insert_per_chord(self):  # Vim Bypass View to Insert
         """Insert a copy of the Input Char, else insert a Line"""
@@ -2915,7 +2915,7 @@ class TerminalVi:
 
         # TODO: calling for another 'self.do_...' can too easily spiral out of control
 
-    def do_insert_one_line(self):  # Vim Return of Insert/ Replace
+    def do_insert_one_line(self):  # Vim Return during Replace/ Insert
         """Insert one Line"""
 
         editor = self.editor
@@ -2923,7 +2923,7 @@ class TerminalVi:
         self.held_vi_file.touches += 1
         self.vi_print("inserted line")
 
-    def do_insert_one_char(self):  # Vim Literals of Insert, or Replace past Last
+    def do_insert_one_char(self):  # Vim Literals of Replace past Last, or of Insert
         """Insert one Char"""
 
         editor = self.editor
@@ -2938,7 +2938,7 @@ class TerminalVi:
         self.held_vi_file.touches += 1
         self.vi_print("inserted char")
 
-    def do_replace_per_choice(self):  # Vim r
+    def do_replace_per_choice(self):  # Vim Rx
         """Replace one Char with the Input Suffix Char, else insert a Line"""
 
         editor = self.editor
@@ -2957,8 +2957,9 @@ class TerminalVi:
 
         editor.continue_do_loop()
 
-        # Vi Py defines ⌃V after FT ftr identically  # TODO: make it work
-        # Vim quirk defines ⌃V after AIOR aior as quoting, but not after FT ft
+        # Vi Py defines ⌃V inside ⇧R ⇧A ⇧I ⇧O Rx A I O Fx Tx ⇧Fx ⇧Tx  # TODO: someday
+        # Vi Py defines ⌃V inside ⇧R ⇧A ⇧I ⇧O A I O today
+        # Vim quirk defines ⌃V inside Rx A I O X ⇧R ⇧A ⇧I ⇧O, but not inside F T ⇧F ⇧T
 
     def do_replace_per_chord(self):  # Vim Bypass View to Replace
         """Replace one Char with the Input Chars"""
@@ -2994,7 +2995,7 @@ class TerminalVi:
     # Variations on Cut Char and Cut Lines
     #
 
-    def do_cut_behind(self):  # Vim X
+    def do_cut_behind(self):  # Vim ⇧X
         """Cut as many as the count of Chars behind"""
 
         count = self.get_vi_arg1_int()
@@ -3002,12 +3003,12 @@ class TerminalVi:
         editor = self.editor
 
         left = min(editor.column, count)
-        editor.column -= left  # a la Vim h Left
+        editor.column -= left  # a la Vim H Left
 
         touches = editor.delete_some_chars(count=left)
         self.held_vi_file.touches += touches
 
-    def do_cut_ahead_take_inserts(self):  # Vim s
+    def do_cut_ahead_take_inserts(self):  # Vim S
         """Cut as many as the count of Chars ahead, and then take Chords as Inserts"""
 
         count = self.get_vi_arg1_int()
@@ -3016,7 +3017,7 @@ class TerminalVi:
 
         self.take_vi_inserts()
 
-    def do_cut_ahead(self):  # Vim x
+    def do_cut_ahead(self):  # Vim X
         """Cut as many as the count of Chars ahead, but land the Cursor in the Line"""
 
         count = self.get_vi_arg1_int()
@@ -3040,13 +3041,13 @@ class TerminalVi:
 
         editor = self.editor
 
-        columns = editor.count_columns_in_row()  # a la Vim l Right
+        columns = editor.count_columns_in_row()  # a la Vim L Right
         right = min(columns - editor.column, count)
 
         touches = editor.delete_some_chars(count=right)
         self.held_vi_file.touches += touches
 
-    def do_slip_last_join_right(self):  # Vim J
+    def do_slip_last_join_right(self):  # Vim ⇧J
         """Join 1 Line or N - 1 Lines to this Line, as if dented by single Spaces"""
 
         count = self.get_vi_arg1_int()
@@ -3062,7 +3063,7 @@ class TerminalVi:
         touches = editor.join_some_lines(joinings)
         self.held_vi_file.touches += touches
 
-    def do_chop_take_inserts(self):  # Vim C
+    def do_chop_take_inserts(self):  # Vim ⇧C
         """Cut N - 1 Lines below & Chars to right in Line, and take Chords as Inserts"""
 
         count = self.get_vi_arg1_int()
@@ -3071,7 +3072,7 @@ class TerminalVi:
 
         self.take_vi_inserts()
 
-    def do_chop(self):  # Vim D  # TODO: ugly to doc
+    def do_chop(self):  # Vim ⇧D  # TODO: ugly to doc
         """Cut N - 1 Lines below & Chars to right in Line, and land Cursor in Line"""
         # except if N > 1 and at or left of Dent, then delete N Lines and Slip to Dent
 
@@ -3098,12 +3099,12 @@ class TerminalVi:
 
         # Cut N - 1 Lines below & Chars to right in Line, and land Cursor in Line
 
-        self.check_vi_index(column)  # Vim D quirk doesn't beep when failing to delete
+        self.check_vi_index(column)  # Vim ⇧D quirk doesn't beep when failing to delete
 
         self.chop_some_vi_lines(count)
         self.slip_back_into_vi_line()
 
-    def do_chop_down(self):  # Vim dd
+    def do_chop_down(self):  # Vim D D
         """Delete N Lines and Slip to Dent"""
 
         count = self.get_vi_arg1_int()
@@ -3125,7 +3126,7 @@ class TerminalVi:
 
         editor.slip_dent()
 
-    def do_slip_first_chop_take_inserts(self):  # Vim S
+    def do_slip_first_chop_take_inserts(self):  # Vim ⇧S
         """Cut N - 1 Lines below & all Chars of this Line, and take Chords as Inserts"""
 
         count = self.get_vi_arg1_int()
@@ -3410,7 +3411,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func(b"\\F", func=editor.do_set_invregex)
         self._init_func(b"\\i", func=editor.do_set_invignorecase)
         self._init_func(b"\\n", func=editor.do_set_invnumber)
-        # TODO: stop commandeering the personal \Esc \F \i \n Chord Sequences
+        # TODO: stop commandeering the personal \Esc \⇧F \I \N Chord Sequences
 
         # funcs[b"]"]  # TODO: b"]"
         funcs[b"^"] = vi.do_slip_dent
@@ -3552,7 +3553,7 @@ class TerminalEx:
         editor = self.editor
         chars = editor.get_arg0_chars()
 
-        if chars == "£":  # TODO: accept U00A3 £ PoundSign into Search Keys
+        if chars == "£":  # TODO: accept U00A3 PoundSign into Search Keys
             self.ex_line += "#"  # a la Vim :abbrev £ #
         else:
             self.ex_line += chars
@@ -3642,7 +3643,7 @@ class TerminalKeyboardEx(TerminalKeyboard):
 
         # TODO: input Search Keys containing more than BASIC_LATIN_STDINS and #
         # TODO: Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
-        # TODO: such as U00A3 £ PoundSign
+        # TODO: such as U00A3 PoundSign
 
         # TODO: define Esc to replace live Regex punctuation with calmer r"."
 
@@ -3868,7 +3869,7 @@ class TerminalEm:
         skin.chord_ints_ahead = list(chars_ahead.encode())
 
     def do_em_quoted_insert(self):  # Emacs ⌃Q
-        """Take the next Input Keyboard Chord to insert or replace, not as Control"""
+        """Take the next Input Keyboard Chord to replace or insert, not as Control"""
 
         self.vi.do_quote_one_intake()
 
@@ -4360,11 +4361,10 @@ class TerminalNudgeIn(argparse.Namespace):
         "\x1B": "Esc",  # kin to ⎋ U238B Broken Circle With Northwest Arrow
         " ": "Space",  # kin to ␢ U2422 Blank Symbol, ␣ U2423 Open Box
         "\x7F": "Delete",  # kin to ⌫ U232B Erase To The Left
-        "\u00A8": "⌥U⌥U",  # U00A8
         "\u00A9": "⌥G",  # U00A9 CopyrightSign
-        "\u00B4": "⌥E⌥E",  # U00B4
         "\u00B5": "⌥M",  # U00B5 MicroSign
     }
+    # FIXME: render ⌥V as itself, not as U221A SquareRoot, and so on
 
     # Striking Meta + Key produces a Unichar
     # when struck inside Keyboard > Use Option as Meta Key = No
@@ -4393,7 +4393,7 @@ class TerminalNudgeIn(argparse.Namespace):
         "⌥7": "\u00B6",  # PilcrowSign
         "⌥8": "\u2022",  # Bullet [Pearl]
         "⌥9": "\u00AA",  # FeminineOrdinalIndicator
-    }
+    }  # FIXME: enough more to edit Em/Vi Py in Emacs => ⌥→ ⌥← ⌥F ⌥B ⌥D
 
     _META_UNI_CHARS_VALUES = sorted(UNICHARS_BY_METACHARS.values())
     assert sorted(set(_META_UNI_CHARS_VALUES)) == sorted(_META_UNI_CHARS_VALUES)
@@ -4449,7 +4449,6 @@ class TerminalNudgeIn(argparse.Namespace):
 
         nudge_chars = nudge_bytes.decode(errors="surrogateescape")
 
-
         prefix = self.prefix
         prefix_bytes = b"" if (prefix is None) else prefix
         prefix_chars = prefix_bytes.decode(errors="surrogateescape")
@@ -4461,9 +4460,7 @@ class TerminalNudgeIn(argparse.Namespace):
         echo = echo.replace("Esc [ C", "Right")  # → U2192 Rightwards Arrow
         echo = echo.replace("Esc [ D", "Left")  # ← U2190 Leftwards Arrows
 
-        # FIXME: render √ as ⌥V, and so on
         # FIXME: render Esc g as ⌥G, and render Esc G as ⇧⌥G, and so on
-        # FIXME: fix the Vim commentary of AIOR aior etc over to ⇧A⇧I⇧O⇧R AIOR etc
 
         echo = echo.strip()
 
@@ -4884,7 +4881,7 @@ class TerminalEditor:
         finally:
 
             skin.chord_ints_ahead = self.skin.chord_ints_ahead
-            skin.traceback = self.skin.traceback  # ZQ of A⌃OzQ⌃CZQ Egg
+            skin.traceback = self.skin.traceback  # ⇧Z⇧Q of A⌃OZ⇧Q⌃C⇧Z⇧Q Egg
 
             self.skin = skin
 
@@ -5002,7 +4999,7 @@ class TerminalEditor:
             elif row < half_screen:
                 top = row
             else:
-                top = row - half_screen  # a la 'do_scroll_till_middle' Vim zz
+                top = row - half_screen  # a la 'do_scroll_till_middle' Vim Z Z
 
         # Scroll ahead to get Cursor on Screen, if need be
 
@@ -5013,7 +5010,7 @@ class TerminalEditor:
             elif (last_row - row) < half_screen:
                 top = last_row - screen_minus
             else:
-                top = row - half_screen  # a la 'do_scroll_till_middle' Vim zz
+                top = row - half_screen  # a la 'do_scroll_till_middle' Vim Z Z
 
         # After fixing the choice, assert the Top Row always was on File
 
@@ -5050,7 +5047,7 @@ class TerminalEditor:
         if wearing_em():
             model_line_number = 1 + self.top_row + (painter.scrolling_rows - 1)
             if False:  # pylint: disable=using-constant-test
-                model_line_number += 1  # Egg of ⌃CN⌃U99⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
+                model_line_number += 1  # Egg of ⌃CN⌥9⌥9⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
 
         painter.top_line_number = 1 + self.top_row
         painter.model_line_number = model_line_number
@@ -5216,7 +5213,7 @@ class TerminalEditor:
         intake_func = keyboard.intake_func
         intake_chords_set = keyboard.choose_intake_chords_set()
 
-        # Pick out when to take the first Input Keyboard Chord for insert or replace
+        # Pick out when to take the first Input Keyboard Chord for replace or insert
 
         intake_ish = False
 
@@ -5361,7 +5358,7 @@ class TerminalEditor:
 
             return
 
-        # Clear the changes counted while taking commands to View, not Insert/ Replace
+        # Clear the changes counted while taking commands to View, not Replace/ Insert
 
         if not self.intake_beyond:
             self.intake_pins[:] = list()
@@ -5754,7 +5751,7 @@ class TerminalEditor:
 
         self.editor_print("Cancelled input")  # 123⌃C Egg, f⌃C Egg, etcA
 
-    def do_raise_name_error(self):  # Vim Zz  # Vim zZ  # etc
+    def do_raise_name_error(self):  # Vim Z⇧Z  # Emacs ⌃X⌃G  # etc
         """Reply to meaningless Keyboard Input"""
 
         nudge = TerminalNudgeIn(self.skin.nudge)
@@ -5799,7 +5796,7 @@ class TerminalEditor:
 
         sys.exit()
 
-    def do_set_invnumber(self):  # Vi Py \n Egg
+    def do_set_invnumber(self):  # Vi Py \N Egg
         """Show Line Numbers or not, but without rerunning Search"""
 
         self.showing_line_number = not self.showing_line_number
@@ -5889,7 +5886,7 @@ class TerminalEditor:
     # Find Spans of Chars
     #
 
-    def do_set_invignorecase(self):  # Vi Py \i Egg
+    def do_set_invignorecase(self):  # Vi Py \I Egg
         """Search Upper/Lower Case or not"""
 
         self.finding_case = not self.finding_case
@@ -5901,7 +5898,7 @@ class TerminalEditor:
         else:
             self.editor_print(":set ignorecase")
 
-    def do_set_invregex(self):  # Vi Py \F Egg
+    def do_set_invregex(self):  # Vi Py \⇧F Egg
         """Search as Regex or search as Chars"""
 
         self.finding_regex = not self.finding_regex
@@ -7918,8 +7915,8 @@ def sys_argv_pick_verb():
 
 # -- bugs --
 
-# FIXME: define Backspace and Delete differently for insert/ replace
-# FIXME: insert/ delete/ replace should trigger re-eval of search spans in lines
+# FIXME: define Backspace and Delete differently for Vi Py Replace/ Insert
+# FIXME: Vi Py replace/ insert/ delete should trigger re-eval of search spans in lines
 
 # TODO:  find more bugs
 
@@ -7931,12 +7928,12 @@ def sys_argv_pick_verb():
 
 
 # TODO: Delete after Replaces as undo Replaces, inside the R mode
-# TODO: code Repeat Count for the a i o A I O variations of Insert
+# TODO: code Repeat Count for the Vi Py ⇧R ⇧A ⇧I ⇧O A I O variations of Replace/ Insert
 # TODO: cancel Insert Repeat Count if moved away while inserting
 
 
 # TODO: something akin to Vim :set cursorline, :set nocursorline
-# TODO: Vim V V to highlight the Line at the Cursor
+# TODO: Vim ⇧V ⇧V to highlight the Line at the Cursor
 # TODO: Vim ⌃V for feeding into :!|pbcopy
 # TODO: Vim ! default into :!|pbcopy
 # TODO: look back over keyboard timeline to guess initial shape of a stroke like ⌃V
@@ -7980,7 +7977,7 @@ def sys_argv_pick_verb():
 # TODO: insert U00C7 ç and U00F1 ñ etc - all the Unicode outside of C0 Controls
 # TODO: #åçéîñøü←↑→↓⇧⋮⌃⌘⌥⎋💔💥😊😠😢
 
-# TODO: Vim \ n somehow doesn't disrupt the 'keep_up_vi_column_seek' of $
+# TODO: Vim equivalent of \N somehow doesn't disrupt the 'keep_up_vi_column_seek' of $
 
 # TODO: name errors for undefined keys inside Ex of / ? etc
 
@@ -8000,7 +7997,7 @@ def sys_argv_pick_verb():
 # TODO: :! for like :!echo $(whoami)@$(hostname):$(pwd)/
 # TODO: accept more chords and DEL and ⌃U after : till \r
 # TODO: accept :123\r, but suggest 123G etc
-# TODO: accept :noh\r and :set ignorecase and so on, but suggest \i etc
+# TODO: accept :noh\r and :set ignorecase and so on, but suggest \I etc
 
 # TODO: toggled :set wrap, :set nowrap
 # TODO: ⌃D ⌃U scrolling
