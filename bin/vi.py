@@ -126,7 +126,7 @@ quirks:
   loses input at crashes, and input outside Basic Latin bytes, except after ⌃Q
 
 keyboard cheat sheet:
-  ⌃X⌃S⌃X⌃C  ⌃Zfg  ⌃G  => how to quit Em Py
+  ⌃X⌃S⌃X⌃C  ⌃X⌃C  ⌃Zfg  ⌃G  => how to quit Em Py
   Down Up Right Left Space  => conventional enough
   ⌃E ⌃A ⌃F ⌃B ⌥M ⌃U⌥GTab  => leap to column
   ⌃N ⌃P ⌥R⌥R⌥R ⌥< ⌥> ⌃U99⌥G⌥G ⌃L⌃L⌃L ⌃U⌃L  => leap to line, scroll screen
@@ -135,7 +135,7 @@ keyboard cheat sheet:
 
 keyboard easter eggs:
   ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
-  ⌥>⌃V ⌥<⌥V ⌃CN⌃U99⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
+  ⌥>⌃V⌃V⌃V ⌥<⌥V ⌃CN⌃U99⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
 
 pipe tests:
   ls |bin/em.py -  # pipe drain
@@ -4449,6 +4449,7 @@ class TerminalNudgeIn(argparse.Namespace):
 
         nudge_chars = nudge_bytes.decode(errors="surrogateescape")
 
+
         prefix = self.prefix
         prefix_bytes = b"" if (prefix is None) else prefix
         prefix_chars = prefix_bytes.decode(errors="surrogateescape")
@@ -4460,7 +4461,8 @@ class TerminalNudgeIn(argparse.Namespace):
         echo = echo.replace("Esc [ C", "Right")  # → U2192 Rightwards Arrow
         echo = echo.replace("Esc [ D", "Left")  # ← U2190 Leftwards Arrows
 
-        # FIXME: render Esc g as ⌥G, and render Esc G as ⇧⌥G
+        # FIXME: render √ as ⌥V, and so on
+        # FIXME: render Esc g as ⌥G, and render Esc G as ⇧⌥G, and so on
         # FIXME: fix the Vim commentary of AIOR aior etc over to ⇧A⇧I⇧O⇧R AIOR etc
 
         echo = echo.strip()
@@ -7988,7 +7990,8 @@ def sys_argv_pick_verb():
 # TODO: show just the leading screen of hits and land on the first for g? :g?
 # TODO: recover :g/ Status when ⌃L has given us :set _lag_ of >1 Screen of Hits
 
-# TODO: ⌃I ⌃O walk the Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
+# TODO: ⌃X⌃X⌃G often gives Em Py something of an 'undo last big move'
+# TODO: ⌃I ⌃O walk Vim Jump List of ' ` G / ? n N % ( ) [[ ]] { } L M H :s :tag :n etc
 # TODO: despite Doc, to match Vim, include in the Jump List the * # forms of / ?
 
 # TODO: mm '' `` pins
