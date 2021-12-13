@@ -3655,7 +3655,7 @@ class TerminalKeyboardEx(TerminalKeyboard):
 class TerminalEm:
     """Feed Keyboard into Scrolling Rows of File of Lines of Chars, a la Emacs"""
 
-    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-many-public-methods
 
     def __init__(self, files, script, evals):
 
@@ -3813,7 +3813,8 @@ class TerminalEm:
         if arg1 is None:
             chars_ahead += "-"
         else:
-            chars_ahead += str(-arg1)
+            int_arg1 = int(arg1)  # unneeded, ducks PyLint invalid-unary-operand-type
+            chars_ahead += str(-int_arg1)
 
         skin.chord_ints_ahead = list(chars_ahead.encode())
 
@@ -4134,7 +4135,7 @@ class TerminalEm:
             # Quit at top Row
 
             if not top_row:
-                if not editor.skin.doing_done:
+                if not index:
                     vi.vi_print("Do you mean ⌃U1⌃V")  # ⌥<⌥V Egg
 
                 return
