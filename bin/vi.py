@@ -126,7 +126,7 @@ quirks:
   loses input at crashes, and input outside Basic Latin bytes, except after ⌃Q
 
 keyboard cheat sheet:
-  ⌃X⌃C  ⌃X⌃S  ⌃Zfg  ⌃G  => how to quit Em Py
+  ⌃X⌃S⌃X⌃C  ⌃Zfg  ⌃G  => how to quit Em Py
   Down Up Right Left Space  => conventional enough
   ⌃E ⌃A ⌃F ⌃B ⌥M ⌃U⌥GTab  => leap to column
   ⌃N ⌃P ⌥R⌥R⌥R ⌥< ⌥> ⌃U99⌥G⌥G ⌃L⌃L⌃L ⌃U⌃L  => leap to line, scroll screen
@@ -176,24 +176,24 @@ def main(argv):
 
     main.since = dt.datetime.now()
 
-    args = parse_vi_argv(argv)
+    args = parse_main_argv(argv)
 
     if args.pwnme is not False:
-        do_args_pwnme(branch=args.pwnme)
+        do_main_arg_pwnme(branch=args.pwnme)
         assert False  # unreached
 
     if args.version:
-        do_args_version()
+        do_main_arg_version()
         if not (args.files or args.evals):
 
             sys.exit()
 
     # Load each File
 
-    edit_the_files(files=args.files, script=args.script, evals=args.evals)
+    run_with_files(files=args.files, script=args.script, evals=args.evals)
 
 
-def parse_vi_argv(argv):
+def parse_main_argv(argv):
     """Convert a Vi Sys ArgV to an Args Namespace, or print some Help and quit"""
 
     doc = ALT_DOC if wearing_em() else None
@@ -317,7 +317,7 @@ def parse_vi_argv(argv):
 
 
 def wearing_em():
-    """Return True to wear a look like Emacs, else return False"""
+    """True to look 'n feel more like Emacs, False to look 'n feel more like Vim"""
 
     verb = sys_argv_pick_verb()
     em_in_verb = "em" in verb
@@ -376,7 +376,7 @@ def parser_format_help(parser):
     # TODO: stop bypassing 'argparse_exit_unless_doc_eq' here
 
 
-def do_args_version():
+def do_main_arg_version():
     """Print a hash of this Code (its Md5Sum) and exit"""
 
     version = module_file_version_zero()
@@ -389,7 +389,7 @@ def do_args_version():
     print("{} {} hash {} ({})".format(title_py, version, str_short_hash, str_hash))
 
 
-def do_args_pwnme(branch):
+def do_main_arg_pwnme(branch):
     """Download fresh Code to run in place of this stale Code"""
     # pylint: disable=too-many-locals
 
@@ -427,9 +427,9 @@ def do_args_pwnme(branch):
 
     chmod_shline = "chmod ugo+x {relpath}".format(relpath=to_relpath)
 
-    vi_py_shline_0 = shlex_join([callpath, "--version"])
+    version_shline_0 = shlex_join([callpath, "--version"])
 
-    shlines = [mv_shline, curl_shline, chmod_shline, vi_py_shline_0]
+    shlines = [mv_shline, curl_shline, chmod_shline, version_shline_0]
 
     # Compose one more Bash Line to call new Self with Args, if more Args were given
 
@@ -445,12 +445,12 @@ def do_args_pwnme(branch):
                 argv.append(arg)
 
     if argv[1:]:
-        vi_py_shline_1 = shlex_join(argv)
-        shlines.append(vi_py_shline_1)
+        version_shline_1 = shlex_join(argv)
+        shlines.append(version_shline_1)
 
     # Run the Bash Script, and exit with its process exit status returncode
 
-    do_args_version()  # print the Version From, before download & run of the new Self
+    do_main_arg_version()  # print the Old Self, before download & run of the new Self
 
     for shline in shlines:
         stderr_print("+ {}".format(shline))
@@ -652,18 +652,18 @@ class TerminalOrder(argparse.Namespace):
 #
 
 
-def edit_the_files(files, script, evals):
+def run_with_files(files, script, evals):
     """Load the first File and then execute Script then Evals, in the way of Vim"""
 
     if wearing_em():
-        vi = TerminalEm(files, script=script, evals=evals)
+        runner = TerminalEm(files, script=script, evals=evals)
     else:
-        vi = TerminalVi(files, script=script, evals=evals)
+        runner = TerminalVi(files, script=script, evals=evals)
 
     returncode = None
     try:
 
-        vi.run_vi_terminal()  # like till SystemExit
+        runner.run_inside_terminal()  # like till SystemExit
         assert False  # unreached
 
     except OSError as exc:
@@ -677,8 +677,8 @@ def edit_the_files(files, script, evals):
         # Log the last lost Python Traceback to XTerm Main Screen
 
         returncode = exc.code
-        if vi.vi_traceback:
-            stderr_print(vi.vi_traceback)
+        if runner.main_traceback:
+            stderr_print(runner.main_traceback)
 
         # Log the lost bits of Return Code to XTerm Main Screen, such as for 512ZQ Egg
 
@@ -715,7 +715,7 @@ class TerminalVi:
 
     def __init__(self, files, script, evals):
 
-        self.vi_traceback = None  # capture Python Tracebacks
+        self.main_traceback = None  # capture Python Tracebacks
 
         self.em = None
         self.script = script  # Ex commands to run after Args
@@ -814,7 +814,7 @@ class TerminalVi:
     # Layer thinly over TerminalEditor
     #
 
-    def run_vi_terminal(self, em=None):
+    def run_inside_terminal(self, em=None):
         """Enter Terminal Driver, then run Vi Keyboard, then exit Terminal Driver"""
 
         self.em = em
@@ -875,7 +875,7 @@ class TerminalVi:
 
         finally:
 
-            self.vi_traceback = editor.skin.traceback  # /⌃G⌃CZQ Egg
+            self.main_traceback = editor.skin.traceback  # /⌃G⌃CZQ Egg
 
     def fabricate_first_vi_chords(self, script, evals):  # pylint: disable=no-self-use
         """Merge the first Chords from the Command Line with basic Vi Py Startup"""
@@ -1331,7 +1331,7 @@ class TerminalVi:
         # Vi Py :q doesn't quit while more Files chosen than fetched, Vi Py :q! does
 
     def might_keep_changes(self, alt):
-        """Return None if no Touches held, else say how to bypass and return True"""
+        """True if said how to bypass, False if no Touches held"""
 
         held_vi_file = self.held_vi_file
 
@@ -1345,7 +1345,7 @@ class TerminalVi:
         return False
 
     def might_keep_files(self, alt):
-        """Return None if no Files held, else say how to bypass and return True"""
+        """True if said how to bypass, False if no Files held"""
 
         files = self.files
         files_index = self.files_index
@@ -1805,7 +1805,7 @@ class TerminalVi:
             editor.continue_do_loop()
 
     def slip_ahead_one(self):
-        """Slip right or down, and return 1, else return None at End of File"""
+        """Slip right or down, and return 1, else return 0 at End of File"""
 
         editor = self.editor
 
@@ -3659,19 +3659,19 @@ class TerminalEm:
 
     def __init__(self, files, script, evals):
 
-        self.vi_traceback = None  # TODO: scrub the Vi mentions out of Emacs
+        self.main_traceback = None
 
         vi = TerminalVi(files, script=script, evals=evals)
         self.vi = vi
 
-    def run_vi_terminal(self):
+    def run_inside_terminal(self):
         """Enter Terminal Driver, then run Emacs Keyboard, then exit Terminal Driver"""
 
         vi = self.vi
         try:
-            vi.run_vi_terminal(em=self)
+            vi.run_inside_terminal(em=self)
         finally:
-            self.vi_traceback = vi.vi_traceback  # ⌃X⌃G⌃X⌃C Egg
+            self.main_traceback = vi.main_traceback  # ⌃X⌃G⌃X⌃C Egg
 
     def take_em_inserts(self):
         """Take keyboard Input Chords to mean insert Chars"""
@@ -4523,7 +4523,7 @@ class TerminalReplyOut(argparse.Namespace):
             assert (self.bell is None) or isinstance(self.bell, bool)
 
 
-class TerminalFile(argparse.Namespace):
+class TerminalFile:
     """Hold a copy of the Bytes of a File awhile"""
 
     def __init__(self, path=None):
@@ -4781,7 +4781,7 @@ class TerminalEditor:
         self.column = None
         self.top_row = None
 
-        # self.held_vi_file = None  # dunno why PyLint doesn't need these too
+        # self.held_file = None  # dunno why PyLint doesn't need these too
         # self.ended_lines = None
         # self.iobytespans = None
 
@@ -4792,7 +4792,7 @@ class TerminalEditor:
     def load_editor_file(self, held_vi_file):
         """Swap in a new File of Lines"""
 
-        self.held_vi_file = held_vi_file  # FIXME: editor.held_vi_file what??
+        self.held_file = held_vi_file
         self.ended_lines = held_vi_file.ended_lines
 
         self.row = 0  # point the Cursor to a Row of File
@@ -5915,7 +5915,7 @@ class TerminalEditor:
 
         iobytespans = self.iobytespans
 
-        iochars = self.held_vi_file.decode_file()
+        iochars = self.held_file.decode_file()
 
         # Cancel the old Spans
 
@@ -7634,7 +7634,7 @@ def argparse_exit_unless_doc_eq(parser, doc=None):
 def argparse_stderr_print_diffs(
     alt_module_doc, alt_parser_doc, alt_module_file, alt_parser_file
 ):
-    """Return True after Printing Diffs, else return False"""
+    """True after Printing Diffs, False when no Diffs found"""
 
     # pylint: disable=too-many-locals
 
@@ -7753,7 +7753,7 @@ def file_print(*args):  # later Python 3 accepts ', **kwargs' here
 
 # deffed in many files  # missing from docs.python.org
 def lines_last_has_no_end(lines):
-    """True iff the last Line exists without Line End"""
+    """True when the last Line exists without Line End, else False"""
 
     if lines:
 
