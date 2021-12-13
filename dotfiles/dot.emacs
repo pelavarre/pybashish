@@ -57,7 +57,6 @@
 (global-set-key (kbd "© TAB") (key-binding (kbd "M-g TAB")))
 
 
-(global-set-key (kbd "ﬁ") (key-binding (kbd "M-%")))  ; U00AE RegisteredSign
 (global-set-key (kbd "®") (key-binding (kbd "M-r")))  ; U00AE RegisteredSign
 (global-set-key (kbd "¯") (key-binding (kbd "M-<")))  ; U00AF Macron
 (global-set-key (kbd "µ") (key-binding (kbd "M-m")))  ; U00B5 MicroSign
