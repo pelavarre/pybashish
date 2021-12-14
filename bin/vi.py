@@ -4055,11 +4055,17 @@ class TerminalEm:
 
         if count == 0:
             editor.row = editor.spot_middle_row()
+            # FIXME:  ⌥R  bounced the Cursor to Middle
         elif count == 1:
             editor.row = editor.top_row
+            # FIXME:  ⌥R  bounced the Cursor to Top
         else:
             assert count == 2
             editor.row = editor.spot_bottom_row()
+            # FIXME:  ⌥R  bounced the Cursor to Bottom
+            # FIXME:  H  bounced the Cursor to Top
+            # FIXME:  M  bounced the Cursor to Middle
+            # FIXME:  L  bounced the Cursor to Bottom
 
     def do_em_recenter_top_bottom(self):  # Emacs ⌃U⌃L, Emacs ⌃L
         """Scroll up or down till Cursor Row lands on Middle/ Top/ Bottom Row"""
@@ -4162,7 +4168,7 @@ class TerminalEm:
     def do_em_query_replace(self):  # Emacs ⌥%
         """Walk Hits and ask:  y Space . Y, or n Delete N, or q Return, etc"""
 
-        raise NotImplementedError()
+        raise NotImplementedError()  # TODO: code up ⌥% 'query_replace'
 
     #
     # Insert Chords as Chars
@@ -4186,6 +4192,35 @@ class TerminalEm:
         vi = self.vi
 
         vi.vi_print("Do you mean ⌃Q⌃J")
+
+    #
+    # Delete Chars
+    #
+
+    def do_em_backward_word(self):  # Emacs ⌥B
+        """Leap behind over Separators & Letters to the first Letter of that Word"""
+
+        raise NotImplementedError()  # TODO: code up ⌥B 'backward_word'
+
+    def do_em_kill_word(self):  # Emacs ⌥D
+        """Cut from here to where ⌥F 'forward-word' finds blanks begin"""
+
+        raise NotImplementedError()  # TODO: code up ⌥D 'kill_word'
+
+    def do_em_forward_word(self):  # Emacs ⌥F
+        """Leap ahead over Separators & Letters to the next Separator or Beyond Line"""
+
+        raise NotImplementedError()  # TODO: code up ⌥F 'forward_word'
+
+    def do_em_mark_paragraph(self):  # Emacs ⌥H
+        """Mark the blank Line before a Paragraph and the Lines of the Paragraph"""
+
+        raise NotImplementedError()  # TODO: code up ⌥H 'mark_paragraph'
+
+    def do_em_zap_to_char(self):  # Emacs ⌥Z
+        """Cut from here to where found, if found, else raise an Exception"""
+
+        raise NotImplementedError()  # TODO: code up ⌥Z 'zap_to_char'
 
     def do_em_shell_command_on_region(self):  # ⌥|
         """Pipe some Chars out, or out and back in again"""
@@ -4284,7 +4319,6 @@ class TerminalKeyboardEm(TerminalKeyboard):
 
         self._init_func(b"\x1B%", em.do_em_query_replace)  # ⌥%
         self._init_func(b"\x1B-", em.do_em_negative_argument)  # ⌥-
-
         self._init_func(b"\x1B0", em.do_em_digit_argument)  # ⌥0
         self._init_func(b"\x1B1", em.do_em_digit_argument)  # ⌥1
         self._init_func(b"\x1B2", em.do_em_digit_argument)  # ⌥2
@@ -4295,15 +4329,19 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self._init_func(b"\x1B7", em.do_em_digit_argument)  # ⌥7
         self._init_func(b"\x1B8", em.do_em_digit_argument)  # ⌥8
         self._init_func(b"\x1B9", em.do_em_digit_argument)  # ⌥9
-
         self._init_func(b"\x1B<", em.do_em_beginning_of_buffer)  # ⌥<
         self._init_func(b"\x1B>", em.do_em_end_of_buffer)  # ⌥>
+        self._init_func(b"\x1Bb", em.do_em_backward_word)  # ⌥B
+        self._init_func(b"\x1Bd", em.do_em_kill_word)  # ⌥D
+        self._init_func(b"\x1Bf", em.do_em_forward_word)  # ⌥F
         self._init_func(b"\x1Bg\x09", em.do_em_move_to_column)  # ⌥GTab
         self._init_func(b"\x1Bg\x1Bg", em.do_em_goto_line)  # ⌥G⌥G
         self._init_func(b"\x1Bgg", em.do_em_goto_line)  # ⌥GG
+        self._init_func(b"\x1Bh", em.do_em_mark_paragraph)  # ⌥H
         self._init_func(b"\x1Bm", em.do_em_back_to_indentation)  # ⌥M
         self._init_func(b"\x1Br", em.do_em_move_to_window_line_top_bottom)  # ⌥R
         self._init_func(b"\x1Bv", em.do_em_scroll_down_command)  # ⌥V
+        self._init_func(b"\x1Bz", em.do_em_zap_to_char)  # ⌥Z
         self._init_func(b"\x1B|", em.do_em_shell_command_on_region)  # ⌥|
 
         # Define Esc Keyboard Input Chords, other than ⌥E ⌥I ⌥N ⌥U,
@@ -4361,8 +4399,6 @@ class TerminalNudgeIn(argparse.Namespace):
         "\x1B": "Esc",  # kin to ⎋ U238B Broken Circle With Northwest Arrow
         " ": "Space",  # kin to ␢ U2422 Blank Symbol, ␣ U2423 Open Box
         "\x7F": "Delete",  # kin to ⌫ U232B Erase To The Left
-        "\u00A9": "⌥G",  # U00A9 CopyrightSign
-        "\u00B5": "⌥M",  # U00B5 MicroSign
     }
     # FIXME: render ⌥V as itself, not as U221A SquareRoot, and so on
 
@@ -4371,16 +4407,6 @@ class TerminalNudgeIn(argparse.Namespace):
     # inside macOS Terminal > Preferences > Profiles
 
     UNICHARS_BY_METACHARS = {
-        "⌥<": "\u00AF",  # Macron
-        "⌥>": "\u02D8",  # Breve
-        "⌥G": "\u00A9",  # CopyrightSign
-        "⌥GG": "\u00A9g",  # CopyrightSign G
-        "⌥GTab": "\u00A9\x09",  # CopyrightSign Tab
-        "⌥G⌥G": "\u00A9\u00A9",  # 2x CopyrightSign
-        "⌥M": "\u00B5",  # MicroSign
-        "⌥R": "\u00AE",  # RegisteredSign
-        "⌥V": "\u221A",  # SquareRoot
-        "⌥|": "\u00BB",  # RightPointingDoubleAngleQuotationMark
         "⌥%": "\uFB01",  # LatinSmallLigatureFI
         "⌥-": "\u2013",  # EnDash
         "⌥0": "\u00BA",  # MasculineOrdinalIndicator
@@ -4393,7 +4419,22 @@ class TerminalNudgeIn(argparse.Namespace):
         "⌥7": "\u00B6",  # PilcrowSign
         "⌥8": "\u2022",  # Bullet [Pearl]
         "⌥9": "\u00AA",  # FeminineOrdinalIndicator
-    }  # FIXME: enough more to edit Em/Vi Py in Emacs => ⌥→ ⌥← ⌥F ⌥B ⌥D
+        "⌥<": "\u00AF",  # Macron
+        "⌥>": "\u02D8",  # Breve
+        "⌥B": "\u222B",  # Integral  # ⌥← comes in as Esc B
+        "⌥D": "\u2202",  # PartialDifferential
+        "⌥F": "\u0192",  # LatinSmallLetterFWithHook  # ⌥→ comes in as Esc F
+        "⌥G": "\u00A9",  # CopyrightSign
+        "⌥GG": "\u00A9g",  # CopyrightSign G
+        "⌥GTab": "\u00A9\x09",  # CopyrightSign Tab
+        "⌥G⌥G": "\u00A9\u00A9",  # 2x CopyrightSign
+        "⌥H": "\u02D9",  # DotAbove
+        "⌥M": "\u00B5",  # MicroSign
+        "⌥R": "\u00AE",  # RegisteredSign
+        "⌥V": "\u221A",  # SquareRoot
+        "⌥Z": "\u03A9",  # GreekCapitalLetterOmega
+        "⌥|": "\u00BB",  # RightPointingDoubleAngleQuotationMark
+    }
 
     _META_UNI_CHARS_VALUES = sorted(UNICHARS_BY_METACHARS.values())
     assert sorted(set(_META_UNI_CHARS_VALUES)) == sorted(_META_UNI_CHARS_VALUES)
@@ -4409,17 +4450,36 @@ class TerminalNudgeIn(argparse.Namespace):
         self.suffix = None  # such as b"x" of b"fx" to Find Char "x" in Vi
         self.epilog = None  # such as b"⌃C" of b"f⌃C" to cancel b"f"
 
-        # Map the many of the ⌥A..⌥Z to themselves, and all of the ^@..^~,~?
+        # Map the ⌃@, ⌃A, ⌃B, ... ⌃Z, ⌃[, ⌃\, ⌃], ⌃^, ⌃_, and ⌃? to themselves
 
         name_by_char = TerminalNudgeIn.NAME_BY_CHAR
+
         for chord in C0_CONTROL_STDINS:  # for ord(chord) in 0x00..0x1F and 0x7F
             name = "⌃" + chr(ord(chord) ^ 0x40)  # ⌃ U2303 UpArrowhead
             assert name[len("⌃") :].encode() in BASIC_LATIN_STDINS, (chord, name)
             ch = chord.decode()
             if ch not in name_by_char.keys():
+
                 name_by_char[ch] = name
 
-            # ⌃@, ⌃A, ⌃B, ... ⌃Z, ⌃[, ⌃\, ⌃], ⌃^, ⌃_, and ⌃?
+        # Map the r"[ -~]" to themselves, including ⇧A to ⇧A, A to A, and so on
+
+        for chord in BASIC_LATIN_STDINS:
+            ch = chord.decode()
+            if ch.lower() != ch.upper():
+
+                if ch == ch.upper():
+                    name = "⇧" + ch
+                else:
+                    name = ch.upper()
+
+                name_by_char[ch] = name
+
+        # Map enough of the Meta ⌥ Keys to themselves
+
+        for (metachars, unichars) in TerminalNudgeIn.UNICHARS_BY_METACHARS.items():
+
+            name_by_char[unichars] = metachars
 
         self.name_by_char = name_by_char
 
@@ -4454,14 +4514,7 @@ class TerminalNudgeIn(argparse.Namespace):
         prefix_chars = prefix_bytes.decode(errors="surrogateescape")
 
         echo = self._to_echoed_chars(prefix_chars, nudge_chars=nudge_chars)
-
-        echo = echo.replace("Esc [ A", "Up")  # ↑ U2191 Upwards Arrow
-        echo = echo.replace("Esc [ B", "Down")  # ↓ U2193 Downwards Arrow
-        echo = echo.replace("Esc [ C", "Right")  # → U2192 Rightwards Arrow
-        echo = echo.replace("Esc [ D", "Left")  # ← U2190 Leftwards Arrows
-
-        # FIXME: render Esc g as ⌥G, and render Esc G as ⇧⌥G, and so on
-
+        echo = self._rep_escaped_chars(echo)
         echo = echo.strip()
 
         return echo
@@ -4482,6 +4535,16 @@ class TerminalNudgeIn(argparse.Namespace):
             if ch in name_by_char.keys():
                 name = name_by_char[ch]
 
+            # Show the Chords as if inserted, for the : Ex Commands of Vim
+
+            if index == len(prefix_chars):
+                if ch == ":":
+                    if not wearing_em():
+
+                        echo += nudge_chars[index:]
+
+                        return echo
+
             # Show each Prefix Chord without Spaces in between them
 
             if index < len(prefix_chars):
@@ -4496,6 +4559,38 @@ class TerminalNudgeIn(argparse.Namespace):
             echo += " " + name
 
         return echo
+
+    def _rep_escaped_chars(self, echo):
+        """Name Chars as more themselves, not so much as Esc ..."""
+        # pylint: disable=no-self-use
+
+        echo = echo.replace("Esc [ ⇧A", "Up")  # ↑ U2191 Upwards Arrow
+        echo = echo.replace("Esc [ ⇧B", "Down")  # ↓ U2193 Downwards Arrow
+        echo = echo.replace("Esc [ ⇧C", "Right")  # → U2192 Rightwards Arrow
+        echo = echo.replace("Esc [ ⇧D", "Left")  # ← U2190 Leftwards Arrows
+
+        echo = echo.replace("Esc B", "⌥←")  # ← U2190 Leftwards Arrows
+        echo = echo.replace("Esc F", "⌥→")  # → U2192 Rightwards Arrow
+
+        for chord in BASIC_LATIN_STDINS:
+            ch = chord.decode()
+
+            if ch.lower() == ch.upper():
+                esc_name = "Esc " + ch
+                meta_name = "⌥" + ch
+            else:
+                if ch == ch.upper():
+                    esc_name = "Esc ⇧" + ch
+                    meta_name = "⇧⌥" + ch
+                else:
+                    esc_name = "Esc " + ch.upper()
+                    meta_name = "⌥" + ch.upper()
+
+            echo = echo.replace(esc_name, meta_name)
+
+        return echo
+
+        # ⌥B and ⌥F echo as themselves only inside Use Option As Meta Key = No
 
 
 class TerminalReplyOut(argparse.Namespace):
@@ -4927,20 +5022,20 @@ class TerminalEditor:
 
                 self.editor_print("Interrupted")
                 self.reply_with_bell()
-                # self.skin.chord_ints_ahead = list()  # TODO: cancel Input at Exc
 
+                # self.skin.chord_ints_ahead = list()  # TODO: cancel Input at Exc
                 self.skin.traceback = traceback.format_exc()
 
             except Exception as exc:  # pylint: disable=broad-except
-                self.skin.reply = TerminalReplyOut()
-
                 # TODO: file_print(traceback.format_exc())
 
                 line = self.format_exc(exc)  # Egg of NotImplementedError, etc
+
+                self.editor_print("")
                 self.editor_print(line)  # "{exc_type}: {str_exc}"
                 self.reply_with_bell()
-                # self.skin.chord_ints_ahead = list()  # TODO: cancel Input at Exc
 
+                # self.skin.chord_ints_ahead = list()  # TODO: cancel Input at Exc
                 self.skin.traceback = traceback.format_exc()
                 if not self.painter.rows:
 
@@ -5757,9 +5852,7 @@ class TerminalEditor:
         nudge = TerminalNudgeIn(self.skin.nudge)
         nudge.prefix = None
 
-        exc_arg = nudge.to_chars()
-
-        raise NameError(exc_arg)
+        raise NameError()
 
     def do_redraw(self):  # Vim ⌃L
         """Toggle between more and less Lag"""
@@ -5842,6 +5935,7 @@ class TerminalEditor:
         self.top_row = self.row
 
         self.editor_print("Cursor is in top row")
+        # FIXME:  ⌃L  scrolled the Row of the Cursor to Top
 
     def scroll_till_middle(self):
         """Scroll up or down till Cursor Row lands in Middle Row of Screen"""
@@ -5862,6 +5956,8 @@ class TerminalEditor:
             self.editor_print("Cursor is above the middle row")
         else:
             self.editor_print("Cursor is in middle row")
+        # FIXME:  ⌃L  scrolled the Row of the Cursor to Above Middle
+        # FIXME:  ⌃L  scrolled the Row of the Cursor to Middle
 
     def scroll_till_bottom(self):
         """Scroll up or down till Cursor Row lands in Bottom Row of Screen"""
@@ -5881,6 +5977,8 @@ class TerminalEditor:
             self.editor_print("Cursor is above the bottom row")
         else:
             self.editor_print("Cursor is in bottom row")
+        # FIXME:  ⌃L  scrolled the Row of the Cursor to Above Bottom
+        # FIXME:  ⌃L  scrolled the Row of the Cursor to Bottom
 
     #
     # Find Spans of Chars
