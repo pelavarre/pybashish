@@ -30,7 +30,7 @@ keyboard cheat sheet:
   B E W ⇧B ⇧E ⇧W { }  => leap across small word, large word, paragraph
   ⇧G 1⇧G ⇧H ⇧L ⇧M - + _ ⌃J ⌃N ⌃P J K  => leap to screen row, leap to line
   1234567890 ⌃C Esc  => repeat, or don't
-  ⌃F ⌃B ⌃E ⌃Y ZB ZT ZZ 99ZZ  => scroll screen
+  ⌃F ⌃B ⌃E ⌃Y ZB ZT Z. 99Z.  => scroll screen
   ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
   \N \I \⇧F ⌃C Esc ⌃G  => toggle line numbers, search case/ regex, show hits
   /... Delete ⌃U ⌃C Return  ?...   * £ # N ⇧N  => search ahead, behind, next
@@ -39,7 +39,7 @@ keyboard cheat sheet:
   X ⇧X DD ⇧D ⇧J s ⇧S ⇧C  => cut chars or lines, join lines, insert after cut
 
 keyboard easter eggs:
-  9^ ⇧G⌃F⌃F 1⇧G⌃B G⌃F⌃E 1⇧G⌃Y ; , N ⇧N 2G9k \N99ZZ  3⇧Z⇧Q 512⇧Z⇧Q
+  9^ ⇧G⌃F⌃F 1⇧G⌃B G⌃F⌃E 1⇧G⌃Y ; , N ⇧N 2G9k \N99Z.  3⇧Z⇧Q 512⇧Z⇧Q
   ⌃C Esc  123Esc Z⇧Q⇧Z⇧Q ⇧A⌃OZ⇧Q⌃O⇧Z⇧Q /⌃G⌃C⇧Z⇧Q F⌃C W*⌃C W*123456N⌃C W*G/⌃M⌃C G/⌃Z
   ⇧QVI⌃MY ⇧REsc ⇧R⌃Zfg ⇧OO⌃O_⌃O^ \⇧FW*/Up \⇧F/$Return ⌃G2⌃G :vi⌃M :n
 
@@ -159,8 +159,6 @@ how to get Em Py:
 #   neglects to keep ⌃X⌃G undefined
 #   neglects to tab-complete incremental searchs  # TODO
 #
-
-# FIXME: make ⌃L and ⌥R agree over which row is Middle Row
 
 # TODO: ⌃S ⌃R ⌥% ⌃XI ...
 # TODO: ⌃X⌃X ...
@@ -1914,6 +1912,8 @@ class TerminalVi:
         editor.row = editor.spot_bottom_row()
         editor.slip_dent()
 
+        self.vi_print("bounced the Cursor to Left Column of Bottom Row")
+
     def do_step_max_high(self):  # Vim ⇧H
         """Leap to first Word of Top Row on Screen"""
 
@@ -1921,12 +1921,16 @@ class TerminalVi:
         editor.row = editor.top_row
         editor.slip_dent()
 
+        self.vi_print("bounced the Cursor to Left Column of Top Row")
+
     def do_step_to_middle(self):  # Vim ⇧M
         """Leap to first Word of Middle Row on Screen"""
 
         editor = self.editor
         editor.row = editor.spot_middle_row()
         editor.slip_dent()
+
+        self.vi_print("bounced the Cursor to Left Column of Middle Row")
 
     def do_step_up_dent(self):  # Vim -
         """Step up a Row or more, but land just past the Indent"""
@@ -2184,7 +2188,7 @@ class TerminalVi:
         editor.step_for_count_slip_to_dent(default=(editor.row + 1))
         editor.scroll_till_top()
 
-    def do_scroll_till_middle(self):  # Vim Z Z  # not Vim ⇧Z⇧Z
+    def do_scroll_till_middle(self):  # Vim Z .  # not Vim ⇧Z⇧Z
         """Scroll up or down till Cursor Row lands in Middle Row of Screen"""
 
         editor = self.editor
@@ -3404,7 +3408,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # TODO: stop commandeering the personal QZ Chord Sequence
 
         self._init_func(b"ZQ", func=vi.do_quit_vi)
-        self._init_func(b"ZZ", func=vi.do_flush_quit_vi)
+        self._init_func(b"Z.", func=vi.do_flush_quit_vi)
 
         # funcs[b"["]  # TODO: b"["
 
@@ -3462,7 +3466,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         self._init_func(b"zb", func=vi.do_scroll_till_bottom)
         self._init_func(b"zt", func=vi.do_scroll_till_top)
-        self._init_func(b"zz", func=vi.do_scroll_till_middle)
+        self._init_func(b"z.", func=vi.do_scroll_till_middle)
 
         funcs[b"{"] = vi.do_paragraph_behind
         funcs[b"|"] = vi.do_slip
@@ -4050,22 +4054,22 @@ class TerminalEm:
     def do_em_move_to_window_line_top_bottom(self):  # ⌥R
         """Step Cursor to Middle/ Top/ Bottom Row"""
 
-        editor = self.vi.editor
+        vi = self.vi
+        editor = vi.editor
         count = len(editor.skin.doing_funcs[1:]) % 3
 
         if count == 0:
             editor.row = editor.spot_middle_row()
-            # FIXME:  ⌥R  bounced the Cursor to Middle
+            vi.vi_print("bounced the Cursor to Leftmost Column of Middle Row")
         elif count == 1:
             editor.row = editor.top_row
-            # FIXME:  ⌥R  bounced the Cursor to Top
+            vi.vi_print("bounced the Cursor to Leftmost Column of Top Row")
         else:
             assert count == 2
             editor.row = editor.spot_bottom_row()
-            # FIXME:  ⌥R  bounced the Cursor to Bottom
-            # FIXME:  H  bounced the Cursor to Top
-            # FIXME:  M  bounced the Cursor to Middle
-            # FIXME:  L  bounced the Cursor to Bottom
+            vi.vi_print("bounced the Cursor to Leftmost Column of Bottom Row")
+
+        editor.column = 0
 
     def do_em_recenter_top_bottom(self):  # Emacs ⌃U⌃L, Emacs ⌃L
         """Scroll up or down till Cursor Row lands on Middle/ Top/ Bottom Row"""
@@ -4400,7 +4404,6 @@ class TerminalNudgeIn(argparse.Namespace):
         " ": "Space",  # kin to ␢ U2422 Blank Symbol, ␣ U2423 Open Box
         "\x7F": "Delete",  # kin to ⌫ U232B Erase To The Left
     }
-    # FIXME: render ⌥V as itself, not as U221A SquareRoot, and so on
 
     # Striking Meta + Key produces a Unichar
     # when struck inside Keyboard > Use Option as Meta Key = No
@@ -5094,7 +5097,7 @@ class TerminalEditor:
             elif row < half_screen:
                 top = row
             else:
-                top = row - half_screen  # a la 'do_scroll_till_middle' Vim Z Z
+                top = row - half_screen  # a la 'do_scroll_till_middle' Vim Z .
 
         # Scroll ahead to get Cursor on Screen, if need be
 
@@ -5105,7 +5108,7 @@ class TerminalEditor:
             elif (last_row - row) < half_screen:
                 top = last_row - screen_minus
             else:
-                top = row - half_screen  # a la 'do_scroll_till_middle' Vim Z Z
+                top = row - half_screen  # a la 'do_scroll_till_middle' Vim Z .
 
         # After fixing the choice, assert the Top Row always was on File
 
@@ -5830,8 +5833,8 @@ class TerminalEditor:
         bottom_row = self.spot_bottom_row()
         rows_on_screen = bottom_row - top_row + 1
 
-        middle = (rows_on_screen + 1) // 2  # match +1 bias in Vi's 'spot_middle_row'
-        middle_row = top_row + middle
+        half_screen = rows_on_screen // 2  # for Vim Z ., Vim ⇧M, Emacs ⌃L, Emacs ⌥R
+        middle_row = top_row + half_screen
 
         return middle_row
 
@@ -5934,8 +5937,7 @@ class TerminalEditor:
 
         self.top_row = self.row
 
-        self.editor_print("Cursor is in top row")
-        # FIXME:  ⌃L  scrolled the Row of the Cursor to Top
+        self.editor_print("scrolled the Row to the Top")
 
     def scroll_till_middle(self):
         """Scroll up or down till Cursor Row lands in Middle Row of Screen"""
@@ -5947,17 +5949,15 @@ class TerminalEditor:
         assert scrolling_rows
         half_screen = scrolling_rows // 2
 
-        up = scrolling_rows // 2
+        up = half_screen
         top_row = (row - up) if (row >= up) else 0
 
         self.top_row = top_row
 
         if row < half_screen:
-            self.editor_print("Cursor is above the middle row")
+            self.editor_print("scrolled the Row to above the Middle")
         else:
-            self.editor_print("Cursor is in middle row")
-        # FIXME:  ⌃L  scrolled the Row of the Cursor to Above Middle
-        # FIXME:  ⌃L  scrolled the Row of the Cursor to Middle
+            self.editor_print("scrolled the Row to the Middle")
 
     def scroll_till_bottom(self):
         """Scroll up or down till Cursor Row lands in Bottom Row of Screen"""
@@ -5974,11 +5974,9 @@ class TerminalEditor:
         self.top_row = top_row
 
         if row < (scrolling_rows - 1):
-            self.editor_print("Cursor is above the bottom row")
+            self.editor_print("scrolled the Row to above the Bottom")
         else:
-            self.editor_print("Cursor is in bottom row")
-        # FIXME:  ⌃L  scrolled the Row of the Cursor to Above Bottom
-        # FIXME:  ⌃L  scrolled the Row of the Cursor to Bottom
+            self.editor_print("scrolled the Row to the Bottom")
 
     #
     # Find Spans of Chars
