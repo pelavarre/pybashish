@@ -127,11 +127,12 @@ quirks:
 
 keyboard cheat sheet:
   ⌃X⌃S⌃X⌃C  ⌃X⌃C  ⌃Zfg  ⌃G  => how to quit Em Py
-  Down Up Right Left Space  => conventional enough
+  Down Up Right Left Space Delete  => conventional enough
   ⌃E ⌃A ⌃F ⌃B ⌥M ⌃U⌥GTab  => leap to column
   ⌃N ⌃P ⌥R⌥R⌥R ⌥< ⌥> ⌥9⌥9⌥G⌥G ⌃L⌃L⌃L ⌃U⌃L  => leap to line, scroll screen
   ⌃U ⌃U -0123456789 ⌃U ⌥-⌥0..⌥9 ⌃G  => repeat, or don't
   ⌃Q⌃J  => take ⌃ and ⌥ as input, not as command
+  ⌃D ⌃K  => cut chars or lines
 
 keyboard easter eggs:
   ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
@@ -955,11 +956,11 @@ class TerminalVi:
 
         editor = self.editor
         if editor.intake_beyond:
-            self.do_quote_one_intake()
+            self.do_vi_quoted_insert()
         else:
             editor.do_raise_name_error()
 
-    def do_quote_one_intake(self):  # Vim ⌃V inside ⇧R ⇧A ⇧I ⇧O A I O
+    def do_vi_quoted_insert(self):  # Vim ⌃V inside ⇧R ⇧A ⇧I ⇧O A I O
         """Take the next Input Keyboard Chord to replace or insert, not as Control"""
 
         editor = self.editor
@@ -1076,18 +1077,18 @@ class TerminalVi:
     def do_vi_c0_control_etx(self):  # Vim ⌃C  # Vi Py Init
         """Cancel Prefix, or close Replace/ Insert, or suggest ⇧Z⇧Z to quit Vi Py"""
 
-        self.cancel_escape_whatever("Cancelled")
+        self.vi_keyboard_quit("Cancelled")
 
         # Vim ⌃C quirk rapidly rings a Bell for each extra ⌃C, Vi Py doesn't
 
     def do_vi_c0_control_esc(self):  # Vim Esc
         """Cancel Prefix, or close Replace/ Insert, or suggest ⇧Z⇧Z to quit Vi Py"""
 
-        self.cancel_escape_whatever("Escaped")
+        self.vi_keyboard_quit("Escaped")
 
         # Vim Esc quirk slowly rings a Bell for each extra Esc, Vi Py doesn't
 
-    def cancel_escape_whatever(self, verbed):
+    def vi_keyboard_quit(self, verbed):
         """Cancel or escape some one thing that is most going on"""
 
         count = self.get_vi_arg1_int(default=None)
@@ -1200,7 +1201,7 @@ class TerminalVi:
         # Vi Py defines ":em" without arg to mean switch into running like Em Py
         # Vim quirkily defines ":em" only with an arg
 
-    def do_vi_sig_tstp(self):  # Vim ⌃Zfg
+    def do_vi_suspend_frame(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
         editor = self.editor
@@ -1210,7 +1211,7 @@ class TerminalVi:
         reply = TerminalReplyOut(self.last_formatted_reply)
         reply.bell = False
 
-        editor.do_sig_tstp()
+        editor.do_suspend_frame()
 
         if self.seeking_column is not None:
             self.keep_up_vi_column_seek()
@@ -1236,7 +1237,7 @@ class TerminalVi:
 
         self.check_vi_count()  # raise NotImplementedError: Repeat Count
 
-        self.flush_vi()
+        self.vi_save_buffer()
         self.next_vi_file()
 
         # Vi Py :wn! quits after last File
@@ -1262,7 +1263,7 @@ class TerminalVi:
     def do_flush_quit_vi(self):  # Vim ⇧Z⇧Z  # Vim :wq!\r
         """Write the File and quit Vi"""
 
-        self.flush_vi()
+        self.vi_save_buffer()
 
         self.quit_vi()
         assert False  # unreached
@@ -1270,19 +1271,19 @@ class TerminalVi:
         # Vi Py ⇧Z⇧Z and :wq! do quit, despite more Files chosen than fetched
         # Vim ⇧Z⇧Z quirk doesn't, but Vim ⇧Z⇧Z ⇧Z⇧Z and :wq! quirks do quit
 
-    def do_might_flush_vi(self):  # Vim :w\r
+    def do_might_vi_save_buffer(self):  # Vim :w\r
         """Write the File and do Not quit it, with less force"""
 
         self.check_vi_count()  # raise NotImplementedError: Repeat Count
-        self.flush_vi()  # TODO: distinguish :w from :w!
+        self.vi_save_buffer()  # TODO: distinguish :w from :w!
 
-    def do_flush_vi(self):  # Vim :w!\r
+    def do_vi_save_buffer(self):  # Vim :w!\r
         """Write the File and do Not quit it, with more force"""
 
         self.check_vi_count()  # raise NotImplementedError: Repeat Count
-        self.flush_vi()
+        self.vi_save_buffer()
 
-    def flush_vi(self):
+    def vi_save_buffer(self):
         """Write the File"""
 
         editor = self.editor
@@ -2817,7 +2818,7 @@ class TerminalVi:
         keyboard.intake_chords_set = chords_set
 
         keyboard.intake_func = self.do_insert_per_chord
-        editor.intake_beyond = "inserting"
+        editor.intake_beyond = "inserting"  # as if many 'do_vi_self_insert_command'
         editor.intake_taken = False
 
     def do_take_replaces(self):  # Vim ⇧R of ⇧R ⇧A ⇧I ⇧O A I O
@@ -2841,7 +2842,7 @@ class TerminalVi:
         keyboard.intake_chords_set = chords_set
 
         keyboard.intake_func = self.do_replace_per_chord
-        editor.intake_beyond = "replacing"
+        editor.intake_beyond = "replacing"  # as if 'C-u M-x overwrite-mode'
         editor.intake_taken = False
 
     def take_vi_views(self):
@@ -3022,7 +3023,7 @@ class TerminalVi:
         self.take_vi_inserts()
 
     def do_cut_ahead(self):  # Vim X
-        """Cut as many as the count of Chars ahead, but land the Cursor in the Line"""
+        """Cut as many as the count of Chars ahead, but keep the Cursor in Bounds"""
 
         count = self.get_vi_arg1_int()
 
@@ -3087,6 +3088,7 @@ class TerminalVi:
         column = editor.column
         row = editor.row
 
+        columns = editor.count_columns_in_row()
         last_row = editor.spot_last_row()
         line = editor.fetch_row_line()
 
@@ -3103,7 +3105,7 @@ class TerminalVi:
 
         # Cut N - 1 Lines below & Chars to right in Line, and land Cursor in Line
 
-        self.check_vi_index(column)  # Vim ⇧D quirk doesn't beep when failing to delete
+        self.check_vi_index(columns)  # Vim ⇧D quirk doesn't beep when failing to delete
 
         self.chop_some_vi_lines(count)
         self.slip_back_into_vi_line()
@@ -3311,7 +3313,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # funcs[b"\x17"] = vi.do_c0_control_etb  # ETB, ⌃W, 23
         # funcs[b"\x18"] = vi.do_c0_control_can  # CAN, ⌃X , 24
         funcs[b"\x19"] = vi.do_scroll_behind_one  # EM, ⌃Y, 25
-        funcs[b"\x1A"] = vi.do_vi_sig_tstp  # SUB, ⌃Z, 26
+        funcs[b"\x1A"] = vi.do_vi_suspend_frame  # SUB, ⌃Z, 26
 
         funcs[b"\x1B"] = vi.do_vi_c0_control_esc  # ESC, ⌃[, 27
         # TODO: corrections_by_chords[b"\x1B3"] = b"#"
@@ -3358,8 +3360,8 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func(b":q!\r", func=vi.do_quit_vi)
         self._init_func(b":q\r", func=vi.do_might_quit_vi)
         self._init_func(b":vi\r", func=vi.do_resume_vi)
-        self._init_func(b":w!\r", func=vi.do_flush_vi)
-        self._init_func(b":w\r", func=vi.do_might_flush_vi)
+        self._init_func(b":w!\r", func=vi.do_vi_save_buffer)
+        self._init_func(b":w\r", func=vi.do_might_vi_save_buffer)
         self._init_func(b":wn!\r", func=vi.do_flush_next_vi)
         self._init_func(b":wn\r", func=vi.do_might_flush_next_vi)
         self._init_func(b":wq!\r", func=vi.do_flush_quit_vi)
@@ -3631,7 +3633,7 @@ class TerminalKeyboardEx(TerminalKeyboard):
         funcs[b"\x08"] = ex.do_undo_append_char  # BS, ⌃H, 8 \b
         funcs[b"\x0D"] = editor.do_sys_exit  # CR, ⌃M, 13 \r
         funcs[b"\x10"] = ex.do_copy_down  # DLE, ⌃P, 16
-        funcs[b"\x1A"] = editor.do_sig_tstp  # SUB, ⌃Z, 26
+        funcs[b"\x1A"] = editor.do_suspend_frame  # SUB, ⌃Z, 26
         funcs[b"\x15"] = ex.do_clear_chars  # NAK, ⌃U, 21
 
         funcs[b"\x1B[A"] = ex.do_copy_down  # ↑ Up Arrow
@@ -3682,7 +3684,7 @@ class TerminalEm:
         """Take keyboard Input Chords to mean insert Chars"""
 
         editor = self.vi.editor
-        editor.intake_beyond = "inserting"
+        editor.intake_beyond = "inserting"  # as if many 'do_em_self_insert_command'
 
     def do_em_prefix_chord(self, chord):  # TODO  # noqa C901 too complex
         """Take ⌃U { ⌃U } [ "-" ] { "0123456789" } [ ⌃U ] as a Prefix to more Chords"""
@@ -3875,7 +3877,7 @@ class TerminalEm:
     def do_em_quoted_insert(self):  # Emacs ⌃Q
         """Take the next Input Keyboard Chord to replace or insert, not as Control"""
 
-        self.vi.do_quote_one_intake()
+        self.vi.do_vi_quoted_insert()
 
     #
     # Define Control Chords
@@ -3924,7 +3926,7 @@ class TerminalEm:
         """Write the File"""
 
         vi = self.vi
-        vi.flush_vi()
+        vi.vi_save_buffer()
 
     def do_em_save_buffers_kill_terminal(self):  # Emacs ⌃X⌃C
         """Write the File and quit Em"""
@@ -3933,7 +3935,7 @@ class TerminalEm:
         editor = vi.editor
         skin = editor.skin
 
-        vi.flush_vi()
+        vi.vi_save_buffer()
 
         skin.doing_traceback = skin.traceback  # ⌃X⌃C of the ...⌃X⌃C Eggs
         vi.quit_vi()
@@ -3941,7 +3943,7 @@ class TerminalEm:
     def do_em_suspend_frame(self):  # Emacs ⌃Z
         """Don't save changes now, do stop Em Py process, till like Bash 'fg'"""
 
-        self.vi.do_vi_sig_tstp()
+        self.vi.do_vi_suspend_frame()
 
     def do_em_display_line_numbers_mode(self):  # Em Py ⌃CN Egg
         """Show Line Numbers or not, but without rerunning Search"""
@@ -3951,7 +3953,7 @@ class TerminalEm:
     #
     # Slip the Cursor to a Column, or step it to a Row
     #
-    # FIXME: code up ⌃U Arg1 and Bounds Checks
+    # TODO: code up ⌃U Arg1 and Bounds Checks
     #
 
     def do_em_back_to_indentation(self):  # Emacs ⌥M
@@ -4166,6 +4168,24 @@ class TerminalEm:
             editor.column = 0  # same or different Column
 
     #
+    # Slip across Words
+    #
+
+    def do_em_backward_word(self):  # Emacs ⌥B
+        """Leap behind over Separators & Letters to the first Letter of that Word"""
+        raise NotImplementedError()  # TODO: code up ⌥B 'backward_word'
+
+    def do_em_forward_word(self):  # Emacs ⌥F
+        """Leap ahead over Separators & Letters to the next Separator or Beyond Line"""
+
+        raise NotImplementedError()  # TODO: code up ⌥F 'forward_word'
+
+    def do_em_mark_paragraph(self):  # Emacs ⌥H
+        """Mark the blank Line before a Paragraph and the Lines of the Paragraph"""
+
+        raise NotImplementedError()  # TODO: code up ⌥H 'mark_paragraph'
+
+    #
     # Search for Hits
     #
 
@@ -4201,30 +4221,41 @@ class TerminalEm:
     # Delete Chars
     #
 
-    def do_em_backward_word(self):  # Emacs ⌥B
-        """Leap behind over Separators & Letters to the first Letter of that Word"""
+    def do_em_delete_char(self):  # Emacs ⌃D
+        """Cut as many as the count of Chars ahead, but keep the Cursor in Bounds"""
 
-        raise NotImplementedError()  # TODO: code up ⌥B 'backward_word'
+        self.vi.do_cut_ahead()
 
-    def do_em_kill_word(self):  # Emacs ⌥D
-        """Cut from here to where ⌥F 'forward-word' finds blanks begin"""
+    def do_delete_backward_char(self):  # Emacs Delete
+        """Cut as many as the count of Chars behind, but keep the Cursor in Bounds"""
 
-        raise NotImplementedError()  # TODO: code up ⌥D 'kill_word'
+        self.vi.do_cut_behind()
 
-    def do_em_forward_word(self):  # Emacs ⌥F
-        """Leap ahead over Separators & Letters to the next Separator or Beyond Line"""
+    def do_em_kill_line(self):  # Emacs ⌃K  # FIXME: doc well
+        """Cut Chars ahead in Line, else cut Line, and complex with Count"""
 
-        raise NotImplementedError()  # TODO: code up ⌥F 'forward_word'
+        vi = self.vi
+        editor = vi.editor
+        columns = editor.count_columns_in_row()
 
-    def do_em_mark_paragraph(self):  # Emacs ⌥H
-        """Mark the blank Line before a Paragraph and the Lines of the Paragraph"""
+        if not columns:
+            vi.do_slip_last_join_right()
+        else:
+            vi.do_chop()
 
-        raise NotImplementedError()  # TODO: code up ⌥H 'mark_paragraph'
+        # FIXME: ⌃K 'kill_line' so often so wrong, from middle column, at before dent
 
     def do_em_zap_to_char(self):  # Emacs ⌥Z
         """Cut from here to where found, if found, else raise an Exception"""
 
         raise NotImplementedError()  # TODO: code up ⌥Z 'zap_to_char'
+
+        # FIXME: ⌥Z 'zap_to_char' could soon at least work within Line
+
+    def do_em_kill_word(self):  # Emacs ⌥D
+        """Cut from here to where ⌥F 'forward-word' finds blanks begin"""
+
+        raise NotImplementedError()  # TODO: code up ⌥D 'kill_word'
 
     def do_em_shell_command_on_region(self):  # ⌥|
         """Pipe some Chars out, or out and back in again"""
@@ -4269,14 +4300,14 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self._init_func(b"\x03n", func=em.do_em_display_line_numbers_mode)  # ⌃CN
         # TODO: stop commandeering the personal ⌃CN Chord Sequence
 
-        # funcs[b"\x04"] = em.do_em_c0_control_eot  # EOT, ⌃D, 4
+        funcs[b"\x04"] = em.do_em_delete_char  # EOT, ⌃D, 4
         funcs[b"\x05"] = em.do_em_move_end_of_line  # ENQ, ⌃E, 5
         funcs[b"\x06"] = em.do_em_forward_char  # ACK, ⌃F, 6
         funcs[b"\x07"] = em.do_em_keyboard_quit  # BEL, ⌃G, 7 \a
         # funcs[b"\x08"] = em.do_em_c0_control_bs  # BS, ⌃H, 8 \b
         # funcs[b"\x09"] = em.do_em_c0_control_tab  # TAB, ⌃I, 9 \t
         # funcs[b"\x0A"] = em.do_em_c0_control_lf  # LF, ⌃J, 10 \n
-        # funcs[b"\x0B"] = em.do_em_c0_control_vt  # VT, ⌃K, 11 \v
+        funcs[b"\x0B"] = em.do_em_kill_line  # VT, ⌃K, 11 \v
         funcs[b"\x0C"] = em.do_em_recenter_top_bottom  # FF, ⌃L, 12 \f
         funcs[b"\x0D"] = em.do_em_newline  # CR, ⌃M, 13 \r
         funcs[b"\x0E"] = em.do_em_next_line  # SO, ⌃N, 14
@@ -4310,7 +4341,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # funcs[b"\x1E"] = em.do_em_c0_control_rs  # RS, ⌃^, 30
         # funcs[b"\x1F"] = em.do_em_c0_control_us  # US, ⌃_, 31
 
-        # funcs[b"\x7F"] = em.do_em_c0_control_del  # DEL, ⌃?, 127
+        funcs[b"\x7F"] = em.do_delete_backward_char  # DEL, ⌃?, 127
 
         # Define the BASIC_LATIN_STDINS (without defining the CR_STDIN outside)
 
@@ -4544,7 +4575,10 @@ class TerminalNudgeIn(argparse.Namespace):
                 if ch == ":":
                     if not wearing_em():
 
-                        echo += nudge_chars[index:]
+                        line = repr(nudge_chars[index:])
+                        assert line[0] == line[-1], line
+
+                        echo += line[1:][:-1]
 
                         return echo
 
@@ -5876,7 +5910,7 @@ class TerminalEditor:
         # Vi Py ⌃L does work in the absence of Redraw bugs
         # Vim ⌃L quirk just adds lag, each time it's called
 
-    def do_sig_tstp(self):  # Vim ⌃Zfg
+    def do_suspend_frame(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
 
         painter = self.painter
