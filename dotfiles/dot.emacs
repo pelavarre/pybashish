@@ -14,11 +14,12 @@
 ;; Add keys (without redefining keys)
 ;; (as dry run by M-x execute-extended-command, M-: eval-expression)
 
+(global-set-key (kbd "C-c %") 'query-replace-regexp)  ; for when C-M-% unavailable
 (global-set-key (kbd "C-c -") 'undo)  ; for when C-- alias of C-_ unavailable
+(global-set-key (kbd "C-c O") 'overwrite-mode)  ; aka toggle Insert
 (global-set-key (kbd "C-c b") 'ibuffer)  ; for ? m Q I O multi-buffer replace
 (global-set-key (kbd "C-c m") 'xterm-mouse-mode)  ; toggle between move and select
 (global-set-key (kbd "C-c n") 'display-line-numbers-mode)  ; toggle line numbers
-(global-set-key (kbd "C-c O") 'overwrite-mode)  ; aka toggle Insert
 (global-set-key (kbd "C-c o") 'occur)
 (global-set-key (kbd "C-c r") 'revert-buffer)
 (global-set-key (kbd "C-c s") 'superword-mode)  ; toggle accelerate of M-f M-b
@@ -56,15 +57,22 @@
 (global-set-key (kbd "© ©") (key-binding (kbd "M-g M-g")))
 (global-set-key (kbd "© TAB") (key-binding (kbd "M-g TAB")))
 
-
 (global-set-key (kbd "®") (key-binding (kbd "M-r")))  ; U00AE RegisteredSign
 (global-set-key (kbd "¯") (key-binding (kbd "M-<")))  ; U00AF Macron
 (global-set-key (kbd "µ") (key-binding (kbd "M-m")))  ; U00B5 MicroSign
+(global-set-key (kbd "ƒ") (key-binding (kbd "M-f")))  ; U0192 LatinSmallLetterFWithHook
+(global-set-key (kbd "˘") (key-binding (kbd "M->")))  ; U02D8 Breve
+(global-set-key (kbd "˙") (key-binding (kbd "M-h")))  ; U02D9 DotAbove
+(global-set-key (kbd "Ω") (key-binding (kbd "M-z")))  ; U03A9 GreekCapitalLetterOmega
+(global-set-key (kbd "∂") (key-binding (kbd "M-d")))  ; U2202 PartialDifferential
+(global-set-key (kbd "√") (key-binding (kbd "M-v")))  ; U221A SquareRoot
+(global-set-key (kbd "∫") (key-binding (kbd "M-b")))  ; U222B Integral
+(global-set-key (kbd "ﬁ") (key-binding (kbd "M-%")))  ; UFB01 LatinSmallLigatureFI
+
+;; ⌥→ ⌥← come in and work like Esc f and Esc b without needing help
+
 (global-set-key (kbd "»")  ; U00BB RightPointingDoubleAngleQuotationMark
     (key-binding (kbd "M-|")))
-(global-set-key (kbd "˘") (key-binding (kbd "M->")))  ; U02D8 Breve
-(global-set-key (kbd "√") (key-binding (kbd "M-v")))  ; U221A SquareRoot
-(global-set-key (kbd "ﬁ") (key-binding (kbd "M-%")))  ; UFB01 LatinSmallLigatureFI
 
 (global-set-key (kbd "–") (key-binding (kbd "M--")))  ; U2013 EnDash
 (global-set-key (kbd "º")  ; U00BA MasculineOrdinalIndicator
@@ -92,7 +100,7 @@
 ; they get you started, but you have to let go the Meta key after the first keystroke
 
 
-;; Sacrifice M-3 to get '# 'self-insert-command at Mac British OptionAsMeta
+;; Sacrifice M-3 to get '# 'self-insert-command at Mac British Option As Meta Key
 
 (global-set-key (kbd "M-3")
     (lambda () (interactive) (insert-char #x23)))  ; # '#' not '£'
