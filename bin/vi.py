@@ -3837,30 +3837,30 @@ class TerminalEm:
         esc_chars = r"\e0 \e1 \e2 \e3 \e4 \e5 \e6 \e7 \e8 \e9".replace(r"\e", "\x1B")
         esc_digits = esc_chars.split()
 
-        metadigits = "⌥0 ⌥1 ⌥2 ⌥3 ⌥4 ⌥5 ⌥6 ⌥7 ⌥8 ⌥9".split()
+        optdigits = "⌥0 ⌥1 ⌥2 ⌥3 ⌥4 ⌥5 ⌥6 ⌥7 ⌥8 ⌥9".split()
 
         #
 
-        metachars = chars
+        optchars = chars
 
         if chars not in esc_digits:
-            if chars not in metadigits:
+            if chars not in optdigits:
 
-                metachars = None
+                optchars = None
 
-                items = TerminalNudgeIn.UNICHARS_BY_METACHARS.items()
+                items = TerminalNudgeIn.UNICHARS_BY_OPTCHARS.items()
                 for (key, unichars) in items:
                     if chars == unichars:
 
-                        metachars = key
+                        optchars = key
 
                         break
 
-                assert metachars in metadigits, (chars, metachars)
+                assert optchars in optdigits, (chars, optchars)
 
-        str_digit = metachars[-1]
+        str_digit = optchars[-1]
 
-        assert str_digit in "0123456789", (chars, metachars)
+        assert str_digit in "0123456789", (chars, optchars)
 
         #
 
@@ -4352,10 +4352,10 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # found at Keyboard > Use Option as Meta Key = No
         # inside macOS Terminal > Preferences > Profiles
 
-        for (metachars, unichars) in TerminalNudgeIn.UNICHARS_BY_METACHARS.items():
-            self._init_meta(metachars, from_chars=unichars)
+        for (optchars, unichars) in TerminalNudgeIn.UNICHARS_BY_OPTCHARS.items():
+            self._init_opt(optchars, from_chars=unichars)
 
-    def _init_meta(self, to_chars, from_chars):
+    def _init_opt(self, to_chars, from_chars):
         """Let people type the From Chars in place of the To Chars"""
 
         funcs = self.func_by_chords
@@ -4405,11 +4405,11 @@ class TerminalNudgeIn(argparse.Namespace):
         "\x7F": "Delete",  # kin to ⌫ U232B Erase To The Left
     }
 
-    # Striking Meta + Key produces a Unichar
+    # Striking Option + Key produces one Unichar in place of the Option ⌥ Char Pair
     # when struck inside Keyboard > Use Option as Meta Key = No
     # inside macOS Terminal > Preferences > Profiles
 
-    UNICHARS_BY_METACHARS = {
+    UNICHARS_BY_OPTCHARS = {
         "⌥%": "\uFB01",  # LatinSmallLigatureFI
         "⌥-": "\u2013",  # EnDash
         "⌥0": "\u00BA",  # MasculineOrdinalIndicator
@@ -4439,8 +4439,8 @@ class TerminalNudgeIn(argparse.Namespace):
         "⌥|": "\u00BB",  # RightPointingDoubleAngleQuotationMark
     }
 
-    _META_UNI_CHARS_VALUES = sorted(UNICHARS_BY_METACHARS.values())
-    assert sorted(set(_META_UNI_CHARS_VALUES)) == sorted(_META_UNI_CHARS_VALUES)
+    _OPT_UNI_VALUES = sorted(UNICHARS_BY_OPTCHARS.values())
+    assert sorted(set(_OPT_UNI_VALUES)) == sorted(_OPT_UNI_VALUES)
 
     # MacOS UK/USA Keyboards reserve ⌥E, ⌥I, ⌥N, ⌥U for adding diacritical marks
     # and they alias X5E ^ at ⌥I⌥I, and X7E ~ at ⌥N⌥N
@@ -4478,11 +4478,11 @@ class TerminalNudgeIn(argparse.Namespace):
 
                 name_by_char[ch] = name
 
-        # Map enough of the Meta ⌥ Keys to themselves
+        # Map enough of the ⌥ Option Keys to themselves
 
-        for (metachars, unichars) in TerminalNudgeIn.UNICHARS_BY_METACHARS.items():
+        for (optchars, unichars) in TerminalNudgeIn.UNICHARS_BY_OPTCHARS.items():
 
-            name_by_char[unichars] = metachars
+            name_by_char[unichars] = optchars
 
         self.name_by_char = name_by_char
 
@@ -4580,16 +4580,16 @@ class TerminalNudgeIn(argparse.Namespace):
 
             if ch.lower() == ch.upper():
                 esc_name = "Esc " + ch
-                meta_name = "⌥" + ch
+                optname = "⌥" + ch
             else:
                 if ch == ch.upper():
                     esc_name = "Esc ⇧" + ch
-                    meta_name = "⇧⌥" + ch
+                    optname = "⇧⌥" + ch
                 else:
                     esc_name = "Esc " + ch.upper()
-                    meta_name = "⌥" + ch.upper()
+                    optname = "⌥" + ch.upper()
 
-            echo = echo.replace(esc_name, meta_name)
+            echo = echo.replace(esc_name, optname)
 
         return echo
 
@@ -7606,7 +7606,7 @@ _DOT_EMACS_ = r"""
 ;   https://github.com/pelavarre/pybashish/blob/pelavarre-patch-1/dotfiles/dot.emacs
 
 
-;; Sacrifice M-3 to get '# 'self-insert-command at Mac British OptionAsMeta
+;; Sacrifice M-3 to get '# 'self-insert-command at Mac British Option As Meta Key
 
 (global-set-key (kbd "M-3")
     (lambda () (interactive) (insert-char #x23)))  ; # '#' not '£'
