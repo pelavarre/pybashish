@@ -40,9 +40,9 @@ keyboard cheat sheet:
 
 keyboard easter eggs:
   9^ ⇧G⌃F⌃F 1⇧G⌃B G⌃F⌃E 1⇧G⌃Y ; , N ⇧N 2G9k \N99Z.  3⇧Z⇧Q 512⇧Z⇧Q
-  ⌃C Esc  123Esc Z⇧Q⇧Z⇧Q ⇧A⌃OZ⇧Q⌃O⇧Z⇧Q /⌃G⌃C⇧Z⇧Q F⌃C W*⌃C W*123456N⌃C W*G/⌃M⌃C G/⌃Z
+  ⌃C Esc  123Esc ⇧A⌃OZ⇧Q⌃O⇧Z⇧Q /⌃G⌃C⇧Z⇧Q F⌃C W*⌃C W*123456N⌃C W*G/⌃M⌃C G/⌃Z
   ⇧QVI⌃MY ⇧REsc ⇧R⌃Zfg ⇧OO⌃O_⌃O^ \⇧FW*/Up \⇧F/$Return ⌃G2⌃G :vi⌃M :n
-  GJ
+  GJ ⇧QZ ⇧Q⇧Z ZQ Z⇧Q ⇧ZQ
 
 pipe tests of ⇧Z⇧Q vs ⇧Z⇧Z:
   ls |bin/vi.py -  # pipe drain
@@ -132,12 +132,12 @@ keyboard cheat sheet:
   ⌃E ⌃A ⌃F ⌃B ⌥M ⌃U⌥GTab  => leap to column
   ⌃N ⌃P ⌥R⌥R⌥R ⌥< ⌥> ⌥9⌥9⌥G⌥G ⌃L⌃L⌃L ⌃U⌃L  => leap to line, scroll screen
   ⌃U ⌃U -0123456789 ⌃U ⌥-⌥0..⌥9 ⌃G  => repeat, or don't
-  ⌃Q⌃J  => take ⌃ and ⌥ as input, not as command
+  ⌃Q  => take ⌃ and ⌥ as input, not as command
   ⌃D ⌃K  => cut chars or lines
 
 keyboard easter eggs:
   ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
-  ⌥>⌃V⌃V⌃V ⌥<⌥V ⌃CN⌥9⌥9⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
+  ⌃XC ⌃CX ⌃C⌃X ⌥>⌃V⌃V⌃V ⌥<⌥V ⌃CN⌥9⌥9⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
 
 pipe tests:
   ls |bin/em.py -  # pipe drain
@@ -1219,6 +1219,11 @@ class TerminalVi:
 
         editor.skin.reply = reply
 
+    def do_record_over_choice(self):  # Vim Qx
+        """Record input Keyboard Chords till next Q, into Macro labelled by Char"""
+
+        raise NotImplementedError()
+
     #
     # Define Chords for entering, pausing, and exiting TerminalVi
     #
@@ -1358,6 +1363,11 @@ class TerminalVi:
 
         return False
 
+    def do_talk_of_shift_z_shift_q(self):  # Vim ⇧Q⇧Z, akin to Emacs ⌃C⌃X
+        """Suggest ⇧Z⇧Q in place of a Q⇧Z⇧Q framing error"""
+
+        self.vi_print("Did you mean ⇧Z⇧Q")
+
     def do_quit_vi(self):  # Vim ⇧Z⇧Q  # Vim :q!\r
         """Lose last changes, but keep last Python Traceback, and quit Vi"""
 
@@ -1368,12 +1378,12 @@ class TerminalVi:
         self.quit_vi()
 
     def quit_vi(self):
-        """Lose last changes, and default to lose last Python Traceback, but now quit Vi"""
+        """Lose last changes and maybe last Python Traceback too, but now quit Vi"""
 
         editor = self.editor
         skin = editor.skin
 
-        skin.traceback = skin.doing_traceback
+        skin.traceback = skin.doing_traceback  # option to log last Python Traceback
         skin.doing_traceback = None
 
         returncode = self.get_vi_arg1_int(default=None)
@@ -3374,13 +3384,14 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func(b":wn\r", func=vi.do_might_flush_next_vi)
         self._init_func(b":wq!\r", func=vi.do_flush_quit_vi)
         self._init_func(b":wq\r", func=vi.do_might_flush_quit_vi)
+        # TODO: think deeper into Vim :
 
         funcs[b";"] = vi.do_slip_redo
         # funcs[b"<"]  # TODO: dedent
         # funcs[b"="]  # TODO: dent after
         # funcs[b">"]  # TODO: indent
         funcs[b"?"] = vi.do_find_behind_vi_line
-        # funcs[b"@"] = vi.do_replay_input
+        # self._init_suffix_func(b"@", func=vi.do_replay_from_choice)
 
         funcs[b"A"] = vi.do_slip_beyond_last_take_inserts
         funcs[b"B"] = vi.do_big_word_start_behind
@@ -3402,6 +3413,9 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # funcs[b"P"] = vi.do_paste_behind
 
         self._init_func(b"Qvi\r", func=vi.do_continue_vi)
+        self._init_func(b"QZ", func=vi.do_talk_of_shift_z_shift_q)
+        self._init_func(b"Qz", func=vi.do_talk_of_shift_z_shift_q)
+        # TODO: think deeper into Vim Q
 
         funcs[b"R"] = vi.do_take_replaces
         funcs[b"S"] = vi.do_slip_first_chop_take_inserts
@@ -3414,54 +3428,9 @@ class TerminalKeyboardVi(TerminalKeyboard):
         funcs[b"X"] = vi.do_cut_behind
         # funcs[b"Y"] = vi.do_copy_row
 
-        self._init_corrector(b"QZ", corrections=b"Z")
-        # TODO: stop commandeering the personal QZ Chord Sequence
-
         self._init_func(b"ZQ", func=vi.do_quit_vi)
-        self._init_func(b"Z.", func=vi.do_flush_quit_vi)
-
-        # funcs[b"["]  # TODO: b"["
-
-        self._init_func(b"\\F", func=editor.do_set_invregex)
-        self._init_func(b"\\i", func=editor.do_set_invignorecase)
-        self._init_func(b"\\n", func=editor.do_set_invnumber)
-        # TODO: stop commandeering the personal \Esc \⇧F \I \N Chord Sequences
-
-        # funcs[b"]"]  # TODO: b"]"
-        funcs[b"^"] = vi.do_slip_dent
-        funcs[b"_"] = vi.do_step_down_minus_dent
-        # funcs[b"`"]  # TODO: close to b"'"
-
-        funcs[b"a"] = vi.do_slip_take_inserts
-        funcs[b"b"] = vi.do_lil_word_start_behind
-        # funcs[b"c"] = vi.do_chop_after_take_inserts
-        # funcs[b"d"] = vi.do_chop_after
-
-        self._init_func(b"dd", func=vi.do_chop_down)
-
-        funcs[b"e"] = vi.do_lil_word_end_ahead
-
-        self._init_suffix_func(b"f", func=vi.do_slip_index_choice)
-
-        self._init_corrector(b"g/", corrections=b":g/")
-        self._init_corrector(b"g?", corrections=b":g?")
-        # TODO: stop commandeering the personal g/ g? Chord Sequences
-
-        # funcs[b"g"]
-        funcs[b"h"] = vi.do_slip_left
-        funcs[b"i"] = vi.do_take_inserts
-        funcs[b"j"] = vi.do_step_down_seek
-        funcs[b"k"] = vi.do_step_up_seek
-        funcs[b"l"] = vi.do_slip_right
-
-        # self._init_suffix_func(b"m", func=vi.do_drop_pin)
-
-        funcs[b"n"] = vi.do_vi_find_later
-        funcs[b"o"] = vi.do_slip_last_split_take_inserts
-
-        # funcs[b"p"] = vi.do_paste_ahead
-        # funcs[b"q"] = vi.do_record_input
-
+        self._init_func(b"Zq", func=vi.do_talk_of_shift_z_shift_q)
+        self._init_suffix_func(b"q", func=vi.do_record_over_choice)
         self._init_suffix_func(b"r", func=vi.do_replace_per_choice)
 
         funcs[b"s"] = vi.do_cut_ahead_take_inserts
@@ -3474,9 +3443,11 @@ class TerminalKeyboardVi(TerminalKeyboard):
         funcs[b"x"] = vi.do_cut_ahead
         # funcs[b"y"] = vi.do_copy_after
 
-        self._init_func(b"zb", func=vi.do_scroll_till_bottom)
-        self._init_func(b"zt", func=vi.do_scroll_till_top)
         self._init_func(b"z.", func=vi.do_scroll_till_middle)
+        self._init_func(b"zQ", func=vi.do_talk_of_shift_z_shift_q)
+        self._init_func(b"zb", func=vi.do_scroll_till_bottom)
+        self._init_func(b"zq", func=vi.do_talk_of_shift_z_shift_q)
+        self._init_func(b"zt", func=vi.do_scroll_till_top)
 
         funcs[b"{"] = vi.do_paragraph_behind
         funcs[b"|"] = vi.do_slip
@@ -3936,6 +3907,11 @@ class TerminalEm:
         vi = self.vi
         vi.vi_save_buffer()
 
+    def do_em_talk_of_control_x_control_c(self):  # Emacs ⌃C⌃X, akin to Vim ⇧Q⇧Z
+        """Suggest ⌃X⌃C in place of a ⌃C⌃X⌃C framing error"""
+
+        self.vi.vi_print("Did you mean ⌃X⌃C")
+
     def do_em_save_buffers_kill_terminal(self):  # Emacs ⌃X⌃C
         """Write the File and quit Em"""
 
@@ -4316,8 +4292,10 @@ class TerminalKeyboardEm(TerminalKeyboard):
         funcs[b"\x01"] = em.do_em_move_beginning_of_line  # SOH, ⌃A, 1
         funcs[b"\x02"] = em.do_em_backward_char  # STX, ⌃B, 2
 
+        self._init_func(b"\x03\x18", func=em.do_em_talk_of_control_x_control_c)  # ⌃C⌃X
         self._init_func(b"\x03n", func=em.do_em_display_line_numbers_mode)  # ⌃CN
-        # TODO: stop commandeering the personal ⌃CN Chord Sequence
+        self._init_func(b"\x03x", func=em.do_em_talk_of_control_x_control_c)  # ⌃CX
+        # TODO: stop commandeering the personal ⌃CN ⌃CX Chord Sequences
 
         funcs[b"\x04"] = em.do_em_delete_char  # EOT, ⌃D, 4
         funcs[b"\x05"] = em.do_em_move_end_of_line  # ENQ, ⌃E, 5
@@ -4344,6 +4322,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # funcs[b"\x18"] = em.do_em_c0_control_can  # CAN, ⌃X , 24
         self._init_func(b"\x18\x03", func=em.do_em_save_buffers_kill_terminal)  # ⌃X⌃C
         self._init_func(b"\x18\x13", func=em.do_em_save_buffer)  # ⌃X⌃S
+        self._init_func(b"\x18c", func=em.do_em_talk_of_control_x_control_c)  # ⌃XC
 
         # funcs[b"\x19"] = em.do_em_c0_control_em  # EM, ⌃Y, 25
 
@@ -5265,7 +5244,8 @@ class TerminalEditor:
         # Callback to build a Prefix before the Chords to Call
 
         if do_prefix_chord_func(chord):
-            self.editor_print()  # echo Prefix
+
+            self.editor_print("...")
 
             return None  # ask for more Prefix, or for other Chords
 
@@ -5274,7 +5254,6 @@ class TerminalEditor:
         # Echo the Evalled Prefix + Chords + Suffix
 
         self.skin.nudge.prefix = uneval_prefix_func(self.skin.nudge.prefix)
-        self.editor_print()
 
         # At KeyboardInterrupt, cancel these keyboard Input Chords and start over
 
@@ -5284,7 +5263,8 @@ class TerminalEditor:
             if prefix or chords:
                 if chord == b"\x03":  # ETX, ⌃C, 3
                     self.skin.nudge.epilog = chords_plus
-                    self.editor_print()  # echo Prefix + Chords
+
+                    self.editor_print()
 
                     return self.do_little
 
@@ -5302,24 +5282,28 @@ class TerminalEditor:
 
         if (not chords_func) or chords_plus_want_suffix:
             self.skin.nudge.chords = chords_plus
-            self.editor_print()  # echo Prefix + Chords
-
             self.skin.arg0_chords = chords_plus
 
             # If need more Chords
 
             if (not chords_plus_func) or chords_plus_want_suffix:
+                if chords_plus not in corrections_by_chords.keys():
 
-                # Option to auto-correct the Chords
+                    # Ask for more Chords, or for Suffix
 
-                if chords_plus in corrections_by_chords.keys():
-                    self.skin.nudge.chords = b""
-                    corrected_chords = corrections_by_chords[chords_plus]
-                    corrected_ints = list(corrected_chords)
-                    chord_ints_ahead[:] = corrected_ints + chord_ints_ahead
-                    self.editor_print("Corrected")
+                    self.editor_print("...")
 
-                # Ask for more Chords, or for Suffix
+                    return None
+
+                # Auto-correct the Chords
+
+                self.skin.nudge.chords = b""
+
+                corrected_chords = corrections_by_chords[chords_plus]
+                corrected_ints = list(corrected_chords)
+                chord_ints_ahead[:] = corrected_ints + chord_ints_ahead
+
+                self.editor_print()
 
                 return None
 
@@ -5330,6 +5314,8 @@ class TerminalEditor:
             assert chords_plus not in corrections_by_chords.keys(), (chords, chord)
             assert chords_plus_func is not None, (chords, chord)
 
+            self.editor_print()
+
             return chords_plus_func
 
         assert self.skin.arg0_chords == chords, (chords, chord, self.skin.arg0_chords)
@@ -5338,7 +5324,6 @@ class TerminalEditor:
 
         suffix = chord
         self.skin.nudge.suffix = suffix
-        self.editor_print()  # echo Prefix + Chords + Suffix
 
         self.skin.arg2_chords = suffix.decode(errors="surrogateescape")
 
@@ -5346,6 +5331,8 @@ class TerminalEditor:
 
         assert chords not in corrections_by_chords.keys()
         assert chords_func is not None, (chords, chord)
+
+        self.editor_print()
 
         return chords_func
 
@@ -5616,8 +5603,8 @@ class TerminalEditor:
 
         message = " ".join(str(_) for _ in args)
 
-        earlier_message = self.skin.reply.message
-        assert not (earlier_message and message), (earlier_message, message)
+        old_message = self.skin.reply.message
+        assert not (old_message and message), (old_message, message)
 
         self.skin.reply.message = message
 
