@@ -29,6 +29,11 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 " Add keys (without redefining keys)
 " n-nore-map = map Normal (non insert) Mode and don't recurse through other remaps
 
+" Esc b  => macOS ⌥← Option Left-Arrow  => take as alias of ⇧B
+" Esc f  => macOS ⌥→ Option Right-Arrow  => take as alias of ⇧W
+:nnoremap <Esc>b B
+:nnoremap <Esc>f W
+
 " \ Delay  => gracefully do nothing
 :nnoremap <Bslash> :<return>
 

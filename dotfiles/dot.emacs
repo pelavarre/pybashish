@@ -25,6 +25,12 @@
 (global-set-key (kbd "C-c s") 'superword-mode)  ; toggle accelerate of M-f M-b
 (global-set-key (kbd "C-c w") 'whitespace-cleanup)
 
+(when (fboundp 'display-line-numbers-mode)
+    (global-set-key (kbd "C-c n") 'display-line-numbers-mode))
+
+(global-set-key (kbd "C-c r")
+    (lambda () (interactive) (revert-buffer 'ignoreAuto 'noConfirm)))
+
 
 ;; Def C-c | = M-h C-u 1 M-| = Mark-Paragraph Universal-Argument Shell-Command-On-Region
 
@@ -67,6 +73,7 @@
 (global-set-key (kbd "∂") (key-binding (kbd "M-d")))  ; U2202 PartialDifferential
 (global-set-key (kbd "√") (key-binding (kbd "M-v")))  ; U221A SquareRoot
 (global-set-key (kbd "∫") (key-binding (kbd "M-b")))  ; U222B Integral
+(global-set-key (kbd "≈") (key-binding (kbd "M-x")))  ; U2248 AlmostEqualTo
 (global-set-key (kbd "ﬁ") (key-binding (kbd "M-%")))  ; UFB01 LatinSmallLigatureFI
 
 ;; ⌥→ ⌥← come in and work like Esc f and Esc b without needing help
