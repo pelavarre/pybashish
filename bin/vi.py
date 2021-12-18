@@ -5885,7 +5885,7 @@ class TerminalEditor:
     def spot_max_column(self, row=None):
         """Spot the last Column in Row, else one beyond while inserting/ replacing"""
 
-        if self.intake_beyond:
+        if self.intake_beyond or self.skin.keyboard.intake_bypass:
             max_column = self.count_columns_in_row(row=row)
         else:
             max_column = self.spot_last_column(row=row)
