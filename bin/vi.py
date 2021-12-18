@@ -42,6 +42,7 @@ keyboard easter eggs:
   9^ ⇧G⌃F⌃F 1⇧G⌃B G⌃F⌃E 1⇧G⌃Y ; , N ⇧N 2G9k \N99Z.  3⇧Z⇧Q 512⇧Z⇧Q
   ⌃C Esc  123Esc Z⇧Q⇧Z⇧Q ⇧A⌃OZ⇧Q⌃O⇧Z⇧Q /⌃G⌃C⇧Z⇧Q F⌃C W*⌃C W*123456N⌃C W*G/⌃M⌃C G/⌃Z
   ⇧QVI⌃MY ⇧REsc ⇧R⌃Zfg ⇧OO⌃O_⌃O^ \⇧FW*/Up \⇧F/$Return ⌃G2⌃G :vi⌃M :n
+  GJ
 
 pipe tests of ⇧Z⇧Q vs ⇧Z⇧Z:
   ls |bin/vi.py -  # pipe drain
@@ -1079,7 +1080,7 @@ class TerminalVi:
 
         self.vi_keyboard_quit("Cancelled")
 
-        # Vim ⌃C quirk rapidly rings a Bell for each extra ⌃C, Vi Py doesn't
+        # Vim ⌃C quirk rings a Bell for each extra ⌃C, Vi Py doesn't
 
     def do_vi_c0_control_esc(self):  # Vim Esc
         """Cancel Prefix, or close Replace/ Insert, or suggest ⇧Z⇧Z to quit Vi Py"""
@@ -3061,12 +3062,19 @@ class TerminalVi:
         editor = self.editor
         row = editor.row
         last_row = editor.spot_last_row()
+        max_column = editor.spot_max_column()
 
-        self.check_vi_index(row < last_row)
-        joinings = min(last_row - row, count_below)
+        if row >= last_row:
 
-        touches = editor.join_some_lines(joinings)
-        self.held_vi_file.touches += touches
+            editor.column = max_column
+
+        else:
+
+            joinings = min(last_row - row, count_below)
+            touches = editor.join_some_lines(joinings)
+            self.held_vi_file.touches += touches
+
+        # Vim ⇧J quirk rings a bell at End-of-File, Emacs doesn't, Vi Py doesn't
 
     def do_chop_take_inserts(self):  # Vim ⇧C
         """Cut N - 1 Lines below & Chars to right in Line, and take Chords as Inserts"""
@@ -3919,7 +3927,7 @@ class TerminalEm:
             )
             # such as '/dev/stdout'  Press ⌃X⌃C to save changes and quit Emacs Py  0.1.2
 
-        # Emacs ⌃G quirk rapidly rings a Bell for each extra ⌃G, Em Py doesn't
+        # Emacs ⌃G quirk rings a Bell for each extra ⌃G, Em Py doesn't
         # FIXME: ⌃U⌃X⌃C should mean Exit 1, not Exit 4
 
     def do_em_save_buffer(self):  # Emacs ⌃X⌃S
@@ -4224,7 +4232,16 @@ class TerminalEm:
     def do_em_delete_char(self):  # Emacs ⌃D
         """Cut as many as the count of Chars ahead, but keep the Cursor in Bounds"""
 
-        self.vi.do_cut_ahead()
+        vi = self.vi
+        editor = vi.editor
+
+        column = editor.column
+        max_column = editor.spot_max_column()
+
+        if column == max_column:  # FIXME: join for ⌃D without inserting a Space
+            vi.do_slip_last_join_right()
+        else:
+            vi.do_cut_ahead()
 
     def do_delete_backward_char(self):  # Emacs Delete
         """Cut as many as the count of Chars behind, but keep the Cursor in Bounds"""
@@ -4236,14 +4253,16 @@ class TerminalEm:
 
         vi = self.vi
         editor = vi.editor
-        columns = editor.count_columns_in_row()
 
-        if not columns:
+        column = editor.column
+        max_column = editor.spot_max_column()
+
+        if column == max_column:  # FIXME: join for ⌃K without inserting a Space
             vi.do_slip_last_join_right()
         else:
             vi.do_chop()
 
-        # FIXME: ⌃K 'kill_line' so often so wrong, from middle column, at before dent
+        # FIXME: Em Py ⌃K 'kill_line' so much wrong with count
 
     def do_em_zap_to_char(self):  # Emacs ⌥Z
         """Cut from here to where found, if found, else raise an Exception"""
@@ -6339,7 +6358,7 @@ class TerminalEditor:
         self.column = 0
 
     def delete_some_chars(self, count):
-        """Delete between 0 and N Chars from this Line at this Column"""
+        """Count and delete between 0 and N chars"""
 
         ended_lines = self.ended_lines
         row = self.row
@@ -6358,38 +6377,38 @@ class TerminalEditor:
         if ended_lines:
             ended_lines[row] = head + chopped_tail + line_end
 
-        return len(chars_dropped)
+        touches = len(chars_dropped)
+
+        return touches
 
     def delete_some_lines(self, count):
-        """Delete between 0 and N Lines at this Row"""
+        """Count and delete between 0 and N Lines at this Row"""
 
         ended_lines = self.ended_lines
         row = self.row
         rows = self.count_rows_in_file()
 
-        assert row < rows, (row, rows)
-
         # Fall back to delete 0 Rows
 
-        touches = 0
+        if row >= rows:
 
-        if row < rows:
+            return 0
 
-            # Delete between 1 and N Lines
+        # Delete between 1 and N Lines
 
-            row_below = min(rows, row + count)
-            ended_lines[row:] = ended_lines[row_below:]
+        row_below = min(rows, row + count)
+        ended_lines[row:] = ended_lines[row_below:]
 
-            touches = row_below - row
+        touches = row_below - row
 
-            # Recover from deleting the Line beneath the Cursor
+        # Recover from deleting the Line beneath the Cursor
 
-            row_rows = self.count_rows_in_file()
-            if row >= row_rows:
-                assert row == row_rows
+        row_rows = self.count_rows_in_file()
+        if row >= row_rows:
+            assert row == row_rows
 
-                if row_rows:
-                    self.row = row_rows - 1
+            if row_rows:
+                self.row = row_rows - 1
 
         return touches
 
