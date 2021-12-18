@@ -42,7 +42,7 @@ keyboard easter eggs:
   9^ ⇧G⌃F⌃F 1⇧G⌃B G⌃F⌃E 1⇧G⌃Y ; , N ⇧N 2G9k \N99Z.  3⇧Z⇧Q 512⇧Z⇧Q
   ⌃C Esc  123Esc ⇧A⌃OZ⇧Q⌃O⇧Z⇧Q /⌃G⌃C⇧Z⇧Q F⌃C W*⌃C W*123456N⌃C W*G/⌃M⌃C G/⌃Z
   ⇧QVI⌃MY ⇧REsc ⇧R⌃Zfg ⇧OO⌃O_⌃O^ \⇧FW*/Up \⇧F/$Return ⌃G2⌃G :vi⌃M :n
-  GJ ⇧QZ ⇧Q⇧Z ZQ Z⇧Q ⇧ZQ
+  GJ Z⇧Z⇧Z⇧Q ⇧ZZ ZQ Z⇧Q ⇧ZQ ⇧QZ ⇧Q⇧Z :Esc
 
 pipe tests of ⇧Z⇧Q vs ⇧Z⇧Z:
   ls |bin/vi.py -  # pipe drain
@@ -63,7 +63,7 @@ how to get Vi Py:
 # Unlike Vi Py, Vim quirkily
 #   runs only as a pipe drain, declines to run as a pipe source or filter
 #   does blink the screen for '+q' without '+vi'
-#   does not name some chords it keeps undefined, such as Vi Py's Z⇧Q and Em Py's ⌃X⌃G
+#   neglects to keep Z⇧Z undefined
 #
 
 
@@ -136,7 +136,7 @@ keyboard cheat sheet:
   ⌃D ⌃K  => cut chars or lines
 
 keyboard easter eggs:
-  ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
+  ⌃Q⌃J  ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
   ⌃XC ⌃CX ⌃C⌃X ⌥>⌃V⌃V⌃V ⌥<⌥V ⌃CN⌥9⌥9⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
 
 pipe tests:
@@ -158,8 +158,8 @@ how to get Em Py:
 # Unlike Em Py, Emacs quirkily
 #   declines to run as pipe drain, source, or filter
 #   declines to take Mac ⌥ Keystrokes of A..Z (minus EINU) as Meta Keyboard Chords
+#   neglects to tab-complete and history-complete incremental searches  # TODO
 #   neglects to keep ⌃X⌃G undefined
-#   neglects to tab-complete incremental searchs  # TODO
 #
 
 # TODO: ⌃S ⌃R ⌥% ⌃XI ...
@@ -1076,7 +1076,7 @@ class TerminalVi:
     # TODO: explore Vim quirk of scrolling and pausing to make room for wide pathnames
 
     def do_vi_c0_control_etx(self):  # Vim ⌃C  # Vi Py Init
-        """Cancel Prefix, or close Replace/ Insert, or suggest ⇧Z⇧Z to quit Vi Py"""
+        """Cancel Prefix, or close Replace/ Insert, or suggest ⇧Z⇧Q to quit Vi Py"""
 
         self.vi_keyboard_quit("Cancelled")
 
@@ -1266,6 +1266,11 @@ class TerminalVi:
         # Vim :wq quirk doesn't quit and does write, when more Files chosen than fetched
         # Vim :wq :wq quirk quits, despite more Files chosen than fetched
 
+    def do_talk_of_shift_z_shift_z(self):  # Vim ⇧ZZ, akin to Vim ⇧QZ
+        """Suggest ⇧Z⇧Z in place of a ⇧ZZ shifting error, etc"""
+
+        self.vi_print("Did you mean ⇧Z ⇧Z")
+
     def do_flush_quit_vi(self):  # Vim ⇧Z⇧Z  # Vim :wq!\r
         """Write the File and quit Vi"""
 
@@ -1364,9 +1369,9 @@ class TerminalVi:
         return False
 
     def do_talk_of_shift_z_shift_q(self):  # Vim ⇧Q⇧Z, akin to Emacs ⌃C⌃X
-        """Suggest ⇧Z⇧Q in place of a Q⇧Z⇧Q framing error"""
+        """Suggest ⇧Z⇧Q in place of a ⇧Q⇧Z⇧Q framing error, etc"""
 
-        self.vi_print("Did you mean ⇧Z⇧Q")
+        self.vi_print("Did you mean ⇧Z ⇧Q")
 
     def do_quit_vi(self):  # Vim ⇧Z⇧Q  # Vim :q!\r
         """Lose last changes, but keep last Python Traceback, and quit Vi"""
@@ -1374,7 +1379,7 @@ class TerminalVi:
         editor = self.editor
         skin = editor.skin
 
-        skin.doing_traceback = skin.traceback  # ⇧Z⇧Q of such eggs as Z⇧Q⇧Z⇧Q
+        skin.doing_traceback = skin.traceback  # ⇧Z⇧Q of such eggs as Z⇧Z⇧Z⇧Q
         self.quit_vi()
 
     def quit_vi(self):
@@ -3430,6 +3435,49 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         self._init_func(b"ZQ", func=vi.do_quit_vi)
         self._init_func(b"Zq", func=vi.do_talk_of_shift_z_shift_q)
+        self._init_func(b"Zz", func=vi.do_talk_of_shift_z_shift_z)
+
+        # funcs[b"["]  # TODO: b"["
+
+        self._init_func(b"\\F", func=editor.do_set_invregex)
+        self._init_func(b"\\i", func=editor.do_set_invignorecase)
+        self._init_func(b"\\n", func=editor.do_set_invnumber)
+        # TODO: stop commandeering the personal \Esc \⇧F \I \N Chord Sequences
+
+        # funcs[b"]"]  # TODO: b"]"
+        funcs[b"^"] = vi.do_slip_dent
+        funcs[b"_"] = vi.do_step_down_minus_dent
+        # funcs[b"`"]  # TODO: close to b"'"
+
+        funcs[b"a"] = vi.do_slip_take_inserts
+        funcs[b"b"] = vi.do_lil_word_start_behind
+        # funcs[b"c"] = vi.do_chop_after_take_inserts
+        # funcs[b"d"] = vi.do_chop_after
+
+        self._init_func(b"dd", func=vi.do_chop_down)
+
+        funcs[b"e"] = vi.do_lil_word_end_ahead
+
+        self._init_suffix_func(b"f", func=vi.do_slip_index_choice)
+
+        self._init_corrector(b"g/", corrections=b":g/")
+        self._init_corrector(b"g?", corrections=b":g?")
+        # TODO: stop commandeering the personal g/ g? Chord Sequences
+
+        # funcs[b"g"]
+        funcs[b"h"] = vi.do_slip_left
+        funcs[b"i"] = vi.do_take_inserts
+        funcs[b"j"] = vi.do_step_down_seek
+        funcs[b"k"] = vi.do_step_up_seek
+        funcs[b"l"] = vi.do_slip_right
+
+        # self._init_suffix_func(b"m", func=vi.do_drop_pin)
+
+        funcs[b"n"] = vi.do_vi_find_later
+        funcs[b"o"] = vi.do_slip_last_split_take_inserts
+
+        # funcs[b"p"] = vi.do_paste_ahead
+
         self._init_suffix_func(b"q", func=vi.do_record_over_choice)
         self._init_suffix_func(b"r", func=vi.do_replace_per_choice)
 
@@ -3444,7 +3492,6 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # funcs[b"y"] = vi.do_copy_after
 
         self._init_func(b"z.", func=vi.do_scroll_till_middle)
-        self._init_func(b"zQ", func=vi.do_talk_of_shift_z_shift_q)
         self._init_func(b"zb", func=vi.do_scroll_till_bottom)
         self._init_func(b"zq", func=vi.do_talk_of_shift_z_shift_q)
         self._init_func(b"zt", func=vi.do_scroll_till_top)
@@ -3908,9 +3955,9 @@ class TerminalEm:
         vi.vi_save_buffer()
 
     def do_em_talk_of_control_x_control_c(self):  # Emacs ⌃C⌃X, akin to Vim ⇧Q⇧Z
-        """Suggest ⌃X⌃C in place of a ⌃C⌃X⌃C framing error"""
+        """Suggest ⌃X⌃C in place of a 1⌃C⌃X⌃C framing error, etc"""
 
-        self.vi.vi_print("Did you mean ⌃X⌃C")
+        self.vi.vi_print("Did you mean ⌃X ⌃C")
 
     def do_em_save_buffers_kill_terminal(self):  # Emacs ⌃X⌃C
         """Write the File and quit Em"""
@@ -4296,7 +4343,6 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self._init_func(b"\x03n", func=em.do_em_display_line_numbers_mode)  # ⌃CN
         self._init_func(b"\x03x", func=em.do_em_talk_of_control_x_control_c)  # ⌃CX
         # TODO: stop commandeering the personal ⌃CN ⌃CX Chord Sequences
-
         funcs[b"\x04"] = em.do_em_delete_char  # EOT, ⌃D, 4
         funcs[b"\x05"] = em.do_em_move_end_of_line  # ENQ, ⌃E, 5
         funcs[b"\x06"] = em.do_em_forward_char  # ACK, ⌃F, 6
@@ -5261,12 +5307,14 @@ class TerminalEditor:
 
         if not wearing_em():
             if prefix or chords:
-                if chord == b"\x03":  # ETX, ⌃C, 3
-                    self.skin.nudge.epilog = chords_plus
+                if chord in (b"\x03", b"\x1B"):  # ETX, ⌃C, 3  # ESC, ⌃[, 27
+                    self.skin.nudge.epilog = chord
 
                     self.editor_print()
 
                     return self.do_little
+
+                    # TODO: fail fast inside '._init_func' calls to redefine ⌃C, ESC
 
         # If not taking a Suffix now
 
