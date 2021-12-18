@@ -783,7 +783,7 @@ class TerminalVi:
             assert False  # unreached
 
             # Vi Py :n quits after last File
-            # Vim :n quirk chokes over no more Files chosen, after last File
+            # Vim :n Quirk chokes over no more Files chosen, after last File
 
         self.files_index = next_files_index
 
@@ -819,7 +819,7 @@ class TerminalVi:
 
         self.em = em
 
-        script = self.script  # Vim quirk falls back to lines of '~/.vimrc'
+        script = self.script  # Vim Quirk falls back to lines of '~/.vimrc'
         evals = self.evals
 
         first_chords = self.fabricate_first_vi_chords(
@@ -1029,7 +1029,7 @@ class TerminalVi:
 
         self.say_more(count)
 
-        # Vim ⌃G quirk doesn't turn Search highlights back on, Vi Py ⌃G does
+        # Vim ⌃G Quirk doesn't turn Search highlights back on, Vi Py ⌃G does
 
     def say_more(self, count=0):
         """Reply once with some details often left unmentioned"""
@@ -1073,21 +1073,21 @@ class TerminalVi:
         more_status = "  ".join(joins)
         editor.editor_print(more_status)  # such as "'bin/vi.py'  less lag"
 
-    # TODO: explore Vim quirk of scrolling and pausing to make room for wide pathnames
+    # TODO: explore Vim Quirk of scrolling and pausing to make room for wide pathnames
 
     def do_vi_c0_control_etx(self):  # Vim ⌃C  # Vi Py Init
         """Cancel Prefix, or close Replace/ Insert, or suggest ⇧Z⇧Q to quit Vi Py"""
 
         self.vi_keyboard_quit("Cancelled")
 
-        # Vim ⌃C quirk rings a Bell for each extra ⌃C, Vi Py doesn't
+        # Vim ⌃C Quirk rings a Bell for each extra ⌃C, Vi Py doesn't
 
     def do_vi_c0_control_esc(self):  # Vim Esc
         """Cancel Prefix, or close Replace/ Insert, or suggest ⇧Z⇧Z to quit Vi Py"""
 
         self.vi_keyboard_quit("Escaped")
 
-        # Vim Esc quirk slowly rings a Bell for each extra Esc, Vi Py doesn't
+        # Vim Esc Quirk slowly rings a Bell for each extra Esc, Vi Py doesn't
 
     def vi_keyboard_quit(self, verbed):
         """Cancel or escape some one thing that is most going on"""
@@ -1125,7 +1125,7 @@ class TerminalVi:
         elif editor.finding_highlights:  # *⌃C Egg, *Esc Egg, etc
 
             self.vi_print("{} Search".format(verbed))
-            editor.finding_highlights = None  # Vim ⌃C, Esc quirks leave highlights up
+            editor.finding_highlights = None  # Vim ⌃C, Esc Quirks leave highlights up
 
         elif verbed == "Escaped":
 
@@ -1236,7 +1236,7 @@ class TerminalVi:
         self.do_flush_next_vi()  # TODO: distinguish :wn from :wn!
 
         # Vi Py :wn quits after last File
-        # Vim :wn quirk chokes over no more Files chosen, after last File
+        # Vim :wn Quirk chokes over no more Files chosen, after last File
 
     def do_flush_next_vi(self):  # Vim :wn!\r
         """Write this File and load Next File, with more force"""
@@ -1263,8 +1263,8 @@ class TerminalVi:
         assert False  # unreached
 
         # Vi Py :wq doesn't write nor quit, while more Files chosen than fetched
-        # Vim :wq quirk doesn't quit and does write, when more Files chosen than fetched
-        # Vim :wq :wq quirk quits, despite more Files chosen than fetched
+        # Vim :wq Quirk doesn't quit and does write, when more Files chosen than fetched
+        # Vim :wq :wq Quirk quits, despite more Files chosen than fetched
 
     def do_talk_of_shift_z_shift_z(self):  # Vim ⇧ZZ, akin to Vim ⇧QZ
         """Suggest ⇧Z⇧Z in place of a ⇧ZZ shifting error, etc"""
@@ -1280,7 +1280,7 @@ class TerminalVi:
         assert False  # unreached
 
         # Vi Py ⇧Z⇧Z and :wq! do quit, despite more Files chosen than fetched
-        # Vim ⇧Z⇧Z quirk doesn't, but Vim ⇧Z⇧Z ⇧Z⇧Z and :wq! quirks do quit
+        # Vim ⇧Z⇧Z Quirk doesn't, but Vim ⇧Z⇧Z, ⇧Z⇧Z, and :wq! do quit
 
     def do_might_vi_save_buffer(self):  # Vim :w\r
         """Write the File and do Not quit it, with less force"""
@@ -1337,8 +1337,8 @@ class TerminalVi:
         self.quit_vi()
         assert False  # unreached
 
-        # Vim :q :q quirk quits, despite more Files chosen than fetched
         # Vi Py :q doesn't quit while more Files chosen than fetched, Vi Py :q! does
+        # Vim :q :q Quirk quits, despite more Files chosen than fetched
 
     def might_keep_changes(self, alt):
         """True if said how to bypass, False if no Touches held"""
@@ -1420,7 +1420,7 @@ class TerminalVi:
             editor.continue_do_loop()
 
         # Vi Py "*" echoes its Search Key as Status, at *, at /Up, at :g/Up, etc
-        # Vim "*" quirk echoes its Search Key as Status, only if ahead on same screen
+        # Vim "*" Quirk echoes its Search Key as Status, only if ahead on same screen
 
     def do_find_behind_vi_this(self):  # Vim #, Vim £
         """Take a Search Key from this Line, and then look behind for it"""
@@ -1443,7 +1443,7 @@ class TerminalVi:
             editor.continue_do_loop()
 
         # Vi Py "#" echoes its Search Key as Status, at #, at /Up, at :g/Up, etc
-        # Vim "#" quirk echoes its Search Key as Status, only if behind on same screen
+        # Vim "#" Quirk echoes its Search Key as Status, only if behind on same screen
 
     def slip_find_fetch_vi_this(self, slip):
         """Take a Word from this Line and return Truthy, else don't"""
@@ -1559,7 +1559,7 @@ class TerminalVi:
             editor.continue_do_loop()
 
         # Vi Py / echoes its Search Key as Status, at /, at /Up, at :g/Up, etc
-        # Vim / quirk echoes its Search Key as Status, only if ahead on same screen
+        # Vim / Quirk echoes its Search Key as Status, only if ahead on same screen
 
     def do_find_trailing_vi_lines(self):  # Vim :g/   # Vi Py :g/, g/
         """Across all the File, print each Line containing 1 or More Matches"""
@@ -1598,15 +1598,15 @@ class TerminalVi:
             )
 
         # Vi Py :g/ lands the Cursor on the last Hit in File
-        # Vim :g/ quirk kicks the Cursor to the first non-blank Column in Line of Hit
+        # Vim :g/ Quirk kicks the Cursor to the first non-blank Column in Line of Hit
 
         # Vi Py :g? lands the Cursor on the first Hit in File  # TODO
-        # Vim :g? quirk takes it as an alias of Vim :g/
+        # Vim :g? Quirk takes it as an alias of Vim :g/
 
         # Vi Py shares one Search Key input history across * # / ? g/ g? :g/ :g?
-        # Vim quirks in * # / ? :g/ :g? divide their work into three input histories
+        # Vim * # / ? :g/ :g? Quirks divide their work into three input histories
 
-        # TODO: Vim :4g/ quirk means search only line 4, not pick +-Nth match
+        # TODO: Vim :4g/ Quirk means search only line 4, not pick +-Nth match
 
     def do_find_behind_vi_line(self):  # Vim ?
         """Take a Search Key as input, and then look behind for it"""
@@ -1624,7 +1624,7 @@ class TerminalVi:
             editor.continue_do_loop()
 
         # Vi Py ? echoes its Search Key as Status, at ?, at ?Up, at :g?Up, etc
-        # Vim ? quirk echoes its Search Key as Status, only if ahead on same screen
+        # Vim ? Quirk echoes its Search Key as Status, only if ahead on same screen
 
     def take_read_vi_line(self, slip):
         """Take a Search Key"""
@@ -1766,8 +1766,8 @@ class TerminalVi:
 
         editor.slip_dent()
 
-        # Vim ⌃O quirk past a Line of 1 Dented Char snaps back after _ but not after ^
-        # Vi Py could, and does Not, repro this quirk
+        # Vim ⌃O Quirk past a Line of 1 Dented Char snaps back after _ but not after ^
+        # Vi Py could, and does Not, repro this Quirk
 
     def do_slip_first(self):  # Vim 0
         """Leap to the first Column in Row"""
@@ -2470,10 +2470,10 @@ class TerminalVi:
 
         self.slip_redo()
 
-        # TODO: Vi Py vs Vim F, T, ⇧F, ⇧T quirks
-        # Vim F Esc quirk means escaped without Bell
-        # Vim F ⌃C quirk means cancelled with Bell
-        # Vim F ⌃Vx quirk means literally go find a ⌃V char, not go find the X char
+        # TODO: Vi Py vs Vim F, T, ⇧F, ⇧T Quirks
+        # Vim F Esc Quirk means escaped without Bell
+        # Vim F ⌃C Quirk means cancelled with Bell
+        # Vim F ⌃Vx Quirk means literally go find a ⌃V char, not go find the X char
 
     def do_slip_index_minus_choice(self):  # Vim Tx
         """Find Char to Right in row, once or more, but then slip left one Column"""
@@ -2980,7 +2980,7 @@ class TerminalVi:
 
         # Vi Py defines ⌃V inside ⇧R ⇧A ⇧I ⇧O Rx A I O Fx Tx ⇧Fx ⇧Tx  # TODO: someday
         # Vi Py defines ⌃V inside ⇧R ⇧A ⇧I ⇧O A I O today
-        # Vim quirk defines ⌃V inside Rx A I O X ⇧R ⇧A ⇧I ⇧O, but not inside F T ⇧F ⇧T
+        # Vim Quirk defines ⌃V inside Rx A I O X ⇧R ⇧A ⇧I ⇧O, not inside F T ⇧F ⇧T 123
 
     def do_replace_per_chord(self):  # Vim Bypass View to Replace
         """Replace one Char with the Input Chars"""
@@ -3089,7 +3089,7 @@ class TerminalVi:
             touches = editor.join_some_lines(joinings)
             self.held_vi_file.touches += touches
 
-        # Vim ⇧J quirk rings a bell at End-of-File, Emacs doesn't, Vi Py doesn't
+        # Vim ⇧J Quirk rings a bell at End-of-File, Emacs doesn't, Vi Py doesn't
 
     def do_chop_take_inserts(self):  # Vim ⇧C
         """Cut N - 1 Lines below & Chars to right in Line, and take Chords as Inserts"""
@@ -3128,7 +3128,7 @@ class TerminalVi:
 
         # Cut N - 1 Lines below & Chars to right in Line, and land Cursor in Line
 
-        self.check_vi_index(columns)  # Vim ⇧D quirk doesn't beep when failing to delete
+        self.check_vi_index(columns)  # Vim ⇧D Quirk doesn't beep when failing to delete
 
         self.chop_some_vi_lines(count)
         self.slip_back_into_vi_line()
@@ -3945,7 +3945,7 @@ class TerminalEm:
             )
             # such as '/dev/stdout'  Press ⌃X⌃C to save changes and quit Emacs Py  0.1.2
 
-        # Emacs ⌃G quirk rings a Bell for each extra ⌃G, Em Py doesn't
+        # Emacs ⌃G Quirk rings a Bell for each extra ⌃G, Em Py doesn't
         # FIXME: ⌃U⌃X⌃C should mean Exit 1, not Exit 4
 
     def do_em_save_buffer(self):  # Emacs ⌃X⌃S
@@ -5962,7 +5962,7 @@ class TerminalEditor:
         self.reopen_terminal()  # for redraw
 
         # Vi Py ⌃L does work in the absence of Redraw bugs
-        # Vim ⌃L quirk just adds lag, each time it's called
+        # Vim ⌃L Quirk just adds lag, each time it's called
 
     def do_suspend_frame(self):  # Vim ⌃Zfg
         """Don't save changes now, do stop Vi Py process, till like Bash 'fg'"""
@@ -6747,7 +6747,7 @@ class TerminalPainter:
                 lines.append("~")
 
                 # Vi Py shows an empty File as occupying no space
-                # Vim quirk presents empty File same as a File of 1 Blank Line
+                # Vim Quirk presents empty File same as a File of 1 Blank Line
 
         # Assert Screen completed
 
