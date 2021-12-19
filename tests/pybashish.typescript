@@ -419,11 +419,21 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 
 ## 2.8 ) Cp
 
-    $ bin/cp.py f.file
-    Namespace(file='f.file', i=0, p=0, R=0)
-    usage: cp.py [-h] [-i] [-p] [-R] [FILE]
-    cp.py: error: not implemented
-    + exit 2
+    $ rm -f f.file*
+    $
+    $ touch f.file
+    $
+    
+    $ bin/cp.py f.file  # call once
+    + cp -ipR f.file f.file~
+    + touch f.file~
+    $
+    $ bin/cp.py f.file  # call again
+    + cp -ipR f.file f.file~2~
+    + touch f.file~2~
+    $
+    
+    $ rm f.file f.file~ f.file~2~
     $
 
 
@@ -1209,9 +1219,9 @@ else exit status 2 from being stubbed out
     + exit 2
     $
 
-    $ touch it~7~  # TODO: think deeper into trashing the Cwd Dir
-    $ bin/cp.py </dev/null >/dev/null 2>&1
-    $ rm -fr it~7~ it~8~
+    $ bin/cp.py /dev/null </dev/null >/dev/null 2>&1
+    $ rm null
+    $ : TODO: think deeper into Cp Py with No Args picks up Last Modified File
     $
 
     $ bin/cspsh.py </dev/null >/dev/null 2>&1
