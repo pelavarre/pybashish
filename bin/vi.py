@@ -1174,16 +1174,16 @@ class TerminalVi:
 
         self.vi_ask("Would you like to play a game? (y/n)")
 
-        chord = editor.take_editor_chord()
+        chords = editor.take_one_chord_cluster()
 
-        editor.skin.nudge.suffix = chord
+        editor.skin.nudge.suffix = chords
 
         # Begin game, or don't
 
         verb = sys_argv_pick_verb()
         title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
 
-        if chord in (b"y", b"Y"):
+        if chords in (b"y", b"Y"):
             self.vi_print("Ok, now try to quit {}".format(title_py))  # Qvi⌃My Egg
         else:
             self.vi_print("Ok")  # Qvi⌃Mn Egg
@@ -1262,6 +1262,8 @@ class TerminalVi:
 
         self.vi_print("Move the cursor ahead past end, or back to start, of cut")
 
+        # FIXME: Code up lots more of Vim C
+
     def do_cut_back_after(self):  # Vim D
         """Call to cut from here to there, after next move"""
 
@@ -1295,6 +1297,7 @@ class TerminalVi:
         self.vi_print("Move the cursor ahead past end, or back to start, of cut")
 
         # FIXME:  For an empty File, Egg DG wrongly says "Cut back 1 lines"
+        # FIXME: Code up lots more of Vim D
 
     def do_cut_back(self):
         """Cut from there to here"""
@@ -1378,6 +1381,8 @@ class TerminalVi:
         self.check_vi_index(self.after_did)
 
         self.after_did()
+
+        # FIXME: Code up lots more of Vim .
 
     def do_record_over_choice(self):  # Vim Qx
         """Record input Keyboard Chords till next Q, into Macro labelled by Char"""
@@ -1938,7 +1943,7 @@ class TerminalVi:
 
         editor.column = 0
 
-    def do_slip_left(self):  # Vim H, ← Left Arrow
+    def do_slip_left(self):  # Vim H, ← Left-Arrow
         """Slip left one Column or more"""
 
         count = self.get_vi_arg1_int()
@@ -1950,7 +1955,7 @@ class TerminalVi:
         left = min(editor.column, count)
         editor.column -= left
 
-    def do_slip_right(self):  # Vim L, → Right Arrow
+    def do_slip_right(self):  # Vim L, → Right-Arrow
         """Slip Right one Column or more"""
 
         count = self.get_vi_arg1_int()
@@ -2147,7 +2152,7 @@ class TerminalVi:
         editor.column = self.seek_vi_column()
         self.keep_up_vi_column_seek()
 
-    def do_step_down_seek(self):  # Vim J, ⌃J, ⌃N, ↓ Down Arrow
+    def do_step_down_seek(self):  # Vim J, ⌃J, ⌃N, ↓ Down-Arrow
         """Step down one Row or more, but seek the current Column"""
 
         editor = self.editor
@@ -2160,7 +2165,7 @@ class TerminalVi:
         editor.column = self.seek_vi_column()
         self.keep_up_vi_column_seek()
 
-    def do_step_up_seek(self):  # Vim K, ⌃P, ↑ Up Arrow
+    def do_step_up_seek(self):  # Vim K, ⌃P, ↑ Up-Arrow
         """Step up a Row or more, but seek the current Column"""
 
         editor = self.editor
@@ -2503,10 +2508,13 @@ class TerminalVi:
             behind = self.slip_behind_one()  # backtrack
             assert behind, (editor.column, editor.count_columns_in_row())
 
-    def do_big_word_start_ahead(self):  # Vim ⇧W  # inverse of Vim ⇧B
+    def do_big_word_start_ahead(self):  # Vim ⇧W, Vi Py ⌥→  # inverse of Vim ⇧B
         """Slip ahead to first Char of next Big Word"""
 
-        self.word_start_ahead_once(VI_BLANK_SET)
+        self.word_start_ahead_for_count(VI_BLANK_SET)
+
+        # Vi Py ⌥→ Option Right-Arrow works like Vi Py ⇧W
+        # Vim ⌥→ Quirk defaults to block Option Right-Arrow from working like Vim ⇧W
 
     def do_lil_word_start_ahead(self):  # Vim W  # inverse of Vim B
         """Slip ahead to first Char of next Lil Word"""
@@ -2559,18 +2567,20 @@ class TerminalVi:
 
                 break
 
-    def do_big_word_start_behind(self):  # Vim ⇧B  # inverse of Vim ⇧W
+    def do_big_word_start_behind(self):  # Vim ⇧B, Vi Py ⌥←  # inverse of Vim ⇧W
         """Slip behind to first Char of Big Word"""
 
         self.word_start_behind_for_count(VI_BLANK_SET)
 
-        # TODO: add option for either of '._' between words, or only '.' between words
-        # TODO: add option for B E W and ⇧B ⇧E ⇧W to swap places
+        # Vi Py ⌥← Option Left-Arrow works like Vi Py ⇧B
+        # Vim ⌥← Quirk defaults to block Option Right-Arrow from working like Vim ⇧B
 
     def do_lil_word_start_behind(self):  # Vim B  # inverse of Vim W
         """Slip behind first Char of Lil Word"""
 
         self.word_start_behind_for_count(VI_BLANK_SET, VI_SYMBOLIC_SET)
+
+        # TODO: add option for B E W to see '.' as part of the word with '_'
 
     def word_start_behind_for_count(self, *charsets):
         """Slip behind to first Char of Word"""
@@ -3423,7 +3433,8 @@ class TerminalKeyboard:
             if some_chords not in funcs.keys():
                 funcs[some_chords] = None
             else:
-                assert funcs[some_chords] is None, chords
+                some_func = funcs[some_chords]
+                assert some_func is None, (some_chords, chords, some_func)
 
         # Call this Func after collecting all these Chords
 
@@ -3507,10 +3518,14 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         funcs[b"\x1B"] = vi.do_vi_c0_control_esc  # ESC, ⌃[, 27
         # TODO: corrections_by_chords[b"\x1B3"] = b"#"
-        funcs[b"\x1B[A"] = vi.do_step_up_seek  # ↑ Up Arrow
-        funcs[b"\x1B[B"] = vi.do_step_down_seek  # ↓ Down Arrow
-        funcs[b"\x1B[C"] = vi.do_slip_right  # → Right Arrow
-        funcs[b"\x1B[D"] = vi.do_slip_left  # ← Left Arrow
+
+        funcs[b"\x1B[A"] = vi.do_step_up_seek  # ↑ Up-Arrow
+        funcs[b"\x1B[B"] = vi.do_step_down_seek  # ↓ Down-Arrow
+        funcs[b"\x1B[C"] = vi.do_slip_right  # → Right-Arrow
+        funcs[b"\x1B[D"] = vi.do_slip_left  # ← Left-Arrow
+
+        funcs[b"\x1Bb"] = vi.do_big_word_start_behind  # ⌥← Option Left-Arrow, ⌥B
+        funcs[b"\x1Bf"] = vi.do_big_word_start_ahead  # ⌥→ Option Right-Arrow, ⌥F
 
         # funcs[b"\x1C"] = vi.do_eval_vi_line   # FS, ⌃\, 28
         # funcs[b"\x1D"] = vi.do_c0_control_gs  # GS, ⌃], 29
@@ -3774,7 +3789,7 @@ class TerminalEx:
 
         sys.exit()
 
-    def do_copy_down(self):  # Ex ⌃P, ↑ Up Arrow, in Vim
+    def do_copy_down(self):  # Ex ⌃P, ↑ Up-Arrow, in Vim
         """Recall last input line"""
 
         editor = self.editor
@@ -3828,7 +3843,7 @@ class TerminalKeyboardEx(TerminalKeyboard):
         funcs[b"\x1A"] = editor.do_suspend_frame  # SUB, ⌃Z, 26
         funcs[b"\x15"] = ex.do_clear_chars  # NAK, ⌃U, 21
 
-        funcs[b"\x1B[A"] = ex.do_copy_down  # ↑ Up Arrow
+        funcs[b"\x1B[A"] = ex.do_copy_down  # ↑ Up-Arrow
 
         funcs[b"\x7F"] = ex.do_undo_append_char  # DEL, ⌃?, 127
 
@@ -4370,12 +4385,17 @@ class TerminalEm:
 
     def do_em_backward_word(self):  # Emacs ⌥B
         """Leap behind over Separators & Letters to the first Letter of that Word"""
-        raise NotImplementedError()  # TODO: code up ⌥B 'backward_word'
+
+        self.vi.do_big_word_start_behind()
+
+        # FIXME: code up Em Py ⌥B 'backward_word' as distinct from Vi Py ⌥B
 
     def do_em_forward_word(self):  # Emacs ⌥F
         """Leap ahead over Separators & Letters to the next Separator or Beyond Line"""
 
-        raise NotImplementedError()  # TODO: code up ⌥F 'forward_word'
+        self.vi.do_big_word_start_ahead()
+
+        # FIXME: code up Em Py ⌥F 'forward_word' as distinct from Vi Py ⌥F
 
     def do_em_mark_paragraph(self):  # Emacs ⌥H
         """Mark the blank Line before a Paragraph and the Lines of the Paragraph"""
@@ -4578,10 +4598,10 @@ class TerminalKeyboardEm(TerminalKeyboard):
         funcs[b"\x1A"] = em.do_em_suspend_frame  # SUB, ⌃Z, 26
         # funcs[b"\x1B"] = ...  # ESC, ⌃[, 27  # taken below by Use Option as Meta Key
 
-        funcs[b"\x1B[A"] = em.do_em_previous_line  # ↑ Up Arrow
-        funcs[b"\x1B[B"] = em.do_em_next_line  # ↓ Down Arrow
-        funcs[b"\x1B[C"] = em.do_em_forward_char  # → Right Arrow
-        funcs[b"\x1B[D"] = em.do_em_backward_char  # ← Left Arrow
+        funcs[b"\x1B[A"] = em.do_em_previous_line  # ↑ Up-Arrow
+        funcs[b"\x1B[B"] = em.do_em_next_line  # ↓ Down-Arrow
+        funcs[b"\x1B[C"] = em.do_em_forward_char  # → Right-Arrow
+        funcs[b"\x1B[D"] = em.do_em_backward_char  # ← Left-Arrow
 
         # funcs[b"\x1C"] = em.do_em_eval_em_line   # FS, ⌃\, 28
         # funcs[b"\x1D"] = em.do_em_c0_control_gs  # GS, ⌃], 29
@@ -4832,10 +4852,10 @@ class TerminalNudgeIn(argparse.Namespace):
 
                         ex_tail = tail
                         if tail.endswith("\r"):
-                            ex_tail = tail[:-len("\r")]
+                            ex_tail = tail[: -len("\r")]
 
                         rep_ex_tail = repr(ex_tail)
-                        assert rep_ex_tail[0] == rep_ex_tail[-1], line
+                        assert rep_ex_tail[0] == rep_ex_tail[-1], rep_ex_tail
                         rep_ex_line = rep_ex_tail[1:][:-1]
 
                         if rep_ex_line == ex_tail:
@@ -5293,7 +5313,7 @@ class TerminalEditor:
 
             # Scroll and prompt
 
-            chord = self.peek_editor_chord()
+            chord = self.peek_one_editor_chord()
             if chord is None:
                 if self.painter.rows:
                     self.scroll_cursor_into_screen()
@@ -5302,9 +5322,9 @@ class TerminalEditor:
 
             # Take one Chord in, or next Chord, or cancel Chords to start again
 
-            chord = self.take_editor_chord()
+            chords = self.take_one_chord_cluster()
 
-            chords_func = self.choose_chords_func(chord)
+            chords_func = self.choose_chords_func(chords)
             if chords_func is None:
 
                 continue
@@ -5487,12 +5507,12 @@ class TerminalEditor:
 
         return screen_spans
 
-    def choose_chords_func(self, chord):  # TODO:  # noqa C901 too complex
+    def choose_chords_func(self, chords):  # TODO:  # noqa C901 too complex
         """Accept one Keyboard Input into Prefix, into main Chords, or as Suffix"""
         # pylint: disable=too-many-locals
 
         chord_ints_ahead = self.skin.chord_ints_ahead
-        chords = self.skin.nudge.chords
+        old_chords = self.skin.nudge.chords
         prefix = self.skin.nudge.prefix
 
         keyboard = self.skin.keyboard
@@ -5504,11 +5524,11 @@ class TerminalEditor:
         corrections_by_chords = keyboard.corrections_by_chords
         intake_chords_set = keyboard.choose_intake_chords_set()
 
-        assert self.skin.nudge.suffix is None, (chords, chord)  # one Chord only
+        assert self.skin.nudge.suffix is None, (old_chords, chords)  # one Stroke only
 
         # Callback to build a Prefix before the Chords to Call
 
-        if do_prefix_chord_func(chord):
+        if do_prefix_chord_func(chords):
 
             self.editor_print("...")
 
@@ -5522,12 +5542,12 @@ class TerminalEditor:
 
         # At KeyboardInterrupt, cancel these keyboard Input Chords and start over
 
-        chords_plus = chord if (chords is None) else (chords + chord)
+        chords_plus = chords if (old_chords is None) else (old_chords + chords)
 
         if not wearing_em():
-            if prefix or chords:
-                if chord in (b"\x03", b"\x1B"):  # ETX, ⌃C, 3  # ESC, ⌃[, 27
-                    self.skin.nudge.epilog = chord
+            if prefix or old_chords:
+                if chords in (b"\x03", b"\x1B"):  # ETX, ⌃C, 3  # ESC, ⌃[, 27
+                    self.skin.nudge.epilog = chords
 
                     self.editor_print()
 
@@ -5537,7 +5557,7 @@ class TerminalEditor:
 
         # If not taking a Suffix now
 
-        chords_func = self.editor_func_by_chords(chords)
+        chords_func = self.editor_func_by_chords(old_chords)
         chords_plus_func = self.editor_func_by_chords(chords=chords_plus)
 
         keyboard.intake_ish = False
@@ -5578,26 +5598,27 @@ class TerminalEditor:
 
             # Call a Func with or without Prefix, and without Suffix
 
-            assert chords_plus not in corrections_by_chords.keys(), (chords, chord)
-            assert chords_plus_func is not None, (chords, chord)
+            assert chords_plus not in corrections_by_chords.keys(), (old_chords, chords)
+            assert chords_plus_func is not None, (old_chords, chords)
 
             self.editor_print()
 
             return chords_plus_func
 
-        assert self.skin.arg0_chords == chords, (chords, chord, self.skin.arg0_chords)
+        arg0_chords = self.skin.arg0_chords
+        assert arg0_chords == old_chords, (old_chords, chords, arg0_chords)
 
         # Call a Func chosen by Chords plus Suffix
 
-        suffix = chord
+        suffix = chords
         self.skin.nudge.suffix = suffix
 
         self.skin.arg2_chars = suffix.decode(errors="surrogateescape")
 
         # Call a Func with Suffix, but with or without Prefix
 
-        assert chords not in corrections_by_chords.keys()
-        assert chords_func is not None, (chords, chord)
+        assert old_chords not in corrections_by_chords.keys()
+        assert chords_func is not None, (old_chords, chords)
 
         self.editor_print()
 
@@ -5718,7 +5739,7 @@ class TerminalEditor:
 
                     # Raise KeyboardInterrupt at ⌃C
 
-                    chord = self.peek_editor_chord()
+                    chord = self.peek_one_editor_chord()
                     if chord == b"\x03":  # ETX, ⌃C, 3
 
                         raise KeyboardInterrupt()
@@ -5912,7 +5933,18 @@ class TerminalEditor:
 
         self.skin.reply.bell = True
 
-    def peek_editor_chord(self):
+    def take_one_chord_cluster(self):
+        """Block Self till next Cluster of keyboard input Chords"""
+
+        chords = self.take_one_editor_chord()
+        if chords == b"\x1B":  # ESC, ⌃[, 27
+            peeked = self.peek_one_editor_chord()
+            if peeked is not None:  # Vim ⌥← b"b"  # Vim ⌥→ b"f"
+                chords += self.take_one_editor_chord()
+
+        return chords
+
+    def peek_one_editor_chord(self):
         """Reveal the next keyboard input Chord"""
 
         chord_ints_ahead = self.skin.chord_ints_ahead
@@ -5949,7 +5981,7 @@ class TerminalEditor:
 
         return chord
 
-    def take_editor_chord(self):
+    def take_one_editor_chord(self):
         """Block Self till next keyboard input Chord"""
 
         chord_ints_ahead = self.skin.chord_ints_ahead
@@ -6434,7 +6466,7 @@ class TerminalEditor:
         self.driver.flush()
 
         try:
-            _ = self.take_editor_chord()
+            _ = self.take_one_chord_cluster()
         except KeyboardInterrupt:
             pass  # take ⌃C as Return here
 
@@ -7835,11 +7867,16 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 " Add keys (without redefining keys)
 " n-nore-map = map Normal (non insert) Mode and don't recurse through other remaps
 
+" Esc b  => macOS ⌥← Option Left-Arrow  => take as alias of ⇧B
+" Esc f  => macOS ⌥→ Option Right-Arrow  => take as alias of ⇧W
+:nnoremap <Esc>b B
+:nnoremap <Esc>f W
+
 " \ Delay  => gracefully do nothing
 :nnoremap <Bslash> :<return>
 
 " \ Esc  => cancel the :set hlsearch highlighting of all search hits on screen
-:nnoremap <Bslash><esc> :noh<return>
+:nnoremap <Bslash><Esc> :noh<return>
 
 " \ e  => reload, if no changes not-saved
 :nnoremap <Bslash>e :e<return>
@@ -7864,6 +7901,8 @@ function! RStripEachLine()
     call cursor(with_line, with_col)
 endfun
 
+" accept Option+3 from US Keyboards as meaning '#' \u0023 Hash Sign
+
 :cmap <Esc>3 #
 :imap <Esc>3 #
 :nmap <Esc>3 #
@@ -7871,6 +7910,7 @@ endfun
 :smap <Esc>3 #
 :vmap <Esc>3 #
 :xmap <Esc>3 #
+
 
 " copied from:  git clone https://github.com/pelavarre/pybashish.git
 
