@@ -4828,12 +4828,20 @@ class TerminalNudgeIn(argparse.Namespace):
                 if ch == ":":
                     if not wearing_em():
 
-                        line = repr(nudge_chars[index:])
-                        assert line[0] == line[-1], line
+                        tail = nudge_chars[index:]
 
-                        echo += line[1:][:-1]
+                        ex_tail = tail
+                        if tail.endswith("\r"):
+                            ex_tail = tail[:-len("\r")]
 
-                        return echo
+                        rep_ex_tail = repr(ex_tail)
+                        assert rep_ex_tail[0] == rep_ex_tail[-1], line
+                        rep_ex_line = rep_ex_tail[1:][:-1]
+
+                        if rep_ex_line == ex_tail:
+                            echo += rep_ex_line
+
+                            return echo
 
             # Show each Prefix Chord without Spaces in between them
 
