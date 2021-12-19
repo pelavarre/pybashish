@@ -1,7 +1,10 @@
 ; ~/.emacs
 
 
-;; Configure Emacs
+;
+; Configure Emacs
+;
+
 
 (setq-default indent-tabs-mode nil)  ; indent with Spaces not Tabs
 (setq-default tab-width 4)  ; count out columns of C-x TAB S-LEFT/S-RIGHT
@@ -11,8 +14,11 @@
 (column-number-mode)  ; show column number up from 0, not just line number up from 1
 
 
-;; Add keys (without redefining keys)
-;; (as dry run by M-x execute-extended-command, M-: eval-expression)
+;
+; Add keys (without redefining keys)
+; (as dry run by M-x execute-extended-command, M-: eval-expression)
+;
+
 
 (global-set-key (kbd "C-c %") 'query-replace-regexp)  ; for when C-M-% unavailable
 (global-set-key (kbd "C-c -") 'undo)  ; for when C-- alias of C-_ unavailable
@@ -45,19 +51,26 @@
     )
 
 
-;; Turn off enough of macOS to run Emacs
+;
+; Doc how to turn off enough of macOS Terminal to run Emacs well
+;
 
-; press Esc to mean Meta, or run Emacs Py in place of Emacs, or else
+; Press Esc to mean Meta, or run Emacs Py in place of Emacs, or else
 ;   macOS Terminal > Preferences > Profiles > Keyboard > Use Option as Meta Key
 
-; press ⌃⇧2 or ⌃Space and hope it comes out as C-@ or C-SPC to mean 'set-mark-command
-;   even though older macOS needed you to turn off System Preferences > Keyboard >
-;   Input Sources > Shortcuts > Select The Previous Input Source  ⌃Space
+; Press ⌃⇧2 or ⌃Space and hope ⌃H K says it comes out as C-@ or C-SPC
+;   to mean 'set-mark-command, even though older macOS needed you to turn off
+;   System Preferences > Keyboard > Input Sources >
+;   Shortcuts > Select The Previous Input Source  ⌃Space
+
+; Except don't work so hard if you have the following in place to keep this easy =>
 
 
-;; Give up unquoted entry of some chars outside Basic Latin
-;; so as to define the Option/Alt Shift key to mean Meta anyhow
-;; when macOS Terminal > Preferences > Profiles > Keyboard > Use Option as Meta Key = No
+;
+; Require ⌃Q prefix to input some chars outside Basic Latin
+; so as to take macOS Terminal Option Key as meaning Emacs Meta anyhow
+; despite macOS Terminal > Preferences > ... > Keyboard > Use Option as Meta Key = No
+;
 
 (define-prefix-command 'my-copyright-sign-map)
 (global-set-key (kbd "©") 'my-copyright-sign-map)  ; U00A9 CopyrightSign
