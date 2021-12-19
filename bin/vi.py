@@ -21,21 +21,22 @@ optional arguments:
 
 quirks:
   works as pipe filter, source, or drain, a la the vim drain:  ls |vi -
+  accepts ⌥ Option shift in place of ⌃O while inserting or replacing chars
   loses input at crashes, and input of C0 Control bytes, except after ⌃V
 
 keyboard cheat sheet:
   ⇧Z⇧Q ⇧Z⇧Z  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M  ⌃C Esc ⌃G  => how to quit & show version
-  $ ^ 0 Fx Tx ⇧Fx ⇧Tx ; , | H L  => leap to column
-  W E B ⇧W ⇧E ⇧B ⌥→ ⌥← } {  => leap across small/ large words, paragraphs
-  ⇧G 1⇧G ⇧L ⇧M ⇧H + _ - ⌃J ⌃N ⌃P J K  => leap to line, screen row
+  ⇧$ ⇧^ 0 Fx Tx ⇧Fx ⇧Tx ; , | H L  => leap to column
+  W E B ⇧W ⇧E ⇧B ⌥→ ⌥← ⇧} ⇧{  => leap across small/ large words, paragraphs
+  ⇧G 1⇧G ⇧L ⇧M ⇧H ⇧+ ⇧_ - ⌃J ⌃N ⌃P J K  => leap to line, screen row
   1234567890 ⌃C Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y ZT Z. ZB  99Z.  => scroll screen
-  ⌃L 999⌃L  => clear lag, inject lag, measure lag
   \N \I \⇧F ⌃C Esc ⌃G  => toggle line numbers, search case/ regex, show hits
   /... Delete ⌃U ⌃C Return  ?...   * £ # N ⇧N  => search ahead, behind, next
   /Return ?Return :g/Return  => search ahead, behind, lots
+  ⌃L 999⌃L  ⌥EE ⇧⌥E⇧⌥E  ⌥NN ⇧⌥N⇧⌥N  => clear/ inject lag, escape mac einu accent
   Rx A I O ⇧R ⇧A ⇧I ⇧O ⌃V ⌃O ⌃C Esc  => replace, insert, & view, once or awhile
-  X ⇧X DD ⇧D ⇧J s ⇧S ⇧C  => cut chars or lines, join lines, insert after cut
+  X ⇧X ⇧J ⇧D ⇧C ⇧S S DD CC  => cut chars or lines, join lines, insert after cut
 
 keyboard easter eggs:
   9^ $⌃OSpace ⇧G⌃F⌃F 1⇧G⌃B G⌃F⌃E 1⇧G⌃Y ; , N ⇧N 2G9k \N99Z.  3⇧Z⇧Q 512⇧Z⇧Q
@@ -62,6 +63,8 @@ how to get Vi Py:
 # Unlike Vi Py, Vim quirkily
 #   runs only as a pipe drain, declines to run as a pipe source or filter
 #   does blink the screen for '+q' without '+vi'
+#   defaults to neglect to accept ⌥ Option shift in place of ⌃O while insert/ replace
+#   fails to conclude macOS ':set ttyfast' can afford ':set showcmd' and ':set ruler'
 #   neglects to keep Z⇧Z undefined
 #
 
@@ -129,7 +132,7 @@ keyboard cheat sheet:
   ⌃X⌃S⌃X⌃C  ⌃X⌃C  ⌃Zfg  ⌃G  => how to quit & show version
   ⌃E ⌥M ⌃A ⌃U⌥GTab ⌃F ⌃B  => leap to column
   ⌥← ⌥→  => leap across words
-  ⌥⇧> ⌥⇧< ⌃N ⌃P ⌥G⌥G ⌃U99⌥G⌥G ⌥R⌥R⌥R  => leap to line, screen row
+  ⇧⌥> ⇧⌥< ⌃N ⌃P ⌥G⌥G ⌃U99⌥G⌥G ⌥R⌥R⌥R  => leap to line, screen row
   ⌃U ⌃U -0123456789 ⌃U ⌥-⌥0..⌥9 ⌃G  => repeat, or don't
   ⌃L⌃L⌃L ⌃U⌃L  => scroll screen
   ⌃CN ⌃Q  => toggle line numbers, insert ⌥ and ⌃ chars
@@ -137,7 +140,7 @@ keyboard cheat sheet:
 
 keyboard easter eggs:
   ⌃Q⌃J  ⌃G⌃G ⌃U123⌃G  PQQ⇧P⌃A⌥Z⇧P  ⌃U-0 ⌃U07 ⌃U9⌃Z
-  ⌃XC ⌃CX ⌃C⌃X ⌥⇧>⌃V⌃V⌃V ⌥⇧<⌥V ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C
+  ⌃XC ⌃CX ⌃C⌃X ⇧⌥>⌃V⌃V⌃V ⇧⌥<⌥V ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C
 
 pipe tests:
   ls |bin/em.py -  # pipe drain
@@ -162,7 +165,7 @@ how to get Em Py:
 #   neglects to keep ⌃X⌃G undefined
 #
 
-# TODO: ⌃S ⌃R ⌥⇧% ⌃XI ⌃X⌃U ⌃X⌃L ...
+# TODO: ⌃S ⌃R ⇧⌥% ⌃XI ⌃X⌃U ⌃X⌃L ...
 # TODO: ⌃X⌃X ...
 # TODO: ⌃C% ⌃C- ⌃C⇧O ⌃CO ⌃CB ⌃CM ⌃CN ⌃CO ⌃CR ⌃CS ⌃CW ⌃C⇧|
 
@@ -474,6 +477,7 @@ C0_CONTROL_STDINS = list(chr(codepoint).encode() for codepoint in range(0x00, 0x
 C0_CONTROL_STDINS.append(chr(0x7F).encode())
 
 BASIC_LATIN_STDINS = list(chr(codepoint).encode() for codepoint in range(0x20, 0x7F))
+BASIC_LATIN_CHARS_SET = set("".join(_.decode() for _ in BASIC_LATIN_STDINS))
 
 assert len(C0_CONTROL_STDINS) == 33 == (128 - 95) == ((0x20 - 0x00) + 1)
 assert len(BASIC_LATIN_STDINS) == 95 == (128 - 33) == (0x7F - 0x20)
@@ -882,8 +886,9 @@ class TerminalVi:
 
             self.main_traceback = editor.skin.traceback  # /⌃G⌃C⇧Z⇧Q Egg
 
-    def fabricate_first_vi_chords(self, script, evals):  # pylint: disable=no-self-use
+    def fabricate_first_vi_chords(self, script, evals):
         """Merge the first Chords from the Command Line with basic Vi Py Startup"""
+        # pylint: disable=no-self-use
 
         chords = b""
 
@@ -1067,7 +1072,7 @@ class TerminalVi:
         if showing_lag is not None:
             str_lag = "{}s lag".format(showing_lag)
 
-        # Collect the mentions into one Status Row
+        # Collect the Mentions
 
         joins = list()
 
@@ -1078,6 +1083,12 @@ class TerminalVi:
 
         if held_vi_file.touches:
             joins.append("{} bytes touched".format(held_vi_file.touches))
+
+        verb = sys_argv_pick_verb()
+        title_py = verb.title() + " Py"  # "Vi Py", "Em Py", etc
+        joins.append(title_py)
+
+        # Join the Mentions into one Status Row
 
         more_status = "  ".join(joins)
         editor.editor_print(more_status)  # such as "'bin/vi.py'  less lag"
@@ -1160,7 +1171,7 @@ class TerminalVi:
         title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
 
         self.vi_print(
-            "{!r}  {} and quit {}  {}".format(nickname, how, title_py, version)
+            "{!r}  {} and quit {} {}".format(nickname, how, title_py, version)
         )
 
         # such as '/dev/stdout'  Press ⇧Z⇧Q to lose changes and quit Vim Py  0.1.23
@@ -1238,6 +1249,8 @@ class TerminalVi:
         after_cut = self.after_cut
         editor = self.editor
 
+        keyboard = editor.skin.keyboard
+
         self.check_vi_count()  # TODO: multiply Repeat Count into movement
 
         # Escape recursion of Vim C inside Vim C
@@ -1262,6 +1275,7 @@ class TerminalVi:
 
         self.editor.after_func = self.do_cut_back
 
+        self.take_one_bypass()
         self.vi_print("Move the cursor ahead past end, or back to start, of cut")
 
         # FIXME: Code up lots more of Vim C
@@ -1271,6 +1285,8 @@ class TerminalVi:
 
         after_cut = self.after_cut
         editor = self.editor
+
+        keyboard = editor.skin.keyboard
 
         self.check_vi_count()  # TODO: multiply Repeat Count into movement
 
@@ -1296,10 +1312,14 @@ class TerminalVi:
 
         self.editor.after_func = self.do_cut_back
 
+        self.take_one_bypass()
         self.vi_print("Move the cursor ahead past end, or back to start, of cut")
 
-        # FIXME:  For an empty File, Egg DG wrongly says "Cut back 1 lines"
+        # FIXME: For an empty File, Egg DG wrongly says "Cut back 1 lines"
         # FIXME: Code up lots more of Vim D
+        # FIXME: Vim quirk deletes an extra Char at any of DFx D⇧Fx CFx C⇧Fx
+        # FIXME: Vim quirk deletes an extra Line at D⇧G
+        # FIXME: Vim quirk differs from Vi Py at ⇧MD⇧H
 
     def do_cut_back(self):
         """Cut from there to here"""
@@ -1307,6 +1327,7 @@ class TerminalVi:
         after_cut = self.after_cut
         after_pin = self.after_pin  # TODO: work on the pin/ after_pin/ head/ tail names
         editor = self.editor
+        keyboard = editor.skin.keyboard
 
         pin = editor.spot_pin()
 
@@ -1325,9 +1346,17 @@ class TerminalVi:
         self.vi_print()  # Cancel the Status from Movement
 
         if after_cut != "changing":
+
             rep_count = editor.format_touch_count()
             self.vi_print("Cut back {}".format(rep_count))
+
         else:
+
+            if keyboard.intake_bypass:  # TODO: make this less ugly
+                keyboard.with_intake_bypass = ""
+                keyboard.intake_beyond = keyboard.intake_bypass
+                keyboard.intake_bypass = ""
+
             self.take_vi_inserts()
 
     def cut_across(self, here_pin, there_pin):
@@ -3068,6 +3097,12 @@ class TerminalVi:
     def do_take_one_bypass(self):  # Vim ⌃O during ⇧R ⇧A ⇧I ⇧O A I O
         """Pause taking keyboard Input Chords to mean replace/ insert Chars"""
 
+        self.take_one_bypass()
+        self.vi_print("Type one command")
+
+    def take_one_bypass(self):
+        """Take next keyboard Input Chords to mean replace/ insert Chars"""
+
         editor = self.editor
 
         column = editor.column
@@ -3078,7 +3113,14 @@ class TerminalVi:
 
         #
 
-        assert editor.intake_beyond
+        if not editor.intake_beyond:
+
+            if keyboard.intake_bypass:
+                keyboard.with_intake_bypass = ""  # TODO: make this less ugly
+
+            return
+
+        #
 
         keyboard.intake_bypass = editor.intake_beyond
         editor.intake_beyond = None
@@ -3096,8 +3138,6 @@ class TerminalVi:
         #
 
         skin.cursor_style = _VIEW_CURSOR_STYLE_
-
-        self.vi_print("Type one command")
 
         skin.doing_traceback = skin.traceback  # A⌃OZ⇧Q⌃O⇧Z⇧Q Egg
 
@@ -3392,6 +3432,7 @@ class TerminalKeyboard:
         self.format_status_func = lambda reply: None
         self.place_cursor_func = lambda: None
 
+        self.with_intake_bypass = ""
         self.intake_bypass = ""
         self.intake_chords_set = set()
         self.intake_func = None
@@ -3456,6 +3497,63 @@ class TerminalKeyboard:
             chords_set = self.intake_chords_set
 
         return chords_set
+
+    def init_unichars_func(self, unichars, optchords):
+        """Let people type the From Chars in place of the To Chars"""
+
+        unichords = unichars.encode()
+
+        funcs = self.func_by_chords
+        suffixes_by_chords = self.suffixes_by_chords
+
+        optfunc = funcs[optchords]
+        if optchords in suffixes_by_chords.keys():
+            self._init_suffix_func(unichords, func=optfunc)
+        else:
+            self._init_func(unichords, func=optfunc)
+
+    def to_optchords(self, optchars):
+        """Pick out the Keyboard Input Chords of a Key shifted by the Option Key"""
+        # pylint: disable=no-self-use
+
+        if optchars.startswith("⌥"):
+
+            optchords = b"\x1B"  # ESC, ⌃[, 27
+            assert optchars[1] == optchars[1].upper()
+            optchords += optchars[1].lower().encode()
+
+            opttail = optchars[2:]
+
+        else:
+            assert optchars.startswith("⇧⌥")
+
+            optchords = b"\x1B"  # ESC, ⌃[, 27
+            assert optchars[2] == optchars[2].upper()
+            optchords += optchars[2].encode()
+
+            opttail = optchars[3:]
+
+        if opttail:
+            if (len(opttail) == 1) and (opttail in BASIC_LATIN_CHARS_SET):
+                optchords += opttail.encode().lower()  # Em Py ⌥GG, Vi Py ⌥EE, etc
+            elif opttail == "Tab":
+                optchords += b"\x09"  # TAB, ⌃I, 9 \t
+            elif (len(opttail) == 2) and (opttail[-1] in string.ascii_uppercase):
+                if opttail[0] == "⌥":  # Em Py ⌥G⌥G, Vi Py ⌥E⌥E, etc
+                    optchords += b"\x1B" + opttail[-1].encode().lower()  # ESC, ⌃[, 27
+                else:
+                    assert opttail[0] == "⇧"
+                    optchords += opttail[-1].encode()
+            elif (len(opttail) == 3) and (opttail[-1] in string.ascii_uppercase):
+                assert opttail[:2] == "⇧⌥"
+                assert opttail[:2] == "⇧⌥", repr(opttail)  # Vi Py ⇧⌥E⇧⌥E, etc
+                optchords += b"\x1B" + opttail[-1].encode()  # ESC, ⌃[, 27
+            else:
+                assert not opttail, repr(opttail)
+
+            # TODO: loosen up this logic to accept more additions before they arrive
+
+        return optchords
 
 
 class ViPyNameError(NameError):
@@ -3691,6 +3789,40 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
 
         funcs["£".encode()] = vi.do_find_behind_vi_this
+
+        # Define Vi Py Esc Keyboard Input Chords, other than ⌥E ⌥I ⌥N ⌥U,
+        # found at Keyboard > Use Option as Meta Key = No
+        # inside macOS Terminal > Preferences > Profiles
+
+        vi_optchars_list = r"""
+            ⌥$ ⌥^ ⌥0 ⌥F ⇧⌥F ⌥T ⇧⌥T ⌥; ⌥, ⌥| ⌥H ⌥L
+            ⌥W ⌥EE ⌥B ⇧⌥W ⇧⌥E⇧⌥E ⇧⌥B ⌥} ⌥{
+            ⇧⌥G ⇧⌥L ⇧⌥M ⇧⌥H ⌥+ ⌥_ ⌥- ⌥J ⌥K
+            ⌥ZT ⌥ZB ⌥Z.
+            ⌥\I ⌥\N ⌥\⇧F
+            ⌥/ ⌥? ⌥* ⌥# ⌥NN ⇧⌥N⇧⌥N
+            ⌥R ⌥A ⌥II ⌥O ⇧⌥R ⇧⌥A ⇧⌥I⇧⌥I ⇧⌥O
+            ⌥X ⇧⌥X ⇧⌥D ⇧⌥J ⌥S ⇧⌥S ⇧⌥C ⌥D ⌥C
+        """.split()
+
+        # ⌥$ ⌥^ ⌥} ⌥{ ⌥+ ⌥_ ⌥? ⌥* ⌥# also known as ⇧⌥$ ⇧⌥^ ⇧⌥} ⇧⌥{ ⇧⌥+ ⇧⌥_ ⇧⌥? ⇧⌥* ⇧⌥#
+        # ⌥→ ⌥← not solved here
+
+        for optchars in vi_optchars_list:
+            assert optchars.startswith("⌥") or optchars.startswith("⇧⌥")
+
+        for optchars in vi_optchars_list:
+            unichars = TerminalNudgeIn.UNICHARS_BY_OPTCHARS[optchars]
+
+            optchords = self.to_optchords(optchars)
+            assert optchords[:1] == b"\x1B", repr(optchords)  # ESC, ⌃[, 27
+            alt_optchords = optchords.replace(b"\x1B", b"")
+            if alt_optchords in (b"ee", b"EE", b"ii", b"II", b"nn", b"NN"):
+                alt_optchords = alt_optchords[-1:]  # TODO:  b"uu", b"UU"
+
+            self.init_unichars_func(unichars, optchords=alt_optchords)
+
+            # print(repr(unichars), repr(alt_optchords), funcs[alt_optchords])
 
 
 #
@@ -4126,7 +4258,7 @@ class TerminalEm:
             nickname = held_vi_file.pick_file_nickname() if held_vi_file else None
 
             vi.vi_print(
-                "{!r}  Press ⌃X⌃C to save changes and quit {}  {}".format(
+                "{!r}  Press ⌃X⌃C to save changes and quit {} {}".format(
                     nickname, title_py, version
                 )
             )
@@ -4184,7 +4316,7 @@ class TerminalEm:
 
         self.vi.slip_behind_one()
 
-    def do_em_beginning_of_buffer(self):  # Emacs ⌥⇧<
+    def do_em_beginning_of_buffer(self):  # Emacs ⇧⌥<
         """Leap to the first Column of the first Line"""
 
         editor = self.vi.editor
@@ -4192,7 +4324,7 @@ class TerminalEm:
         editor.row = 0
         editor.column = 0
 
-    def do_em_end_of_buffer(self):  # Emacs ⌥⇧>
+    def do_em_end_of_buffer(self):  # Emacs ⇧⌥>
         """Leap to the last Column of the last Line"""
 
         editor = self.vi.editor
@@ -4330,7 +4462,7 @@ class TerminalEm:
 
             if editor.top_row == last_row:
                 if not index:
-                    vi.vi_print("Do you mean ⌃U1⌥V")  # ⌥⇧>⌃V Egg
+                    vi.vi_print("Do you mean ⌃U1⌥V")  # ⇧⌥>⌃V Egg
 
                 return
 
@@ -4367,7 +4499,7 @@ class TerminalEm:
 
             if not top_row:
                 if not index:
-                    vi.vi_print("Do you mean ⌃U1⌃V")  # ⌥⇧<⌥V Egg
+                    vi.vi_print("Do you mean ⌃U1⌃V")  # ⇧⌥<⌥V Egg
 
                 return
 
@@ -4412,10 +4544,10 @@ class TerminalEm:
     # Search for Hits
     #
 
-    def do_em_query_replace(self):  # Emacs ⌥⇧%
+    def do_em_query_replace(self):  # Emacs ⇧⌥%
         """Walk Hits and ask:  y Space . Y, or n Delete N, or q Return, etc"""
 
-        raise NotImplementedError()  # TODO: code up ⌥⇧% 'query_replace'
+        raise NotImplementedError()  # TODO: code up ⇧⌥% 'query_replace'
 
     #
     # Insert Chords as Chars
@@ -4625,11 +4757,11 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self.intake_chords_set = set(BASIC_LATIN_STDINS)
         self.intake_func = em.do_em_self_insert_command
 
-        # Define the Esc Keyboard Input Chords
+        # Define Em Py Esc Keyboard Input Chords
         # found at Keyboard > Use Option as Meta Key = Yes
         # inside macOS Terminal > Preferences > Profiles
 
-        self._init_func(b"\x1B%", em.do_em_query_replace)  # ⌥⇧%
+        self._init_func(b"\x1B%", em.do_em_query_replace)  # ⇧⌥%
         self._init_func(b"\x1B-", em.do_em_negative_argument)  # ⌥-
         self._init_func(b"\x1B0", em.do_em_digit_argument)  # ⌥0
         self._init_func(b"\x1B1", em.do_em_digit_argument)  # ⌥1
@@ -4641,8 +4773,8 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self._init_func(b"\x1B7", em.do_em_digit_argument)  # ⌥7
         self._init_func(b"\x1B8", em.do_em_digit_argument)  # ⌥8
         self._init_func(b"\x1B9", em.do_em_digit_argument)  # ⌥9
-        self._init_func(b"\x1B<", em.do_em_beginning_of_buffer)  # ⌥⇧<
-        self._init_func(b"\x1B>", em.do_em_end_of_buffer)  # ⌥⇧>
+        self._init_func(b"\x1B<", em.do_em_beginning_of_buffer)  # ⇧⌥<
+        self._init_func(b"\x1B>", em.do_em_end_of_buffer)  # ⇧⌥>
         self._init_func(b"\x1Bb", em.do_em_backward_word)  # ⌥B
         self._init_func(b"\x1Bd", em.do_em_kill_word)  # ⌥D
         self._init_func(b"\x1Bf", em.do_em_forward_word)  # ⌥F
@@ -4657,47 +4789,17 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self._init_suffix_func(b"\x1Bz", em.do_em_zap_to_char)  # ⌥Z
         self._init_func(b"\x1B|", em.do_em_shell_command_on_region)  # ⌥|
 
-        # Define Esc Keyboard Input Chords, other than ⌥E ⌥I ⌥N ⌥U,
-        # found at Keyboard > Use Option as Meta Key = No
-        # inside macOS Terminal > Preferences > Profiles
+        em_optchars_list = """
+            ⌥% ⌥-
+            ⌥0 ⌥1 ⌥2 ⌥3 ⌥4 ⌥5 ⌥6 ⌥7 ⌥8 ⌥9 ⌥< ⌥>
+            ⌥B ⌥D ⌥F ⌥G ⌥GG ⌥GTab ⌥G⌥G ⌥H ⌥M ⌥R ⌥V ⌥X ⌥Z ⌥|
+        """.split()
 
-        for (optchars, unichars) in TerminalNudgeIn.UNICHARS_BY_OPTCHARS.items():
-            self._init_opt(optchars, from_chars=unichars)
+        for optchars in em_optchars_list:
+            unichars = TerminalNudgeIn.UNICHARS_BY_OPTCHARS[optchars]
+            optchords = self.to_optchords(optchars)
 
-    def _init_opt(self, to_chars, from_chars):
-        """Let people type the From Chars in place of the To Chars"""
-
-        funcs = self.func_by_chords
-        suffixes_by_chords = self.suffixes_by_chords
-
-        # Pick out the Keyboard Input Chords we get
-
-        from_chords = from_chars.encode()
-
-        # Pick out the Keyboard Input Chords we want
-
-        assert to_chars[0] == "⌥"
-        to_chords = b"\x1B"
-
-        assert to_chars[1] == to_chars[1].upper()
-        to_chords += to_chars[1].lower().encode()
-
-        to_tail = to_chars[2:]
-        if to_tail:
-            if to_tail == "G":
-                to_chords += "g".encode()
-            elif to_tail == "Tab":
-                to_chords += b"\x09"
-            elif to_tail == "⌥G":
-                to_chords += b"\x1B" + "g".encode()
-
-        # Say to take the Keyboard Input Chords we get as the Func
-
-        to_func = funcs[to_chords]
-        if to_chords in suffixes_by_chords.keys():
-            self._init_suffix_func(from_chords, func=to_func)
-        else:
-            self._init_func(from_chords, func=to_func)
+            self.init_unichars_func(unichars, optchords=optchords)
 
 
 #
@@ -4723,8 +4825,15 @@ class TerminalNudgeIn(argparse.Namespace):
     # inside macOS Terminal > Preferences > Profiles
 
     UNICHARS_BY_OPTCHARS = {
-        "⌥%": "\uFB01",  # LatinSmallLigatureFI  # aka ⌥⇧%
+
+        "⌥#": "\u2039",  # SingleLeftPointingAngleQuotationMark  # aka ⇧⌥#
+        "⌥$": "\u203A",  # SingleRightPointingAngleQuotationMark  # aka ⇧⌥$
+        "⌥%": "\uFB01",  # LatinSmallLigatureFI  # aka ⇧⌥%
+        "⌥*": "\u00B0",  # DegreeSign  # aka ⇧⌥*
+        "⌥+": "\u00B1",  # PlusMinusSign  # aka ⇧⌥+
+        "⌥,": "\u2264",  # LessThanOrEqualTo
         "⌥-": "\u2013",  # EnDash
+        "⌥/": "\u00F7",  # DivisionSign
         "⌥0": "\u00BA",  # MasculineOrdinalIndicator
         "⌥1": "\u00A1",  # InvertedExclamationMark
         "⌥2": "\u20AC",  # EuroSign
@@ -4735,26 +4844,76 @@ class TerminalNudgeIn(argparse.Namespace):
         "⌥7": "\u00B6",  # PilcrowSign
         "⌥8": "\u2022",  # Bullet [Pearl]
         "⌥9": "\u00AA",  # FeminineOrdinalIndicator
-        "⌥<": "\u00AF",  # Macron  # aka ⌥⇧<
-        "⌥>": "\u02D8",  # Breve  # aka ⌥⇧>
+        "⌥;": "\u2026",  # HorizontalEllipsis
+        "⌥<": "\u00AF",  # Macron  # aka ⇧⌥<
+        "⌥>": "\u02D8",  # Breve  # aka ⇧⌥>
+        "⌥?": "\u00BF",  # InvertedQuestionMark  # aka ⇧⌥?
+        "⌥A": "\u00E5",  # LatinSmallLetterAWithRingAbove
         "⌥B": "\u222B",  # Integral  # ⌥← comes in as Esc B
+        "⌥C": "\u00E7",  # LatinSmallLetterCWithCedilla
         "⌥D": "\u2202",  # PartialDifferential
+        "⌥EE": "\u00E9",  # LatinSmallLetterEWithAcute E
         "⌥F": "\u0192",  # LatinSmallLetterFWithHook  # ⌥→ comes in as Esc F
         "⌥G": "\u00A9",  # CopyrightSign
         "⌥GG": "\u00A9g",  # CopyrightSign G
         "⌥GTab": "\u00A9\x09",  # CopyrightSign Tab
         "⌥G⌥G": "\u00A9\u00A9",  # 2x CopyrightSign
         "⌥H": "\u02D9",  # DotAbove
+        "⌥II": "\u00EE",  # LatinSmallLetterIWithCircumflex
+        "⌥J": "\u2206",  # Increment
+        "⌥K": "\u02DA",  # RingAbove
+        "⌥L": "\u00AC",  # NotSign
         "⌥M": "\u00B5",  # MicroSign
+        "⌥NN": "\u00F1",  # LatinSmallLetterNWithTilde
+        "⌥O": "\u00F8",  # LatinSmallLetterOWithStroke
         "⌥R": "\u00AE",  # RegisteredSign
+        "⌥S": "\u00DF",  # LatimSmallLetterSharpS
+        "⌥T": "\u2020",  # Dagger
         "⌥V": "\u221A",  # SquareRoot
+        "⌥W": "\u2211",  # NArySummation
         "⌥X": "\u2248",  # AlmostEqualTo
         "⌥Z": "\u03A9",  # GreekCapitalLetterOmega
+        "⌥Z.": "\u03A9.",  # GreekCapitalLetterOmega .
+        "⌥ZB": "\u03A9b",  # GreekCapitalLetterOmega B
+        "⌥ZT": "\u03A9t",  # GreekCapitalLetterOmega T
+        r"⌥\I": "\u00ABi",  # LeftPointingDoubleAngleQuotationMark I
+        r"⌥\N": "\u00ABn",  # LeftPointingDoubleAngleQuotationMark N
+        "⌥\\": "\u00AB",  # LeftPointingDoubleAngleQuotationMark
+        r"⌥\⇧F": "\u00ABF",  # LeftPointingDoubleAngleQuotationMark ⇧F
+        "⌥^": "\uFB02",  # LatinSmallLigatureFL
+        "⌥_": "\u2014",  # EmDash
+        "⌥{": "\u201D",  # RightDoubleQuotationMark
         "⌥|": "\u00BB",  # RightPointingDoubleAngleQuotationMark
+        "⌥}": "\u2019",  # RightSingleQuotationMark
+        "⇧⌥A": "\u00C5",  # LatinCapitalLetterAWithRingAbove
+        "⇧⌥B": "\u0131",  # LatinSmallLetterDotlessI
+        "⇧⌥C": "\u00C7",  # LatinCapitalLetterCWithCedilla
+        "⇧⌥D": "\u00CE",  # LatinCapitalLetterIWithCircumflex
+        "⇧⌥E⇧⌥E": "\u00B4",  # AcuteAccent
+        "⇧⌥F": "\u00CF",  # LatinCapitalLetterIWithDiaeresis
+        "⇧⌥G": "\u02DD",  # DoubleAcuteAccent
+        "⇧⌥H": "\u00D3",  # LatinCapitalLetterOWithAcute
+        "⇧⌥I⇧⌥I": "\u02C6",  # ModifierLetterCircumflexAccent
+        "⇧⌥J": "\u00D4",  # LatinCapitalLetterOWithCircumflex
+        "⇧⌥L": "\u00D2",  # LatinCapitalLetterOWithGrave
+        "⇧⌥M": "\u00C2",  # LatinCapitalLetterAWithCircumflex
+        "⇧⌥N⇧⌥N": "\u02DC",  # SmallTilde
+        "⇧⌥O": "\u00D8",  # LatinCapitalLetterOWithStroke
+        "⇧⌥R": "\u2030",  # PerMilleSign
+        "⇧⌥S": "\u00CD",  # LatinCapitalLetterIWithAcute
+        "⇧⌥T": "\u02C7",  # Caron
+        "⇧⌥W": "\u201E",  # DoubleLow9QuotationMark
+        "⇧⌥X": "\u02DB",  # Ogonek
     }
 
-    _OPT_UNI_VALUES = sorted(UNICHARS_BY_OPTCHARS.values())
-    assert sorted(set(_OPT_UNI_VALUES)) == sorted(_OPT_UNI_VALUES)
+    # FIXME: macOS Option keys outside Basic Latin for Vi Py  # ⌥C ⌥D 1234567890
+
+    OPTCHARS_COUNTER = collections.Counter(UNICHARS_BY_OPTCHARS.values())
+    OPTCHARS_DUPES = list(_ for _ in OPTCHARS_COUNTER.items() if _[-1] != 1)
+    OPTCHARS_BY_UNICHARS = {v: k for (k, v) in UNICHARS_BY_OPTCHARS.items()}
+
+    assert not OPTCHARS_DUPES, ascii(OPTCHARS_DUPES)
+    assert len(UNICHARS_BY_OPTCHARS.keys()) == len(OPTCHARS_BY_UNICHARS.keys())
 
     # MacOS UK/USA Keyboards reserve ⌥E, ⌥I, ⌥N, ⌥U for adding diacritical marks
     # and they alias X5E ^ at ⌥I⌥I, and X7E ~ at ⌥N⌥N
@@ -5342,7 +5501,7 @@ class TerminalEditor:
             # Reply
 
             keyboard.enter_do_func()
-            with_bypass = keyboard.intake_bypass
+            keyboard.with_intake_bypass = keyboard.intake_bypass
             try:
 
                 self.call_chords_func(chords_func)  # reply to one whole Nudge
@@ -5372,7 +5531,7 @@ class TerminalEditor:
                     raise
 
             finally:
-                if with_bypass:
+                if keyboard.with_intake_bypass:
                     self.close_keyboard_intake()
                 keyboard.exit_do_func()
 
