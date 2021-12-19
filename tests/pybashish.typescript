@@ -1211,7 +1211,7 @@ else exit status 2 from being stubbed out
 
     $ touch it~7~  # TODO: think deeper into trashing the Cwd Dir
     $ bin/cp.py </dev/null >/dev/null 2>&1
-    $ rm -fr it~7~
+    $ rm -fr it~7~ it~8~
     $
 
     $ bin/cspsh.py </dev/null >/dev/null 2>&1
