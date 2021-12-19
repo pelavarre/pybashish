@@ -129,7 +129,7 @@ keyboard cheat sheet:
   ⌃X⌃S⌃X⌃C  ⌃X⌃C  ⌃Zfg  ⌃G  => how to quit & show version
   ⌃E ⌥M ⌃A ⌃U⌥GTab ⌃F ⌃B  => leap to column
   ⌥← ⌥→  => leap across words
-  ⌥> ⌥< ⌃N ⌃P ⌥G⌥G ⌃U99⌥G⌥G ⌥R⌥R⌥R  => leap to line, screen row
+  ⌥⇧> ⌥⇧< ⌃N ⌃P ⌥G⌥G ⌃U99⌥G⌥G ⌥R⌥R⌥R  => leap to line, screen row
   ⌃U ⌃U -0123456789 ⌃U ⌥-⌥0..⌥9 ⌃G  => repeat, or don't
   ⌃L⌃L⌃L ⌃U⌃L  => scroll screen
   ⌃CN ⌃Q  => toggle line numbers, insert ⌥ and ⌃ chars
@@ -137,7 +137,7 @@ keyboard cheat sheet:
 
 keyboard easter eggs:
   ⌃Q⌃J  ⌃G⌃G ⌃U123⌃G  PQQ⇧P⌃A⌥Z⇧P  ⌃U-0 ⌃U07 ⌃U9⌃Z
-  ⌃XC ⌃CX ⌃C⌃X ⌥>⌃V⌃V⌃V ⌥<⌥V ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C
+  ⌃XC ⌃CX ⌃C⌃X ⌥⇧>⌃V⌃V⌃V ⌥⇧<⌥V ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C
 
 pipe tests:
   ls |bin/em.py -  # pipe drain
@@ -162,8 +162,9 @@ how to get Em Py:
 #   neglects to keep ⌃X⌃G undefined
 #
 
-# TODO: ⌃S ⌃R ⌥% ⌃XI ...
+# TODO: ⌃S ⌃R ⌥⇧% ⌃XI ⌃X⌃U ⌃X⌃L ...
 # TODO: ⌃X⌃X ...
+# TODO: ⌃C% ⌃C- ⌃C⇧O ⌃CO ⌃CB ⌃CM ⌃CN ⌃CO ⌃CR ⌃CS ⌃CW ⌃C⇧|
 
 
 #
@@ -1565,7 +1566,7 @@ class TerminalVi:
     # Define Chords to take a Word of this Line as the Search Key, and look for it
     #
 
-    def do_find_ahead_vi_this(self):  # Vim *
+    def do_find_ahead_vi_this(self):  # Vim ⇧*
         """Take a Search Key from this Line, and then look ahead for it"""
 
         editor = self.editor
@@ -1588,7 +1589,7 @@ class TerminalVi:
         # Vi Py "*" echoes its Search Key as Status, at *, at /Up, at :g/Up, etc
         # Vim "*" Quirk echoes its Search Key as Status, only if ahead on same screen
 
-    def do_find_behind_vi_this(self):  # Vim #, Vim £
+    def do_find_behind_vi_this(self):  # Vim ⇧#, Vim ⇧£
         """Take a Search Key from this Line, and then look behind for it"""
 
         editor = self.editor
@@ -1769,12 +1770,12 @@ class TerminalVi:
         # Vi Py :g? lands the Cursor on the first Hit in File  # TODO
         # Vim :g? Quirk takes it as an alias of Vim :g/
 
-        # Vi Py shares one Search Key input history across * # / ? g/ g? :g/ :g?
-        # Vim * # / ? :g/ :g? Quirks divide their work into three input histories
+        # Vi Py shares one Search Key input history across ⇧* ⇧# / ⇧? g/ g? :g/ :g?
+        # Vim ⇧* ⇧# / ⇧? :g/ :g? Quirks divide their work into three input histories
 
         # TODO: Vim :4g/ Quirk means search only line 4, not pick +-Nth match
 
-    def do_find_behind_vi_line(self):  # Vim ?
+    def do_find_behind_vi_line(self):  # Vim ⇧?
         """Take a Search Key as input, and then look behind for it"""
 
         editor = self.editor
@@ -1789,8 +1790,8 @@ class TerminalVi:
 
             editor.continue_do_loop()
 
-        # Vi Py ? echoes its Search Key as Status, at ?, at ?Up, at :g?Up, etc
-        # Vim ? Quirk echoes its Search Key as Status, only if ahead on same screen
+        # Vi Py ⇧? echoes its Search Key as Status, at ?, at ?Up, at :g?Up, etc
+        # Vim ⇧? Quirk echoes its Search Key as Status, only if ahead on same screen
 
     def take_read_vi_line(self, slip):
         """Take a Search Key"""
@@ -1917,7 +1918,7 @@ class TerminalVi:
 
         editor.column = column
 
-    def do_slip_dent(self):  # Vim ^
+    def do_slip_dent(self):  # Vim ⇧^
         """Leap to just past the Indent, but first Step Down if Arg"""
 
         count = self.get_vi_arg1_int(default=None)
@@ -2057,7 +2058,7 @@ class TerminalVi:
 
         editor.step_for_count_slip_to_dent(default=(last_row + 1))
 
-    def do_step_down_dent(self):  # Vim +, Return
+    def do_step_down_dent(self):  # Vim ⇧+, Return
         """Step down a Row or more, but land just past the Indent"""
 
         self.step_down_for_count()
@@ -2077,7 +2078,7 @@ class TerminalVi:
 
         editor.row += down
 
-    def do_step_down_minus_dent(self):  # Vim _
+    def do_step_down_minus_dent(self):  # Vim ⇧_
         """Leap to just past the Indent, but first Step Down if Arg"""
 
         self.step_down_for_count_minus()
@@ -2141,7 +2142,7 @@ class TerminalVi:
     # Step the Cursor up and down between Rows, while holding on to the Column
     #
 
-    def do_slip_max_seek(self):  # Vim $
+    def do_slip_max_seek(self):  # Vim ⇧$
         """Leap to the last Column in Row, and keep seeking last Columns"""
 
         editor = self.editor
@@ -2394,7 +2395,7 @@ class TerminalVi:
     # Search ahead for an Empty Line (while ignoring Blank Lines)
     #
 
-    def do_paragraph_ahead(self):  # Vim }
+    def do_paragraph_ahead(self):  # Vim ⇧}
         """Step down over Empty Lines, then over Non-Empty Lines"""
 
         editor = self.editor
@@ -2423,7 +2424,7 @@ class TerminalVi:
 
         editor.continue_do_loop()
 
-    def do_paragraph_behind(self):  # Vim {
+    def do_paragraph_behind(self):  # Vim ⇧{
         """Step up over Empty Lines, then over Non-Empty Lines"""
 
         editor = self.editor
@@ -3577,7 +3578,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_func(b":wn\r", func=vi.do_might_flush_next_vi)
         self._init_func(b":wq!\r", func=vi.do_flush_quit_vi)
         self._init_func(b":wq\r", func=vi.do_might_flush_quit_vi)
-        # TODO: think deeper into Vim :
+        # TODO: think deeper into Vim ⇧:
 
         funcs[b";"] = vi.do_slip_redo
         # funcs[b"<"]  # TODO: dedent
@@ -4183,7 +4184,7 @@ class TerminalEm:
 
         self.vi.slip_behind_one()
 
-    def do_em_beginning_of_buffer(self):  # Emacs ⌥<
+    def do_em_beginning_of_buffer(self):  # Emacs ⌥⇧<
         """Leap to the first Column of the first Line"""
 
         editor = self.vi.editor
@@ -4191,7 +4192,7 @@ class TerminalEm:
         editor.row = 0
         editor.column = 0
 
-    def do_em_end_of_buffer(self):  # Emacs ⌥>
+    def do_em_end_of_buffer(self):  # Emacs ⌥⇧>
         """Leap to the last Column of the last Line"""
 
         editor = self.vi.editor
@@ -4329,7 +4330,7 @@ class TerminalEm:
 
             if editor.top_row == last_row:
                 if not index:
-                    vi.vi_print("Do you mean ⌃U1⌥V")  # ⌥>⌃V Egg
+                    vi.vi_print("Do you mean ⌃U1⌥V")  # ⌥⇧>⌃V Egg
 
                 return
 
@@ -4366,7 +4367,7 @@ class TerminalEm:
 
             if not top_row:
                 if not index:
-                    vi.vi_print("Do you mean ⌃U1⌃V")  # ⌥<⌥V Egg
+                    vi.vi_print("Do you mean ⌃U1⌃V")  # ⌥⇧<⌥V Egg
 
                 return
 
@@ -4411,10 +4412,10 @@ class TerminalEm:
     # Search for Hits
     #
 
-    def do_em_query_replace(self):  # Emacs ⌥%
+    def do_em_query_replace(self):  # Emacs ⌥⇧%
         """Walk Hits and ask:  y Space . Y, or n Delete N, or q Return, etc"""
 
-        raise NotImplementedError()  # TODO: code up ⌥% 'query_replace'
+        raise NotImplementedError()  # TODO: code up ⌥⇧% 'query_replace'
 
     #
     # Insert Chords as Chars
@@ -4628,7 +4629,7 @@ class TerminalKeyboardEm(TerminalKeyboard):
         # found at Keyboard > Use Option as Meta Key = Yes
         # inside macOS Terminal > Preferences > Profiles
 
-        self._init_func(b"\x1B%", em.do_em_query_replace)  # ⌥%
+        self._init_func(b"\x1B%", em.do_em_query_replace)  # ⌥⇧%
         self._init_func(b"\x1B-", em.do_em_negative_argument)  # ⌥-
         self._init_func(b"\x1B0", em.do_em_digit_argument)  # ⌥0
         self._init_func(b"\x1B1", em.do_em_digit_argument)  # ⌥1
@@ -4640,8 +4641,8 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self._init_func(b"\x1B7", em.do_em_digit_argument)  # ⌥7
         self._init_func(b"\x1B8", em.do_em_digit_argument)  # ⌥8
         self._init_func(b"\x1B9", em.do_em_digit_argument)  # ⌥9
-        self._init_func(b"\x1B<", em.do_em_beginning_of_buffer)  # ⌥<
-        self._init_func(b"\x1B>", em.do_em_end_of_buffer)  # ⌥>
+        self._init_func(b"\x1B<", em.do_em_beginning_of_buffer)  # ⌥⇧<
+        self._init_func(b"\x1B>", em.do_em_end_of_buffer)  # ⌥⇧>
         self._init_func(b"\x1Bb", em.do_em_backward_word)  # ⌥B
         self._init_func(b"\x1Bd", em.do_em_kill_word)  # ⌥D
         self._init_func(b"\x1Bf", em.do_em_forward_word)  # ⌥F
@@ -4722,7 +4723,7 @@ class TerminalNudgeIn(argparse.Namespace):
     # inside macOS Terminal > Preferences > Profiles
 
     UNICHARS_BY_OPTCHARS = {
-        "⌥%": "\uFB01",  # LatinSmallLigatureFI
+        "⌥%": "\uFB01",  # LatinSmallLigatureFI  # aka ⌥⇧%
         "⌥-": "\u2013",  # EnDash
         "⌥0": "\u00BA",  # MasculineOrdinalIndicator
         "⌥1": "\u00A1",  # InvertedExclamationMark
@@ -4734,8 +4735,8 @@ class TerminalNudgeIn(argparse.Namespace):
         "⌥7": "\u00B6",  # PilcrowSign
         "⌥8": "\u2022",  # Bullet [Pearl]
         "⌥9": "\u00AA",  # FeminineOrdinalIndicator
-        "⌥<": "\u00AF",  # Macron
-        "⌥>": "\u02D8",  # Breve
+        "⌥<": "\u00AF",  # Macron  # aka ⌥⇧<
+        "⌥>": "\u02D8",  # Breve  # aka ⌥⇧>
         "⌥B": "\u222B",  # Integral  # ⌥← comes in as Esc B
         "⌥D": "\u2202",  # PartialDifferential
         "⌥F": "\u0192",  # LatinSmallLetterFWithHook  # ⌥→ comes in as Esc F
@@ -7851,17 +7852,22 @@ _DOT_VIMRC_ = r"""
 " ~/.vimrc
 
 
+"
 " Lay out Spaces and Tabs
+"
+
 
 :set softtabstop=4 shiftwidth=4 expandtab
 autocmd FileType c,cpp   set softtabstop=8 shiftwidth=8 expandtab
 autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 
-:set background=light
 
-
+"
 " Configure Vim
+"
 
+
+:set background=light
 :syntax on
 
 :set ignorecase
@@ -7872,12 +7878,16 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 :highlight RedLight ctermbg=red
 :call matchadd('RedLight', '\s\+$')
 
-:set ruler  " not inferred from :set ttyfast at Mac
-:set showcmd  " not inferred from :set ttyfast at Linux or Mac
+:set ruler  " quirkily not inferred from :set ttyfast at Mac
+:set showcmd  " quirkily not inferred from :set ttyfast at Linux or Mac
 
 
+"
 " Add keys (without redefining keys)
-" n-nore-map = map Normal (non insert) Mode and don't recurse through other remaps
+"
+" N-NoRe-Map = Map only for Normal (View) Mode and don't Recurse through other maps
+"
+
 
 " Esc b  => macOS ⌥← Option Left-Arrow  => take as alias of ⇧B
 " Esc f  => macOS ⌥→ Option Right-Arrow  => take as alias of ⇧W
@@ -7885,27 +7895,27 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 :nnoremap <Esc>f W
 
 " \ Delay  => gracefully do nothing
-:nnoremap <Bslash> :<return>
+:nnoremap <BSlash> :<return>
 
 " \ Esc  => cancel the :set hlsearch highlighting of all search hits on screen
-:nnoremap <Bslash><Esc> :noh<return>
+:nnoremap <BSlash><Esc> :noh<return>
 
 " \ e  => reload, if no changes not-saved
-:nnoremap <Bslash>e :e<return>
+:nnoremap <BSlash>e :e<return>
 
 " \ i  => toggle ignoring case in searches, but depends on :set nosmartcase
-:nnoremap <Bslash>i :set invignorecase<return>
+:nnoremap <BSlash>i :set invignorecase<return>
 
 " \ m  => mouse moves cursor
 " \ M  => mouse selects zigzags of chars to copy-paste
-:nnoremap <Bslash>m :set mouse=a<return>
-:nnoremap <Bslash>M :set mouse=<return>
+:nnoremap <BSlash>m :set mouse=a<return>
+:nnoremap <BSlash>M :set mouse=<return>
 
 " \ n  => toggle line numbers
-:nnoremap <Bslash>n :set invnumber<return>
+:nnoremap <BSlash>n :set invnumber<return>
 
 " \ w  => delete the trailing whitespace from each line (not yet from file)
-:nnoremap <Bslash>w :call RStripEachLine()<return>
+:nnoremap <BSlash>w :call RStripEachLine()<return>
 function! RStripEachLine()
     let with_line = line(".")
     let with_col = col(".")
@@ -7924,6 +7934,15 @@ endfun
 :xmap <Esc>3 #
 
 
+"
+" Require ⌃V prefix to input some chars outside Basic Latin
+" so as to take macOS Terminal Option Key as meaning Vim ⌃O
+" despite macOS Terminal > Preferences > ... > Keyboard > Use Option as Meta Key = No
+"
+
+" ... redacted here to limit the character set of this source file ...
+
+
 " copied from:  git clone https://github.com/pelavarre/pybashish.git
 
 
@@ -7940,7 +7959,10 @@ _DOT_EMACS_ = r"""
 ; ~/.emacs
 
 
-;; Configure Emacs
+;
+; Configure Emacs
+;
+
 
 (setq-default indent-tabs-mode nil)  ; indent with Spaces not Tabs
 (setq-default tab-width 4)  ; count out columns of C-x TAB S-LEFT/S-RIGHT
@@ -7950,20 +7972,24 @@ _DOT_EMACS_ = r"""
 (column-number-mode)  ; show column number up from 0, not just line number up from 1
 
 
-;; Add keys (without redefining keys)
-;; (as dry run by M-x execute-extended-command, M-: eval-expression)
+;
+; Add keys (without redefining keys)
+; (as dry run by M-x execute-extended-command, M-: eval-expression)
+;
+
 
 (global-set-key (kbd "C-c %") 'query-replace-regexp)  ; for when C-M-% unavailable
 (global-set-key (kbd "C-c -") 'undo)  ; for when C-- alias of C-_ unavailable
 (global-set-key (kbd "C-c O") 'overwrite-mode)  ; aka toggle Insert
 (global-set-key (kbd "C-c b") 'ibuffer)  ; for ? m Q I O multi-buffer replace
 (global-set-key (kbd "C-c m") 'xterm-mouse-mode)  ; toggle between move and select
-(global-set-key (kbd "C-c n") 'display-line-numbers-mode)  ; toggle line numbers
 (global-set-key (kbd "C-c o") 'occur)
 (global-set-key (kbd "C-c r") 'revert-buffer)
 (global-set-key (kbd "C-c s") 'superword-mode)  ; toggle accelerate of M-f M-b
 (global-set-key (kbd "C-c w") 'whitespace-cleanup)
 
+(setq linum-format "%2d ")
+(global-set-key (kbd "C-c n") 'linum-mode)  ; toggle line numbers
 (when (fboundp 'display-line-numbers-mode)
     (global-set-key (kbd "C-c n") 'display-line-numbers-mode))
 
@@ -7983,7 +8009,32 @@ _DOT_EMACS_ = r"""
     )
 
 
-; see more lines at:  git clone https://github.com/pelavarre/pybashish.git
+;
+; Doc how to turn off enough of macOS Terminal to run Emacs well
+;
+
+; Press Esc to mean Meta, or run Emacs Py in place of Emacs, or else
+;   macOS Terminal > Preferences > Profiles > Keyboard > Use Option as Meta Key
+
+; Press ⌃⇧2 or ⌃Space and hope ⌃H K says it comes out as C-@ or C-SPC
+;   to mean 'set-mark-command, even though older macOS needed you to turn off
+;   System Preferences > Keyboard > Input Sources >
+;   Shortcuts > Select The Previous Input Source  ⌃Space
+
+; Except don't work so hard if you have the following in place to keep this easy =>
+
+
+;
+; Require ⌃Q prefix to input some chars outside Basic Latin
+; so as to take macOS Terminal Option Key as meaning Emacs Meta anyhow
+; despite macOS Terminal > Preferences > ... > Keyboard > Use Option as Meta Key = No
+;
+
+
+; ... redacted here to limit the character set of this source file ...
+
+
+; copied from:  git clone https://github.com/pelavarre/pybashish.git
 
 
 """
@@ -8402,7 +8453,7 @@ def sys_argv_pick_verb():
 # TODO: something akin to Vim :set cursorline, :set nocursorline
 # TODO: Vim ⇧V ⇧V to highlight the Line at the Cursor
 # TODO: Vim ⌃V for feeding into :!|pbcopy
-# TODO: Vim ! default into :!|pbcopy
+# TODO: Vim ⇧! default into :!|pbcopy
 # TODO: look back over keyboard timeline to guess initial shape of a stroke like ⌃V
 
 
