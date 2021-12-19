@@ -19,12 +19,13 @@
 (global-set-key (kbd "C-c O") 'overwrite-mode)  ; aka toggle Insert
 (global-set-key (kbd "C-c b") 'ibuffer)  ; for ? m Q I O multi-buffer replace
 (global-set-key (kbd "C-c m") 'xterm-mouse-mode)  ; toggle between move and select
-(global-set-key (kbd "C-c n") 'display-line-numbers-mode)  ; toggle line numbers
 (global-set-key (kbd "C-c o") 'occur)
 (global-set-key (kbd "C-c r") 'revert-buffer)
 (global-set-key (kbd "C-c s") 'superword-mode)  ; toggle accelerate of M-f M-b
 (global-set-key (kbd "C-c w") 'whitespace-cleanup)
 
+(setq linum-format "%2d ")
+(global-set-key (kbd "C-c n") 'linum-mode)  ; toggle line numbers
 (when (fboundp 'display-line-numbers-mode)
     (global-set-key (kbd "C-c n") 'display-line-numbers-mode))
 
