@@ -24,14 +24,13 @@ quirks:
   loses input at crashes, and input of C0 Control bytes, except after ⌃V
 
 keyboard cheat sheet:
-  ⇧Z⇧Q ⇧Z⇧Z  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M  ⌃C Esc  => how to quit Vi Py
-  Down Up Right Left Space Delete Return  => conventional enough
-  0 ^ $ Fx Tx ⇧Fx ⇧Tx ; , | H L  => leap to column
-  B E W ⇧B ⇧E ⇧W { }  => leap across small word, large word, paragraph
-  ⇧G 1⇧G ⇧H ⇧L ⇧M - + _ ⌃J ⌃N ⌃P J K  => leap to screen row, leap to line
+  ⇧Z⇧Q ⇧Z⇧Z  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M  ⌃C Esc ⌃G  => how to quit & show version
+  $ ^ 0 Fx Tx ⇧Fx ⇧Tx ; , | H L  => leap to column
+  W E B ⇧W ⇧E ⇧B ⌥→ ⌥← } {  => leap across small/ large words, paragraphs
+  ⇧G 1⇧G ⇧L ⇧M ⇧H + _ - ⌃J ⌃N ⌃P J K  => leap to line, screen row
   1234567890 ⌃C Esc  => repeat, or don't
-  ⌃F ⌃B ⌃E ⌃Y ZB ZT Z. 99Z.  => scroll screen
-  ⌃L 999⌃L ⌃G  => clear lag, inject lag, measure lag and show version
+  ⌃F ⌃B ⌃E ⌃Y ZT Z. ZB  99Z.  => scroll screen
+  ⌃L 999⌃L  => clear lag, inject lag, measure lag
   \N \I \⇧F ⌃C Esc ⌃G  => toggle line numbers, search case/ regex, show hits
   /... Delete ⌃U ⌃C Return  ?...   * £ # N ⇧N  => search ahead, behind, next
   /Return ?Return :g/Return  => search ahead, behind, lots
@@ -49,8 +48,8 @@ pipe tests of ⇧Z⇧Q vs ⇧Z⇧Z:
   cat bin/vi.py |bin/vi.py |grep import  # pipe filter
 
 how to get Vi Py:
-  R=pelavarre/pybashish/master/bin/vi.py
-  curl -sSO --location https://raw.githubusercontent.com/$R
+  R=pelavarre/pybashish/pelavarre-patch-1/bin/vi,py
+  echo curl -sSO https=//raw,githubusercontent,com/$R |tr ,= .: |bash
   python3 vi.py vi.py  # with updates at:  python3 vi.py --pwnme
   /egg
 """
@@ -127,25 +126,26 @@ quirks:
   loses input at crashes, and input outside Basic Latin bytes, except after ⌃Q
 
 keyboard cheat sheet:
-  ⌃X⌃S⌃X⌃C  ⌃X⌃C  ⌃Zfg  ⌃G  => how to quit Em Py
-  Down Up Right Left Space Delete  => conventional enough
-  ⌃E ⌃A ⌃F ⌃B ⌥M ⌃U⌥GTab  => leap to column
-  ⌃N ⌃P ⌥R⌥R⌥R ⌥< ⌥> ⌥9⌥9⌥G⌥G ⌃L⌃L⌃L ⌃U⌃L  => leap to line, scroll screen
+  ⌃X⌃S⌃X⌃C  ⌃X⌃C  ⌃Zfg  ⌃G  => how to quit & show version
+  ⌃E ⌥M ⌃A ⌃U⌥GTab ⌃F ⌃B  => leap to column
+  ⌥← ⌥→  => leap across words
+  ⌥> ⌥< ⌃N ⌃P ⌥G⌥G ⌃U99⌥G⌥G ⌥R⌥R⌥R  => leap to line, screen row
   ⌃U ⌃U -0123456789 ⌃U ⌥-⌥0..⌥9 ⌃G  => repeat, or don't
-  ⌃Q  => take ⌃ and ⌥ as input, not as command
-  ⌃D ⌃K  => cut chars or lines
+  ⌃L⌃L⌃L ⌃U⌃L  => scroll screen
+  ⌃CN ⌃Q  => toggle line numbers, insert ⌥ and ⌃ chars
+  ⌃D ⌃K  => cut chars of lines, join lines
 
 keyboard easter eggs:
-  ⌃Q⌃J  ⌃G ⌃U123⌃G  ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C  ⌃U-0 ⌃U07 ⌃U9⌃Z
-  ⌃XC ⌃CX ⌃C⌃X ⌥>⌃V⌃V⌃V ⌥<⌥V ⌃CN⌥9⌥9⌥G⌥G⌃L⌃L⌃L⌃U1⌥V
+  ⌃Q⌃J  ⌃G⌃G ⌃U123⌃G  PQQ⇧P⌃A⌥Z⇧P  ⌃U-0 ⌃U07 ⌃U9⌃Z
+  ⌃XC ⌃CX ⌃C⌃X ⌥>⌃V⌃V⌃V ⌥<⌥V ⌃X⌃G⌃X⌃C ⌃U⌃X⌃C ⌃U512⌃X⌃C
 
 pipe tests:
   ls |bin/em.py -  # pipe drain
   cat bin/em.py |bin/em.py |grep import  # pipe filter
 
 how to get Em Py:
-  R=pelavarre/pybashish/master/bin/vi.py
-  curl -sSO --location https://raw.githubusercontent.com/$R
+  R=pelavarre/pybashish/pelavarre-patch-1/bin/vi,py
+  echo curl -sSO https=//raw,githubusercontent,com/$R |tr ,= .: |bash
   echo cp -ip vi_py em_py |tr _ . |bash
   python3 em.py em.py  # with updates at:  python3 em.py --pwnme
   ⌃Segg
@@ -1037,6 +1037,7 @@ class TerminalVi:
         self.say_more(count)
 
         # Vim ⌃G Quirk doesn't turn Search highlights back on, Vi Py ⌃G does
+        # TODO: Think more deeply into Vi Py ⌃C Esc vs Vi Py ⌃G
 
     def say_more(self, count=0):
         """Reply once with some details often left unmentioned"""
@@ -1147,7 +1148,7 @@ class TerminalVi:
             self.suggest_quit_vi("Press ⇧Z⇧Q to lose changes")  # ⌃C Egg
 
     def suggest_quit_vi(self, how):
-        """Print how to Quit Vi Py"""
+        """Print how to Quit Em Py or Vi Py, etc"""
 
         version = module_file_version_zero()
 
@@ -3456,6 +3457,10 @@ class TerminalKeyboard:
         return chords_set
 
 
+class ViPyNameError(NameError):
+    """Signal trouble like a NameError but mention the Vi Py keymap"""
+
+
 class TerminalKeyboardVi(TerminalKeyboard):
     """Map Keyboard Inputs to Code, for when feeling like Vi"""
 
@@ -4526,6 +4531,10 @@ class TerminalEm:
         """Take an ELisp command line to run"""
 
         raise NotImplementedError()  # TODO: code up ⌥X 'execute_extended_command'
+
+
+class EmPyNameError(NameError):
+    """Signal trouble like a NameError but mention the Em Py keymap"""
 
 
 class TerminalKeyboardEm(TerminalKeyboard):
@@ -6214,7 +6223,10 @@ class TerminalEditor:
         nudge = TerminalNudgeIn(self.skin.nudge)
         nudge.prefix = None
 
-        raise NameError()
+        if wearing_em():
+            raise EmPyNameError()
+
+        raise ViPyNameError()
 
     def do_redraw(self):  # Vim ⌃L
         """Toggle between more and less Lag"""
