@@ -32,7 +32,7 @@ keyboard cheat sheet:
   1234567890 ⌃C Esc  => repeat, or don't
   ⌃F ⌃B ⌃E ⌃Y ZT Z. ZB  99Z.  => scroll screen
   \N \I \⇧F ⌃C Esc ⌃G  => toggle line numbers, search case/ regex, show hits
-  /... Delete ⌃U ⌃C Return  ?...   * £ # N ⇧N  => search ahead, behind, next
+  /... Delete ⌃U ⌃C Return  ?...   * # N ⇧N  => search ahead, behind, next
   /Return ?Return :g/Return  => search ahead, behind, lots
   ⌃L 999⌃L  ⌥EE ⇧⌥E⇧⌥E  ⌥NN ⇧⌥N⇧⌥N  => clear/ inject lag, escape mac einu accent
   Rx A I O ⇧R ⇧A ⇧I ⇧O ⌃V ⌃O ⌃C Esc  => replace, insert, & view, once or awhile
@@ -962,6 +962,44 @@ class TerminalVi:
 
         return evalled
 
+    def vi_get_arg0_digit(self):
+        """Pick out which Decimal Digit called this Code"""
+
+        editor = self.editor
+        chars = editor.get_arg0_chars()
+
+        #
+
+        esc_chars = r"\e0 \e1 \e2 \e3 \e4 \e5 \e6 \e7 \e8 \e9".replace(r"\e", "\x1B")
+        esc_digits = esc_chars.split()
+
+        optdigits = "⌥0 ⌥1 ⌥2 ⌥3 ⌥4 ⌥5 ⌥6 ⌥7 ⌥8 ⌥9".split()
+
+        #
+
+        optchars = chars
+
+        if chars not in esc_digits:
+            if chars not in optdigits:
+
+                optchars = None
+
+                items = TerminalNudgeIn.UNICHARS_BY_OPTCHARS.items()
+                for (key, unichars) in items:
+                    if chars == unichars:
+
+                        optchars = key
+
+                        break
+
+                assert optchars in optdigits, (chars, optchars)
+
+        str_digit = optchars[-1]
+
+        assert str_digit in "0123456789", (chars, optchars)
+
+        return str_digit
+
     def do_vi_c0_control_syn(self):  # Vim ⌃V during ⇧R ⇧A ⇧I ⇧O A I O
         """Define ⌃V during ⇧R ⇧A ⇧I ⇧O A I O, but not yet otherwise"""
 
@@ -1601,7 +1639,7 @@ class TerminalVi:
 
         if not editor.skin.doing_done:
             if self.slip_find_fetch_vi_this(slip=+1) is None:
-                self.vi_print("Press * # £ only when Not on a blank line")  # * Egg
+                self.vi_print("Press * # only when Not on a blank line")  # * Egg
 
                 return
 
@@ -1614,7 +1652,7 @@ class TerminalVi:
         # Vi Py "*" echoes its Search Key as Status, at *, at /Up, at :g/Up, etc
         # Vim "*" Quirk echoes its Search Key as Status, only if ahead on same screen
 
-    def do_find_behind_vi_this(self):  # Vim ⇧#, Vim ⇧£
+    def do_find_behind_vi_this(self):  # Vim ⇧#
         """Take a Search Key from this Line, and then look behind for it"""
 
         editor = self.editor
@@ -1623,8 +1661,8 @@ class TerminalVi:
         # Take up a new Search Key
 
         if not editor.skin.doing_done:
-            if self.slip_find_fetch_vi_this(slip=-1) is None:  # # Egg, £ Egg
-                self.vi_print("Press # £ * only when Not on a blank line")
+            if self.slip_find_fetch_vi_this(slip=-1) is None:  # # Egg
+                self.vi_print("Press # * only when Not on a blank line")
 
                 return
 
@@ -1842,9 +1880,9 @@ class TerminalVi:
 
             if not editor.finding_line:  # Vim Return  # /Return Egg, ?Return Egg
                 if slip < 0:  # ?Return Egg
-                    self.vi_print("Press one of ? / # £ * to enter a Search Key")
+                    self.vi_print("Press one of ? / # * to enter a Search Key")
                 else:  # /Return Egg
-                    self.vi_print("Press one of / ? * # £ to enter a Search Key")
+                    self.vi_print("Press one of / ? * # to enter a Search Key")
 
                 return False
 
@@ -1891,7 +1929,7 @@ class TerminalVi:
         # Take up an old Search Key
 
         if editor.finding_line is None:
-            self.vi_print("Press one of ? / # £ * to enter a Search Key")  # N Egg
+            self.vi_print("Press one of ? / # * to enter a Search Key")  # N Egg
 
             return
 
@@ -1916,7 +1954,7 @@ class TerminalVi:
         # Take up an old Search Key
 
         if editor.finding_line is None:
-            self.vi_print("Press one of / ? * # £ to enter a Search Key")  # n Egg
+            self.vi_print("Press one of / ? * # to enter a Search Key")  # n Egg
 
             return
 
@@ -1961,14 +1999,17 @@ class TerminalVi:
         # Vim ⌃O Quirk past a Line of 1 Dented Char snaps back after _ but not after ^
         # Vi Py could, and does Not, repro this Quirk
 
-    def do_slip_first(self):  # Vim 0
+    def do_slip_first(self):  # Vim 0  # Vim ⌥0
         """Leap to the first Column in Row"""
 
         editor = self.editor
+        if editor.skin.arg1 is None:
 
-        assert editor.skin.arg1 is None  # require no Digits before Vi Py 0 runs here
+            editor.column = 0
 
-        editor.column = 0
+        else:
+
+            self.do_vi_digit_argument()
 
     def do_slip_left(self):  # Vim H, ← Left-Arrow
         """Slip left one Column or more"""
@@ -3032,7 +3073,7 @@ class TerminalVi:
         self.vi_print("Press Esc to quit, else type chars to insert")
         skin.cursor_style = _INSERT_CURSOR_STYLE_
 
-        chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN]) | set(["£".encode()])
+        chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
         keyboard.intake_chords_set = chords_set
 
         keyboard.intake_func = self.do_insert_per_chord
@@ -3056,7 +3097,7 @@ class TerminalVi:
         self.vi_print("Press Esc to quit, else type chars to write over")
         skin.cursor_style = _REPLACE_CURSOR_STYLE_
 
-        chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN]) | set(["£".encode()])
+        chords_set = set(BASIC_LATIN_STDINS) | set([CR_STDIN])
         keyboard.intake_chords_set = chords_set
 
         keyboard.intake_func = self.do_replace_per_chord
@@ -3089,6 +3130,30 @@ class TerminalVi:
             self.do_take_one_bypass()
         else:
             editor.do_raise_name_error()
+
+    def do_vi_digit_argument(self):  # Vim ⌥0, ⌥1, ⌥2, ⌥3, ⌥4, ⌥5, ⌥6, ⌥7, ⌥8, ⌥9
+        """Mostly work like 0, 1, 2, 3, 4, 5, 6, 7, 8, 9"""
+
+        editor = self.editor
+        skin = editor.skin
+
+        arg1 = skin.arg1
+        chord_ints_ahead = skin.chord_ints_ahead
+
+        # FIXME: explain, and discuss re-entry into 'def do_take_one_bypass'  : -)
+
+        self.do_take_one_bypass()
+
+        # FIXME: explain
+
+        str_digit = self.vi_get_arg0_digit()
+
+        if arg1 is None:
+            chars_ahead = str_digit
+        else:
+            chars_ahead = str(arg1) + str_digit
+
+        chord_ints_ahead[::] = chord_ints_ahead + list(chars_ahead.encode())
 
     def do_take_one_bypass(self):  # Vim ⌃O during ⇧R ⇧A ⇧I ⇧O A I O
         """Pause taking keyboard Input Chords to mean replace/ insert Chars"""
@@ -3617,7 +3682,6 @@ class TerminalKeyboardVi(TerminalKeyboard):
         funcs[b"\x1A"] = vi.do_vi_suspend_frame  # SUB, ⌃Z, 26
 
         funcs[b"\x1B"] = vi.do_vi_c0_control_esc  # ESC, ⌃[, 27
-        # TODO: corrections_by_chords[b"\x1B3"] = b"#"
 
         funcs[b"\x1B[A"] = vi.do_step_up_seek  # ↑ Up-Arrow
         funcs[b"\x1B[B"] = vi.do_step_down_seek  # ↓ Down-Arrow
@@ -3654,6 +3718,15 @@ class TerminalKeyboardVi(TerminalKeyboard):
         funcs[b"/"] = vi.do_find_ahead_vi_line
 
         funcs[b"0"] = vi.do_slip_first
+        funcs[b"1"] = vi.do_vi_digit_argument
+        funcs[b"2"] = vi.do_vi_digit_argument
+        funcs[b"3"] = vi.do_vi_digit_argument
+        funcs[b"4"] = vi.do_vi_digit_argument
+        funcs[b"5"] = vi.do_vi_digit_argument
+        funcs[b"6"] = vi.do_vi_digit_argument
+        funcs[b"7"] = vi.do_vi_digit_argument
+        funcs[b"8"] = vi.do_vi_digit_argument
+        funcs[b"9"] = vi.do_vi_digit_argument
 
         self._init_corrector(b":/", corrections=b"/")
         self._init_corrector(b":?", corrections=b"?")
@@ -3717,6 +3790,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # funcs[b"Y"] = vi.do_copy_row
 
         self._init_func(b"ZQ", func=vi.do_quit_vi)
+        self._init_func(b"ZZ", func=vi.do_flush_quit_vi)
         self._init_func(b"Zq", func=vi.do_talk_of_shift_z_shift_q)
         self._init_func(b"Zz", func=vi.do_talk_of_shift_z_shift_z)
 
@@ -3782,18 +3856,16 @@ class TerminalKeyboardVi(TerminalKeyboard):
         funcs[b"}"] = vi.do_paragraph_ahead
         # funcs[b"~"] = vi.do_flip_char_case
 
-        # Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
-
-        funcs["£".encode()] = vi.do_find_behind_vi_this
-
         # Define Vi Py Esc Keyboard Input Chords, other than ⌥E ⌥I ⌥N ⌥U,
         # found at Keyboard > Use Option as Meta Key = No
         # inside macOS Terminal > Preferences > Profiles
 
         vi_optchars_list = r"""
+            ⇧⌥Z⇧⌥Q ⇧⌥Z⇧⌥Z ⇧⌥QVI⌃M
             ⇧⌥$ ⇧⌥^ ⌥0 ⌥F ⇧⌥F ⌥T ⇧⌥T ⌥; ⌥, ⇧⌥| ⌥H ⌥L
             ⌥W ⌥EE ⌥B ⇧⌥W ⇧⌥E⇧⌥E ⇧⌥B ⇧⌥} ⇧⌥{
             ⇧⌥G ⇧⌥L ⇧⌥M ⇧⌥H ⇧⌥+ ⇧⌥_ ⌥- ⌥J ⌥K
+            ⌥1 ⌥2 ⌥3 ⌥4 ⌥5 ⌥6 ⌥7 ⌥8 ⌥9
             ⌥ZT ⌥ZB ⌥Z.
             ⌥\I ⌥\N ⌥\⇧F
             ⌥/ ⇧⌥? ⇧⌥* ⇧⌥# ⌥NN ⇧⌥N⇧⌥N
@@ -3804,16 +3876,27 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # ⌥→ ⌥← not solved here
 
         for optchars in vi_optchars_list:
-            assert optchars.startswith("⌥") or optchars.startswith("⇧⌥")
+
+            kind0 = optchars.startswith("⌥")
+            kind1 = optchars.startswith("⇧⌥"), repr(optchars)
+            kind2 = optchars == "⇧⌥QVI⌃M"
+
+            assert kind0 or kind1 or kind2
 
         for optchars in vi_optchars_list:
             unichars = TerminalNudgeIn.UNICHARS_BY_OPTCHARS[optchars]
 
-            optchords = self.to_optchords(optchars)
-            assert optchords[:1] == b"\x1B", repr(optchords)  # ESC, ⌃[, 27
-            alt_optchords = optchords.replace(b"\x1B", b"")
-            if alt_optchords in (b"ee", b"EE", b"ii", b"II", b"nn", b"NN"):
-                alt_optchords = alt_optchords[-1:]  # TODO:  b"uu", b"UU"
+            if optchars == "⇧⌥QVI⌃M":
+
+                alt_optchords = b"Qvi\r"
+
+            else:
+
+                optchords = self.to_optchords(optchars)
+                assert optchords[:1] == b"\x1B", repr(optchords)  # ESC, ⌃[, 27
+                alt_optchords = optchords.replace(b"\x1B", b"")
+                if alt_optchords in (b"ee", b"EE", b"ii", b"II", b"nn", b"NN"):
+                    alt_optchords = alt_optchords[-1:]  # TODO:  b"uu", b"UU"
 
             self.init_unichars_func(unichars, optchords=alt_optchords)
 
@@ -3899,10 +3982,7 @@ class TerminalEx:
         editor = self.editor
         chars = editor.get_arg0_chars()
 
-        if chars == "£":  # TODO: accept U00A3 PoundSign into Search Keys
-            self.ex_line += "#"  # a la Vim :abbrev £ #
-        else:
-            self.ex_line += chars
+        self.ex_line += chars
 
     def do_undo_append_char(self):
         """Undo the last Append Char, else Quit Ex"""
@@ -3984,8 +4064,6 @@ class TerminalKeyboardEx(TerminalKeyboard):
 
         for chords in BASIC_LATIN_STDINS:
             funcs[chords] = ex.do_append_char
-
-        funcs["£".encode()] = ex.do_append_char
 
         # TODO: input Search Keys containing more than BASIC_LATIN_STDINS and #
         # TODO: Define Chords beyond the C0_CONTROL_STDINS and BASIC_LATIN_STDINS
@@ -4168,43 +4246,16 @@ class TerminalEm:
     def do_em_digit_argument(self):  # Emacs ⌥0, ⌥1, ⌥2, ⌥3, ⌥4, ⌥5, ⌥6, ⌥7, ⌥8, ⌥9
         """Mostly work like ⌃U 0, 1, 2, 3, 4, 5, 6, 7, 8, 9"""
 
-        editor = self.vi.editor
-        skin = self.vi.editor.skin
+        vi = self.vi
+        editor = vi.editor
+        skin = editor.skin
+
         arg1 = skin.arg1
-
-        chars = editor.get_arg0_chars()
-
-        #
-
-        esc_chars = r"\e0 \e1 \e2 \e3 \e4 \e5 \e6 \e7 \e8 \e9".replace(r"\e", "\x1B")
-        esc_digits = esc_chars.split()
-
-        optdigits = "⌥0 ⌥1 ⌥2 ⌥3 ⌥4 ⌥5 ⌥6 ⌥7 ⌥8 ⌥9".split()
+        chord_ints_ahead = skin.chord_ints_ahead
 
         #
 
-        optchars = chars
-
-        if chars not in esc_digits:
-            if chars not in optdigits:
-
-                optchars = None
-
-                items = TerminalNudgeIn.UNICHARS_BY_OPTCHARS.items()
-                for (key, unichars) in items:
-                    if chars == unichars:
-
-                        optchars = key
-
-                        break
-
-                assert optchars in optdigits, (chars, optchars)
-
-        str_digit = optchars[-1]
-
-        assert str_digit in "0123456789", (chars, optchars)
-
-        #
+        str_digit = vi.vi_get_arg0_digit()
 
         chars_ahead = "\x15"  # NAK, ⌃U, 21
         if arg1 is None:
@@ -4212,7 +4263,7 @@ class TerminalEm:
         else:
             chars_ahead += str(arg1) + str_digit
 
-        skin.chord_ints_ahead = list(chars_ahead.encode())
+        chord_ints_ahead[::] = chord_ints_ahead + list(chars_ahead.encode())
 
     def do_em_quoted_insert(self):  # Emacs ⌃Q
         """Take the next Input Keyboard Chord to replace or insert, not as Control"""
@@ -4830,8 +4881,8 @@ class TerminalNudgeIn(argparse.Namespace):
         "⌥/": "\u00F7",  # DivisionSign
         "⌥0": "\u00BA",  # MasculineOrdinalIndicator
         "⌥1": "\u00A1",  # InvertedExclamationMark
-        "⌥2": "\u20AC",  # EuroSign
-        "⌥3": "\u00A3",  # PoundSign
+        "⌥2": "\u2122",  # TradeMarkSign  # ⌥2 at UK Keyboard is \20AC EuroSign
+        "⌥3": "\u00A3",  # PoundSign  # ⌥3 at UK Keyboard is \0023 NumberSign
         "⌥4": "\u00A2",  # CentSign
         "⌥5": "\u221E",  # Infinity
         "⌥6": "\u00A7",  # SectionSign
@@ -4872,7 +4923,6 @@ class TerminalNudgeIn(argparse.Namespace):
         "⌥ZT": "\u03A9t",  # GreekCapitalLetterOmega T
         r"⌥\I": "\u00ABi",  # LeftPointingDoubleAngleQuotationMark I
         r"⌥\N": "\u00ABn",  # LeftPointingDoubleAngleQuotationMark N
-        "⌥\\": "\u00AB",  # LeftPointingDoubleAngleQuotationMark
         r"⌥\⇧F": "\u00ABF",  # LeftPointingDoubleAngleQuotationMark ⇧F
         "⇧⌥^": "\uFB02",  # LatinSmallLigatureFL
         "⇧⌥_": "\u2014",  # EmDash
@@ -4890,6 +4940,7 @@ class TerminalNudgeIn(argparse.Namespace):
         "⇧⌥I⇧⌥I": "\u02C6",  # ModifierLetterCircumflexAccent
         "⇧⌥J": "\u00D4",  # LatinCapitalLetterOWithCircumflex
         "⇧⌥L": "\u00D2",  # LatinCapitalLetterOWithGrave
+        "⇧⌥QVI⌃M": "\u0152vi\r",  # LatinCapitalLigatureOE V I Return
         "⇧⌥M": "\u00C2",  # LatinCapitalLetterAWithCircumflex
         "⇧⌥N⇧⌥N": "\u02DC",  # SmallTilde
         "⇧⌥O": "\u00D8",  # LatinCapitalLetterOWithStroke
@@ -4898,6 +4949,8 @@ class TerminalNudgeIn(argparse.Namespace):
         "⇧⌥T": "\u02C7",  # Caron
         "⇧⌥W": "\u201E",  # DoubleLow9QuotationMark
         "⇧⌥X": "\u02DB",  # Ogonek
+        "⇧⌥Z⇧⌥Q": "\u00B8\u0152",  # Cedilla LatinCapitalLigatureOE
+        "⇧⌥Z⇧⌥Z": "\u00B8\u00B8",  # 2x Cedilla
     }
 
     # FIXME: macOS Option keys outside Basic Latin for Vi Py  # ⌥C ⌥D 1234567890
