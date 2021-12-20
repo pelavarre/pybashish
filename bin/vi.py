@@ -3585,6 +3585,12 @@ class TerminalKeyboard:
 
             opttail = optchars[2:]
 
+        elif optchars.startswith("⇧⌥:"):
+
+            optchords = b":" + optchars[len("⇧⌥:") :].replace("⇧", "").encode()
+
+            return optchords  # TODO: make this less ugly
+
         else:
             assert optchars.startswith("⇧⌥")
 
@@ -3730,8 +3736,9 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         self._init_corrector(b":/", corrections=b"/")
         self._init_corrector(b":?", corrections=b"?")
+        # FIXME: Solve Vi Py ⌥⇧:/ ⌥⇧:?
 
-        self._init_func(b":em\r", func=vi.do_resume_vi)
+        # self._init_func(b":em\r", func=em.do_resume_em)
         # self._init_func(b":g?", func=vi.do_find_leading_vi_lines)
         self._init_func(b":g/", func=vi.do_find_trailing_vi_lines)
         self._init_func(b":n!\r", func=vi.do_next_vi_file)
@@ -3818,6 +3825,7 @@ class TerminalKeyboardVi(TerminalKeyboard):
         self._init_corrector(b"g/", corrections=b":g/")
         self._init_corrector(b"g?", corrections=b":g?")
         # TODO: stop commandeering the personal g/ g? Chord Sequences
+        # FIXME: Solve Vi Py ⌥⇧:g/ ⌥⇧:g⇧?
 
         # funcs[b"g"]
         funcs[b"h"] = vi.do_slip_left
@@ -3862,6 +3870,8 @@ class TerminalKeyboardVi(TerminalKeyboard):
 
         vi_optchars_list = r"""
             ⇧⌥Z⇧⌥Q ⇧⌥Z⇧⌥Z ⇧⌥QVI⌃M
+            ⇧⌥:g/ ⇧⌥:n⇧!⌃M ⇧⌥:n⌃M ⇧⌥:q⇧!⌃M ⇧⌥:q⌃M ⇧⌥:vi⌃M
+            ⇧⌥:w⇧!⌃M ⇧⌥:w⌃M ⇧⌥:wn⇧!⌃M ⇧⌥:wn⌃M ⇧⌥:wq⇧!⌃M ⇧⌥:wq⌃M
             ⇧⌥$ ⇧⌥^ ⌥0 ⌥F ⇧⌥F ⌥T ⇧⌥T ⌥; ⌥, ⇧⌥| ⌥H ⌥L
             ⌥W ⌥EE ⌥B ⇧⌥W ⇧⌥E⇧⌥E ⇧⌥B ⇧⌥} ⇧⌥{
             ⇧⌥G ⇧⌥L ⇧⌥M ⇧⌥H ⇧⌥+ ⇧⌥_ ⌥- ⌥J ⌥K
@@ -3889,6 +3899,15 @@ class TerminalKeyboardVi(TerminalKeyboard):
             if optchars == "⇧⌥QVI⌃M":
 
                 alt_optchords = b"Qvi\r"
+
+            elif optchars.startswith("⇧⌥:"):
+
+                alt_optchars = optchars
+                alt_optchars = alt_optchars[len("⇧⌥") :]  # keep only the ":"
+                alt_optchars = alt_optchars.replace("⇧", "")
+                alt_optchars = alt_optchars.replace("⌃M", "\r")
+
+                alt_optchords = alt_optchars.encode()
 
             else:
 
@@ -4831,7 +4850,10 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self._init_func(b"\x1Bm", em.do_em_back_to_indentation)  # ⌥M
         self._init_func(b"\x1Br", em.do_em_move_to_window_line_top_bottom)  # ⌥R
         self._init_func(b"\x1Bv", em.do_em_scroll_down_command)  # ⌥V
+
         self._init_func(b"\x1Bx", em.do_em_execute_extended_command)  # ⌥X
+        # self._init_func(b"\x1Bxvi\r", vi.do_vi_resume_vi)  # ⌥X
+
         self._init_suffix_func(b"\x1Bz", em.do_em_zap_to_char)  # ⌥Z
         self._init_func(b"\x1B|", em.do_em_shell_command_on_region)  # ⇧⌥|
 
@@ -4890,6 +4912,19 @@ class TerminalNudgeIn(argparse.Namespace):
         "⌥8": "\u2022",  # Bullet [Pearl]
         "⌥9": "\u00AA",  # FeminineOrdinalIndicator
         "⌥;": "\u2026",  # HorizontalEllipsis
+        "⇧⌥:": "\u00DA",  # LatinCapitalLetterAWithAcute
+        "⇧⌥:g/": "\u00DAg/",  # LatinCapitalLetterAWithAcute : ...
+        "⇧⌥:n⇧!⌃M": "\u00DAn!\r",
+        "⇧⌥:n⌃M": "\u00DAn\r",
+        "⇧⌥:q⇧!⌃M": "\u00DAq!\r",
+        "⇧⌥:q⌃M": "\u00DAq\r",
+        "⇧⌥:vi⌃M": "\u00DAvi\r",
+        "⇧⌥:w⇧!⌃M": "\u00DAw!\r",
+        "⇧⌥:w⌃M": "\u00DAw\r",
+        "⇧⌥:wn⇧!⌃M": "\u00DAwn!\r",
+        "⇧⌥:wn⌃M": "\u00DAwn\r",
+        "⇧⌥:wq⇧!⌃M": "\u00DAwq!\r",
+        "⇧⌥:wq⌃M": "\u00DAwq\r",
         "⇧⌥<": "\u00AF",  # Macron
         "⇧⌥>": "\u02D8",  # Breve
         "⇧⌥?": "\u00BF",  # InvertedQuestionMark
@@ -8140,15 +8175,16 @@ function! RStripEachLine()
     call cursor(with_line, with_col)
 endfun
 
-" accept Option+3 from US Keyboards as meaning '#' \u0023 Hash Sign
-
-:cmap <Esc>3 #
-:imap <Esc>3 #
-:nmap <Esc>3 #
-:omap <Esc>3 #
-:smap <Esc>3 #
-:vmap <Esc>3 #
-:xmap <Esc>3 #
+""' commented out for now
+"" accept Option+3 from US Keyboards as meaning '#' \u0023 Hash Sign
+"
+":cmap <Esc>3 #
+":imap <Esc>3 #
+":nmap <Esc>3 #
+":omap <Esc>3 #
+":smap <Esc>3 #
+":vmap <Esc>3 #
+":xmap <Esc>3 #
 
 
 "
@@ -8156,6 +8192,7 @@ endfun
 " so as to take macOS Terminal Option Key as meaning Vim ⌃O
 " despite macOS Terminal > Preferences > ... > Keyboard > Use Option as Meta Key = No
 "
+
 
 " ... redacted here to limit the character set of this source file ...
 
