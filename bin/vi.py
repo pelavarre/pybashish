@@ -26,7 +26,7 @@ quirks:
 
 keyboard cheat sheet:
   ⇧Z⇧Q ⇧Z⇧Z  ⌃Zfg  :q!⌃M :n!⌃M :w!⌃M  ⌃C Esc ⌃G  => how to quit & show version
-  ⇧$ ⇧^ 0 Fx Tx ⇧Fx ⇧Tx ; , | H L  => leap to column
+  ⇧$ ⇧^ 0 Fx Tx ⇧Fx ⇧Tx ; , ⇧| H L  => leap to column
   W E B ⇧W ⇧E ⇧B ⌥→ ⌥← ⇧} ⇧{  => leap across small/ large words, paragraphs
   ⇧G 1⇧G ⇧L ⇧M ⇧H ⇧+ ⇧_ - ⌃J ⌃N ⌃P J K  => leap to line, screen row
   1234567890 ⌃C Esc  => repeat, or don't
@@ -1249,8 +1249,6 @@ class TerminalVi:
         after_cut = self.after_cut
         editor = self.editor
 
-        keyboard = editor.skin.keyboard
-
         self.check_vi_count()  # TODO: multiply Repeat Count into movement
 
         # Escape recursion of Vim C inside Vim C
@@ -1285,8 +1283,6 @@ class TerminalVi:
 
         after_cut = self.after_cut
         editor = self.editor
-
-        keyboard = editor.skin.keyboard
 
         self.check_vi_count()  # TODO: multiply Repeat Count into movement
 
@@ -3795,17 +3791,16 @@ class TerminalKeyboardVi(TerminalKeyboard):
         # inside macOS Terminal > Preferences > Profiles
 
         vi_optchars_list = r"""
-            ⌥$ ⌥^ ⌥0 ⌥F ⇧⌥F ⌥T ⇧⌥T ⌥; ⌥, ⌥| ⌥H ⌥L
-            ⌥W ⌥EE ⌥B ⇧⌥W ⇧⌥E⇧⌥E ⇧⌥B ⌥} ⌥{
-            ⇧⌥G ⇧⌥L ⇧⌥M ⇧⌥H ⌥+ ⌥_ ⌥- ⌥J ⌥K
+            ⇧⌥$ ⇧⌥^ ⌥0 ⌥F ⇧⌥F ⌥T ⇧⌥T ⌥; ⌥, ⇧⌥| ⌥H ⌥L
+            ⌥W ⌥EE ⌥B ⇧⌥W ⇧⌥E⇧⌥E ⇧⌥B ⇧⌥} ⇧⌥{
+            ⇧⌥G ⇧⌥L ⇧⌥M ⇧⌥H ⇧⌥+ ⇧⌥_ ⌥- ⌥J ⌥K
             ⌥ZT ⌥ZB ⌥Z.
             ⌥\I ⌥\N ⌥\⇧F
-            ⌥/ ⌥? ⌥* ⌥# ⌥NN ⇧⌥N⇧⌥N
+            ⌥/ ⇧⌥? ⇧⌥* ⇧⌥# ⌥NN ⇧⌥N⇧⌥N
             ⌥R ⌥A ⌥II ⌥O ⇧⌥R ⇧⌥A ⇧⌥I⇧⌥I ⇧⌥O
             ⌥X ⇧⌥X ⇧⌥D ⇧⌥J ⌥S ⇧⌥S ⇧⌥C ⌥D ⌥C
         """.split()
 
-        # ⌥$ ⌥^ ⌥} ⌥{ ⌥+ ⌥_ ⌥? ⌥* ⌥# also known as ⇧⌥$ ⇧⌥^ ⇧⌥} ⇧⌥{ ⇧⌥+ ⇧⌥_ ⇧⌥? ⇧⌥* ⇧⌥#
         # ⌥→ ⌥← not solved here
 
         for optchars in vi_optchars_list:
@@ -4655,10 +4650,10 @@ class TerminalEm:
     # Shell out
     #
 
-    def do_em_shell_command_on_region(self):  # ⌥|
+    def do_em_shell_command_on_region(self):  # ⇧⌥|
         """Take a Bash command line to pipe some Chars through"""
 
-        raise NotImplementedError()  # TODO: code up ⌥| 'shell_command_on_region'
+        raise NotImplementedError()  # TODO: code up ⇧⌥| 'shell_command_on_region'
 
     def do_em_execute_extended_command(self):  # ⌥X
         """Take an ELisp command line to run"""
@@ -4787,12 +4782,12 @@ class TerminalKeyboardEm(TerminalKeyboard):
         self._init_func(b"\x1Bv", em.do_em_scroll_down_command)  # ⌥V
         self._init_func(b"\x1Bx", em.do_em_execute_extended_command)  # ⌥X
         self._init_suffix_func(b"\x1Bz", em.do_em_zap_to_char)  # ⌥Z
-        self._init_func(b"\x1B|", em.do_em_shell_command_on_region)  # ⌥|
+        self._init_func(b"\x1B|", em.do_em_shell_command_on_region)  # ⇧⌥|
 
         em_optchars_list = """
-            ⌥% ⌥-
-            ⌥0 ⌥1 ⌥2 ⌥3 ⌥4 ⌥5 ⌥6 ⌥7 ⌥8 ⌥9 ⌥< ⌥>
-            ⌥B ⌥D ⌥F ⌥G ⌥GG ⌥GTab ⌥G⌥G ⌥H ⌥M ⌥R ⌥V ⌥X ⌥Z ⌥|
+            ⇧⌥% ⌥-
+            ⌥0 ⌥1 ⌥2 ⌥3 ⌥4 ⌥5 ⌥6 ⌥7 ⌥8 ⌥9 ⇧⌥< ⇧⌥>
+            ⌥B ⌥D ⌥F ⌥G ⌥GG ⌥GTab ⌥G⌥G ⌥H ⌥M ⌥R ⌥V ⌥X ⌥Z ⇧⌥|
         """.split()
 
         for optchars in em_optchars_list:
@@ -4825,12 +4820,11 @@ class TerminalNudgeIn(argparse.Namespace):
     # inside macOS Terminal > Preferences > Profiles
 
     UNICHARS_BY_OPTCHARS = {
-
-        "⌥#": "\u2039",  # SingleLeftPointingAngleQuotationMark  # aka ⇧⌥#
-        "⌥$": "\u203A",  # SingleRightPointingAngleQuotationMark  # aka ⇧⌥$
-        "⌥%": "\uFB01",  # LatinSmallLigatureFI  # aka ⇧⌥%
-        "⌥*": "\u00B0",  # DegreeSign  # aka ⇧⌥*
-        "⌥+": "\u00B1",  # PlusMinusSign  # aka ⇧⌥+
+        "⇧⌥#": "\u2039",  # SingleLeftPointingAngleQuotationMark
+        "⇧⌥$": "\u203A",  # SingleRightPointingAngleQuotationMark
+        "⇧⌥%": "\uFB01",  # LatinSmallLigatureFI
+        "⇧⌥*": "\u00B0",  # DegreeSign
+        "⇧⌥+": "\u00B1",  # PlusMinusSign
         "⌥,": "\u2264",  # LessThanOrEqualTo
         "⌥-": "\u2013",  # EnDash
         "⌥/": "\u00F7",  # DivisionSign
@@ -4845,9 +4839,9 @@ class TerminalNudgeIn(argparse.Namespace):
         "⌥8": "\u2022",  # Bullet [Pearl]
         "⌥9": "\u00AA",  # FeminineOrdinalIndicator
         "⌥;": "\u2026",  # HorizontalEllipsis
-        "⌥<": "\u00AF",  # Macron  # aka ⇧⌥<
-        "⌥>": "\u02D8",  # Breve  # aka ⇧⌥>
-        "⌥?": "\u00BF",  # InvertedQuestionMark  # aka ⇧⌥?
+        "⇧⌥<": "\u00AF",  # Macron
+        "⇧⌥>": "\u02D8",  # Breve
+        "⇧⌥?": "\u00BF",  # InvertedQuestionMark
         "⌥A": "\u00E5",  # LatinSmallLetterAWithRingAbove
         "⌥B": "\u222B",  # Integral  # ⌥← comes in as Esc B
         "⌥C": "\u00E7",  # LatinSmallLetterCWithCedilla
@@ -4880,11 +4874,11 @@ class TerminalNudgeIn(argparse.Namespace):
         r"⌥\N": "\u00ABn",  # LeftPointingDoubleAngleQuotationMark N
         "⌥\\": "\u00AB",  # LeftPointingDoubleAngleQuotationMark
         r"⌥\⇧F": "\u00ABF",  # LeftPointingDoubleAngleQuotationMark ⇧F
-        "⌥^": "\uFB02",  # LatinSmallLigatureFL
-        "⌥_": "\u2014",  # EmDash
-        "⌥{": "\u201D",  # RightDoubleQuotationMark
-        "⌥|": "\u00BB",  # RightPointingDoubleAngleQuotationMark
-        "⌥}": "\u2019",  # RightSingleQuotationMark
+        "⇧⌥^": "\uFB02",  # LatinSmallLigatureFL
+        "⇧⌥_": "\u2014",  # EmDash
+        "⇧⌥{": "\u201D",  # RightDoubleQuotationMark
+        "⇧⌥|": "\u00BB",  # RightPointingDoubleAngleQuotationMark
+        "⇧⌥}": "\u2019",  # RightSingleQuotationMark
         "⇧⌥A": "\u00C5",  # LatinCapitalLetterAWithRingAbove
         "⇧⌥B": "\u0131",  # LatinSmallLetterDotlessI
         "⇧⌥C": "\u00C7",  # LatinCapitalLetterCWithCedilla
@@ -4926,9 +4920,11 @@ class TerminalNudgeIn(argparse.Namespace):
         self.suffix = None  # such as b"x" of b"fx" to Find Char "x" in Vi
         self.epilog = None  # such as b"⌃C" of b"f⌃C" to cancel b"f"
 
+        # FIXME: Below is too much work to do for each new TerminalNudgeIn?
+
         # Map the ⌃@, ⌃A, ⌃B, ... ⌃Z, ⌃[, ⌃\, ⌃], ⌃^, ⌃_, and ⌃? to themselves
 
-        name_by_char = TerminalNudgeIn.NAME_BY_CHAR
+        name_by_char = dict(TerminalNudgeIn.NAME_BY_CHAR)
 
         for chord in C0_CONTROL_STDINS:  # for ord(chord) in 0x00..0x1F and 0x7F
             name = "⌃" + chr(ord(chord) ^ 0x40)  # ⌃ U2303 UpArrowhead
@@ -4938,7 +4934,7 @@ class TerminalNudgeIn(argparse.Namespace):
 
                 name_by_char[ch] = name
 
-        # Map the r"[ -~]" to themselves, including ⇧A to ⇧A, A to A, and so on
+        # Map the r"[A-Z]" to themselves: ⇧A to ⇧A, A to A, etc
 
         for chord in BASIC_LATIN_STDINS:
             ch = chord.decode()
@@ -4949,12 +4945,21 @@ class TerminalNudgeIn(argparse.Namespace):
                 else:
                     name = ch.upper()
 
+                assert ch not in name_by_char.keys(), (ch, name, name_by_char[ch])
                 name_by_char[ch] = name
+
+        # Map the shifted punctuation to themselves
+
+        ascii_shifted_marks = '~!@#$%^&*()_+{}|:"<>?'
+        for ch in ascii_shifted_marks:
+            name = "⇧" + ch
+            name_by_char[ch] = name
 
         # Map enough of the ⌥ Option Keys to themselves
 
         for (optchars, unichars) in TerminalNudgeIn.UNICHARS_BY_OPTCHARS.items():
 
+            assert unichars not in name_by_char.keys(), (unichars, optchars)
             name_by_char[unichars] = optchars
 
         self.name_by_char = name_by_char
