@@ -29,6 +29,7 @@ examples:
 
 from __future__ import print_function
 
+import collections
 import getpass
 import os
 import platform
@@ -38,8 +39,6 @@ import sys
 import textwrap
 
 import argdoc
-
-import pwd_  # FIXME: packaging
 
 import read
 
@@ -412,39 +411,20 @@ def _log_error(message):
     return 127
 
 
+# @functools.cache  # we shipped with some Memoization here, for awhile
 def calc_ps1():
-    "Calculate what kind of prompt to print next"
+    """Form a PyBashIsh prompt"""
 
-    # Usually return a short prompt
+    ps1_tuple = shutil_ps1_tuple()
+
+    user = ps1_tuple.user
+    hostname = ps1_tuple.hostname
+    pwd = ps1_tuple.pwd
+    mark = ps1_tuple.mark
 
     env = "pybashish"
-    mark = "$" if os.getuid() else "#"
 
-    if hasattr(calc_ps1, "user"):
-        ps1 = f"({env}) {mark} "
-
-        return ps1
-
-    # But first calculate a long prompt
-
-    user = getpass.getuser()  # a la Bash:  id -un
-    calc_ps1.user = user
-
-    hostname = platform.node()
     #
-    # FIXME: Noise to Stderr at "platform.node()" in such tests as:  mkdir foo/ && cd foo/ && rm -fr ../foo/
-    #
-    #   Linux => sh: 0: getcwd() failed: No such file or directory"
-    #   Mac => shell-init: error retrieving current directory: getcwd: cannot access parent directories: No such file or directory
-    #
-
-    gotcwd = os.environ["PWD"]
-    try:
-        gotcwd = os.getcwd()
-    except FileNotFoundError:
-        pass
-
-    where = pwd_.os_path_homepath(gotcwd)
 
     assert read.ESC_CHAR == "\x1B"
 
@@ -452,14 +432,68 @@ def calc_ps1():
     green = "\x1B[00;32m"  # Demo ANSI TTY escape codes without "01;" bolding
     blue = "\x1B[00;34m"
 
-    ps1 = f"{green}{user}@{hostname}{nocolor}:{blue}{where}{nocolor}{mark} \r\n({env}) {mark} "
+    ps1 = f"{green}{user}@{hostname}{nocolor}:"
+    ps1 += f"{blue}{pwd}{nocolor}{mark} \r\n"
+    ps1 += f"({env}) {mark} "
 
-    return ps1
+    #
+
+    if not hasattr(calc_ps1, "once"):
+        calc_ps1.once = True
+
+        return ps1
+
+    brief_ps1 = f"({env}) {mark} "
+
+    return brief_ps1
 
 
 #
-# Define some Python idioms
+# Call on Python
 #
+
+
+# deffed in many files  # missing from docs.python.org
+def shutil_ps1_tuple():
+    """Fetch the context people mostly cite to explain Shell trouble"""
+
+    user = getpass.getuser()  # a la Bash:  id -un
+
+    hostname = platform.node()
+
+    pwd = os.environ["PWD"]
+    try:
+        pwd = os.getcwd()
+    except FileNotFoundError:
+        pass
+
+    mark = "$" if os.getuid() else "#"
+
+    ps1 = "{user}@{hostname}:{pwd}{mark} ".format(
+        user=user, hostname=hostname, pwd=pwd, mark=mark
+    )
+
+    Ps1Tuple = collections.namedtuple(
+        "Ps1Tuple", "user, hostname, pwd, mark, ps1".split(", ")
+    )
+
+    ps1_tuple = Ps1Tuple(user=user, hostname=hostname, pwd=pwd, mark=mark, ps1=ps1)
+
+    return ps1_tuple
+
+    #
+    # at backlevel Python, our 'def shutil_ps1_tuple' may fail such tests as
+    #
+    #   cd && mkdir foo/ && cd foo/ && rm -fr ../foo/
+    #   python3 -c 'import platform; platform.node()'
+    #
+    # by provoking your Shell to spit out such messages as
+    #
+    #    sh: 0: getcwd() failed: No such file or directory'
+    #
+    #    shell-init: error retrieving current directory:
+    #        getcwd: cannot access parent directories: No such file or directory
+    #
 
 
 # deffed in many files  # missing from docs.python.org
