@@ -523,6 +523,7 @@ alias -- -gsp='--exec-echo-xe git show --pretty='
 
 alias -- -gap='--exec-echo-xe git add --patch'
 alias -- -gba='--exec-echo-xe git branch --all'
+# alias -- -gbq='--exec-echo-xe git rev-parse --abbrev-ref HEAD'
 alias -- -gbq='--exec-echo-xe "git branch |grep '\''[*]'\''"'
 alias -- -gca='--exec-echo-xe git commit --amend'
 alias -- -gcd=--git-chdir

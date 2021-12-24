@@ -557,6 +557,7 @@ alias -- -gsp='--exec-echo-xe git show --pretty='
 
 alias -- -gap='--exec-echo-xe git add --patch'
 alias -- -gba='--exec-echo-xe git branch --all'
+# alias -- -gbq='--exec-echo-xe git rev-parse --abbrev-ref HEAD'
 alias -- -gbq='--exec-echo-xe "git branch |grep '\''[*]'\''"'
 alias -- -gca='--exec-echo-xe git commit --amend'
 alias -- -gcd=--git-chdir
@@ -1026,9 +1027,9 @@ source ~/.zprofilesecrets
 # source ~/.zshrc  # sometimes needed in Bash as:  source ~/.bashrc
 
 
-# Setting PATH for Python 3.9
+# Setting PATH for Python 3.10
 # The original version is saved in .zprofile.pysave
-# PATH="/Library/Frameworks/Python.framework/Versions/3.9/bin:${PATH}"
+# PATH="/Library/Frameworks/Python.framework/Versions/3.10/bin:${PATH}"
 # export PATH
 
 # Setting PATH for Python 2.7
