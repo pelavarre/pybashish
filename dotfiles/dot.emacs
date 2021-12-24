@@ -121,10 +121,11 @@
 ; they get you started, but you have to let go the Meta key after the first keystroke
 
 
+;;; commented out for now
 ;; Sacrifice M-3 to get '# 'self-insert-command at Mac British Option As Meta Key
-
-(global-set-key (kbd "M-3")
-    (lambda () (interactive) (insert-char #x23)))  ; # '#' not '£'
+;
+;(global-set-key (kbd "M-3")
+;    (lambda () (interactive) (insert-char #x23)))  ; # '#' not '£'
 
 
 ; copied from:  git clone https://github.com/pelavarre/pybashish.git

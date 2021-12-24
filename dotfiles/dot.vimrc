@@ -72,15 +72,16 @@ function! RStripEachLine()
     call cursor(with_line, with_col)
 endfun
 
-" accept Option+3 from US Keyboards as meaning '#' \u0023 Hash Sign
-
-:cmap <Esc>3 #
-:imap <Esc>3 #
-:nmap <Esc>3 #
-:omap <Esc>3 #
-:smap <Esc>3 #
-:vmap <Esc>3 #
-:xmap <Esc>3 #
+""" commented out for now
+"" accept Option+3 from US Keyboards as meaning '#' \u0023 Hash Sign
+"
+":cmap <Esc>3 #
+":imap <Esc>3 #
+":nmap <Esc>3 #
+":omap <Esc>3 #
+":smap <Esc>3 #
+":vmap <Esc>3 #
+":xmap <Esc>3 #
 
 
 "
@@ -214,8 +215,8 @@ endfun
 :nnoremap å a
 :inoremap î <C-o>i
 :nnoremap î i
-:inoremap o <C-o>o
-:nnoremap o o
+:inoremap ø <C-o>o
+:nnoremap ø o
 :inoremap ‰ <C-o>R
 :nnoremap ‰ R
 :inoremap Å <C-o>A
