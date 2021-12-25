@@ -323,7 +323,7 @@ def parse_main_argv(argv):
 def wearing_em():
     """True to look 'n feel more like Emacs, False to look 'n feel more like Vim"""
 
-    verb = sys_argv_pick_verb()
+    verb = os_path_corename(sys.argv[0])
     em_in_verb = "em" in verb
 
     return em_in_verb
@@ -341,7 +341,7 @@ def parser_format_help(parser):
     want_qpy = want_verb + "?py"  # such as "vi?py"
     want_title_py = "Em Py" if wearing_em() else "Vi Py"
 
-    got_verb = sys_argv_pick_verb()  # such as "vim"
+    got_verb = os_path_corename(sys.argv[0])  # such as "vim"
     got_py = got_verb + ".py"  # such as "vim.py"
     got_qpy = got_verb + "?py"  # such as "vim?py"
     got_title_py = got_verb.title() + " Py"  # such as "Vim Py"
@@ -387,7 +387,7 @@ def do_main_arg_version():
     str_hash = module_file_hash()
     str_short_hash = str_hash[:4]  # conveniently fewer nybbles  # good enough?
 
-    verb = sys_argv_pick_verb()
+    verb = os_path_corename(sys.argv[0])
     title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
 
     print("{} {} hash {} ({})".format(title_py, version, str_short_hash, str_hash))
@@ -1122,7 +1122,7 @@ class TerminalVi:
         if held_vi_file.touches:
             joins.append("{} bytes touched".format(held_vi_file.touches))
 
-        verb = sys_argv_pick_verb()
+        verb = os_path_corename(sys.argv[0])
         title_py = verb.title() + " Py"  # "Vi Py", "Em Py", etc
         joins.append(title_py)
 
@@ -1205,7 +1205,7 @@ class TerminalVi:
         held_vi_file = self.held_vi_file
         nickname = held_vi_file.pick_file_nickname() if held_vi_file else None
 
-        verb = sys_argv_pick_verb()
+        verb = os_path_corename(sys.argv[0])
         title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
 
         self.vi_print(
@@ -1231,7 +1231,7 @@ class TerminalVi:
 
         # Begin game, or don't
 
-        verb = sys_argv_pick_verb()
+        verb = os_path_corename(sys.argv[0])
         title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
 
         if chords in (b"y", b"Y"):
@@ -4314,7 +4314,7 @@ class TerminalEm:
 
         else:
 
-            verb = sys_argv_pick_verb()
+            verb = os_path_corename(sys.argv[0])
             title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
 
             version = module_file_version_zero()
@@ -8541,7 +8541,18 @@ def lines_last_has_no_end(lines):
 
 
 # deffed in many files  # missing from docs.python.org
-def os_path_homepath(path):
+def os_path_corename(path):
+    """Return the File Basename part that means which look to wear"""
+
+    basename = os.path.basename(path)
+    name = os.path.splitext(basename)[0]
+    corename = name.split("~")[0]
+
+    return corename  # such as "vim" from "bin/vim~1205pl2108~.py"
+
+
+# deffed in many files  # missing from docs.python.org
+def os_path_homepath(path):  # inverse of 'os.path.expanduser'
     """Return the ~/... RelPath of a File or Dir of the Home, else the AbsPath"""
 
     home = os.path.abspath(os.environ["HOME"])
@@ -8633,17 +8644,6 @@ def str_remove_line_end(chars):
     line = (chars + "\n").splitlines()[0]
 
     return line
-
-
-# deffed in many files  # missing from docs.python.org
-def sys_argv_pick_verb():
-    """Return the File Basename part that means which look to wear"""
-
-    basename = os.path.basename(sys.argv[0])
-    name = os.path.splitext(basename)[0]
-    corename = name.split("~")[0]
-
-    return corename  # such as "vim" from "bin/vim~1205pl2108~.py"
 
 
 # Cite some Terminal Doc's and Git-track experience of Terminal Output magic
