@@ -12,7 +12,7 @@ read files, accept edits, write files, in the way of classical vim
 positional arguments:
   FILE              a file to edit (default: '/dev/stdin')
 
-optional arguments:
+options:
   -h, --help        show this help message and exit
   -u SCRIPT         file of ex commands to run after args (default: '/dev/null')
   -c COMMAND        another ex command to run after args and after '-u'
@@ -8373,12 +8373,18 @@ def argparse_exit_unless_doc_eq(parser, doc=None):
 
     if sys.version_info[:3] < (3, 9, 6):
 
-        alt_module_doc = str_join_first_paragraph(alt_module_doc)
-        alt_parser_doc = str_join_first_paragraph(alt_parser_doc)
+        alt_module_doc = argparse_textwrap_unwrap_one_paragraph(alt_module_doc)
+        alt_parser_doc = argparse_textwrap_unwrap_one_paragraph(alt_parser_doc)
 
         if "[FILE ...]" in module_doc:
             alt_parser_doc = alt_parser_doc.replace("[FILE [FILE ...]]", "[FILE ...]")
             # older Python needed this accomodation, such as Feb/2015 Python 3.4.3
+
+        if "\noptions:" in module_doc:
+            alt_parser_doc = alt_parser_doc.replace(
+                "\noptional arguments:", "\noptions:"
+            )
+            # older Python needed this accomodation, such as Jun/2021 Python 3.9.6
 
     # Sketch where the Doc's came from
 
@@ -8400,6 +8406,22 @@ def argparse_exit_unless_doc_eq(parser, doc=None):
     if got_diffs:
 
         sys.exit(1)  # trust caller to log SystemExit exceptions well
+
+
+# deffed in many files  # missing from docs.python.org
+def argparse_module_doc_and_file(doc, f):
+    """Take the Doc as from Main File, else pick the Doc out of the Calling Module"""
+
+    module_doc = doc
+    module_file = __main__.__file__
+
+    if doc is None:
+        module = inspect.getmodule(f.f_back)
+
+        module_doc = module.__doc__
+        module_file = f.f_back.f_code.co_filename
+
+    return (module_doc, module_file)
 
 
 # deffed in many files  # missing from docs.python.org
@@ -8457,19 +8479,15 @@ def argparse_stderr_print_diffs(
 
 
 # deffed in many files  # missing from docs.python.org
-def argparse_module_doc_and_file(doc, f):
-    """Take the Doc as from Main File, else pick the Doc out of the Calling Module"""
+def argparse_textwrap_unwrap_one_paragraph(doc):
+    """Join by single spaces all the leading lines up to the first empty line"""
 
-    module_doc = doc
-    module_file = __main__.__file__
+    index = (doc + "\n\n").index("\n\n")
+    lines = doc[:index].splitlines()
+    chars = " ".join(_.strip() for _ in lines)
+    alt_doc = chars + doc[index:]
 
-    if doc is None:
-        module = inspect.getmodule(f.f_back)
-
-        module_doc = module.__doc__
-        module_file = f.f_back.f_code.co_filename
-
-    return (module_doc, module_file)
+    return alt_doc
 
 
 # deffed in many files  # missing from docs.python.org
@@ -8623,18 +8641,6 @@ def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
     sys.stdout.flush()
     print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
-
-
-# deffed in many files  # missing from docs.python.org
-def str_join_first_paragraph(doc):
-    """Join by single spaces all the leading lines up to the first empty line"""
-
-    index = (doc + "\n\n").index("\n\n")
-    lines = doc[:index].splitlines()
-    chars = " ".join(_.strip() for _ in lines)
-    alt = chars + doc[index:]
-
-    return alt
 
 
 # deffed in many files  # missing from docs.python.org
