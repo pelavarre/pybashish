@@ -89,6 +89,10 @@ endfun
 " despite macOS Terminal > Preferences > ... > Keyboard > Use Option as Meta Key = No
 "
 
+" colon escape to Ex
+:inoremap Ú <C-o>:
+:nnoremap Ú :
+
 " leap to column
 :inoremap › <C-o>$
 :nnoremap › $
