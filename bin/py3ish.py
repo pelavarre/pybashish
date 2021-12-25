@@ -2,12 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-usage: pyish.py
+usage: import py3ish
 
 emulate Python 3 inside of Python 2, well enough for now
-
-quirks:
-  cd pybashish/ && make  # foolishly insists this docstring should be an argdoc
 """
 
 # FIXME: help find and review diffs among scattered forks of shared defs
