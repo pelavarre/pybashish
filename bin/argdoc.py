@@ -684,6 +684,10 @@ class ArgDocRipper(argparse.Namespace):
     def compare_file_to_help_doc(self, file_doc, file_path, help_doc):
         """Show the Help Doc printed by an Arg Doc file calling Arg Parse"""
 
+        file_doc = file_doc.replace("\noptional arguments:", "\noptions:")
+        help_doc = help_doc.replace("\noptional arguments:", "\noptions:")
+        # TODO:  Accept Arg Doc Options change from Oct/2021 Python 3.10 more elegantly
+
         if file_doc.strip() == help_doc.strip():
 
             return

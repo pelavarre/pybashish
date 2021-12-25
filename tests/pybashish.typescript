@@ -701,7 +701,9 @@ Show the ruler
 
 ## 2.21 ) Help
 
-    $ bin/help.py help
+    # TODO:  Accept Arg Doc Options change from Oct/2021 Python 3.10 more elegantly
+
+    $ bin/help.py help |sed 's,optional arguments:,options:,'
     usage: help.py [-h] [VERB]
 
     print some help
@@ -709,7 +711,7 @@ Show the ruler
     positional arguments:
       VERB        a verb to explain, such as "grep" or "echo"
 
-    optional arguments:
+    options:
       -h, --help  show this help message and exit
 
     examples:
