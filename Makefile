@@ -75,7 +75,7 @@ test-once:
 	rm -fr a b
 	:
 	rm -fr ../pybashish/__pycache__
-	rm -fr ../pybashish/bin/pyish.pyc
+	rm -fr ../pybashish/bin/py3ish.pyc
 	rm -fr ../pybashish/bin/__pycache__
 	git status --short --ignored
 	:

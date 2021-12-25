@@ -126,9 +126,9 @@ PyBashIsh does a few things much much better, some things just as well, and many
         -  ..  argdoc  base64  bash  bind  cal  cat  cd  chmod  clear  column  cp  cspsh
         date  dd  doctestbash  echo  em  emacs  exit  expand  find  fmt  grep  gunzip  gzip
         head  hearme-3  help  hexdump  history  hostname  ls  make  mkdir  mv  paste  pbcopy
-        pbpaste  perl  ping  pwd  pyish  read  rm  scp  sleep  sort  sponge  ssh  strings
-        subsh  subsh2  tabs  tail  tar  tar2  touch  tr  unalias  vi  vim  watch  wc  which
-        xargs  zcat  zsh
+        pbpaste  perl  ping  pwd  read  rm  scp  sleep  sort  sponge  ssh  strings  subsh
+        subsh2  tabs  tail  tar  tar2  touch  tr  unalias  vi  vim  watch  wc  which  xargs
+        zcat  zsh
 
     Note: The "#" hash mark means ignore the following chars in the line
     Note: The ":" colon as the first word means mostly ignore the following words in the line
@@ -419,18 +419,21 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 
 ## 2.8 ) Cp
 
-    $ bin/cp.py
-    Namespace(file=None, i=0, p=0, R=0)
-    usage: cp.py [-h] [-i] [-p] [-R] [FILE]
-    cp.py: error: not implemented
-    + exit 2
+    $ rm -f f.file*
+    $
+    $ touch f.file
     $
 
-    $ bin/cp.py f.file
-    Namespace(file='f.file', i=0, p=0, R=0)
-    usage: cp.py [-h] [-i] [-p] [-R] [FILE]
-    cp.py: error: not implemented
-    + exit 2
+    $ bin/cp.py f.file  # call once
+    + cp -ipR f.file f.file~
+    + touch f.file~
+    $
+    $ bin/cp.py f.file  # call again
+    + cp -ipR f.file f.file~2~
+    + touch f.file~2~
+    $
+
+    $ rm f.file f.file~ f.file~2~
     $
 
 
@@ -698,7 +701,9 @@ Show the ruler
 
 ## 2.21 ) Help
 
-    $ bin/help.py help
+    # TODO:  Accept Arg Doc Options change from Oct/2021 Python 3.10 more elegantly
+
+    $ bin/help.py help |sed 's,optional arguments:,options:,'
     usage: help.py [-h] [VERB]
 
     print some help
@@ -706,7 +711,7 @@ Show the ruler
     positional arguments:
       VERB        a verb to explain, such as "grep" or "echo"
 
-    optional arguments:
+    options:
       -h, --help  show this help message and exit
 
     examples:
@@ -1144,7 +1149,7 @@ Clean up
 
 ## 2.37 ) Tr
 
-    $ bin/cat.py $(git ls-files |grep -v '^tests/') |bin/tr.py |awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
+    $ bin/cat.py $(git ls-files |grep '[.]py$') |bin/tr.py |awk '{gsub(/[0Aa]/, "\n&");gsub(/[~]/, "&\n")} //'
 
      !"#$%&'()*+,-./
     0123456789:;<=>?@
@@ -1196,7 +1201,7 @@ Split words of lines into one word per line
 
 ## 3 ) Additional tests
 
-Show every verb called with no args return exit 0,
+Show every verb called with no args returns exit 0,
 else exit status 2 from rejecting usage,
 else exit status 2 from being stubbed out
 
@@ -1214,8 +1219,13 @@ else exit status 2 from being stubbed out
     + exit 2
     $ bin/column.py </dev/null >/dev/null 2>&1
     + exit 2
-    $ bin/cp.py </dev/null >/dev/null 2>&1
-    + exit 2
+    $
+
+    $ bin/cp.py /dev/null </dev/null >/dev/null 2>&1
+    $ rm null
+    $ : TODO: think deeper into Cp Py with No Args picks up Last Modified File
+    $
+
     $ bin/cspsh.py </dev/null >/dev/null 2>&1
     + exit 2
     $
@@ -1249,9 +1259,6 @@ else exit status 2 from being stubbed out
     + exit 2
     $ bin/mv.py </dev/null >/dev/null 2>&1
     + exit 2
-    $
-
-    $ python2 bin/pyish.py
     $
 
     $ bin/pwd_.py </dev/null >/dev/null 2>&1

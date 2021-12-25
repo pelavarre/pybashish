@@ -54,6 +54,8 @@ from __future__ import print_function
 import __main__
 import argparse
 import collections
+import difflib
+import inspect
 import os
 import pprint
 import re
@@ -276,6 +278,10 @@ def parse_args(args=None, namespace=None, doc=None, path=None):
     except SystemExit:
         ArgDocRipper(verbose=1).make_argument_parser(doc, path=path)
         raise
+
+    if False:
+        _ = argparse_compile_argdoc(epi="quirks")
+        argparse_exit_unless_doc_eq(parser)
 
     return named_args
 
@@ -683,6 +689,10 @@ class ArgDocRipper(argparse.Namespace):
 
     def compare_file_to_help_doc(self, file_doc, file_path, help_doc):
         """Show the Help Doc printed by an Arg Doc file calling Arg Parse"""
+
+        file_doc = file_doc.replace("\noptional arguments:", "\noptions:")
+        help_doc = help_doc.replace("\noptional arguments:", "\noptions:")
+        # TODO:  Accept Arg Doc Options change from Oct/2021 Python 3.10 more elegantly
 
         if file_doc.strip() == help_doc.strip():
 
@@ -2377,7 +2387,7 @@ class PositionalPhraseSyntaxTaker(argparse.Namespace):
 
 
 #
-# Define some Python idioms
+# Call on Python
 #
 
 
@@ -2477,6 +2487,181 @@ class ShardsTaker(argparse.Namespace):
             shards.append(shard)
 
         return shards
+
+
+# deffed in many files  # missing from docs.python.org
+def argparse_compile_argdoc(epi, drop_help=None, doc=None):
+    """Construct the 'argparse.ArgumentParser' with Epilog but without Arguments"""
+
+    f = inspect.currentframe()
+    (module_doc, _) = argparse_module_doc_and_file(doc=doc, f=f)
+
+    # Pick the ArgParse Prog, Description, & Epilog out of the Main Arg Doc
+
+    prog = module_doc.strip().splitlines()[0].split()[1]
+
+    headlines = list(
+        _ for _ in module_doc.strip().splitlines() if _ and not _.startswith(" ")
+    )
+    description = headlines[1]
+
+    epilog_at = module_doc.index(epi)
+    epilog = module_doc[epilog_at:]
+
+    # Start forming the ArgParse Parser
+
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description=description,
+        add_help=(not drop_help),
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog=epilog,
+    )
+
+    return parser
+
+
+# deffed in many files  # missing from docs.python.org
+def argparse_exit_unless_doc_eq(parser, doc=None):
+    """Exit nonzero, unless __main__.__doc__ equals 'parser.format_help()'"""
+
+    f = inspect.currentframe()
+    (module_doc, module_file) = argparse_module_doc_and_file(doc=doc, f=f)
+
+    # Fetch the two docs
+
+    with_columns = os.getenv("COLUMNS")
+    os.environ["COLUMNS"] = str(89)  # Black promotes 89 columns per line
+    try:
+        parser_doc = parser.format_help()
+    finally:
+        if with_columns is None:
+            os.environ.pop("COLUMNS")
+        else:
+            os.environ["COLUMNS"] = with_columns
+
+    # Cut the worthless jitter we wish away
+
+    alt_module_doc = module_doc.strip()
+    alt_parser_doc = parser_doc
+
+    if sys.version_info[:3] < (3, 9, 6):
+
+        alt_module_doc = argparse_textwrap_unwrap_one_paragraph(alt_module_doc)
+        alt_parser_doc = argparse_textwrap_unwrap_one_paragraph(alt_parser_doc)
+
+        if "[FILE ...]" in module_doc:
+            alt_parser_doc = alt_parser_doc.replace("[FILE [FILE ...]]", "[FILE ...]")
+            # older Python needed this accomodation, such as Feb/2015 Python 3.4.3
+
+        if "\noptions:" in module_doc:
+            alt_parser_doc = alt_parser_doc.replace(
+                "\noptional arguments:", "\noptions:"
+            )
+            # older Python needed this accomodation, such as Jun/2021 Python 3.9.6
+
+    # Sketch where the Doc's came from
+
+    alt_module_file = module_file
+    alt_module_file = os.path.split(alt_module_file)[-1]
+    alt_module_file = "{} --help".format(alt_module_file)
+
+    alt_parser_file = "argparse.ArgumentParser(..."
+
+    # Count significant differences
+
+    got_diffs = argparse_stderr_print_diffs(
+        alt_module_doc,
+        alt_parser_doc=alt_parser_doc,
+        alt_module_file=alt_module_file,
+        alt_parser_file=alt_parser_file,
+    )
+
+    if got_diffs:
+
+        sys.exit(1)  # trust caller to log SystemExit exceptions well
+
+
+# deffed in many files  # missing from docs.python.org
+def argparse_module_doc_and_file(doc, f):
+    """Take the Doc as from Main File, else pick the Doc out of the Calling Module"""
+
+    module_doc = doc
+    module_file = __main__.__file__
+
+    if doc is None:
+        module = inspect.getmodule(f.f_back)
+
+        module_doc = module.__doc__
+        module_file = f.f_back.f_code.co_filename
+
+    return (module_doc, module_file)
+
+
+# deffed in many files  # missing from docs.python.org
+def argparse_stderr_print_diffs(
+    alt_module_doc, alt_parser_doc, alt_module_file, alt_parser_file
+):
+    """True after Printing Diffs, False when no Diffs found"""
+
+    # pylint: disable=too-many-locals
+
+    for diff_precision in range(2):
+
+        a_lines = alt_module_doc.splitlines()
+        b_lines = alt_parser_doc.splitlines()
+
+        # First count differences ignoring blank space between Words,
+        # but end by counting even the smallest differences in Chars
+
+        if not diff_precision:
+
+            a_words_by_index = list()
+            for (index, a_line) in enumerate(a_lines):
+                a_words = " ".join(a_line.split())
+                a_words_by_index.append(a_words)
+
+            for (index, b_line) in enumerate(b_lines):
+                b_words = " ".join(b_line.split())
+                if b_words in a_words_by_index:
+                    a_index = a_words_by_index.index(b_words)
+                    a_line = a_lines[a_index]
+
+                    b_lines[index] = a_line
+
+        diff_lines = list(
+            difflib.unified_diff(
+                a=a_lines,
+                b=b_lines,
+                fromfile=alt_module_file,
+                tofile=alt_parser_file,
+            )
+        )
+
+        # Return True if differences found, but first print these differents to Stderr
+
+        if diff_lines:  # TODO: ugly contingent '.rstrip()'
+
+            lines = list((_.rstrip() if _.endswith("\n") else _) for _ in diff_lines)
+            stderr_print("\n".join(lines))
+
+            return True
+
+    # Return False if no differences found
+
+    return False
+
+
+# deffed in many files  # missing from docs.python.org
+def argparse_textwrap_unwrap_one_paragraph(doc):
+    """Join by single spaces all the leading lines up to the first empty line"""
+
+    index = (doc + "\n\n").index("\n\n")
+    lines = doc[:index].splitlines()
+    chars = " ".join(_.strip() for _ in lines)
+    alt_doc = chars + doc[index:]
+
+    return alt_doc
 
 
 # deffed in many files  # missing from docs.python.org

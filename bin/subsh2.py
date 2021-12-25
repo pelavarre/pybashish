@@ -46,7 +46,7 @@ import sys
 
 import argdoc
 
-import pyish
+import py3ish
 
 
 def main(argv):
@@ -95,7 +95,7 @@ class ShVerb(object):
         kwargs__ = dict(kwargs_)
         kwargs__.update(kwargs)
 
-        ran = pyish.subprocess_run(args__, **kwargs__)
+        ran = py3ish.subprocess_run(args__, **kwargs__)
         vars_ = vars(ran)
 
         int_ = Int(ran.returncode)

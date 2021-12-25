@@ -15,9 +15,9 @@ _DOT_BASH_PROFILE_=~/.bash_profile  # don't export, to say if this file has been
 alias -- '::'=--colon-colon
 function --colon-colon () {
     if which pbcopy >/dev/null; then
-        (echo '⌃ ⌥ ⇧ ⌘ ⎋ ⇥ ⋮ #' |tee >(pbcopy))
+        (echo '# £ ← ↑ → ↓ ⇧ ⋮ ⌃ ⌘ ⌥ ⎋' |tee >(pbcopy))
     else
-        echo '⌃ ⌥ ⇧ ⌘ ⎋ ⇥ ⋮ #'
+        echo '# £ ← ↑ → ↓ ⇧ ⋮ ⌃ ⌘ ⌥ ⎋'
     fi
 }
 
@@ -192,6 +192,8 @@ function u () { --exec-echo-xe uniq "$@" "|expand"; }
 function v () { --exec-echo-xe pbpaste "$@"; }
 function w () { --exec-echo-xe wc -l "$@"; }
 function x () { --exec-echo-xe hexdump -C"$@"; }
+
+# FIXME:  explain Terminal hung by:  h |l
 
 function --dir-p-tac () {
     if [[ "$(uname)" == "Darwin" ]]; then
@@ -521,6 +523,7 @@ alias -- -gsp='--exec-echo-xe git show --pretty='
 
 alias -- -gap='--exec-echo-xe git add --patch'
 alias -- -gba='--exec-echo-xe git branch --all'
+# alias -- -gbq='--exec-echo-xe git rev-parse --abbrev-ref HEAD'
 alias -- -gbq='--exec-echo-xe "git branch |grep '\''[*]'\''"'
 alias -- -gca='--exec-echo-xe git commit --amend'
 alias -- -gcd=--git-chdir
@@ -762,63 +765,68 @@ function --git-show-conflict () {  # -gs1, -gs2, -gs3
 #
 
 
-function --pylint () {
+function --pylint1 () {
+    (
+        set -xe
+        ~/.venvs/pylint/bin/pylint \
+            --rcfile=/dev/null --reports=n --score=n --disable=locally-disabled \
+            -d W1514 -d R1734,R1735 -d C0103,C0201,C0209,C0302,C0325,C0411 \
+            "$@"
+    )
+}
 
-    echo + .../pylint ... "$@"
+    #
+    # (unspecified-encoding)
+    # W1514: Using open without explicitly specifying an encoding
+    # nope, i keep simply reading text from a file simple, viva default "utf_8"
+    #
 
-    ~/.venvs/pylint/bin/pylint \
-        --rcfile=/dev/null --reports=n --score=n --disable=locally-disabled \
-        -d R1734,R1735 -d C0103,C0201,C0209,C0302,C0325,C0411 -d W1514 \
+    #
+    # R1734: Consider using [] instead of list() (use-list-literal)
+    # R1735: Consider using {} instead of dict() (use-dict-literal)
+    # nope, my old eyes appreciate the louder more explicit 'list()' mark
+    #
+
+    #
+    # (invalid-name)
+    # C0103: Variable name "..." doesn... conform to snake_case naming style
+    # nope, my one and two letter variable names do have a place, albeit only rarely
+    #
+    # (consider-iterating-dictionary)
+    # C0201: Consider iterating the dictionary directly instead of calling .keys()
+    # nope, explicit better than implicit, for keeping part separate from whole
+    #
+    # (consider-using-f-string)
+    # C0209: Formatting a regular string which could be a f-string'
+    # nope, going with F Strings always doesn't always make the source more clear
+    #
+    # (too-many-lines)
+    # C0302: Too many lines in module (.../1000)
+    # yes, but large files do have a place, albeit only rarely
+    #
+    # (superfluous-parens)
+    # C0325: Unnecessary parens after 'not' keyword
+    # nope, i applaud the clarity of 'if not (0 < i <= last):'
+    #
+    # (wrong-import-order)
+    # C0411: standard import "import ..." should be placed before "import __main__"
+    # nope, i give the win to Flake8
+    #
+
+function --pylint2 () {
+    --pylint1 \
+        -d W0511 -d R0913,R0915 \
         "$@"
 }
 
+    # (fixme)
+    # W0511: FIXME, TODO
 
-#
-# (inconsistent-return-statements)
-# R1710: Either all return statements in a function
-# should return an expression, or none of them should.
-# yes, except when we should all read falling off the end as meaning Return None
-#
-# R1734: Consider using [] instead of list() (use-list-literal)
-# R1735: Consider using {} instead of dict() (use-dict-literal)
-# nope, my old eyes appreciate the louder more explicit 'list()' mark
-#
+    # (too-many-arguments)
+    # R0913: Too many arguments
 
-#
-# C0103: Variable name "..." doesn... conform to snake_case naming style
-# (invalid-name)
-# nope, my one and two letter variable names do have a place, albeit only rarely
-#
-# (consider-iterating-dictionary)
-# C0201: Consider iterating the dictionary directly instead of calling .keys()
-# nope, explicit better than implicit, for keeping part separate from whole
-#
-# (consider-using-f-string)
-# C0209: Formatting a regular string which could be a f-string'
-# nope, going with F Strings always doesn't always make the source more clear
-#
-# (too-many-lines)
-# C0302: Too many lines in module (.../1000)
-# yes, but large files do have a place, albeit only rarely
-#
-# (superfluous-parens)
-# C0325: Unnecessary parens after 'not' keyword
-# nope, i applaud the clarity of 'if not (0 < i <= last):'
-#
-# (wrong-import-order)
-# C0411: standard import "import ..." should be placed before "import __main__"
-# nope, i give the win to Flake8
-#
-#  (import-outside-toplevel)
-# C0415: Import outside toplevel (...
-# ok, i'll disable it explicitly in source when paid to work with it
-#
-
-#
-# (unspecified-encoding)
-# W1514: Using open without explicitly specifying an encoding
-# nope, i keep simply reading text from a file simple, viva default "utf_8"
-#
+    # (too-many-statements)
+    # R0915: Too many statementss
 
 
 #
@@ -826,16 +834,21 @@ function --pylint () {
 #
 
 
-alias -- -e='--exec-echo-xe emacs -nw --no-splash'
+alias -- -e="--exec-echo-xe \"emacs -nw --no-splash --eval '(menu-bar-mode -1)'\""
 alias -- -v='--exec-echo-xe vim'
 
 function -eg () {
-    echo 'emacs -nw --no-splash $(git show --name-only --pretty=)' "$@" >&2
-    emacs       -nw --no-splash $(git show --name-only --pretty=)  "$@"
+    local opts="-nw --no-splash"
+    local arg='(menu-bar-mode -1)'
+    local paths=$(set -xe; git show --name-only --pretty=)
+    echo "emacs -nw --no-splash --eval '(menu-bar-mode -1)'" $paths "$@"
+    emacs       -nw --no-splash --eval '(menu-bar-mode -1)' $paths "$@"
 }
+
 function -vg () {
-    echo 'vim $(git show --name-only --pretty=)' "$@" >&2
-    vim       $(git show --name-only --pretty=)  "$@"
+    local paths=$(set -xe; git show --name-only --pretty=)
+    echo vim $paths "$@" >&2
+    vim $paths "$@" >&2
 }
 
 
@@ -862,7 +875,6 @@ function -p () {
         )
     fi
 }
-
 
 function -p3 () {
     ( set -xe; python3 -i "$@" ~/.python.py 'print(sys.version.split()[0])'; )

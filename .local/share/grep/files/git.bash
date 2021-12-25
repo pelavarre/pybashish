@@ -4,6 +4,10 @@
 
 git --version
 
+git config core.editor
+git config --get-regexp '^user[.]'
+ls ~/.gitconfig .git/config
+
 echo 'git clean -ffxdq'  # destroy everything not added, without backup
 echo 'git reset --hard @{upstream}'  # shove all my comments into the "git reflog", take theirs instead
 

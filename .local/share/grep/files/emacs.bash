@@ -3,14 +3,14 @@
 #
 
 emacs --version
-emacs -nw --no-splash  # free-text glass-terminal
+emacs -nw --no-splash --eval '(menu-bar-mode -1)'  # free-text glass-terminal
 emacs -nw ~/.emacs
 
 #
 # emacs  ⌃G  => cancel
 # emacs  ⌃Q ⌃J  => literal input, literal newline
 #
-# emacs  ⌃A ⌃B ⌃E ⌃F ⌥M  => move column
+# emacs  ⌃A ⌃B ⌃E ⌃F ⌥M ⌥GTab  => move column
 # emacs  ⌥B ⌥F ⌥A ⌥E  => move small word, sentence
 # emacs  ⌃P ⌃N ⌥< ⌥> ⌥GG  => move row, goto line
 # emacs  fixme  => move match balance pair
@@ -26,7 +26,7 @@ emacs -nw ~/.emacs
 #
 # emacs  ⌃X( ⌃X) ⌃XE  => record input, replay input
 # emacs  fixme  => vertical delete copy paste insert
-# emacs  ⌃X⇥ ⌃XRD  => dent/dedent
+# emacs  ⌃XTab ⌃XRD  => dent/dedent
 # emacs  ⌃U1⌥|  => pipe bash, such as ⌥H⌃U1⌥| or ⌥<⌃@⌥>⌃U1⌥|
 #
 # emacs  ⌃V ⌥V ⌃L  => scroll rows
