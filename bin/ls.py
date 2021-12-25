@@ -80,13 +80,14 @@ from __future__ import print_function
 
 import collections
 import datetime as dt
-import distutils.version
 import os
 import stat
 import subprocess
 import sys
 
 import argdoc
+
+import pkg_resources  # in 2021, actually more native than "import distutils"
 
 
 def main():
@@ -448,21 +449,19 @@ def stats_items_sorted(stats_by_name, by, order):
         return items
 
     assert order in "ascending descending".split()
-    py_sort_reverse = True if (order == "descending") else False
+    reverse = True if (order == "descending") else False
 
     items.sort(key=lambda sw: sw[0])
     if by == "extension":
-        items.sort(key=lambda sw: os.path.splitext(sw[0])[-1], reverse=py_sort_reverse)
+        items.sort(key=lambda sw: os.path.splitext(sw[0])[-1], reverse=reverse)
     elif by == "name":  # sort by "name" here meaning sort by name+ext
-        items.sort(key=lambda sw: sw[0], reverse=py_sort_reverse)
+        items.sort(key=lambda sw: sw[0], reverse=reverse)
     elif by == "size":
-        items.sort(key=lambda sw: sw[-1].st_size, reverse=py_sort_reverse)
+        items.sort(key=lambda sw: sw[-1].st_size, reverse=reverse)
     elif by == "time":
-        items.sort(key=lambda sw: sw[-1].st_mtime, reverse=py_sort_reverse)
+        items.sort(key=lambda sw: sw[-1].st_mtime, reverse=reverse)
     elif by == "version":
-        items.sort(
-            key=lambda sw: looser_comparable_version(sw[0]), reverse=py_sort_reverse
-        )
+        items.sort(key=lambda sw: looser_comparable_version(sw[0]), reverse=reverse)
     else:
         assert False
 
@@ -477,9 +476,9 @@ def stats_items_sorted(stats_by_name, by, order):
 # deffed in many files  # missing from docs.python.org
 def looser_comparable_version(vstring):
     """Workaround TypeError in LooseVersion comparisons between int and str"""
-    words = distutils.version.LooseVersion(vstring).version
-    diffables = [([_], []) if isinstance(_, int) else ([], [_]) for _ in words]
-    return diffables
+    # diffable = distutils.version.LooseVersion(vstring).version
+    diffable = pkg_resources.parse_version(vstring)
+    return diffable
 
 
 def print_as_plural_if_plural(tops, index):

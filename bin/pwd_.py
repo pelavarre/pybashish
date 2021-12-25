@@ -16,7 +16,7 @@ quirks:
   offers "--brief" and "--home", unlike Bash anywhere
   offers "--physical" like Linux, not just "-P" like Mac
   doesn't offer the explicit "--logical" of Linux, nor the "-L" of Mac and Linux
-  doesn't redefine the "import pwd" of https://docs.python.org/3/library/pwd.html
+  doesn't redefine the 'import pwd' of https://docs.python.org/3/library/pwd.html
 
 examples:
   pwd
