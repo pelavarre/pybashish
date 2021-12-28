@@ -60,7 +60,7 @@ def main(argv):
             fmt_argv_tail[index] = "-w{}".format(-int(arg))
 
     args = argdoc.parse_args(fmt_argv_tail)
-    width = (stdout_columns - 1) if (args.width is None) else int(args.width)
+    width = (stdout_columns - 1) if (args.w is None) else int(args.w)
 
     # Option to print the ruler and discard Stdin
 

@@ -43,7 +43,6 @@ import argdoc
 def main():
 
     args = argdoc.parse_args()
-    args.j = args.ymd  # FIXME: solve argdoc for when multiple options have same arg YMD
 
     if None not in (args.j, args.date):
         stderr_print("date.py: error: choose -j or --date, not both")

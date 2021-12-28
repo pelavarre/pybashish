@@ -137,7 +137,7 @@ def _parse_read_argv(argv):
 
     # Choose a prompt
 
-    args.prompting = "? " if (args.prompt is None) else args.prompt
+    args.prompting = "? " if (args.p is None) else args.p
 
     return args
 

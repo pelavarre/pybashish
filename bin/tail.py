@@ -10,8 +10,8 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  -F                    --follow --retry
-  -f, --follow          don't quit, keep the file open, to show the lines appended to it, if any
+  -F                    --follow and --retry
+  -f, --follow          don't quit, poll to show the lines appended to the file, if any
   --retry               close and reopen the file, when the file is renamed or rotated
   -n COUNT, --lines COUNT
                         how many trailing lines to show (default: 10)

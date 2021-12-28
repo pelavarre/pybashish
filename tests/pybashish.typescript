@@ -155,13 +155,13 @@ ArgDoc compiles standard Python Arg Docs into standard Python ArgParser Parsers
 Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     $ bin/argdoc.py -ijk
-    usage: argdoc.py [-h] [-q] [-v] [--rip SHRED] [FILE] [-- [WORD [WORD ...]]]
+    usage: argdoc.py [-h] [--rip SHRED] [FILE] [WORD ...]
     argdoc.py: error: unrecognized arguments: -ijk
     + exit 2
     $
 
     $ bin/argdoc.py
-    #!/usr/bin/env python
+    #!/usr/bin/env python3
     # -*- coding: utf-8 -*-
 
     """
@@ -169,56 +169,65 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     do good stuff
 
-    optional arguments:
+    options:
       -h, --help  show this help message and exit
 
     examples:
       Oh no! No examples disclosed!! 💥 💔 💥
     """
 
-
-    import __main__
     import argparse
     import sys
+    import textwrap
 
+    parser = argparse.ArgumentParser(
+        prog="null",
+        description="do good stuff",
+        add_help=True,
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog=textwrap.dedent(
+            """
+            examples:
+              Oh no! No examples disclosed!! 💥 💔 💥
+            """
+        ),
+    )
 
-    def main(argv):
-        """Run a command line"""
+    args = parser.parse_args()
+    sys.stderr.write("{}\n".format(args))
 
-        doc = __main__.__doc__
+    sys.stderr.write("{}\n".format(parser.format_usage().rstrip()))
+    sys.stderr.write("null: error: not implemented\n")
 
-        prog = doc.strip().splitlines()[0].split()[1]
-        description = list(_ for _ in doc.strip().splitlines() if _)[1]
-        epilog_at = doc.index("examples:")
-        epilog = doc[epilog_at:]
-
-        parser = argparse.ArgumentParser(  # copied from '/dev/null' by 'argdoc.py'
-            prog=prog,
-            description=description,
-            add_help=True,
-            formatter_class=argparse.RawTextHelpFormatter,
-            epilog=epilog,
-        )
-
-        args = parser.parse_args(argv[1:])
-        sys.stderr.write("{}\n".format(args))
-
-        main.args = args
-        main.parser = parser
-
-        sys.stderr.write("{}\n".format(parser.format_usage().rstrip()))
-        sys.stderr.write("null: error: not implemented\n")
-        sys.exit(2)  # exit 2 from rejecting usage
-
-
-    if __name__ == "__main__":
-        sys.exit(main(sys.argv))
+    sys.exit(2)  # exit 2 to reject usage
     $
 
     $ bin/argdoc.py /dev/null x y z
-    usage: argdoc.py [-h] [-q] [-v] [--rip SHRED] [FILE] [-- [WORD [WORD ...]]]
-    argdoc.py: error: unrecognized args: 'x y z', in place of '-- x y z'
-    + exit 2
+    ---
+    +++ x y z
+    @@ -2,9 +2,12 @@
+     # -*- coding: utf-8 -*-
+
+     """
+    -usage: null [-h]
+    +usage: null [-h] X
+
+     do good stuff
+    +
+    +positional arguments:
+    +  X           y z
+
+     options:
+       -h, --help  show this help message and exit
+    @@ -30,6 +33,8 @@
+         ),
+     )
+
+    +parser.add_argument("x", metavar="X", help="y z")
+    +
+     args = parser.parse_args()
+     sys.stderr.write("{}\n".format(args))
+
     $
 
     $ rm -fr bin/p.py
@@ -376,42 +385,42 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 ## 2.7 ) ChMod
 
     $ bin/chmod.py
-    usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
+    usage: chmod.py [-h] [-R] MODE [TOP ...]
     chmod.py: error: the following arguments are required: MODE, TOP
     + exit 2
     $
 
     $ bin/chmod.py -R ugo+rw /dev/null
     Namespace(mode='ugo+rw', tops=['/dev/null'], recursive=1)
-    usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
+    usage: chmod.py [-h] [-R] MODE [TOP ...]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py ugo+rw /dev/null -R
     Namespace(mode='ugo+rw', tops=['/dev/null'], recursive=1)
-    usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
+    usage: chmod.py [-h] [-R] MODE [TOP ...]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py -rw /dev/null
-    Namespace(mode='-rw', tops=['/dev/null'], recursive=0)
-    usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
+    Namespace(mode='-rw', tops=['/dev/null'], recursive=False)
+    usage: chmod.py [-h] [-R] MODE [TOP ...]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py +rw /dev/null
-    Namespace(mode='+rw', tops=['/dev/null'], recursive=0)
-    usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
+    Namespace(mode='+rw', tops=['/dev/null'], recursive=False)
+    usage: chmod.py [-h] [-R] MODE [TOP ...]
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py =rw /dev/null
-    Namespace(mode='=rw', tops=['/dev/null'], recursive=0)
-    usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
+    Namespace(mode='=rw', tops=['/dev/null'], recursive=False)
+    usage: chmod.py [-h] [-R] MODE [TOP ...]
     chmod.py: error: not implemented
     + exit 2
     $
@@ -692,8 +701,8 @@ Show the ruler
 ## 2.20 ) Head
 
     $ bin/head.py
-    Namespace(files=[], lines=None)
-    usage: head.py [-h] [-n COUNT] [FILE [FILE ...]]
+    Namespace(files=[], n=None)
+    usage: head.py [-h] [-n COUNT] [FILE ...]
     head.py: error: not implemented
     + exit 2
     $
@@ -981,14 +990,14 @@ Clean up
 ## 2.28 ) Mv
 
     $ bin/mv.py
-    Namespace(file=None, i=0)
+    Namespace(file=None, i=False)
     usage: mv.py [-h] [-i] [FILE]
     mv.py: error: not implemented
     + exit 2
     $
 
     $ bin/mv.py f.file
-    Namespace(file='f.file', i=0)
+    Namespace(file='f.file', i=False)
     usage: mv.py [-h] [-i] [FILE]
     mv.py: error: not implemented
     + exit 2
@@ -1030,7 +1039,7 @@ Clean up
 
     $ bin/rm.py
     Namespace(files=[])
-    usage: rm.py [-h] [FILE [FILE ...]]
+    usage: rm.py [-h] [FILE ...]
     rm.py: error: not implemented
     + exit 2
     $
@@ -1082,8 +1091,8 @@ Clean up
 ## 2.34 ) Tail
 
     $ bin/tail.py
-    Namespace(files=[], F=0, follow=0, retry=0, lines=None)
-    usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE [FILE ...]]
+    Namespace(files=[], F=False, follow=False, retry=False, n=None)
+    usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE ...]
     tail.py: error: not implemented
     + exit 2
     $
@@ -1165,8 +1174,8 @@ Clean up
 ## 2.38 ) Watch
 
     $ bin/watch.py
-    Namespace(words=[], interval=None)
-    usage: watch.py [-h] [-n SECS] [WORD [WORD ...]]
+    Namespace(words=[], n=None)
+    usage: watch.py [-h] [-n SECS] [WORD ...]
     watch.py: error: not implemented
     + exit 2
     $
@@ -1175,8 +1184,8 @@ Clean up
 ## 2.39 ) Wc
 
     $ bin/wc.py
-    Namespace(files=[], max_line_length=0, lines=0, chars=0, bytes=0)
-    usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE [FILE ...]]
+    Namespace(files=[], max_line_length=False, lines=False, chars=False, bytes=False)
+    usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE ...]
     wc.py: error: not implemented
     + exit 2
     $
@@ -1202,8 +1211,8 @@ Split words of lines into one word per line
 ## 3 ) Additional tests
 
 Show every verb called with no args returns exit 0,
-else exit status 2 from rejecting usage,
-else exit status 2 from being stubbed out
+else exit status 2 to reject usage
+else exit status 2 to stub out
 
     $ : - .. #
     $
@@ -1300,7 +1309,7 @@ that still calls for automagic "show this help message and exit"
 
     $ bin/argdoc.py --rip argparse bin/cal.py >bin/p.py
     $ python3 bin/p.py
-    Namespace(ymd=None, help=0, h=0)
+    Namespace(ymd=None, help=False, h=False)
     usage: cal.py [--help] [-h] [YMD]
     cal.py: error: not implemented
     + exit 2
@@ -1308,7 +1317,7 @@ that still calls for automagic "show this help message and exit"
 
     $ bin/argdoc.py --rip argdoc bin/cal.py >bin/p.py
     $ python3 bin/p.py
-    Namespace(ymd=None, help=0, h=0)
+    Namespace(ymd=None, help=False, h=False)
     usage: cal.py [--help] [-h] [YMD]
     cal.py: error: not implemented
     + exit 2

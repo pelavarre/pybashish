@@ -10,7 +10,7 @@ positional arguments:
 
 optional arguments:
   --help  show this help message and exit
-  -h      stop coloring one day (default: color when stdout isatty)
+  -h      stop coloring the day of today (default: do color at stdout isatty)
 
 quirks:
   starts each week on Monday, a la linux "ncal -MC", as in England

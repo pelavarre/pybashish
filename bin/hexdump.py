@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 r"""
-usage: hexdump.py [-h] [-C] [--bytes BYTES] [--charset CHARSET] [--dump-byteset] [FILE [FILE ...]]
+usage: hexdump.py [-h] [-C] [--bytes [BYTES]] [--charset [CHARSET]] [--dump-byteset]
+                  [FILE [FILE ...]]
 
 show bytes as nybbles and more
 
@@ -11,18 +12,18 @@ positional arguments:
 optional arguments:
   -h, --help           show this help message and exit
   -C                   show bytes as eight-bit chars:  distinct monospaced glyphs
-  --bytes [BYTES]      group bytes as each single 1 byte, or pairs of 2, or quads of 4, etc
+  --bytes [BYTES]      group bytes as single bytes, or pairs of 2, or quads of 4, etc
   --charset [CHARSET]  show bytes as decoded by a charset (default: "utf-8")
   --dump-byteset       write the bytes b"\x00" through b"\xff" to stdout
 
 quirks:
-  too many emoji don't do monospace, and passing through arbitrary unicode has arbitrary effects
+  too many emoji don't do monospace, passing unicode through has arbitrary effects
   shows terminal control (not data) characters of \u0000..\u00ff as \u0100..\u01ff
   shows utf-8 emoji as themselves, followed by as many spaces as they have bytes
   shows the bytes of encoding errors as if decoding the characters \u0000..\u00ff
-  shows nybbles in uppercase (following black python not linux c, for the sake of human eyes)
-  shows empty files as a zeroed count of bytes (unlike bash showing nothing to mean zero)
-  shows the --bytes in groups of n at a time (doesn't always make you count off all the bytes)
+  shows nybbles in uppercase (a la black python, not linux c)
+  shows empty files as a zeroed count of bytes (unlike bash showing nothing)
+  shows the --bytes in groups of n at a time (doesn't so much make you count them)
   ends each line when it ends, doesn't pad some with spaces
   doesn't (yet?) compress duplicate lines of hex
 
@@ -38,7 +39,7 @@ examples:
   echo -n hexdump.py |hexdump.py -C
   echo -n hexdump.py |hexdump.py --c  # our shorthand meaning --charset utf-8
   echo -n 0123456789abcdef |hexdump.py --bytes 4 -C  # quads
-  /bin/echo -n $'ijk\xC0\x80nop' |hexdump.py --chars  # overlong encoding, aka non-shortest form
+  /bin/echo -n $'ijk\xC0\x80nop' |hexdump.py --chars  # overlong encoding, non-shortest
   echo -n 'åéîøü←↑→↓⇧⌃⌘⌥💔💥😊😠😢' |hexdump.py --chars  # common non-ascii
   echo -n $'\xC2\xA0 « » “ ’ ” – — ′ ″ ‴ ' |hexdump.py --chars  # common 'smart' chars
   hexdump.py --dump-byteset |hexdump.py --chars

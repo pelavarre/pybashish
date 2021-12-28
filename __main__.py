@@ -7,10 +7,6 @@ import signal
 import subprocess
 import sys
 
-import bin.argdoc  # FIXME: packaging  # concisely require Python >= June/2019 Python 3.7
-
-bin.argdoc.require_sys_version_info()  # duck foolish Flake8 F401 "'...' imported but unused"
-
 
 def main(argv):
     """

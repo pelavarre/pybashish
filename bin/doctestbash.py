@@ -329,7 +329,7 @@ def equal_as_unordered_str_namespace(want, got):
     """
     Reformat a printed Namespace to match the wanted key order
 
-    As a workaround for the change in CPython behavior at:
+    FIXME As a workaround for the change in CPython behavior at:
         argparse should preserve argument ordering in Namespace
         https://bugs.python.org/issue39058
     """
@@ -337,15 +337,19 @@ def equal_as_unordered_str_namespace(want, got):
     # Give up if not a match for prints of "argparse.Namespace" instances
 
     if not want.startswith("Namespace("):
-        return
-    if not got.startswith("Namespace("):
+
         return
 
-    # Give up if this Python doesn't sort an "a" key before a "z" key
+    if not got.startswith("Namespace("):
+
+        return
+
+    # Give up if this Python does sort an "a" key before a "z" key
 
     space = argparse.Namespace(z=26)
     space.a = 1
     if str(space) != "Namespace(z=26, a=1)":
+
         return
 
     # Eval both, and substitute the "want" for the "got" only when they're equal
@@ -353,7 +357,9 @@ def equal_as_unordered_str_namespace(want, got):
     eval_want = eval("argparse." + want)
     eval_got = eval("argparse." + got)
 
-    if eval_want == eval_got:
+    if str(sorted(vars(eval_want).items())) == str(sorted(vars(eval_got).items())):
+        # ok ignore key order, but don't accept False == 0, nor True == 1
+
         return True
 
 

@@ -2,9 +2,8 @@
 
 r"""
 usage: ls.py [-h] [-1] [-C] [-l] [--headings] [-d] [-a] [--full-time] [-F]
-             [--sort FIELD] [-S] [-X] [-f] [-t] [-v] [--ascending]
-             [--descending] [-r]
-             [TOP [TOP ...]]
+             [--sort FIELD] [-S] [-X] [-f] [-t] [-v] [--ascending] [--descending] [-r]
+             [TOP ...]
 
 show the files and dirs inside a dir
 
@@ -15,25 +14,25 @@ optional arguments:
   -h, --help       show this help message and exit
   -1               print as one column: one filename per line
   -C               print by filling multiple columns (default: True)
-  -l               print as rows of permissions, links, owner, group, size, date/time-stamp, name
+  -l               print as rows of perms, links, owner, group, size, date/time, name
   --headings       print as rows (a la -l), but start with one row of column headings
-  -d, --directory  list less rows: each top only as itself, omitting the dirs and files inside it
-  -a, --all        list more rows: add the names starting with a "." dot
-  --full-time      list more details: add the %a weekday and %f microseconds into date/time-stamps
-  -F, --classify   list more details: mark names as "/*@" for dirs, "chmod +x", and "ln -s"
+  -d, --directory  list less: each top as itself, omitting dirs and files inside
+  -a, --all        list more: add the dirs and files whose names start with a "." dot
+  --full-time      detail more: add the %a weekday and %f microseconds
+  -F, --classify   detail more: mark names as "/*@" for dirs, "chmod +x", and "ln -s"
   --sort FIELD     choose sort field by name: ext, name, none, time, or size
-  -S               sort by size descending (or -r ascending)
-  -X               sort by ext ascending (or -r descending)
-  -f               sort by none and imply --all (like classic -f, distinct from Linux -U)
-  -t               sort by time descending (or -r ascending)
-  -v               sort by version ascending (or -r descending) (such as 3.2.1 before 3.10)
+  -S               sort by size descend (or -r ascend)
+  -X               sort by ext ascend (or -r descend)
+  -f               sort --all by none (like classic -f, distinct from Linux -U)
+  -t               sort by time descend (or -r ascend)
+  -v               sort by version ascend (or -r descend) (such as 3.2.1 before 3.10)
   --ascending      sort ascending:  newest to oldest, largest to smallest, etc
   --descending     sort descending:  newest to oldest, largest to smallest, etc
-  -r               reverse the default sorts by size ascending, time ascending, name descending, etc
+  -r               reverse defaults: name desc, size asc, ext desc, time asc, etc
 
 temporary quirks:
   doesn't sort the files before the dirs when given both files and dirs as tops
-  shows only first failure to list a top and quit, should show all failures and successes
+  shows first failure to list a top and quit, not all failures vs successes
 
 quirks:
   doesn't show owner and group
@@ -61,6 +60,7 @@ examples:
   ls.py -C |tee as-wide-as-tty.txt
   (mkdir foo && cd foo/ && echo hi>x && rm -fr ../foo/ && ls.py .)
 """
+# FIXME: add Linux -U like classic -f but without implying -a
 
 # FIXME: -ll print header line "Mode Links Owner Group Bytes m d H:M Name\n"
 # FIXME: -lll print blank line, header line, blank line, data lines, blank trailer line
