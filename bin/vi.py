@@ -510,13 +510,13 @@ ESC = "\x1B"  # Esc
 CSI = ESC + "["  # Control Sequence Introducer (CSI)
 
 ED_2 = "\x1B[2J"  # Erase in Display (ED)  # 2 = Whole Screen
-CUP_Y_X = "\x1B[{};{}H"  # Cursor Position (CUP)
+CUP_Y_X = "\x1B[{};{}H"  # Cursor Position (CUP)  # such as "\x1B[1;1H"
 CUP_1_1 = "\x1B[H"  # Cursor Position (CUP)  # (1, 1) = Upper Left
 
-DECSCUSR_N = "\x1B[{} q"  # Set Cursor Style
+DECSCUSR_N = "\x1B[{} q"  # Set Cursor Style  # such as "\x1B[2 q"
 DECSCUSR = "\x1B[ q"  # Clear Cursor Style (but doc'ed poorly)
 
-SGR_N = "\x1B[{}m"  # Select Graphic Rendition
+SGR_N = "\x1B[{}m"  # Select Graphic Rendition  # such as "\x1B[7m"
 SGR = "\x1B[m"  # SGR > Reset, Normal, All Attributes Off
 
 DECSC = ESC + "7"  # DEC Save Cursor
