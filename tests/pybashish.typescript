@@ -155,7 +155,7 @@ ArgDoc compiles standard Python Arg Docs into standard Python ArgParser Parsers
 Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     $ bin/argdoc.py -ijk
-    usage: argdoc.py [-h] [--rip SHRED] [FILE] [WORD ...]
+    usage: argdoc.py [-h] [--rip SHRED] [FILE] [WORD ...
     argdoc.py: error: unrecognized arguments: -ijk
     + exit 2
     $
@@ -169,7 +169,7 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     do good stuff
 
-    options:
+    option...
       -h, --help  show this help message and exit
 
     examples:
@@ -217,7 +217,7 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
     +positional arguments:
     +  X           y z
 
-     options:
+     option...
        -h, --help  show this help message and exit
     @@ -30,6 +33,8 @@
          ),
@@ -385,42 +385,42 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 ## 2.7 ) ChMod
 
     $ bin/chmod.py
-    usage: chmod.py [-h] [-R] MODE [TOP ...]
+    usage: chmod.py [-h] [-R] MODE [TOP ...
     chmod.py: error: the following arguments are required: MODE, TOP
     + exit 2
     $
 
     $ bin/chmod.py -R ugo+rw /dev/null
     Namespace(mode='ugo+rw', tops=['/dev/null'], recursive=1)
-    usage: chmod.py [-h] [-R] MODE [TOP ...]
+    usage: chmod.py [-h] [-R] MODE [TOP ...
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py ugo+rw /dev/null -R
     Namespace(mode='ugo+rw', tops=['/dev/null'], recursive=1)
-    usage: chmod.py [-h] [-R] MODE [TOP ...]
+    usage: chmod.py [-h] [-R] MODE [TOP ...
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py -rw /dev/null
     Namespace(mode='-rw', tops=['/dev/null'], recursive=False)
-    usage: chmod.py [-h] [-R] MODE [TOP ...]
+    usage: chmod.py [-h] [-R] MODE [TOP ...
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py +rw /dev/null
     Namespace(mode='+rw', tops=['/dev/null'], recursive=False)
-    usage: chmod.py [-h] [-R] MODE [TOP ...]
+    usage: chmod.py [-h] [-R] MODE [TOP ...
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py =rw /dev/null
     Namespace(mode='=rw', tops=['/dev/null'], recursive=False)
-    usage: chmod.py [-h] [-R] MODE [TOP ...]
+    usage: chmod.py [-h] [-R] MODE [TOP ...
     chmod.py: error: not implemented
     + exit 2
     $
@@ -702,7 +702,7 @@ Show the ruler
 
     $ bin/head.py
     Namespace(files=[], n=None)
-    usage: head.py [-h] [-n COUNT] [FILE ...]
+    usage: head.py [-h] [-n COUNT] [FILE ...
     head.py: error: not implemented
     + exit 2
     $
@@ -712,7 +712,7 @@ Show the ruler
 
     # TODO:  Accept Arg Doc Options change from Oct/2021 Python 3.10 more elegantly
 
-    $ bin/help.py help |sed 's,optional arguments:,options:,'
+    $ bin/help.py help
     usage: help.py [-h] [VERB]
 
     print some help
@@ -720,7 +720,7 @@ Show the ruler
     positional arguments:
       VERB        a verb to explain, such as "grep" or "echo"
 
-    options:
+    option...
       -h, --help  show this help message and exit
 
     examples:
@@ -832,16 +832,16 @@ Show the ruler
 
 ## 2.25 ) Ls
 
-List the files and dirs inside a dir
+List the files and dirs inside a dir, no matter local Linux UMask 020 or Mac 022
 
     $ rm -fr lsdir/
     $
 
-    $ bin/mkdir.py -p lsdir/dir
-    $ bin/touch.py lsdir/execable
-    $ chmod +x lsdir/execable
-    $ bin/touch.py lsdir/file
-    $ ln -s "$PWD"/lsdir/file lsdir/link
+    $ (umask 022 && bin/mkdir.py -p lsdir/dir)
+    $ (umask 022 && bin/touch.py lsdir/execable)
+    $ (umask 022 && chmod +x lsdir/execable)
+    $ (umask 022 && bin/touch.py lsdir/file)
+    $ (umask 022 && ln -s "$PWD"/lsdir/file lsdir/link)
     $
 
     $ (cd lsdir/ && ../bin/ls.py -C)
@@ -868,7 +868,7 @@ List the files and dirs inside a dir
 
     $ (cd lsdir/ && ../bin/ls.py -al)
     drwxr-xr-x  .  .  .  .  ...  .
-    drwxr-xr-x  .  .  .  .  ...  ..
+    drwx...r-x  .  .  .  .  ...  ..
     drwxr-xr-x  .  .  .  .  ...  dir
     -rwxr-xr-x  .  .  .  0  ...  execable
     -rw-r--r--  .  .  .  0  ...  file
@@ -1039,7 +1039,7 @@ Clean up
 
     $ bin/rm.py
     Namespace(files=[])
-    usage: rm.py [-h] [FILE ...]
+    usage: rm.py [-h] [FILE ...
     rm.py: error: not implemented
     + exit 2
     $
@@ -1092,7 +1092,7 @@ Clean up
 
     $ bin/tail.py
     Namespace(files=[], F=False, follow=False, retry=False, n=None)
-    usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE ...]
+    usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE ...
     tail.py: error: not implemented
     + exit 2
     $
@@ -1175,7 +1175,7 @@ Clean up
 
     $ bin/watch.py
     Namespace(words=[], n=None)
-    usage: watch.py [-h] [-n SECS] [WORD ...]
+    usage: watch.py [-h] [-n SECS] [WORD ...
     watch.py: error: not implemented
     + exit 2
     $
@@ -1185,7 +1185,7 @@ Clean up
 
     $ bin/wc.py
     Namespace(files=[], max_line_length=False, lines=False, chars=False, bytes=False)
-    usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE ...]
+    usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE ...
     wc.py: error: not implemented
     + exit 2
     $

@@ -38,6 +38,7 @@ examples:
 
 from __future__ import print_function
 
+import argparse
 import pprint
 import shlex
 import subprocess
@@ -92,7 +93,7 @@ class ShVerb(object):
         kwargs__ = dict(kwargs_)
         kwargs__.update(kwargs)
 
-        ran = subprocess.run(args__, **kwargs__)
+        ran = subprocess_run(args__, **kwargs__)
         vars_ = vars(ran)
 
         int_ = Int(ran.returncode)
@@ -100,6 +101,42 @@ class ShVerb(object):
         vars(int_).update(vars_)
 
         return int_
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(*args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(*args, **kwargs)
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+    args_ = args[0] if args else kwargs["args"]
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(*args, **kwargs_)
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    run = argparse.Namespace(
+        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 if __name__ == "__main__":

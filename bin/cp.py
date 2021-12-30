@@ -27,6 +27,7 @@ examples:
 """
 
 
+import argparse
 import glob
 import os
 import re
@@ -64,7 +65,7 @@ def main():
 
         shargv = shlex.split(shline)
         sys.stderr.write("+ {}\n".format(shline))
-        subprocess.run(shargv, stdin=subprocess.PIPE, check=True)
+        subprocess_run(shargv, stdin=subprocess.PIPE, check=True)
 
 
 # deffed in many files  # missing from docs.python.org
@@ -162,6 +163,53 @@ def os_path_rev_eval(rev, default):
             int_rev = int(match.group(1))
 
     return int_rev  # such as 7 from "it~7~" or from "it~7"
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(*args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(*args, **kwargs)
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+
+    args_ = args
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(*args_, **kwargs_)
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
+    run = argparse.Namespace(
+        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 if __name__ == "__main__":

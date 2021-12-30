@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 
+import argparse
 import os
 import signal
 import subprocess
@@ -21,12 +22,50 @@ def main(argv):
     # Call Bash Py, except don't take SIGINT KeyboardInterrupt's from it
 
     bin_bash_py = os.path.join(bin_dir, "bash.py")
-    with_siginfo = signal.signal(signal.SIGINT, handler=signal.SIG_IGN)
+    handler = signal.SIG_IGN  # no KwArgs for 'signal.signal' till later Python
+    with_handler = signal.signal(signal.SIGINT, handler)
     try:
-        ran = subprocess.run([bin_bash_py] + ["-i"] + argv[1:])
+        ran = subprocess_run([bin_bash_py] + ["-i"] + argv[1:])
     finally:
-        signal.signal(signal.SIGINT, with_siginfo)
+        signal.signal(signal.SIGINT, with_handler)
     sys.exit(ran.returncode)
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(*args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(*args, **kwargs)
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+
+    args_ = args[0] if args else kwargs["args"]
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(*args, **kwargs_)
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    run = argparse.Namespace(
+        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 if __name__ == "__main__":

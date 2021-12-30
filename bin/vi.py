@@ -94,7 +94,6 @@ import time
 import traceback
 import tty
 
-subprocess_run = subprocess.run  # evade Linters who freak over "shell=True"
 
 ENV_HOME = os.environ["HOME"]
 
@@ -8650,6 +8649,42 @@ def str_remove_line_end(chars):
     line = (chars + "\n").splitlines()[0]
 
     return line
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(*args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(*args, **kwargs)
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+    args_ = args[0] if args else kwargs["args"]
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(*args, **kwargs_)
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    run = argparse.Namespace(
+        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 # Cite some Terminal Doc's and Git-track experience of Terminal Output magic

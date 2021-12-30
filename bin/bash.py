@@ -29,6 +29,7 @@ examples:
 
 from __future__ import print_function
 
+import argparse
 import collections
 import getpass
 import os
@@ -220,7 +221,7 @@ def builtin_via_py(what_py, argv=None):
     wherewhat = os.path.join(FILE_DIR, what_py)
     wherewhat_argv = [wherewhat] + argv[1:]
 
-    ran = subprocess.run(wherewhat_argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    ran = subprocess_run(wherewhat_argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     return ran
 
@@ -313,7 +314,7 @@ def _compile_shline(shline, argv):
         argv_ = shlex.split(escaped_shline)
 
         def how(argv):
-            ran = subprocess.run(argv_)
+            ran = subprocess_run(argv_)
             return ran.returncode
 
         return how
@@ -337,7 +338,7 @@ def _compile_shline(shline, argv):
 
         def how(argv):
             try:
-                ran = subprocess.run([wherewhat] + argv[1:])
+                ran = subprocess_run([wherewhat] + argv[1:])
             except PermissionError as exc:
                 stderr_print("bash.py: error: {}: {}".format(type(exc).__name__, exc))
                 ran.returncode = 126  # exit 126 from executable permission error
@@ -374,11 +375,11 @@ def _compile_explicit_relpath(verb):
 def _calc_wherewhat(verb):
     """Map verb to file"""
 
-    what = f"{verb}_.py"
+    what = "{}_.py".format(verb)
     wherewhat = os.path.join(FILE_DIR, what)
     if not os.path.exists(wherewhat):
         if not verb.endswith("_"):
-            what = f"{verb}.py"
+            what = "{}.py".format(verb)
             wherewhat = os.path.join(FILE_DIR, what)
 
     return wherewhat
@@ -432,9 +433,13 @@ def calc_ps1():
     green = "\x1B[00;32m"  # Demo ANSI TTY escape codes without "01;" bolding
     blue = "\x1B[00;34m"
 
-    ps1 = f"{green}{user}@{hostname}{nocolor}:"
-    ps1 += f"{blue}{pwd}{nocolor}{mark} \r\n"
-    ps1 += f"({env}) {mark} "
+    ps1 = "{green}{user}@{hostname}{nocolor}:".format(
+        green=green, user=user, hostname=hostname, nocolor=nocolor
+    )
+    ps1 += "{blue}{pwd}{nocolor}{mark} \r\n".format(
+        blue=blue, pwd=pwd, nocolor=nocolor, mark=mark
+    )
+    ps1 += "({env}) {mark} ".format(env=env, mark=mark)
 
     #
 
@@ -443,7 +448,7 @@ def calc_ps1():
 
         return ps1
 
-    brief_ps1 = f"({env}) {mark} "
+    brief_ps1 = "({env}) {mark} ".format(env=env, mark=mark)
 
     return brief_ps1
 
@@ -497,10 +502,47 @@ def shutil_ps1_tuple():
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
+    print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(*args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(*args, **kwargs)
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+
+    args_ = args[0] if args else kwargs["args"]
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(*args, **kwargs_)
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    run = argparse.Namespace(
+        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 BUILTINS = {

@@ -493,7 +493,9 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         self.echoes = self.echoes[:-1]
         self.chars = self.chars[:-1]
-        self.putch(f"{backing}{blanking}{backing}")
+        self.putch(
+            "{backing}{blanking}{backing}".format(backing=backing, blanking=blanking)
+        )
 
     def _drop_line(self, stdin):  # aka Stty "kill" many, aka Bind "unix-line-discard"
         """Undo all the inserts of chars since the start of line"""
@@ -636,9 +638,9 @@ class GlassTeletype(contextlib.ContextDecorator):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
+    print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 

@@ -103,6 +103,7 @@ examples:
 # TODO: announce first file dropped into "~/.pb_history/pb.bin~"
 
 
+import argparse
 import collections
 import datetime as dt
 import decimal
@@ -709,7 +710,7 @@ class PbVirtualMachine:
 
         stderr_print("+", shline)
         argv = shlex.split(shline)
-        ran = subprocess.run(
+        ran = subprocess_run(
             argv,
             shell=False,
             input=shinput,
@@ -953,7 +954,7 @@ def suspend_to_pb(pb_lines):
 
     argv = shlex.split("pbcopy")
 
-    ran = subprocess.run(  # call for Stdin, without Stdout/err, with ReturnCode Zero
+    ran = subprocess_run(  # call for Stdin, without Stdout/err, with ReturnCode Zero
         argv,
         shell=False,
         input=shinput,
@@ -1003,9 +1004,9 @@ def check(goal=None, want=True, got=None, **kwargs):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
+    print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 
@@ -1029,13 +1030,50 @@ def strip_right_above_below(chars):
     return chars
 
 
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(*args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(*args, **kwargs)
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+
+    args_ = args[0] if args else kwargs["args"]
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")  # FIXME for _shbutton
+
+    sub = subprocess.Popen(*args, **kwargs_)
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    run = argparse.Namespace(
+        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
+
+
 # deffed in many files  # missing from docs.python.org
 def subprocess_run_check_stdout_chars(args):
     """Call for Stdout, without Stderr, with ReturnCode Zero"""
 
     argv = shlex.split(args)
 
-    ran = subprocess.run(
+    ran = subprocess_run(
         argv,
         shell=False,
         stdin=subprocess.PIPE,

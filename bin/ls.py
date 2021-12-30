@@ -78,6 +78,7 @@ examples:
 
 from __future__ import print_function
 
+import argparse
 import collections
 import datetime as dt
 import os
@@ -774,22 +775,59 @@ def sys_stdout_guess_tty_columns_os_environ_int(hint):
 def os_path_isdir_deleted(top):  # FIXME: solve this without calling:  bash /dev/null
     """Mark a deleted dir apart from undeleted dirs, even if working inside of it"""
 
-    ran = subprocess.run(
+    run = subprocess_run(
         "bash /dev/null".split(),
         cwd=top,
         stdin=subprocess.PIPE,  # FIXME FIXME: how often should .run.stdin be PIPE?
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
-    if ran.stdout or ran.stderr or ran.returncode:
+    if run.stdout or run.stderr or run.returncode:
         return True
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
+    print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(*args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(*args, **kwargs)
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+
+    args_ = args[0] if args else kwargs["args"]
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(*args, **kwargs_)
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    run = argparse.Namespace(
+        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 if __name__ == "__main__":

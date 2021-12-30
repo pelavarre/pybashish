@@ -1599,11 +1599,11 @@ def exit_unless_main_doc_eq(parser):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
     """Format and log like "print", except flush Stdout & write and flush Stderr"""
 
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
+    print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 

@@ -127,7 +127,7 @@ def main(argv):
         sys.exit(0)  # exit zero from printing help
 
     if main.args.verbose >= 2:
-        stderr_print(f"grep.py: args={args}")
+        stderr_print("grep.py: args={}".format(args))
 
     # Publish default files individually, apart from this source file
 
@@ -326,7 +326,7 @@ def _ext_files_readlines(ext, files):
             chars = incoming.read()
         file_lines = chars.splitlines()
 
-        prefix = "" if (ext_ == ext) else f"# {what}: "
+        prefix = "" if (ext_ == ext) else "# {what}: ".format(what=what)
 
         prefixed_lines = file_lines
         if prefix:
@@ -601,18 +601,22 @@ def split_paragraphs(lines, keepends=False):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
 def verbose_print(*args, **kwargs):
+    """Print the Args, but to Stderr, not to Stdout, but only when Main Arg Verbose"""
+
     sys.stdout.flush()
     if main.args.verbose:
-        print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+        print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org

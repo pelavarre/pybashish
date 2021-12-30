@@ -15,7 +15,6 @@ from __future__ import print_function
 import argparse
 import collections
 import inspect
-import io
 import shlex
 import subprocess
 import sys
@@ -66,8 +65,7 @@ def subprocess_run(*args, **kwargs):
     """
     Emulate Python 3 "subprocess.run"
 
-    Leave in place the standard defaults of stdin=sys.stdin, stdout=sys.stdout, stderr=sys.stderr
-    Although most callers mean to say stdin=subprocess.PIPE
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
     """
 
     args_ = args[0] if args else kwargs["args"]
@@ -76,19 +74,18 @@ def subprocess_run(*args, **kwargs):
     if ("input" in kwargs) and ("stdin" in kwargs):
         raise ValueError("stdin and input arguments may not both be used.")
 
-    if "input" in kwargs:  # FIXME FIXME FIXME: this doesn't work??
-        del kwargs_["input"]
-        kwargs_["stdin"] = io.StringIO(kwargs["input"])
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
 
     sub = subprocess.Popen(*args, **kwargs_)
     (stdout, stderr) = sub.communicate()
     returncode = sub.poll()
 
-    ran = argparse.Namespace(
+    run = argparse.Namespace(
         args=args_, stdout=stdout, stderr=stderr, returncode=returncode
     )
 
-    return ran
+    return run
 
 
 # deffed in many files  # missing from docs.python.org
