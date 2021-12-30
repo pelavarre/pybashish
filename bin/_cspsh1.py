@@ -23,6 +23,9 @@ examples:
   cspsh.py -i  # chat out one result at a time
   cspsh.py -f  # dump a large pile of results
 """
+
+# TODO: PyLint speaks of E1101: Instance of '...' has no '...' member (no-member)
+
 # FIXME: bring in the maths unicode that doesn't copy-paste well from 1.4..1.10
 
 # FIXME: disentangle "passme.cspvm" from "def CspCommandLine"
@@ -471,6 +474,7 @@ class EventChoice(CspWorker):
                 CspCommandLine.cspvm.trace_close()
 
     def __str__(self):
+        # pylint: disable=disallowed-name  # disallowed name "bar"
 
         bars = self.bars
         choices = self.choices
@@ -485,6 +489,7 @@ class EventChoice(CspWorker):
 
     @classmethod
     def take_one(cls, taker):
+        # pylint: disable=disallowed-name  # disallowed name "bar"
 
         choices = list()
         bars = list()
@@ -1037,10 +1042,12 @@ class ShardsTaker(argparse.Namespace):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args, end=None):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, end=end, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org

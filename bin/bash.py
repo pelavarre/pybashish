@@ -29,6 +29,7 @@ examples:
 
 from __future__ import print_function
 
+import argparse
 import collections
 import getpass
 import os
@@ -47,6 +48,7 @@ FILE_DIR = os.path.split(os.path.realpath(__file__))[0]  # sample before 1st "os
 
 
 def main(argv):
+    _ = argv
 
     args = argdoc.parse_args()
     if not args.interact:
@@ -220,12 +222,13 @@ def builtin_via_py(what_py, argv=None):
     wherewhat = os.path.join(FILE_DIR, what_py)
     wherewhat_argv = [wherewhat] + argv[1:]
 
-    ran = subprocess.run(wherewhat_argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    ran = subprocess_run(wherewhat_argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     return ran
 
 
 def builtin_help(argv):
+    _ = argv
     compile_and_run_shline("help")
 
 
@@ -248,16 +251,19 @@ def builtin_history(argv):
     except SystemExit as exc:
         returncode = exc.code
 
-        return returncode
+        return returncode  # TODO: always zero here?
 
     shlines = read.ShLineHistory.shlines  # couple less tightly  # add date/time-stamp's
     for (index, shline) in enumerate(shlines):
         lineno = 1 + index
         print("{:5d}  {}".format(lineno, shline))
 
+    return None
+
 
 def builtin_pass(argv):  # think more about  $ : --help
-    pass  # FIXME: stop zeroing last exit status "$?" at each blank input line
+    _ = argv
+    # FIXME: stop zeroing last exit status "$?" at each blank input line
 
 
 #
@@ -312,11 +318,12 @@ def _compile_shline(shline, argv):
         escaped_shline = shline[len(":!") :].lstrip()
         argv_ = shlex.split(escaped_shline)
 
-        def how(argv):
-            ran = subprocess.run(argv_)
+        def how1(argv):
+            _ = argv
+            ran = subprocess_run(argv_)
             return ran.returncode
 
-        return how
+        return how1
 
     # Plan to decline to call any explicit relpath
 
@@ -335,15 +342,15 @@ def _compile_shline(shline, argv):
 
     if os.path.exists(wherewhat):
 
-        def how(argv):
+        def how2(argv):
             try:
-                ran = subprocess.run([wherewhat] + argv[1:])
+                ran = subprocess_run([wherewhat] + argv[1:])
             except PermissionError as exc:
                 stderr_print("bash.py: error: {}: {}".format(type(exc).__name__, exc))
                 ran.returncode = 126  # exit 126 from executable permission error
             return ran.returncode
 
-        return how
+        return how2
 
     # Plan to reject a verb that maps to a Py file that doesn't exist
 
@@ -374,11 +381,11 @@ def _compile_explicit_relpath(verb):
 def _calc_wherewhat(verb):
     """Map verb to file"""
 
-    what = f"{verb}_.py"
+    what = "{}_.py".format(verb)
     wherewhat = os.path.join(FILE_DIR, what)
     if not os.path.exists(wherewhat):
         if not verb.endswith("_"):
-            what = f"{verb}.py"
+            what = "{}.py".format(verb)
             wherewhat = os.path.join(FILE_DIR, what)
 
     return wherewhat
@@ -387,19 +394,21 @@ def _calc_wherewhat(verb):
 def _compile_log_error(message):
     """Plan to log an error message and return nonzero"""
 
-    def how(argv):
+    def how3(argv):
+        _ = argv
         return _log_error(message)
 
-    return how
+    return how3
 
 
 def _compile_return_error():
     """Plan to to return nonzero, as if error message already logged"""
 
-    def how(argv):
+    def how4(argv):
+        _ = argv
         return 127
 
-    return how
+    return how4
 
 
 def _log_error(message):
@@ -432,9 +441,13 @@ def calc_ps1():
     green = "\x1B[00;32m"  # Demo ANSI TTY escape codes without "01;" bolding
     blue = "\x1B[00;34m"
 
-    ps1 = f"{green}{user}@{hostname}{nocolor}:"
-    ps1 += f"{blue}{pwd}{nocolor}{mark} \r\n"
-    ps1 += f"({env}) {mark} "
+    ps1 = "{green}{user}@{hostname}{nocolor}:".format(
+        green=green, user=user, hostname=hostname, nocolor=nocolor
+    )
+    ps1 += "{blue}{pwd}{nocolor}{mark} \r\n".format(
+        blue=blue, pwd=pwd, nocolor=nocolor, mark=mark
+    )
+    ps1 += "({env}) {mark} ".format(env=env, mark=mark)
 
     #
 
@@ -443,7 +456,7 @@ def calc_ps1():
 
         return ps1
 
-    brief_ps1 = f"({env}) {mark} "
+    brief_ps1 = "({env}) {mark} ".format(env=env, mark=mark)
 
     return brief_ps1
 
@@ -497,10 +510,58 @@ def shutil_ps1_tuple():
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(args, **kwargs)  # pylint: disable=subprocess-run-check
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
+    run = argparse.Namespace(
+        args=args, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 BUILTINS = {

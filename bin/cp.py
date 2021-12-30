@@ -27,6 +27,7 @@ examples:
 """
 
 
+import argparse
 import glob
 import os
 import re
@@ -46,8 +47,8 @@ def main():
 
     # Pick a ToName to copy to
 
-    (dirname, basename) = os.path.split(frompath)
-    (base, ext, rev) = os_path_partition(basename)
+    (_, basename) = os.path.split(frompath)
+    (base, _, _) = os_path_partition(basename)
     toname = os_path_nextname(basename=base)
 
     # Copy and touch
@@ -64,7 +65,7 @@ def main():
 
         shargv = shlex.split(shline)
         sys.stderr.write("+ {}\n".format(shline))
-        subprocess.run(shargv, stdin=subprocess.PIPE, check=True)
+        subprocess_run(shargv, stdin=subprocess.PIPE, check=True)
 
 
 # deffed in many files  # missing from docs.python.org
@@ -87,7 +88,7 @@ def os_path_choose():
 def os_path_intrev(path):
     """Pick the Rev Int out of a Path"""
 
-    (base, ext, rev) = os_path_partition(path)
+    (_, _, rev) = os_path_partition(path)
     intrev = os_path_rev_eval(rev, default=0)
 
     return intrev
@@ -106,10 +107,10 @@ def os_path_nextname(basename):
 
         return basename
 
-    paths.sort(key=lambda _: os_path_intrev(_))
+    paths.sort(key=os_path_intrev)
     last_path = paths[-1]
 
-    (base, ext, rev) = os_path_partition(last_path)
+    (base, ext, _) = os_path_partition(last_path)
     last_intrev = os_path_intrev(last_path)
     next_intrev = last_intrev + 1
 
@@ -162,6 +163,52 @@ def os_path_rev_eval(rev, default):
             int_rev = int(match.group(1))
 
     return int_rev  # such as 7 from "it~7~" or from "it~7"
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(args, **kwargs)  # pylint: disable=subprocess-run-check
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
+    run = argparse.Namespace(
+        args=args, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 if __name__ == "__main__":

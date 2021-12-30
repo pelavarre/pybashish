@@ -48,7 +48,7 @@ import sys
 import argdoc
 
 
-def main(argv):
+def main():
     """Run from the Command Line"""
 
     # Parse args
@@ -245,19 +245,19 @@ def take_one_test(incoming, line):
 def run_one_shline(shline):
     """Shell out"""
 
-    ran = subprocess.run(
+    run = subprocess_run(
         shline,
         shell=True,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
-    assert not ran.stderr  # because stderr=subprocess.STDOUT
-    assert ran.returncode is not None
+    assert not run.stderr  # because stderr=subprocess.STDOUT
+    assert run.returncode is not None
 
-    gots = ran.stdout.decode().strip().replace("\r\n", "\n").splitlines()
-    if ran.returncode:
-        gots.append("+ exit {}".format(ran.returncode))
+    gots = run.stdout.decode().strip().replace("\r\n", "\n").splitlines()
+    if run.returncode:
+        gots.append("+ exit {}".format(run.returncode))
 
     return gots
 
@@ -276,12 +276,14 @@ def require_test_passed(path, passes, gots, dent, wants):
     tail_wants = list(wants)
     tail_gots = list(gots)
 
+    want = got = None
     for (want, got) in zip(wants + empties, gots + empties):
 
         if got != want:
             if not equal_as_unordered_str_namespace(want, got=got):
                 if not equal_but_for_ellipses(got, want=want):
                     eq = False
+
                     break
 
         vv_print(dent + got)
@@ -290,6 +292,7 @@ def require_test_passed(path, passes, gots, dent, wants):
         tail_gots = tail_gots[1:]
 
     if eq:
+
         return
 
     vv_print()
@@ -300,8 +303,10 @@ def require_test_passed(path, passes, gots, dent, wants):
     vv_print()
     vv_print()
 
-    vv_print("want ......: {}".format(want))
-    vv_print("but got ...: {}".format(got))
+    vv_print("want .......: {}".format(want))
+    vv_print("but got ....: {}".format(got))
+    diff_mask = "".join(("^" if (_[0] != _[-1]) else ".") for _ in zip(want, got))
+    vv_print("diff mask ..: {}".format(diff_mask))
     vv_print()
     vv_print()
 
@@ -309,7 +314,7 @@ def require_test_passed(path, passes, gots, dent, wants):
     if ellipsis in want:
 
         vv_print("want splits ......: {}".format(want.split(ellipsis)))
-        vv_print("but got ..........: {}".format(repr(got)))
+        vv_print("but got splits ...: {}".format(got.split(ellipsis)))
         vv_print()
         vv_print()
 
@@ -329,7 +334,7 @@ def equal_as_unordered_str_namespace(want, got):
     """
     Reformat a printed Namespace to match the wanted key order
 
-    As a workaround for the change in CPython behavior at:
+    FIXME As a workaround for the change in CPython behavior at:
         argparse should preserve argument ordering in Namespace
         https://bugs.python.org/issue39058
     """
@@ -337,24 +342,24 @@ def equal_as_unordered_str_namespace(want, got):
     # Give up if not a match for prints of "argparse.Namespace" instances
 
     if not want.startswith("Namespace("):
-        return
+
+        return False
+
     if not got.startswith("Namespace("):
-        return
 
-    # Give up if this Python doesn't sort an "a" key before a "z" key
-
-    space = argparse.Namespace(z=26)
-    space.a = 1
-    if str(space) != "Namespace(z=26, a=1)":
-        return
+        return False
 
     # Eval both, and substitute the "want" for the "got" only when they're equal
 
-    eval_want = eval("argparse." + want)
-    eval_got = eval("argparse." + got)
+    eval_want = eval("argparse." + want)  # pylint: disable=eval-used
+    eval_got = eval("argparse." + got)  # pylint: disable=eval-used
 
-    if eval_want == eval_got:
+    if str(sorted(vars(eval_want).items())) == str(sorted(vars(eval_got).items())):
+        # ok ignore key order, but don't accept False == 0, nor True == 1
+
         return True
+
+    return False
 
 
 def equal_but_for_ellipses(got, want):
@@ -386,6 +391,7 @@ def equal_but_for_ellipses(got, want):
     # Fail if some text unmatched
 
     if given:
+
         return False
 
     # Succeed here, if no failures above
@@ -398,15 +404,68 @@ def vv_print(*args):
         stderr_print(*args)
 
 
+#
+# Call on Python
+#
+
+
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(args, **kwargs)  # pylint: disable=subprocess-run-check
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
+    run = argparse.Namespace(
+        args=args, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    main()
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

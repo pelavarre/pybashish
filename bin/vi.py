@@ -94,7 +94,6 @@ import time
 import traceback
 import tty
 
-subprocess_run = subprocess.run  # evade Linters who freak over "shell=True"
 
 ENV_HOME = os.environ["HOME"]
 
@@ -510,13 +509,13 @@ ESC = "\x1B"  # Esc
 CSI = ESC + "["  # Control Sequence Introducer (CSI)
 
 ED_2 = "\x1B[2J"  # Erase in Display (ED)  # 2 = Whole Screen
-CUP_Y_X = "\x1B[{};{}H"  # Cursor Position (CUP)
+CUP_Y_X = "\x1B[{};{}H"  # Cursor Position (CUP)  # such as "\x1B[1;1H"
 CUP_1_1 = "\x1B[H"  # Cursor Position (CUP)  # (1, 1) = Upper Left
 
-DECSCUSR_N = "\x1B[{} q"  # Set Cursor Style
+DECSCUSR_N = "\x1B[{} q"  # Set Cursor Style  # such as "\x1B[2 q"
 DECSCUSR = "\x1B[ q"  # Clear Cursor Style (but doc'ed poorly)
 
-SGR_N = "\x1B[{}m"  # Select Graphic Rendition
+SGR_N = "\x1B[{}m"  # Select Graphic Rendition  # such as "\x1B[7m"
 SGR = "\x1B[m"  # SGR > Reset, Normal, All Attributes Off
 
 DECSC = ESC + "7"  # DEC Save Cursor
@@ -8635,12 +8634,12 @@ def shlex_quote(arg):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args):  # later Python 3 accepts ', **kwargs' here
+def stderr_print(*args):
     """Print the Args, but to Stderr, not to Stdout"""
 
     sys.stdout.flush()
     print(*args, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
@@ -8650,6 +8649,52 @@ def str_remove_line_end(chars):
     line = (chars + "\n").splitlines()[0]
 
     return line
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(args, **kwargs)  # pylint: disable=subprocess-run-check
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
+    run = argparse.Namespace(
+        args=args, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 # Cite some Terminal Doc's and Git-track experience of Terminal Output magic

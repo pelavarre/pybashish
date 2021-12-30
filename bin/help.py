@@ -22,6 +22,7 @@ examples:
 
 from __future__ import print_function
 
+import argparse
 import glob
 import os
 import shlex
@@ -64,7 +65,7 @@ def main():
     if args.verb:
         what = whats_by_verb[args.verb]
         shline = "./{} --help".format(what)
-        ran = subprocess.run(shlex.split(shline))
+        ran = subprocess_run(shlex.split(shline))
         sys.exit(ran.returncode)
 
     #
@@ -142,10 +143,58 @@ def print_cells(cells, dent="    ", sep="  ", width=None):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
+
+
+# deffed in many files  # since Sep/2015 Python 3.5
+def subprocess_run(args, **kwargs):
+    """
+    Emulate Python 3 "subprocess.run"
+
+    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    """
+
+    # Trust the library, if available
+
+    if hasattr(subprocess, "run"):
+        run = subprocess.run(args, **kwargs)  # pylint: disable=subprocess-run-check
+
+        return run
+
+    # Emulate the library roughly, because often good enough
+
+    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
+
+    if ("input" in kwargs) and ("stdin" in kwargs):
+        raise ValueError("stdin and input arguments may not both be used.")
+
+    if "input" in kwargs:
+        raise NotImplementedError("subprocess.run.input")
+
+    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
+    (stdout, stderr) = sub.communicate()
+    returncode = sub.poll()
+
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
+    run = argparse.Namespace(
+        args=args, stdout=stdout, stderr=stderr, returncode=returncode
+    )
+
+    return run
 
 
 if __name__ == "__main__":

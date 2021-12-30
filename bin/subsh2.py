@@ -51,7 +51,7 @@ import py3ish
 
 def main(argv):
 
-    args = argdoc.parse_args()
+    args = argdoc.parse_args(argv[1:])
     words = args.words
 
     verb = ShVerb()
@@ -95,10 +95,10 @@ class ShVerb(object):
         kwargs__ = dict(kwargs_)
         kwargs__.update(kwargs)
 
-        ran = py3ish.subprocess_run(args__, **kwargs__)
-        vars_ = vars(ran)
+        run = py3ish.subprocess_run(args__, **kwargs__)
+        vars_ = vars(run)
 
-        int_ = Int(ran.returncode)
+        int_ = Int(run.returncode)
         int_.vars = vars_
         vars(int_).update(vars_)
 

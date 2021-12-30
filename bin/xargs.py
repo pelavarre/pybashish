@@ -31,7 +31,7 @@ def main():
 
     words = stdin.split()
     len_words = len(words)
-    words_per_line = len_words if (args.max_args is None) else int(args.max_args)
+    words_per_line = len_words if (args.n is None) else int(args.n)
 
     if len_words:
         for index in range(0, len_words, words_per_line):

@@ -63,21 +63,21 @@ def main(argv):
 
     # Require -tvf or -xvkf
 
-    tvf = args.t and args.v and args.file
-    xvkf = args.x and args.v and args.k and args.file
+    tvf = args.t and args.v and args.f
+    xvkf = args.x and args.v and args.k and args.f
     if not (tvf or xvkf):
         stderr_print_usage_error(args)
         sys.exit(2)  # exit 2 from rejecting usage
 
     # Interpret -tvf or -xvkf
 
-    args_file = args.file
-    if args.file == "-":
-        args_file = "/dev/stdin"
+    args_f = args.f
+    if args.f == "-":
+        args_f = "/dev/stdin"
         prompt_tty_stdin()
 
     try:
-        tar_file_tvf_xvkf(args_file, args_x=args.x)
+        tar_file_tvf_xvkf(args_f, args_x=args.x)
     except Exception:
         sys.stderr.write("tar.py: error: args={}\n".format(args))
         raise
@@ -92,7 +92,7 @@ def stderr_print_usage_error(args):
     for concise in "txvk":
         if getattr(args, concise):
             str_args += concise
-    if args.file is not None:
+    if args.f is not None:
         str_args += "f"
     str_args = "-{}".format(str_args) if str_args else ""
 
@@ -105,12 +105,12 @@ def stderr_print_usage_error(args):
         stderr_print("tar.py: error: unrecognized arguments: {}".format(str_args))
 
 
-def tar_file_tvf_xvkf(args_file, args_x):
+def tar_file_tvf_xvkf(args_f, args_x):
     """Walk the files and dirs found inside a top dir compressed as Tgz"""
 
     # Walk to each file or dir found inside
 
-    with tarfile.open(args_file) as untarring:  # tarfile.TarFile
+    with tarfile.open(args_f) as untarring:  # tarfile.TarFile
 
         names = untarring.getnames()
         for name in names:
@@ -146,10 +146,12 @@ def prompt_tty_stdin():
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

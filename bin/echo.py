@@ -30,7 +30,7 @@ import sys
 import argdoc
 
 
-def main(argv):
+def main():
 
     args = argdoc.parse_args()
 
@@ -46,7 +46,7 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    main()
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

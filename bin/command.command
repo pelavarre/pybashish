@@ -406,15 +406,11 @@ def path_from_bashline(bashline, filename):
 
 
 def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
 
-    if stderr_print.separate_once:
-        stderr_print.separate_once = False
-        sys.stderr.write("\n")
-
-    str_args = " ".join(str(_) for _ in args)
-    sys.stderr.write("{}\n".format(str_args))
-
-    sys.stderr.flush()
+    sys.stdout.flush()
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 main()

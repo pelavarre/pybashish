@@ -26,6 +26,11 @@ examples:
 # code reviewed by people, and by Black and Flake8 bots
 # table of contents in Vim at :/g^#
 
+# TODO: PyLint E1101: Instance of '...' has no '...' member (no-member)
+# TODO: PyLint R0901: Too many ancestors (.../7) (too-many-ancestors)
+# TODO: PyLint R0911: Too many return statements (.../6) (too-many-return-statements)
+# TODO: PyLint R1710: ... all ... return an expr... (inconsistent-return-statements)
+
 
 import __main__
 import argparse
@@ -373,7 +378,7 @@ class Cell:
         formats.append(head)
 
         last_index = len(replies) - 1
-        for (index, bond) in enumerate(replies):
+        for index in range(len(replies)):
             if index == 0:
                 formats.append(first)  # say a single bond is more a first, less a last
             elif index == last_index:
@@ -417,22 +422,22 @@ class Bond(collections.namedtuple("Bond", "up, key, down".split(", "))):
 class SourceCell(Cell):
     """Format the Graph rooted by the Cell, as Source Chars of our Lisp on Python"""
 
-    def _as_source_(cell, func, replies, style):
+    def _as_source_(self, func, replies, style):
         """Format this Cell as Source Chars"""
 
         # Pull the Replies from the Graph, if none supplied
         # else form Source Chars out of the Replies
 
         if replies is None:
-            py = cell._grok_(func=func)
+            py = self._grok_(func=func)
             return py
 
         # Study this Cell, its children, and the bonds between them
 
-        bonds = list(cell._bonds_())
+        bonds = list(self._bonds_())
 
-        cell_type_name = type(cell).__name__
-        formats = cell._choose_formats_(style, replies=replies)
+        cell_type_name = type(self).__name__
+        formats = self._choose_formats_(style, replies=replies)
 
         assert len(replies) == len(bonds)
         assert len(formats[1:][:-1]) == len(replies)
@@ -450,7 +455,7 @@ class SourceCell(Cell):
 
             str_reply = str(reply)
             if isinstance(down, str):  # TODO: 'isinstance' should be method
-                if func == format_as_py:  # TODO: inelegant to override str for func
+                if func is format_as_py:  # TODO: inelegant to override str for func
                     str_reply = '"{}"'.format(reply)
 
             if key is None:
@@ -1018,9 +1023,9 @@ class Proc(ArgsCspCell, collections.namedtuple("Proc", list())):
     def _accept_one_(cls, bot):
         if proc_with_args := bot.accept_one(ProcWithArgs):
             return proc_with_args
-        elif proc_with_one := bot.accept_one(ProcWithOne):
+        if proc_with_one := bot.accept_one(ProcWithOne):
             return proc_with_one
-        elif proc_name := bot.accept_one(ProcName):
+        if proc_name := bot.accept_one(ProcName):
             return proc_name
 
 
@@ -1165,9 +1170,9 @@ class World(
     def _accept_one_(cls, bot):
         if event_set := bot.accept_one(EventSet):
             return event_set
-        elif argot := bot.accept_one(Argot):
+        if argot := bot.accept_one(Argot):
             return argot
-        elif alphabet := bot.accept_one(Alphabet):
+        if alphabet := bot.accept_one(Alphabet):
             return alphabet
 
 
@@ -1204,7 +1209,7 @@ class Step(
     def _accept_one_(cls, bot):
         if argot_event := bot.accept_one(ArgotEvent):
             return argot_event
-        elif event := bot.accept_one(Event):
+        if event := bot.accept_one(Event):
             return event
 
 
@@ -1241,7 +1246,7 @@ class Epilog(
     def _accept_one_(cls, bot):
         if proc := bot.accept_one(Proc):
             return proc
-        elif pocket := bot.accept_one(Pocket):
+        if pocket := bot.accept_one(Pocket):
             return pocket
 
 
@@ -1343,11 +1348,11 @@ class ProcBody(KwArgsCspCell, collections.namedtuple("ProcBody", list())):
     def _accept_one_(cls, bot):
         if sharp_body := bot.accept_one(SharpBody):
             return sharp_body
-        elif fuzzy_body := bot.accept_one(FuzzyBody):
+        if fuzzy_body := bot.accept_one(FuzzyBody):
             return fuzzy_body
-        elif fork := bot.accept_one(Fork):
+        if fork := bot.accept_one(Fork):
             return fork
-        elif basic_body := bot.accept_one(BasicBody):
+        if basic_body := bot.accept_one(BasicBody):
             return basic_body
 
 
@@ -1407,7 +1412,7 @@ class BasicBody(
     def _accept_one_(cls, bot):
         if proc := bot.accept_one(Proc):
             return proc
-        elif pocket := bot.accept_one(Pocket):
+        if pocket := bot.accept_one(Pocket):
             return pocket
 
 
@@ -1424,7 +1429,7 @@ class Pocketable(
     def _accept_one_(cls, bot):
         if fork := bot.accept_one(Fork):
             return fork
-        elif proc_body := bot.accept_one(ProcBody):
+        if proc_body := bot.accept_one(ProcBody):
             return proc_body
 
 
@@ -1461,17 +1466,17 @@ class Term(
     def _accept_one_(cls, bot):
         if transcript := bot.accept_one(Transcript):
             return transcript
-        elif event_set := bot.accept_one(EventSet):
+        if event_set := bot.accept_one(EventSet):
             return event_set
-        elif proc_def := bot.accept_one(ProcDef):
+        if proc_def := bot.accept_one(ProcDef):
             return proc_def
-        elif argot_def := bot.accept_one(ArgotDef):
+        if argot_def := bot.accept_one(ArgotDef):
             return argot_def
-        elif pocketable := bot.accept_one(Pocketable):
+        if pocketable := bot.accept_one(Pocketable):
             return pocketable
-        elif step := bot.accept_one(Step):
+        if step := bot.accept_one(Step):
             return step
-        elif argot := bot.accept_one(Argot):
+        if argot := bot.accept_one(Argot):
             return argot
 
 
@@ -1535,7 +1540,7 @@ def compile_argdoc(epi):
     prog = doc.strip().splitlines()[0].split()[1]
     description = list(_ for _ in doc.strip().splitlines() if _)[1]
     epilog_at = doc.index(epi)
-    epilog = doc[epilog_at:]
+    epilog = doc[epilog_at:]  # pylint: disable=unsubscriptable-object
 
     parser = argparse.ArgumentParser(
         prog=prog,
@@ -1599,12 +1604,12 @@ def exit_unless_main_doc_eq(parser):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
-    """Format and log like "print", except flush Stdout & write and flush Stderr"""
+def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
 
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
@@ -1612,13 +1617,13 @@ def stderr_print_diff(**kwargs):
     """Return the Diff of the Lines given, but print it first when not empty"""
 
     (fromfile, tofile) = kwargs.keys()
-    a = kwargs[fromfile].splitlines()
-    b = kwargs[tofile].splitlines()
+    a_lines = kwargs[fromfile].splitlines()
+    b_lines = kwargs[tofile].splitlines()
 
     diff_lines = list(
         difflib.unified_diff(
-            a=a,
-            b=b,
+            a=a_lines,
+            b=b_lines,
             fromfile=fromfile,
             tofile=tofile,
         )
@@ -1658,7 +1663,7 @@ def try_test_self_some():
 
     tests = collect_tests()
 
-    for (index, test) in enumerate(tests):
+    for test in tests:
 
         TRACES[::] = list()
         try:
@@ -1684,7 +1689,7 @@ def try_test_self_one(test):
     if py:
         assert str_exc is None
 
-        cell_of_py = eval(py)
+        cell_of_py = eval(py)  # pylint: disable=eval-used
         _trace_(dict(got_cell_of_py=bool(cell_of_py)))
 
         py_of_cell = format_as_py(cell_of_py)
@@ -1732,7 +1737,7 @@ def try_test_self_one(test):
         _trace_(dict(csp_of_cell=csp_of_cell))
         assert csp_of_cell == csp
 
-        cell_of_py = eval(py_of_cell)
+        cell_of_py = eval(py_of_cell)  # pylint: disable=eval-used
         _trace_(dict(got_cell_of_py=bool(cell_of_py)))
         assert cell_of_py == cell_of_csp
 
@@ -1760,7 +1765,7 @@ def collect_tests():
     # Visit each line of Csp that has no Python
 
     csp_laters = list()
-    for (index, csp_line) in enumerate(csp_lines):
+    for csp_line in csp_lines:
 
         # Join Csp lines til all ( [ { ⟨ marks closed by ) ] } ⟩ marks
 

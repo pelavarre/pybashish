@@ -28,6 +28,7 @@ examples:
 """
 
 # FIXME: solve the noqa-C901's
+# TODO: PyLint speaks of E1101: Instance of '...' has no '...' member (no-member)
 
 # TODO: produce permutation iterators
 
@@ -312,6 +313,7 @@ class CspCommand(CspTree):
 
     @staticmethod
     def take_tree_from(taker, before):
+        _ = before
 
         cuts = taker.peek_cuts(2)
         if cuts[1] and cuts[1].chars == "=":
@@ -755,7 +757,7 @@ class CspCutter(argparse.Namespace):
 
         found = self.find_row_column_line0_line1(cut)
         if found:
-            (column, row, line0, line1) = found
+            (_, _, line0, line1) = found
 
             mention = "{}\n{}".format(line0, line1)
             return mention
@@ -1010,9 +1012,10 @@ def check(goal=None, want=True, got=None, **kwargs):
 
     if not happy:
         if goal:
+
             raise KwargsException(goal=goal, want=want, got=got, **kwargs)
-        else:
-            raise KwargsException(want=want, got=got, **kwargs)
+
+        raise KwargsException(want=want, got=got, **kwargs)
 
 
 # deffed in many files  # missing from docs.python.org
@@ -1025,17 +1028,19 @@ def kbhit():
     xlist = list()
     timeout = 0
     selected = select.select(rlist, wlist, xlist, timeout)
-    (rlist_, wlist_, xlist_) = selected
+    (rlist_, _, _) = selected
 
     if rlist_ == rlist:
         return True
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args, end=None):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, end=end, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org

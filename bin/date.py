@@ -43,7 +43,6 @@ import argdoc
 def main():
 
     args = argdoc.parse_args()
-    args.j = args.ymd  # FIXME: solve argdoc for when multiple options have same arg YMD
 
     if None not in (args.j, args.date):
         stderr_print("date.py: error: choose -j or --date, not both")
@@ -162,10 +161,12 @@ def misread_ymdhms_linux(ymd):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

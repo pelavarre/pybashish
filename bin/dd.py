@@ -53,6 +53,7 @@ def main():
     # Define SIGINFO
 
     def siginfo(signum, frame):
+        _ = (signum, frame)
         stderr_print("dd.py: ⌃T SIGINFO")
 
     with SigInfoHandler(handler=siginfo):
@@ -105,25 +106,27 @@ class SigInfoHandler(contextlib.ContextDecorator):
     def __enter__(self):
         handler = self.handler
         if hasattr(signal, "SIGINFO"):  # Mac
-            with_siginfo = signal.signal(signal.SIGINFO, handler)
+            with_handler = signal.signal(signal.SIGINFO, handler)
         else:  # Linux
-            with_siginfo = signal.signal(signal.SIGUSR1, handler)
-        self.with_siginfo = with_siginfo
+            with_handler = signal.signal(signal.SIGUSR1, handler)
+        self.with_handler = with_handler
         return self
 
     def __exit__(self, *exc_info):
-        with_siginfo = self.with_siginfo
+        with_handler = self.with_handler
         if hasattr(signal, "SIGINFO"):  # Mac
-            signal.signal(signal.SIGINFO, with_siginfo)
+            signal.signal(signal.SIGINFO, with_handler)
         else:  # Linux
-            signal.signal(signal.SIGUSR1, with_siginfo)
+            signal.signal(signal.SIGUSR1, with_handler)
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

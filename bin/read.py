@@ -116,7 +116,7 @@ def main(argv):
 def _parse_read_argv(argv):
     """Parse the command line"""
 
-    args = argdoc.parse_args()
+    args = argdoc.parse_args(argv[1:])
 
     # Default to no splatter, else Ascii splat "*" splatter, to show input length not choice
 
@@ -137,7 +137,7 @@ def _parse_read_argv(argv):
 
     # Choose a prompt
 
-    args.prompting = "? " if (args.prompt is None) else args.prompt
+    args.prompting = "? " if (args.p is None) else args.p
 
     return args
 
@@ -166,6 +166,7 @@ class TerminalShadow:
         self.tty_lines = list()
 
     def putch(self, chars):
+        """Print one or more Basic Latin or C0 Control Chars"""
 
         for ch in chars:
             stdin = ch.encode()
@@ -194,6 +195,8 @@ class GlassTeletype(contextlib.ContextDecorator):
 
     Compare Bash "bind -p", Zsh "bindkey", Bash "stty -a", and Unicode-Org U0000.pdf
     """
+
+    # pylint: disable=too-many-instance-attributes  # 11/7
 
     def __init__(self, editing=None, silencing=None, splatter=None):
 
@@ -404,13 +407,16 @@ class GlassTeletype(contextlib.ContextDecorator):
         xlist = list()
         timeout = 0
         selected = select.select(rlist, wlist, xlist, timeout)
-        (rlist_, wlist_, xlist_) = selected
+        (rlist_, _, _) = selected
 
         if rlist_ == rlist:
+
             return True
 
+        return False
+
     def putch(self, chars):
-        """Print one or more decoded Basic Latin character or decode C0 Control code"""
+        """Print one or more Basic Latin or C0 Control Chars"""
 
         for ch in chars:
             self.shadow.putch(ch)
@@ -482,6 +488,8 @@ class GlassTeletype(contextlib.ContextDecorator):
     def _drop_char(self, stdin):  # aka Stty "erase", aka Bind "backward-delete-char"
         """Undo just the last insert of one char, no matter how it echoed out"""
 
+        _ = stdin
+
         if not self.echoes:
             return
 
@@ -493,33 +501,42 @@ class GlassTeletype(contextlib.ContextDecorator):
 
         self.echoes = self.echoes[:-1]
         self.chars = self.chars[:-1]
-        self.putch(f"{backing}{blanking}{backing}")
+        self.putch(
+            "{backing}{blanking}{backing}".format(backing=backing, blanking=blanking)
+        )
 
     def _drop_line(self, stdin):  # aka Stty "kill" many, aka Bind "unix-line-discard"
         """Undo all the inserts of chars since the start of line"""
 
         if not self.echoes:
             self._ring_bell(stdin)
+
             return
 
         while self.echoes:
             self._drop_char(stdin)
 
+        # return
+
     def _drop_next_char(self, stdin):
         """End the input if line empty, else drop the next char, else ring bell"""
 
         if not self.chars:
+
             return self._end_input(stdin)
 
-        pass  # FIXME: code up the ← Left Arrow, to make drop-next-char possible
-
         self._ring_bell(stdin)
+
+        return None
+
+        # FIXME: code up the ← Left Arrow, to make drop-next-char possible
 
     def _drop_word(self, stdin):  # aka Stty "werase" many, aka Bind "unix-word-rubout"
         """Undo all the inserts of chars since the start of the last word"""
 
         if not self.echoes:
             self._ring_bell(stdin)
+
             return
 
         while self.echoes and self.echoes[-1] == " ":
@@ -531,6 +548,8 @@ class GlassTeletype(contextlib.ContextDecorator):
     def _end_input(self, stdin):
         """End the input and the shline"""
 
+        _ = stdin
+
         if not self.echoes:
             self.putch("^D")  # FIXME: second of two "^D"
 
@@ -541,6 +560,8 @@ class GlassTeletype(contextlib.ContextDecorator):
 
     def _end_line(self, stdin):
         """End the shline"""
+
+        _ = stdin
 
         self.putch("\r\n")  # echo ending the shline
 
@@ -609,6 +630,8 @@ class GlassTeletype(contextlib.ContextDecorator):
     def _quoted_insert(self, stdin):
         """Add any one keystroke to the shline"""
 
+        _ = stdin
+
         next_stdin = self.getch()  # such as the b"\x1B[A" ↑ Up Arrow
         next_char = next_stdin.decode()
         self._insert_chars(next_char)
@@ -616,16 +639,22 @@ class GlassTeletype(contextlib.ContextDecorator):
     def _raise_keyboard_interrupt(self, stdin):  # aka Stty "intr" SIGINT
         """Raise KeyboardInterrupt"""
 
+        _ = stdin
+
         raise KeyboardInterrupt()  # FIXME: also SIGINFO, SIGUSR1, SIGSUSP, SIGQUIT
 
     def _reprint(self, stdin):
         """Restart the edit of this line"""
+
+        _ = stdin
 
         self.putch("^R\r\n")  # strike this one out, open up another
         self.putch("".join(self.echoes))  # echo as if inserting each char of this line
 
     def _ring_bell(self, stdin):
         """Ring the Terminal bell"""
+
+        _ = stdin
 
         self.putch("\a")
 
@@ -636,10 +665,12 @@ class GlassTeletype(contextlib.ContextDecorator):
 
 
 # deffed in many files  # missing from docs.python.org
-def stderr_print(*args, **kwargs):
+def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
-    print(*args, **kwargs, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

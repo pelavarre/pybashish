@@ -84,7 +84,8 @@ def main(argv):
 
     if args.rip is False:
 
-        exec(py, globals())  # call through Class ZCatLines via the main Globals
+        exec(py, globals())  # pylint: disable=exec-used
+        # call through Class ZCatLines via the main Globals
 
     elif p_py is not None:
 

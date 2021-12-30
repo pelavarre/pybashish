@@ -85,6 +85,9 @@ grep-fixme:
 	echo && echo && echo && git grep 'F'IXME |awk -F: '{ n=$$1; if (n != o) {o=n; print ""; print $$1":"}; $$1=""; print substr($$0, 2)}' |less -FRX
 
 
+tgz:
+	cd .. && rm -fr pybashish.tgz && tar --exclude '.*' -czf pybashish.tgz pybashish/
+
 me:
 	python3 ../pybashish/
 

@@ -41,10 +41,10 @@ def main():
     socket_fqdn = socket.getfqdn()
     socket_canonname = calc_socket_canonname_else_none(socket_hostname)
 
-    verbose_print(f"platform_node={platform_node}")
-    verbose_print(f"socket_hostname={socket_hostname!r}")
-    verbose_print(f"socket_fqdn={socket_fqdn}")
-    verbose_print(f"socket_canonname={socket_canonname}")
+    verbose_print("platform_node={}".format(platform_node))
+    verbose_print("socket_hostname={!r}".format(socket_hostname))
+    verbose_print("socket_fqdn={}".format(socket_fqdn))
+    verbose_print("socket_canonname={}".format(socket_canonname))
 
     assert "." not in platform_node
     assert "." not in socket_hostname
@@ -99,10 +99,10 @@ def is_numeric_hostname(hostname):
 
 
 # deffed in many files  # missing from docs.python.org
-def verbose_print(*args, **kwargs):
+def verbose_print(*args):
     sys.stdout.flush()
     if main.args.verbose:
-        print(*args, **kwargs, file=sys.stderr)
+        print(*args, file=sys.stderr)
     sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
 
 

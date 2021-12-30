@@ -193,6 +193,8 @@ def opt_in_argv_tail(argv_tail, concise, mnemonic):
         if arg.startswith(concise) and not arg.startswith("--"):
             return True
 
+    return False
+
 
 #
 # Define some Python idioms
