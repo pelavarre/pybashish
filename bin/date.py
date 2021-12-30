@@ -162,9 +162,11 @@ def misread_ymdhms_linux(ymd):
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
     print(*args, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

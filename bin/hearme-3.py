@@ -74,7 +74,7 @@ import argdoc
 def main(argv):  # FIXME FIXME  # noqa C901
     """Run a command line"""
 
-    args = argdoc.parse_args()
+    args = argdoc.parse_args(argv[1:])
 
     # Choose to edit the os copy-paste clipboard, or not
 
@@ -221,33 +221,34 @@ def add_awk_hint(awk, hint):  # FIXME FIXME  # noqa C901
 
         match = re.match(r"^(_?)[.]([0-9]+)$", string=shard0)
         if not match:
+
             raise TypeError()
+
+        j_index = int(match.group(2))
+
+        if not match.group(1):
+            awk_value = "${}".format(1 + j_index)
+        elif j_index == 0:
+            awk_value = "$0"
+        elif j_index == 1:
+            awk_value = "$NF"
         else:
-            j_index = int(match.group(2))
+            awk_value = "$(NF - {})".format(j_index - 1)
 
-            if not match.group(1):
-                awk_value = "${}".format(1 + j_index)
-            elif j_index == 0:
-                awk_value = "$0"
-            elif j_index == 1:
-                awk_value = "$NF"
+        if len(shards) == 1:
+            awk.prints.append(awk_value)
+        else:
+
+            awk_line = "v{} += {}".format(j_index, awk_value)  # same sum
+            if shards[1:] == "+/".split():
+                awk_end_print = "v{}".format(j_index)
+            elif shards[1:] == "+/ % #".split():
+                awk_end_print = "v{} / NR".format(j_index)
             else:
-                awk_value = "$(NF - {})".format(j_index - 1)
+                raise TypeError()
 
-            if len(shards) == 1:
-                awk.prints.append(awk_value)
-            else:
-
-                awk_line = "v{} += {}".format(j_index, awk_value)  # same sum
-                if shards[1:] == "+/".split():
-                    awk_end_print = "v{}".format(j_index)
-                elif shards[1:] == "+/ % #".split():
-                    awk_end_print = "v{} / NR".format(j_index)
-                else:
-                    raise TypeError()
-
-                awk.lines.append(awk_line)
-                awk.end_prints.append(awk_end_print)
+            awk.lines.append(awk_line)
+            awk.end_prints.append(awk_end_print)
 
 
 #
@@ -263,13 +264,15 @@ def prompt_tty_stdin():
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
     print(*args, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 # deffed in many files  # since Sep/2015 Python 3.5
-def subprocess_run(*args, **kwargs):
+def subprocess_run(args, **kwargs):
     """
     Emulate Python 3 "subprocess.run"
 
@@ -279,14 +282,16 @@ def subprocess_run(*args, **kwargs):
     # Trust the library, if available
 
     if hasattr(subprocess, "run"):
-        run = subprocess.run(*args, **kwargs)
+        run = subprocess.run(args, **kwargs)  # pylint: disable=subprocess-run-check
 
         return run
 
     # Emulate the library roughly, because often good enough
 
-    args_ = args[0] if args else kwargs["args"]
     kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
 
     if ("input" in kwargs) and ("stdin" in kwargs):
         raise ValueError("stdin and input arguments may not both be used.")
@@ -294,12 +299,19 @@ def subprocess_run(*args, **kwargs):
     if "input" in kwargs:
         raise NotImplementedError("subprocess.run.input")
 
-    sub = subprocess.Popen(*args, **kwargs_)
+    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
     (stdout, stderr) = sub.communicate()
     returncode = sub.poll()
 
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
     run = argparse.Namespace(
-        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+        args=args, stdout=stdout, stderr=stderr, returncode=returncode
     )
 
     return run
@@ -309,7 +321,7 @@ if __name__ == "__main__":
     sys.exit(main(sys.argv))
 
 
-"""
+_ = """
 FIXME: A grammar of HearMe Hints
 
 FIXME: produce ".py" or ".c", not always only ".awk"

@@ -230,8 +230,8 @@ def parse_csp_chars(csp_chars):  # noqa: C901
 
 
 args = argdoc.parse_args()
-csp_chars = args.command if args.command else DEFAULT_CSP_CHARS
-parse_csp_chars(csp_chars)
+main_csp_chars = args.command if args.command else DEFAULT_CSP_CHARS
+parse_csp_chars(csp_chars=main_csp_chars)
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

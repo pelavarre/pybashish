@@ -185,7 +185,7 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback) = exc_info
+        (_, exc, _) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
             null_fileno = os.open(os.devnull, flags=os.O_WRONLY)

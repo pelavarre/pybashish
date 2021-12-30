@@ -73,7 +73,7 @@ def complete_rows(rows, cell):
 
     completed_rows = list()
     for row in rows:
-        completed_row = row + ((max_row_width - len(row)) * [""])
+        completed_row = row + ((max_row_width - len(row)) * [cell])
         completed_rows.append(completed_row)
 
     return completed_rows
@@ -159,9 +159,11 @@ def prompt_tty_stdin():
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
     print(*args, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

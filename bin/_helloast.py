@@ -41,14 +41,14 @@ class AstNodeVisitor(ast.NodeVisitor):
 
 
 visitor = AstNodeVisitor()
-node = ast.parse(PY)
-visitor.visit(node)
+top_node = ast.parse(PY)
+visitor.visit(top_node)
 
 print()
-print(ast.dump(node))
+print(ast.dump(top_node))
 
 print()
-print(ast.unparse(node))
+print(ast.unparse(top_node))
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

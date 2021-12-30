@@ -312,9 +312,11 @@ def striplines(chars):
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
     print(*args, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 # deffed in many files  # missing from docs.python.org
@@ -331,7 +333,7 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback) = exc_info
+        (_, exc, _) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
             null_fileno = os.open(os.devnull, flags=os.O_WRONLY)

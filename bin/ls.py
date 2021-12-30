@@ -408,8 +408,7 @@ def _run_one_top_walk(tops, index, top, names, args, args_directory):
     else:
         assert args._print_as == "rows_of_detail"
         print_as_rows_of_detail(
-            tops,
-            index=index,
+            index,
             args=args,
             items=items,
             reps_by_name=reps_by_name,
@@ -450,7 +449,7 @@ def stats_items_sorted(stats_by_name, by, order):
         return items
 
     assert order in "ascending descending".split()
-    reverse = True if (order == "descending") else False
+    reverse = order == "descending"
 
     items.sort(key=lambda sw: sw[0])
     if by == "extension":
@@ -508,9 +507,7 @@ def print_as_matrix_of_names(cells, stdout_columns):
         print(sep.join(row).rstrip())
 
 
-def print_as_rows_of_detail(
-    tops, index, args, items, reps_by_name, now_year, args_directory
-):
+def print_as_rows_of_detail(index, args, items, reps_by_name, now_year, args_directory):
     """Print as rows of details, for one name per line"""
 
     # Choose how to print None
@@ -719,6 +716,8 @@ def sys_stdout_guess_tty_columns(*hints):
 
         return terminal_width
 
+    return None
+
 
 # deffed in many files  # missing from docs.python.org
 def sys_stdout_guess_tty_columns_os(hint):
@@ -732,7 +731,7 @@ def sys_stdout_guess_tty_columns_os(hint):
     elif hasattr(hint, "startswith"):
         if hint.startswith(os.sep):
             devname = hint
-            showing = open(devname)
+            showing = open(devname)  # pylint: disable=consider-using-with
             fd = showing.fileno()
 
     terminal_width = None
@@ -782,19 +781,25 @@ def os_path_isdir_deleted(top):  # FIXME: solve this without calling:  bash /dev
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+
     if run.stdout or run.stderr or run.returncode:
+
         return True
+
+    return False
 
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
     print(*args, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 # deffed in many files  # since Sep/2015 Python 3.5
-def subprocess_run(*args, **kwargs):
+def subprocess_run(args, **kwargs):
     """
     Emulate Python 3 "subprocess.run"
 
@@ -804,14 +809,16 @@ def subprocess_run(*args, **kwargs):
     # Trust the library, if available
 
     if hasattr(subprocess, "run"):
-        run = subprocess.run(*args, **kwargs)
+        run = subprocess.run(args, **kwargs)  # pylint: disable=subprocess-run-check
 
         return run
 
     # Emulate the library roughly, because often good enough
 
-    args_ = args[0] if args else kwargs["args"]
     kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
 
     if ("input" in kwargs) and ("stdin" in kwargs):
         raise ValueError("stdin and input arguments may not both be used.")
@@ -819,12 +826,19 @@ def subprocess_run(*args, **kwargs):
     if "input" in kwargs:
         raise NotImplementedError("subprocess.run.input")
 
-    sub = subprocess.Popen(*args, **kwargs_)
+    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
     (stdout, stderr) = sub.communicate()
     returncode = sub.poll()
 
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
     run = argparse.Namespace(
-        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+        args=args, stdout=stdout, stderr=stderr, returncode=returncode
     )
 
     return run

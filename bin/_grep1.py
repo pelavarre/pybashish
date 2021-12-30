@@ -252,9 +252,13 @@ def _pick_export_lines_word_zero(lines):
 
                 return word0
 
+    return None
+
 
 def _format_one_file(wherewhat, lines, file_word_0):
     """Format one file for export"""
+
+    _ = wherewhat
 
     writes = list(lines)
 
@@ -319,8 +323,8 @@ def _ext_files_readlines(ext, files):
     files_lines = list()
     for file_ in files:
 
-        (where, what) = os.path.split(file_)
-        (name, ext_) = os.path.splitext(what)
+        (_, what) = os.path.split(file_)
+        (_, ext_) = os.path.splitext(what)
 
         with open(file_) as incoming:  # FIXME: odds on errors="surrogateescape" someday
             chars = incoming.read()
@@ -438,7 +442,7 @@ def grep_lines(args, lines, chosen_lines):  # FIXME FIXME  # noqa C901
     if len(file_hits) != 1:
         exit_status = exit_status if exit_status else 2
 
-    for (index, hit) in enumerate(file_hits):
+    for hit in file_hits:
         # print((20 * "-"), index, (20 * "-"))
 
         hit_lines = hit
@@ -610,7 +614,7 @@ def stderr_print(*args):
 
 
 # deffed in many files  # missing from docs.python.org
-def verbose_print(*args, **kwargs):
+def verbose_print(*args):
     """Print the Args, but to Stderr, not to Stdout, but only when Main Arg Verbose"""
 
     sys.stdout.flush()
@@ -633,7 +637,7 @@ class BrokenPipeErrorSink(contextlib.ContextDecorator):
         return self
 
     def __exit__(self, *exc_info):
-        (exc_type, exc, exc_traceback) = exc_info
+        (_, exc, _) = exc_info
         if isinstance(exc, BrokenPipeError):  # catch this one
 
             null_fileno = os.open(os.devnull, flags=os.O_WRONLY)

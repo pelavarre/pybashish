@@ -41,6 +41,7 @@ def parse_main_doc(epi=None):
 
     epilog = None
     if epi is not None:
+        # pylint: disable=unsubscriptable-object
         epilog_at = doc.index(epi)
         epilog = textwrap.dedent(doc[epilog_at:]).strip()
 
@@ -64,6 +65,7 @@ def main():
 
 # deffed in many files  # missing from docs.python.org
 def click_main(func):
+    _ = func
     try:
         main()
     except SystemExit as exc:

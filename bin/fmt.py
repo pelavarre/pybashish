@@ -178,6 +178,8 @@ def sys_stdout_guess_tty_columns(*hints):
 
         return terminal_width
 
+    return None
+
 
 # deffed in many files  # missing from docs.python.org
 def sys_stdout_guess_tty_columns_os(hint):
@@ -191,7 +193,7 @@ def sys_stdout_guess_tty_columns_os(hint):
     elif hasattr(hint, "startswith"):
         if hint.startswith(os.sep):
             devname = hint
-            showing = open(devname)
+            showing = open(devname)  # pylint: disable=consider-using-with
             fd = showing.fileno()
 
     terminal_width = None
@@ -257,9 +259,11 @@ def str_splitdent(line):
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
     print(*args, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 if __name__ == "__main__":

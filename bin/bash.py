@@ -48,6 +48,7 @@ FILE_DIR = os.path.split(os.path.realpath(__file__))[0]  # sample before 1st "os
 
 
 def main(argv):
+    _ = argv
 
     args = argdoc.parse_args()
     if not args.interact:
@@ -227,6 +228,7 @@ def builtin_via_py(what_py, argv=None):
 
 
 def builtin_help(argv):
+    _ = argv
     compile_and_run_shline("help")
 
 
@@ -249,16 +251,19 @@ def builtin_history(argv):
     except SystemExit as exc:
         returncode = exc.code
 
-        return returncode
+        return returncode  # TODO: always zero here?
 
     shlines = read.ShLineHistory.shlines  # couple less tightly  # add date/time-stamp's
     for (index, shline) in enumerate(shlines):
         lineno = 1 + index
         print("{:5d}  {}".format(lineno, shline))
 
+    return None
+
 
 def builtin_pass(argv):  # think more about  $ : --help
-    pass  # FIXME: stop zeroing last exit status "$?" at each blank input line
+    _ = argv
+    # FIXME: stop zeroing last exit status "$?" at each blank input line
 
 
 #
@@ -313,11 +318,12 @@ def _compile_shline(shline, argv):
         escaped_shline = shline[len(":!") :].lstrip()
         argv_ = shlex.split(escaped_shline)
 
-        def how(argv):
+        def how1(argv):
+            _ = argv
             ran = subprocess_run(argv_)
             return ran.returncode
 
-        return how
+        return how1
 
     # Plan to decline to call any explicit relpath
 
@@ -336,7 +342,7 @@ def _compile_shline(shline, argv):
 
     if os.path.exists(wherewhat):
 
-        def how(argv):
+        def how2(argv):
             try:
                 ran = subprocess_run([wherewhat] + argv[1:])
             except PermissionError as exc:
@@ -344,7 +350,7 @@ def _compile_shline(shline, argv):
                 ran.returncode = 126  # exit 126 from executable permission error
             return ran.returncode
 
-        return how
+        return how2
 
     # Plan to reject a verb that maps to a Py file that doesn't exist
 
@@ -388,19 +394,21 @@ def _calc_wherewhat(verb):
 def _compile_log_error(message):
     """Plan to log an error message and return nonzero"""
 
-    def how(argv):
+    def how3(argv):
+        _ = argv
         return _log_error(message)
 
-    return how
+    return how3
 
 
 def _compile_return_error():
     """Plan to to return nonzero, as if error message already logged"""
 
-    def how(argv):
+    def how4(argv):
+        _ = argv
         return 127
 
-    return how
+    return how4
 
 
 def _log_error(message):
@@ -503,13 +511,15 @@ def shutil_ps1_tuple():
 
 # deffed in many files  # missing from docs.python.org
 def stderr_print(*args):
+    """Print the Args, but to Stderr, not to Stdout"""
+
     sys.stdout.flush()
     print(*args, file=sys.stderr)
-    sys.stderr.flush()  # esp. when kwargs["end"] != "\n"
+    sys.stderr.flush()  # like for kwargs["end"] != "\n"
 
 
 # deffed in many files  # since Sep/2015 Python 3.5
-def subprocess_run(*args, **kwargs):
+def subprocess_run(args, **kwargs):
     """
     Emulate Python 3 "subprocess.run"
 
@@ -519,14 +529,16 @@ def subprocess_run(*args, **kwargs):
     # Trust the library, if available
 
     if hasattr(subprocess, "run"):
-        run = subprocess.run(*args, **kwargs)
+        run = subprocess.run(args, **kwargs)  # pylint: disable=subprocess-run-check
 
         return run
 
     # Emulate the library roughly, because often good enough
 
-    args_ = args[0] if args else kwargs["args"]
     kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
 
     if ("input" in kwargs) and ("stdin" in kwargs):
         raise ValueError("stdin and input arguments may not both be used.")
@@ -534,12 +546,19 @@ def subprocess_run(*args, **kwargs):
     if "input" in kwargs:
         raise NotImplementedError("subprocess.run.input")
 
-    sub = subprocess.Popen(*args, **kwargs_)
+    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
     (stdout, stderr) = sub.communicate()
     returncode = sub.poll()
 
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
     run = argparse.Namespace(
-        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+        args=args, stdout=stdout, stderr=stderr, returncode=returncode
     )
 
     return run

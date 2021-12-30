@@ -48,7 +48,7 @@ import sys
 import argdoc
 
 
-def main(argv):
+def main():
     """Run from the Command Line"""
 
     # Parse args
@@ -276,6 +276,7 @@ def require_test_passed(path, passes, gots, dent, wants):
     tail_wants = list(wants)
     tail_gots = list(gots)
 
+    want = got = None
     for (want, got) in zip(wants + empties, gots + empties):
 
         if got != want:
@@ -342,21 +343,23 @@ def equal_as_unordered_str_namespace(want, got):
 
     if not want.startswith("Namespace("):
 
-        return
+        return False
 
     if not got.startswith("Namespace("):
 
-        return
+        return False
 
     # Eval both, and substitute the "want" for the "got" only when they're equal
 
-    eval_want = eval("argparse." + want)
-    eval_got = eval("argparse." + got)
+    eval_want = eval("argparse." + want)  # pylint: disable=eval-used
+    eval_got = eval("argparse." + got)  # pylint: disable=eval-used
 
     if str(sorted(vars(eval_want).items())) == str(sorted(vars(eval_got).items())):
         # ok ignore key order, but don't accept False == 0, nor True == 1
 
         return True
+
+    return False
 
 
 def equal_but_for_ellipses(got, want):
@@ -416,7 +419,7 @@ def stderr_print(*args):
 
 
 # deffed in many files  # since Sep/2015 Python 3.5
-def subprocess_run(*args, **kwargs):
+def subprocess_run(args, **kwargs):
     """
     Emulate Python 3 "subprocess.run"
 
@@ -426,14 +429,16 @@ def subprocess_run(*args, **kwargs):
     # Trust the library, if available
 
     if hasattr(subprocess, "run"):
-        run = subprocess.run(*args, **kwargs)
+        run = subprocess.run(args, **kwargs)  # pylint: disable=subprocess-run-check
 
         return run
 
     # Emulate the library roughly, because often good enough
 
-    args_ = args[0] if args else kwargs["args"]
     kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
 
     if ("input" in kwargs) and ("stdin" in kwargs):
         raise ValueError("stdin and input arguments may not both be used.")
@@ -441,19 +446,26 @@ def subprocess_run(*args, **kwargs):
     if "input" in kwargs:
         raise NotImplementedError("subprocess.run.input")
 
-    sub = subprocess.Popen(*args, **kwargs_)
+    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
     (stdout, stderr) = sub.communicate()
     returncode = sub.poll()
 
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
     run = argparse.Namespace(
-        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+        args=args, stdout=stdout, stderr=stderr, returncode=returncode
     )
 
     return run
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    main()
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

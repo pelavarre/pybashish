@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+"""
+usage:  python3 ../pybashish/
+"""
+
 from __future__ import print_function
 
 import argparse
@@ -32,7 +36,7 @@ def main(argv):
 
 
 # deffed in many files  # since Sep/2015 Python 3.5
-def subprocess_run(*args, **kwargs):
+def subprocess_run(args, **kwargs):
     """
     Emulate Python 3 "subprocess.run"
 
@@ -42,14 +46,16 @@ def subprocess_run(*args, **kwargs):
     # Trust the library, if available
 
     if hasattr(subprocess, "run"):
-        run = subprocess.run(*args, **kwargs)
+        run = subprocess.run(args, **kwargs)  # pylint: disable=subprocess-run-check
 
         return run
 
     # Emulate the library roughly, because often good enough
 
-    args_ = args[0] if args else kwargs["args"]
     kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    if "check" in kwargs:
+        del kwargs_["check"]
 
     if ("input" in kwargs) and ("stdin" in kwargs):
         raise ValueError("stdin and input arguments may not both be used.")
@@ -57,12 +63,19 @@ def subprocess_run(*args, **kwargs):
     if "input" in kwargs:
         raise NotImplementedError("subprocess.run.input")
 
-    sub = subprocess.Popen(*args, **kwargs_)
+    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
     (stdout, stderr) = sub.communicate()
     returncode = sub.poll()
 
+    if "check" in kwargs:
+        if returncode != 0:
+
+            raise subprocess.CalledProcessError(
+                returncode=returncode, cmd=args, output=stdout
+            )
+
     run = argparse.Namespace(
-        args=args_, stdout=stdout, stderr=stderr, returncode=returncode
+        args=args, stdout=stdout, stderr=stderr, returncode=returncode
     )
 
     return run

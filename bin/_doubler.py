@@ -19,6 +19,7 @@ regex = r"^{name}(~|~[0-9]+~)?$".format(name=NAME)
 
 name_by_index = dict()
 
+name = None
 for name in os.listdir():
     match = re.match(regex, string=name)
     if match:

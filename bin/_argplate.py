@@ -38,7 +38,7 @@ def compile_argdoc(epi):
     prog = doc.strip().splitlines()[0].split()[1]
     description = list(_ for _ in doc.strip().splitlines() if _)[1]
     epilog_at = doc.index(epi)
-    epilog = doc[epilog_at:]
+    epilog = doc[epilog_at:]  # pylint: disable=unsubscriptable-object
 
     parser = argparse.ArgumentParser(
         prog=prog,
