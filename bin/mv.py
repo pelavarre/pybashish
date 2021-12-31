@@ -8,7 +8,7 @@ rename a file (make it not found)
 positional arguments:
   FILE        the file to rename (default: last modified in cwd)
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
   -i          ask before replacing some other file
 

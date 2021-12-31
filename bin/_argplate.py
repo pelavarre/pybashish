@@ -5,7 +5,7 @@ usage: _argplate.py [-h]
 
 show how to include examples in argparse help lines
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 examples:

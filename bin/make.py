@@ -5,7 +5,7 @@ usage: make.py [-h]
 
 figure out how to make more things from some things
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

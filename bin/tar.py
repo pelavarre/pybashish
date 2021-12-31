@@ -5,7 +5,7 @@ usage: tar.py [-h] [-t] [-x] [-v] [-k] [-f FILE]
 
 walk the files and dirs found inside a top dir compressed as Tgz
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
   -t          list every file, without writing any files
   -x          write out a copy of every file

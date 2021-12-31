@@ -8,7 +8,7 @@ show what day it is, or was, of which year and month
 positional arguments:
   YMD     print for another %d|%m%d|%y%m%d|%Y%m%d, a la bash "cal -H yyyy-mm-dd"
 
-optional arguments:
+options:
   --help  show this help message and exit
   -h      stop coloring the day of today (default: do color at stdout isatty)
 

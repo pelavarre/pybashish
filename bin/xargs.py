@@ -5,7 +5,7 @@ usage: xargs.py [-h] [-n MAX_ARGS]
 
 split and rejoin the words of all lines of input into one line of output
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -n MAX_ARGS, --max-args MAX_ARGS
                         words per line

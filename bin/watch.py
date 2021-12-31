@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: watch.py [-h] [-n SECS] [WORD [WORD ...]]
+usage: watch.py [-h] [-n SECS] [WORD ...]
 
 repeat a Bash command every so often till Control+C, and delete duplicate outputs
 
 positional arguments:
   WORD                  word of command
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -n SECS, --interval SECS
                         seconds to wait between updates (default: 0.2s)

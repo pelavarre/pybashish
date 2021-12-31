@@ -3,7 +3,7 @@
 # FIXME: discard this abandoned dead code in favour of:  hearme.py
 
 """
-usage: jq.py [-h] [FILTER] [FILE [FILE ...]]
+usage: jq.py [-h] [FILTER] [FILE ...]
 
 walk the json at standard input
 
@@ -11,7 +11,7 @@ positional arguments:
   FILTER      filter coded as jq
   FILE        a file of json, or lines of text (default: json at stdin)
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:
@@ -45,8 +45,6 @@ examples:
   echo '["aa", "cc", "bb"]' |jq .
   jq . <(echo '[12, 345, 6789]')
 """
-
-# FIXME: refresh "def main" instantiation of usage: FILE [FILE ...]]
 
 # guesses:
 #

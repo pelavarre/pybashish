@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 r"""
-usage: bin/_grep.py [--help] [-h] [--rip [SHRED]] [PATTERN [PATTERN ...]]
+usage: bin/_grep.py [--help] [-h] [--rip [SHRED]] [PATTERN ...]
 
 write and run code to search for patterns, or just write it
 
 positional arguments:
   PATTERN        search key, in the syntax of a Python regular expression
 
-optional arguments:
+options:
   --help         show this help message and exit
   -h             say less (same as grep -h)
   --rip [SHRED]  rip code to stdout (or to a filename with a '.' dot in it)

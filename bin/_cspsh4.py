@@ -5,7 +5,7 @@ usage: _cspsh4.py [-h]
 
 chat over programs written as "communicating sequential processes"
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 workflow:

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: rm.py [-h] [FILE [FILE ...]]
+usage: rm.py [-h] [FILE ...]
 
 move a file to the ../__jqd-trash/ dir
 
 positional arguments:
   FILE        a file to trash (default: last modified of cwd)
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

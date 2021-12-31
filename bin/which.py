@@ -8,7 +8,7 @@ point to the source files defining a verb here for you
 positional arguments:
   VERB        the verb, such as "which.py" itself
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 examples:

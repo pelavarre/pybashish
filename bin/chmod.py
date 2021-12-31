@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-usage: chmod.py [-h] [-R] MODE [TOP [TOP ...]]
+usage: chmod.py [-h] [-R] MODE [TOP ...]
 
 change the permissions on a file or dir
 
@@ -9,7 +9,7 @@ positional arguments:
   MODE             one of r"[ugo]*[-+=][rwx]+", or more arcane choices
   TOP              the file or dir to change permissions at
 
-optional arguments:
+options:
   -h, --help       show this help message and exit
   -R, --recursive  change the dirs and files inside of top dirs, not just the top dir
 

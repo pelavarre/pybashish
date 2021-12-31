@@ -8,7 +8,7 @@ print some help
 positional arguments:
   VERB        a verb to explain, such as "grep" or "echo"
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 examples:

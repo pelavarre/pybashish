@@ -5,7 +5,7 @@ usage: cspsh.py [-h] [-f] [-i] [-q] [-v] [-c COMMAND]
 
 chat over programs written as "communicating sequential processes"
 
-optional arguments:
+options:
   -h, --help      show this help message and exit
   -f, --force     ask less questions, such as quit without prompting
   -i, --interact  ask more questions, such as prompt for more commands

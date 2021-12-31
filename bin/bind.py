@@ -5,7 +5,7 @@ usage: bind.py [-h] [-p]
 
 look at what each keystroke means
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
   -p          print what each keystroke means
 

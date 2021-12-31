@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 r"""
-usage: echo.py [-h] [-n] [--verbose] [WORD [WORD ...]]
+usage: echo.py [-h] [-n] [--verbose] [WORD ...]
 
 print some words
 
 positional arguments:
   WORD        a word to print
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
   -n          print just the words, don't add an end-of-line
   --verbose   print the "shlex.split" to "sys.stderr"

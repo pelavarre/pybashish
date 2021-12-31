@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 r"""
-usage: sponge.py [-h] [-a] [FILE [FILE ...]]
+usage: sponge.py [-h] [-a] [FILE ...]
 
 read every line of input bytes (or chars), then write a copy to each output
 
 positional arguments:
   FILE          file to write (default: stdout)
 
-optional arguments:
+options:
   -h, --help    show this help message and exit
   -a, --append  append to each file, rather than replacing each file
 

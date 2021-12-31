@@ -5,7 +5,7 @@ usage: dd.py [-h]
 
 copy from input stream to output stream
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

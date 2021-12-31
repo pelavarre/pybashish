@@ -5,7 +5,7 @@ usage: read.py [-h] [-e] [-p PROMPT] [-r] [-s] [--splat [SPLAT]] [--lines]
 
 read one line of standard input, and print it
 
-optional arguments:
+options:
   -h, --help       show this help message and exit
   -e               let people edit input and history
   -p PROMPT        chars to print out before reading input (default: "? ")

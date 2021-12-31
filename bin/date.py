@@ -5,7 +5,7 @@ usage: date.py [-h] [-j YMD] [--date YMD]
 
 show what time it is now, of which day
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
   -j YMD      test a time other than now in mac tradition, such as -j 123123591970.59
   --date YMD  test a time other than now in linux tradition, such as --date '1970-12-31 23:59:59'

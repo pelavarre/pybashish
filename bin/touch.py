@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: touch.py [-h] [FILE [FILE ...]]
+usage: touch.py [-h] [FILE ...]
 
 mark a file as modified, or create a new empty file
 
 positional arguments:
   FILE        a file to mark as modified (default: copies zero bytes from latest in cwd)
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

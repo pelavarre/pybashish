@@ -8,7 +8,7 @@ do good stuff
 positional arguments:
   HELLO          an arg for us
 
-optional arguments:
+options:
   -h, --help     show this help message and exit
 
 examples:

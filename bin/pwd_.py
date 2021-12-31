@@ -5,7 +5,7 @@ usage: pwd_.py [-h] [-P] [--brief] [--home]
 
 show the os.environ["PWD"], by default just its "os.path.abspath"
 
-optional arguments:
+options:
   -h, --help      show this help message and exit
   -P, --physical  show the "realpath"s, not "abspath"s, of sym links
   --brief         show the briefest abspath/ homepath/ realpath
