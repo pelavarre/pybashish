@@ -3,10 +3,13 @@
 """
 usage: emacs.py [-h] ...
 
-read files, accept edits, write files
+read files, accept edits, write files, in the way of classical emacs
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
+
+quirks:
+  runs like 'em.py' but then emulates Emacs bugs more closely
 
 how to get Emacs Py:
   R=pelavarre/pybashish/master/bin/vi.py
@@ -18,11 +21,9 @@ how to get Emacs Py:
 how to get Emacs Py again:
   python3 emacs?py --pwnme
 
-how to get more help for EMacs:
+how to get more help for Emacs Py:
   python3 emacs?py --help
 """
-
-# FIXME: Emacs ⌃C escape is small 0-9a-zA-Z namespace, but ⌃C⌃C is as large as all Emacs
 
 import sys
 

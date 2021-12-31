@@ -3,16 +3,16 @@
 """
 usage: em.py [-h] ...
 
-read files, accept edits, write files
+read files, accept edits, write files, much in the way of classical emacs
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 how to get Em Py:
-  R=pelavarre/pybashish/master/bin/vi.py
-  curl -sSO --location https://raw.githubusercontent.com/$R
-  echo cp -ip vi_py em_py |tr _ . ||bash
-  python3 em?py em?py
+  R=pelavarre/pybashish/pelavarre-patch-1/bin/vi,py
+  echo curl -sSO https=//raw,githubusercontent,com/$R |tr ,= .: |bash
+  echo cp -ip vi_py em_py |tr _ . |bash
+  python3 em.py em.py  # with updates at:  python3 em.py --pwnme
   ⌃Segg
 
 how to get Em Py again:
@@ -22,7 +22,8 @@ how to get more help for Em Py:
   python3 em?py --help
 """
 
-# FIXME: Emacs ⌃C escape is small 0-9a-zA-Z namespace, but ⌃C⌃C is as large as all Emacs
+# FIXME: Emacs ⌃C is small 0-9a-zA-Z namespace, but ⌃C⌃C is large
+# FIXME: of sequences at Emacs M-x describe-bindings  C-x o  C-c o  ^[^ ]* [^ ]
 
 import sys
 

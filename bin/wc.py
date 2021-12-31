@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
 
 """
-usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE [FILE ...]]
+usage: wc.py [-h] [-l] [-w] [-m] [-c] [-L] [FILE ...]
 
 count lines and words and characters and bytes
 
 positional arguments:
   FILE                  a file to examine (default: stdin)
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -L, --max-line-length
-                        count max characters per line
   -l, --lines           count lines
+  -w, --words           count lines
   -m, --chars           count characters
   -c, --bytes           count bytes
+  -L, --max-line-length
+                        count max characters per line
 
 quirks:
-  acts like "wc -L -l" if called without args, unlike Bash "wc"
+  acts like 'wc -l' if called without args, unlike Bash 'wc' and 'wc -lwc'
 
 unsurprising quirks:
-  prompts for stdin, like mac bash "grep -R .", unlike bash "wc"
-  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
-  takes "-" as meaning "/dev/stdin", like linux "wc -", unlike mac "wc -"
+  prompts Tty Stdin, like Mac 'grep -R .', unlike Bash 'wc'
+  takes 'stty -a' line-editing C0-Control's, not also 'bind -p' C0-Control's
+  takes '-' as meaning '/dev/stdin', like Linux 'wc -', unlike Mac 'wc -'
+  takes '--help' as an option, like Linux 'wc --help', unlike Mac 'wc --help'
 
 examples:
   Oh no! No examples disclosed!! 💥 💔 💥
