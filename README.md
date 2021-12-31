@@ -77,7 +77,7 @@ has it already put the work in to defend you from such painful surprises?
     ls.py --headings
     ls.py --full-time
 
-1.9 ) Does your Bash Tr never tell you which unusual chars you're dealing with?
+1.9 ) Does your Bash Tr never tell you which unusual chars you're working with?
 
     tr --unique-everseen  # usage error
 
@@ -94,18 +94,24 @@ shove that chore of translation onto you?
     grep.py --rip .py --patterns  Key1 Key2 Key3  # lets you choose multiple keys
     zcat.py --rip .py  # lets you compress the input
 
+note: this 2nd vision has begun to become real, out at
+
+    shell2py.py grep -a Key1
+
 3 )
 
 Does your Python write the equivalent ArgParse calls for the Help Doc you give it, or
 does it shove that chore of translation onto you?
 
-    cat --help  # usage error
+    wc --help  # usage error at Mac
 
-    cat.py --help
-    argdoc.py --rip .py cat.py
+    wc.py --help
+    argdoc.py $(which wc.py)
+
+note: this 3rd vision should code one copy of the Epilog, not two, when Epilog large
 
 4 )
 
 Stand up and push back, why not?
 
-- PyBashIsh, born 20/Jun/2020
+- PyBashIsh, born 20/Jun/2020, updated Dec/2021
