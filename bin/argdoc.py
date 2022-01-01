@@ -409,7 +409,7 @@ def parser_add_args_from_para(parser, para, usage):
 def parser_add_options_from_para(parser, para, usage):
     """Take the next Para as Lines of Options, if tagged as Options"""
 
-    if para[0].startswith("options"):
+    if para[0].startswith("options") or para[0].startswith("optional arguments"):
         for line in textwrap_para_unbreakdent_lines(para=para[1:]):
             parser_add_option_line(parser, usage=usage, line=line)
 
@@ -483,27 +483,46 @@ def parser_add_option_line(parser, usage, line):
     """Rip one Add_Argument Call of an Option or two from one Doc Line"""
 
     dests = list()
+    alt_metavar = None  # cut from Help here, but picked up or not by elsewhere
     help_tail = line.strip()
 
     words = line.split()
-    for (index, word) in enumerate(words):
+    index = 0
+    while index < len(words):
+        word = words[index]
+        next_word = words[index + 1] if words[(index + 1) :] else None
+
         if not word.startswith("-"):
 
             break
 
         dests.append(word.split(",")[0])
-        after_word = help_tail.index(word) + len(word)
 
+        after_word = help_tail.index(word) + len(word)
         help_tail = help_tail[after_word:].strip()  # mutate
 
-        if index == 0:
-            if not word.endswith(","):
+        if not word.endswith(","):
+            if not next_word.endswith(","):
 
                 break
 
-        if index >= 1:
+            alt_metavar = next_word.split(",")[0]
+
+        if alt_metavar is not None:
+
+            index += 1
+            word = next_word
+            # TODO: ugly
+
+            after_word = help_tail.index(word) + len(word)
+            help_tail = help_tail[after_word:].strip()  # mutate
+            # TODO: ugly
+
+        if len(dests) >= 2:
 
             break
+
+        index += 1
 
     if len(dests) in (1, 2):
 
@@ -771,13 +790,14 @@ def rip_pylines_on_argparse(parser):
         pylines.extend(action_pychars.splitlines())
 
     for action in parser._get_optional_actions():  # pylint: disable=protected-access
-        action_pychars = rip_py_option_action(parser, action=action)
-        if action_pychars is not None:
+        if not parser_action_is_from_add_help(parser, action=action):
+            action_pychars = rip_py_option_action(parser, action=action)
+            if action_pychars is not None:
 
-            pylines.append("")
-            pylines.extend(action_pychars.splitlines())
+                pylines.append("")
+                pylines.extend(action_pychars.splitlines())
 
-            # never just:  -h, --help  show this help message and exit
+                # never just:  -h, --help  show this help message and exit
 
     return pylines
 
@@ -808,10 +828,8 @@ def rip_py_arg_action(action):
     return chars
 
 
-def rip_py_option_action(parser, action):  # noqa C901 too complex (11)
-    """Rip a Py Fragment that runs on ArgParse to add this one Option"""
-
-    pylines = list()
+def parser_action_is_from_add_help(parser, action):
+    """Say if an Action is the Action from Parser Add Help"""
 
     if action.option_strings == ["-h", "--help"]:
         if action.help == "show this help message and exit":
@@ -819,7 +837,17 @@ def rip_py_option_action(parser, action):  # noqa C901 too complex (11)
 
                 if parser.add_help:
 
-                    return None
+                    return True
+
+    return False
+
+
+def rip_py_option_action(parser, action):
+    """Rip a Py Fragment that runs on ArgParse to add this one Option"""
+
+    _ = parser
+
+    pylines = list()
 
     pylines.append("parser.add_argument(")
 
@@ -859,7 +887,7 @@ def rip_py_option_action(parser, action):  # noqa C901 too complex (11)
 #
 
 
-def rip_py_add_patch(parser, words, pychars):  # noqa C901 too complex (16)
+def rip_py_add_patch(parser, words, pychars):
     """Rip a Py Patch to add one Arg or Option, to Python that runs on ArgParse"""
 
     patcher = _parser_patch_words(words)
@@ -1183,7 +1211,7 @@ def parser_add_help_from_doc(doc):
 
     lines = doc.splitlines()
     for (index, line) in enumerate(lines):
-        next_line = lines[index + 1] if ((index + 1) < len(lines)) else ""
+        next_line = lines[index + 1] if lines[(index + 1) :] else ""
 
         stripped = line.strip()
         if stripped.startswith("-h, --help"):
@@ -1215,7 +1243,7 @@ def parser_epi_from_doc(doc):
 
     if paras:
         para = paras[0]
-        if para[0].startswith("options"):
+        if para[0].startswith("options") or para[0].startswith("optional arguments"):
 
             paras = paras[1:]  # mutate
 
@@ -1332,7 +1360,7 @@ def argparse_doc_upgrade(doc):
 
     # Option to tighten up the comparison, by applying no Upgrade now
 
-    if True:
+    if False:  # pylint: disable=using-constant-test
 
         return doc.strip()
 
@@ -1442,7 +1470,7 @@ EXAMPLE_ARGDOC_PY = r'''
 
     do good stuff
 
-    optional arguments:
+    options:
       -h, --help  show this help message and exit
 
     examples:
