@@ -64,6 +64,11 @@ Contents
 
 + 3 ) Additional tests
 
+++ 3.1 ) Verbs with no Args
+++ 3.2 ) Alt Help Options
+++ 3.3 ) Patches composed by Arg Doc Py
+++ 3.4 ) Clean up
+
 
 To refresh this table of contents, try:
 
@@ -150,17 +155,11 @@ FIXME:  test passes falsely when i delete the first words of the "Next try one o
 
 ## 2.1 ) ArgDoc
 
-ArgDoc compiles standard Python Arg Docs into standard Python ArgParser Parsers
+ArgDoc compiles standard Python Arg Docs into standard Python ArgParse Parsers
 
 Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
-    $ bin/argdoc.py -ijk
-    usage: argdoc.py [-h] [--rip SHRED] [FILE] [WORD ...
-    argdoc.py: error: unrecognized arguments: -ijk
-    + exit 2
-    $
-
-    $ bin/argdoc.py
+    $ bin/argdoc.py /dev/null
     #!/usr/bin/env python3
     # -*- coding: utf-8 -*-
 
@@ -169,7 +168,7 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     do good stuff
 
-    option...
+    option...:
       -h, --help  show this help message and exit
 
     examples:
@@ -202,6 +201,9 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
     sys.exit(2)  # exit 2 to reject usage
     $
 
+Calling Dev Null with Options and Help shows you how to write the ArgParse Python
+to declare those too
+
     $ bin/argdoc.py /dev/null x y z
     ---
     +++ x y z
@@ -217,7 +219,7 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
     +positional arguments:
     +  X           y z
 
-     option...
+     option...:
        -h, --help  show this help message and exit
     @@ -30,6 +33,8 @@
          ),
@@ -229,6 +231,47 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
      sys.stderr.write("{}\n".format(args))
 
     $
+
+When you pass Options past Arg Doc Py itself, you get help on how to write those too
+
+    $ bin/argdoc.py -ijk
+    usage: argdoc.py [-h] [--rip SHRED] [FILE] [WORD ...
+    argdoc.py: error: unrecognized arguments: -ijk
+    + exit 2
+    $
+
+    $ bin/argdoc.py -- -ijk
+
+    ---
+    +++ -ijk
+    @@ -2,12 +2,13 @@
+     # -*- coding: utf-8 -*-
+
+     """
+    -usage: null [-h]
+    +usage: null [-h] [-ijk]
+
+     do good stuff
+
+     option...:
+       -h, --help  show this help message and exit
+    +  -ijk        Ijk
+
+     examples:
+       Oh no! No examples disclosed!! 💥 💔 💥
+    @@ -30,6 +31,8 @@
+         ),
+     )
+
+    +parser.add_argument("-ijk", action="count", help="Ijk")
+    +
+     args = parser.parse_args()
+     sys.stderr.write("{}\n".format(args))
+
+    $
+
+
+Drop that starter Doc and Python into your source, call it, and work it up from there
 
     $ rm -fr bin/p.py
     $
@@ -254,8 +297,6 @@ Compiling "/dev/null" gives you an Arg Doc that works, to start with
 
     $ rm -fr bin/p.py
     $
-
-Drop that starter Doc and Python into your source, call it, and work it up from there
 
 
 ## 2.2 ) Bash
@@ -720,7 +761,7 @@ Show the ruler
     positional arguments:
       VERB        a verb to explain, such as "grep" or "echo"
 
-    option...
+    option...:
       -h, --help  show this help message and exit
 
     examples:
@@ -1210,6 +1251,9 @@ Split words of lines into one word per line
 
 ## 3 ) Additional tests
 
+
+## 3.1 ) Verbs with no Args
+
 Show every verb called with no args returns exit 0,
 else exit status 2 to reject usage
 else exit status 2 to stub out
@@ -1298,6 +1342,9 @@ else exit status 2 to stub out
     $ bin/xargs.py </dev/null >/dev/null 2>&1
     $
 
+
+## 3.2 ) Alt Help Options
+
 Test an option spelled differently than:  -h, --help
 that still calls for automagic "show this help message and exit"
 
@@ -1325,6 +1372,231 @@ that still calls for automagic "show this help message and exit"
 
     $ rm -fr bin/p.py
     $
+
+
+## 3.3 ) Patches composed by Arg Doc Py
+
+Add one required Arg
+
+    $ bin/argdoc.py -- ALSO require more
+    ---
+    +++ ALSO require more
+    @@ -2,9 +2,12 @@
+     # -*- coding: utf-8 -*-
+
+     """
+    -usage: null [-h]
+    +usage: null [-h] ALSO
+
+     do good stuff
+    +
+    +positional arguments:
+    +  ALSO        require more
+
+     option...:
+       -h, --help  show this help message and exit
+    @@ -30,6 +33,8 @@
+         ),
+     )
+
+    +parser.add_argument("also", metavar="ALSO", help="require more")
+    +
+     args = parser.parse_args()
+     sys.stderr.write("{}\n".format(args))
+
+    $
+
+
+Add a Long Option, but also a Short Option to abbreviate it
+
+    $ bin/argdoc.py -- -o OPT, --option OPT allow more by dashes
+    ---
+    +++ -o OPT, --option OPT allow more by dashes
+    @@ -2,12 +2,13 @@
+     # -*- coding: utf-8 -*-
+
+     """
+    -usage: null [-h]
+    +usage: null [-h] [-o OPT]
+
+     do good stuff
+
+     option...:
+    -  -h, --help  show this help message and exit
+    +  -h, --help            show this help message and exit
+    +  -o OPT, --option OPT  allow more by dashes
+
+     examples:
+       Oh no! No examples disclosed!! 💥 💔 💥
+    @@ -30,6 +31,8 @@
+         ),
+     )
+
+    +parser.add_argument("-o", "--option", metavar="OPT", help="allow more by dashes")
+    +
+     args = parser.parse_args()
+     sys.stderr.write("{}\n".format(args))
+
+    $
+
+
+Add an Option with required Arg, without making the caller spell out the Arg twice
+
+    $ bin/argdoc.py -- -o, --option OPT more concise metavar
+    ---
+    +++ -o, --option OPT more concise metavar
+    @@ -2,12 +2,13 @@
+     # -*- coding: utf-8 -*-
+
+     """
+    -usage: null [-h]
+    +usage: null [-h] [-o OPT]
+
+     do good stuff
+
+     option...:
+    -  -h, --help  show this help message and exit
+    +  -h, --help            show this help message and exit
+    +  -o OPT, --option OPT  more concise metavar
+
+     examples:
+       Oh no! No examples disclosed!! 💥 💔 💥
+    @@ -30,6 +31,8 @@
+         ),
+     )
+
+    +parser.add_argument("-o", "--option", metavar="OPT", help="more concise metavar")
+    +
+     args = parser.parse_args()
+     sys.stderr.write("{}\n".format(args))
+
+    $
+
+
+Add an Optional Arg
+
+    $ bin/argdoc.py -- '[ALSO]' opt arg
+    ---
+    +++ [ALSO] opt arg
+    @@ -2,9 +2,12 @@
+     # -*- coding: utf-8 -*-
+
+     """
+    -usage: null [-h]
+    +usage: null [-h] [ALSO]
+
+     do good stuff
+    +
+    +positional arguments:
+    +  ALSO        opt arg
+
+     option...:
+       -h, --help  show this help message and exit
+    @@ -30,6 +33,8 @@
+         ),
+     )
+
+    +parser.add_argument("also", metavar="ALSO", nargs="?", help="opt arg")
+    +
+     args = parser.parse_args()
+     sys.stderr.write("{}\n".format(args))
+
+    $
+    $ bin/argdoc.py -- -o, --option '[OPT]' opt metavar
+    ---
+    +++ -o, --option [OPT] opt metavar
+    @@ -2,12 +2,14 @@
+     # -*- coding: utf-8 -*-
+
+     """
+    -usage: null [-h]
+    +usage: null [-h] [-o [OPT]]
+
+     do good stuff
+
+     option...:
+    -  -h, --help  show this help message and exit
+    +  -h, --help            show this help message and exit
+    +  -o [OPT], --option [OPT]
+    +                        opt metavar
+
+     examples:
+       Oh no! No examples disclosed!! 💥 💔 💥
+    @@ -30,6 +32,8 @@
+         ),
+     )
+
+    +parser.add_argument("-o", "--option", metavar="OPT", nargs="?", help="opt metavar")
+    +
+     args = parser.parse_args()
+     sys.stderr.write("{}\n".format(args))
+
+    $
+
+
+Add zero or more Optional Args at the end
+
+    $ bin/argdoc.py -- '[ALSO ...]' allow many more
+    ---
+    +++ [ALSO ...] allow many more
+    @@ -2,9 +2,12 @@
+     # -*- coding: utf-8 -*-
+
+     """
+    -usage: null [-h]
+    +usage: null [-h] [ALSO ...
+
+     do good stuff
+    +
+    +positional arguments:
+    +  ALSO        allow many more
+
+     option...:
+       -h, --help  show this help message and exit
+    @@ -30,6 +33,8 @@
+         ),
+     )
+
+    +parser.add_argument("also", metavar="ALSO", nargs="*", help="allow many more")
+    +
+     args = parser.parse_args()
+     sys.stderr.write("{}\n".format(args))
+
+    $
+
+
+Do also let the caller spell the Zero or More Args at the end in the way of Python 2
+
+    $ bin/argdoc.py -- '[ALSO [ALSO ...]]' old style
+    ---
+    +++ [ALSO [ALSO ...]] old style
+    @@ -2,9 +2,12 @@
+     # -*- coding: utf-8 -*-
+
+     """
+    -usage: null [-h]
+    +usage: null [-h] [ALSO ...
+
+     do good stuff
+    +
+    +positional arguments:
+    +  ALSO        old style
+
+     option...:
+       -h, --help  show this help message and exit
+    @@ -30,6 +33,8 @@
+         ),
+     )
+
+    +parser.add_argument("also", metavar="ALSO", nargs="*", help="old style")
+    +
+     args = parser.parse_args()
+     sys.stderr.write("{}\n".format(args))
+
+$
+
+
+## 3.4 ) Clean up
 
 Clean up
 
