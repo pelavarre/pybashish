@@ -756,7 +756,7 @@ def rip_py_on_argdoc(parser):
 
 
 def rip_py_on_argparse(parser):
-    """Rip a Py Prog that runs on ArgParse to form and run the Parser"""
+    """Rip a whole Py Prog that runs on ArgParse to form and run the Parser"""
 
     doc = parser.format_help().rstrip()
 
@@ -769,7 +769,27 @@ def rip_py_on_argparse(parser):
 
 
 def rip_pylines_on_argparse(parser):
-    """Rip a Py Prog that runs on ArgParse to form the Parser, without running it"""
+    """Rip a Py Prog that runs on ArgParse to form the Parser without running it"""
+
+    pylines1 = argparse_pylines_epi_twice(parser)
+    pylines2 = argparse_pylines_epi_index(parser)
+
+    assert pylines1 is not None
+    if pylines2 is None:
+
+        return pylines1
+
+    if (len(pylines2) + 1) < len(pylines1):
+
+        return pylines2
+
+    return pylines1
+
+    # keep it at flat 'pylines1' til plainly shorter after adding 'import __main__'
+
+
+def argparse_pylines_epi_twice(parser):
+    """Rip a Py Prog that declares Epilog twice to run on ArgParse"""
 
     dent = "    "
 
@@ -790,6 +810,59 @@ def rip_pylines_on_argparse(parser):
     pylines.append("    epilog={},".format(rep_epilog))
     pylines.append(")")
 
+    argparse_add_pylines_args_options(parser, pylines)
+
+    pylines = "\n".join(pylines).splitlines()
+
+    return pylines
+
+
+def argparse_pylines_epi_index(parser):
+    """Rip a Py Prog that finds Epilog in the Main Doc to run on ArgParse"""
+
+    # Give up if it's difficult
+
+    if parser.epilog is None:
+
+        return None
+
+    stripped = parser.epilog.strip()
+    if not stripped:
+
+        return None
+
+    epi = stripped.splitlines()[0]
+    if epi in parser.format_help():
+
+        return None
+
+    # Make it so
+
+    pylines = list()
+
+    pylines.append("doc = __main__.__doc__")
+    pylines.append("epi_at = doc.index({})".format(black_repr(epi)))
+    pylines.append("epilog = doc[epi_at:]")
+
+    pylines.append("")
+    pylines.append("parser = argparse.ArgumentParser(")
+    pylines.append("    prog={},".format(black_repr(parser.prog)))
+    pylines.append("    description={},".format(black_repr(parser.description)))
+    pylines.append("    add_help={},".format(parser.add_help))
+    pylines.append("    formatter_class=argparse.RawTextHelpFormatter,")
+    pylines.append("    epilog=epilog,")
+    pylines.append(")")
+
+    argparse_add_pylines_args_options(parser, pylines)
+
+    pylines = "\n".join(pylines).splitlines()
+
+    return pylines
+
+
+def argparse_add_pylines_args_options(parser, pylines):
+    """Rip the Py Lines for adding Args and Options"""
+
     for action in parser._get_positional_actions():  # pylint: disable=protected-access
         action_pychars = rip_py_arg_action(action)
         assert action_pychars is not None
@@ -804,10 +877,6 @@ def rip_pylines_on_argparse(parser):
 
                 pylines.append("")
                 pylines.extend(action_pychars.splitlines())
-
-                # never just:  -h, --help  show this help message and exit
-
-    return pylines
 
 
 def rip_py_arg_action(action):
@@ -1465,7 +1534,7 @@ def stderr_print(*args):
 
 
 #
-# Supply one Py as a template to copy-edit
+# Supply one flat Py, as a template to copy-edit
 #
 
 
@@ -1542,8 +1611,20 @@ def pychars_replace_lines(chars, lines):
 
     alt = chars
 
+    # Say to import more than Sys from Python, if working below the level of Arg Doc
+
+    repl = "\n" + "\n".join(lines) + "\n"
+
+    imports = "argparse sys textwrap".split()
+    if "__main__" in repl:
+        imports = "__main__ argparse sys textwrap".split()
+
+    py_imports = "\nimport " + "\nimport ".join(imports) + "\n"
+
+    # Apply some patches
+
     py1 = "\nimport sys\n"
-    alt = alt.replace(py1, "\nimport argparse\nimport sys\nimport textwrap\n")  # mutate
+    alt = alt.replace(py1, py_imports)  # mutate
 
     py2 = "\nimport argdoc\n\n"
     alt = alt.replace(py2, "\n")  # mutate
@@ -1551,8 +1632,9 @@ def pychars_replace_lines(chars, lines):
     py3 = "\nparser = argdoc.ArgumentParser()\n"
     start = alt.index(py3)
     stop = start + len(py3)
-    repl = "\n" + "\n".join(lines) + "\n"
     alt = alt[:start] + repl + alt[stop:]  # mutate
+
+    # Succeed
 
     return alt
 
@@ -1560,7 +1642,7 @@ def pychars_replace_lines(chars, lines):
 def parser_exit_unless_exec_eq(parser, pychars):
     """Run the PyChars to produce an Alt Parser, and require that it's equal"""
 
-    pyglobals = dict(argparse=argparse, textwrap=textwrap)
+    pyglobals = dict(__main__=__main__, argparse=argparse, textwrap=textwrap)
     pylocals = dict()
     exec(pychars, pyglobals, pylocals)  # pylint: disable=exec-used
 
@@ -1679,9 +1761,6 @@ def black_repr_doc(text):
 
 if __name__ == "__main__":
     main()
-
-
-# FIXME: code one copy of the Epilog, not two, when Epilog large
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

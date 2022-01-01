@@ -108,8 +108,6 @@ does it shove that chore of translation onto you?
     wc.py --help
     argdoc.py $(which wc.py)
 
-note: this 3rd vision should code one copy of the Epilog, not two, when Epilog large
-
 4 )
 
 Stand up and push back, why not?
