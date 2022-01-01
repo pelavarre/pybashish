@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE [FILE ...]]
+usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE ...]
 
 show just the trailing lines of a file
 
 positional arguments:
   FILE                  the file to drop leading lines from (default: stdin)
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -F                    --follow and --retry
   -f, --follow          don't quit, poll to show the lines appended to the file, if any

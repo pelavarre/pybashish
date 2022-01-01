@@ -8,7 +8,7 @@ inject a choice of process returncode
 positional arguments:
   STATUS      an eight-bit code seen as happy if zero, sad if positive, very sad if negative
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

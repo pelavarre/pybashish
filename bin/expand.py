@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 r"""
-usage: expand.py [-h] [--csv] [--repr] [--keep-tabs] [--wiki] [FILE [FILE ...]]
+usage: expand.py [-h] [--csv] [--repr] [--keep-tabs] [--wiki] [FILE ...]
 
 replace tabs with spaces, replace cr with lf, strip leading and trailing empty lines
 
 positional arguments:
   FILE         a file to copy out (default: stdin)
 
-optional arguments:
+options:
   -h, --help   show this help message and exit
   --csv        convert to a ".csv" table
   --repr       replace all but r"[\n\r\t]" and plain ascii with python \u escapes

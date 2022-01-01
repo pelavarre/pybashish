@@ -10,7 +10,7 @@ show the files and dirs inside a dir
 positional arguments:
   TOP              the name of a dir or file to show
 
-optional arguments:
+options:
   -h, --help       show this help message and exit
   -1               print as one column: one filename per line
   -C               print by filling multiple columns (default: True)

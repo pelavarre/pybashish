@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: paste.py [-h] [FILE [FILE ...]]
+usage: paste.py [-h] [FILE ...]
 
 copy each file into place as a column
 
 positional arguments:
   FILE        a file to copy (default: stdin)
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

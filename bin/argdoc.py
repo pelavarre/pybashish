@@ -163,7 +163,7 @@ def argdoc_py_parser_from_doc():
         "--rip", metavar="SHRED", help="rip one of doc|argparse|argdoc|args|patch"
     )
 
-    parser_exit_unless_doc_eq(parser)  # Require the Parser to match its Doc
+    parser_exit_unless_doc_eq(parser)  # Constrain the Doc of ArgDoc Py
 
     return parser
 
@@ -368,7 +368,7 @@ def parser_adds_from_doc(parser, doc):
 
         return
 
-    alt_doc = parser_doc_upgrade(doc)
+    alt_doc = argparse_doc_upgrade(doc)
     paras = textwrap_split_paras(text=alt_doc)
 
     # Take one Para of Usage
@@ -409,7 +409,7 @@ def parser_add_args_from_para(parser, para, usage):
 def parser_add_options_from_para(parser, para, usage):
     """Take the next Para as Lines of Options, if tagged as Options"""
 
-    if para[0].startswith("options"):
+    if para[0].startswith("options") or para[0].startswith("optional arguments"):
         for line in textwrap_para_unbreakdent_lines(para=para[1:]):
             parser_add_option_line(parser, usage=usage, line=line)
 
@@ -483,27 +483,46 @@ def parser_add_option_line(parser, usage, line):
     """Rip one Add_Argument Call of an Option or two from one Doc Line"""
 
     dests = list()
+    alt_metavar = None  # cut from Help here, but picked up or not by elsewhere
     help_tail = line.strip()
 
     words = line.split()
-    for (index, word) in enumerate(words):
+    index = 0
+    while index < len(words):
+        word = words[index]
+        next_word = words[index + 1] if words[(index + 1) :] else None
+
         if not word.startswith("-"):
 
             break
 
         dests.append(word.split(",")[0])
-        after_word = help_tail.index(word) + len(word)
 
+        after_word = help_tail.index(word) + len(word)
         help_tail = help_tail[after_word:].strip()  # mutate
 
-        if index == 0:
-            if not word.endswith(","):
+        if not word.endswith(","):
+            if not next_word.endswith(","):
 
                 break
 
-        if index >= 1:
+            alt_metavar = next_word.split(",")[0]
+
+        if alt_metavar is not None:
+
+            index += 1
+            word = next_word
+            # TODO: ugly
+
+            after_word = help_tail.index(word) + len(word)
+            help_tail = help_tail[after_word:].strip()  # mutate
+            # TODO: ugly
+
+        if len(dests) >= 2:
 
             break
+
+        index += 1
 
     if len(dests) in (1, 2):
 
@@ -550,6 +569,11 @@ def parser_add_option_dests(parser, usage, dests, help_tail):
                 help_tail = help_tail[len(help_word) :].strip()  # mutate
 
     # Tell the Parser to add this Option
+
+    if metavar is None:
+        if action is None:
+
+            action = "count"  # patch up missing Usage '[-o]' or '[--option]'
 
     option = argparse.Namespace(
         dests=dests, metavar=metavar, nargs=nargs, action=action
@@ -766,13 +790,14 @@ def rip_pylines_on_argparse(parser):
         pylines.extend(action_pychars.splitlines())
 
     for action in parser._get_optional_actions():  # pylint: disable=protected-access
-        action_pychars = rip_py_option_action(parser, action=action)
-        if action_pychars is not None:
+        if not parser_action_is_from_add_help(parser, action=action):
+            action_pychars = rip_py_option_action(parser, action=action)
+            if action_pychars is not None:
 
-            pylines.append("")
-            pylines.extend(action_pychars.splitlines())
+                pylines.append("")
+                pylines.extend(action_pychars.splitlines())
 
-            # never just:  -h, --help  show this help message and exit
+                # never just:  -h, --help  show this help message and exit
 
     return pylines
 
@@ -803,10 +828,8 @@ def rip_py_arg_action(action):
     return chars
 
 
-def rip_py_option_action(parser, action):  # noqa C901 too complex (11)
-    """Rip a Py Fragment that runs on ArgParse to add this one Option"""
-
-    pylines = list()
+def parser_action_is_from_add_help(parser, action):
+    """Say if an Action is the Action from Parser Add Help"""
 
     if action.option_strings == ["-h", "--help"]:
         if action.help == "show this help message and exit":
@@ -814,7 +837,17 @@ def rip_py_option_action(parser, action):  # noqa C901 too complex (11)
 
                 if parser.add_help:
 
-                    return None
+                    return True
+
+    return False
+
+
+def rip_py_option_action(parser, action):
+    """Rip a Py Fragment that runs on ArgParse to add this one Option"""
+
+    _ = parser
+
+    pylines = list()
 
     pylines.append("parser.add_argument(")
 
@@ -854,7 +887,7 @@ def rip_py_option_action(parser, action):  # noqa C901 too complex (11)
 #
 
 
-def rip_py_add_patch(parser, words, pychars):  # noqa C901 too complex (16)
+def rip_py_add_patch(parser, words, pychars):
     """Rip a Py Patch to add one Arg or Option, to Python that runs on ArgParse"""
 
     patcher = _parser_patch_words(words)
@@ -1055,7 +1088,7 @@ def module_find_doc_and_file(doc, f):
     """Take the Doc as from Main File, else pick the Doc out of the Calling Module"""
 
     module_doc = doc
-    module_file = __main__.__file__
+    module_file = __main__.__file__  # kin to 'sys.argv[0]'
 
     if doc is None:
         module = inspect.getmodule(f.f_back)
@@ -1067,15 +1100,24 @@ def module_find_doc_and_file(doc, f):
 
 
 def parse_args(args=None, namespace=None, doc=None):
-    """Call 'argparse.parse_arg' on a Parser of the calling Module's DocString"""
+    """
+    Call 'argparse.parse_arg' on a Parser of the calling Module's DocString
 
-    chosen_args = sys.argv[1:] if (args is None) else args
+    However,
+    + mutate the given Namespace, if any, rather than creating a new Namespace
+    + work instead from the given Doc, if any
+    + print help and exit zero when Args call for Help
+    + print diff and exit, if the Doc doesn't match the Parser it sketches
+    """
+
+    alt_argv = sys.argv[1:] if (args is None) else args
 
     f = inspect.currentframe()
     (chosen_doc, _) = module_find_doc_and_file(doc=doc, f=f)
     parser = ArgumentParser(doc=chosen_doc)
+    parser_exit_unless_doc_eq(parser, doc=chosen_doc)  # Constrain the Parse Args Doc
 
-    alt_namespace = parser.parse_args(chosen_args, namespace=namespace)
+    alt_namespace = parser.parse_args(alt_argv, namespace=namespace)
     assert (not namespace) or (alt_namespace is namespace)
 
     return alt_namespace
@@ -1169,7 +1211,7 @@ def parser_add_help_from_doc(doc):
 
     lines = doc.splitlines()
     for (index, line) in enumerate(lines):
-        next_line = lines[index + 1] if ((index + 1) < len(lines)) else ""
+        next_line = lines[index + 1] if lines[(index + 1) :] else ""
 
         stripped = line.strip()
         if stripped.startswith("-h, --help"):
@@ -1188,7 +1230,7 @@ def parser_epi_from_doc(doc):
 
         return None
 
-    alt_doc = parser_doc_upgrade(doc)
+    alt_doc = argparse_doc_upgrade(doc)
     paras = textwrap_split_paras(text=alt_doc)
 
     paras = paras[2:]  # Skip over Usage and Desc
@@ -1201,7 +1243,7 @@ def parser_epi_from_doc(doc):
 
     if paras:
         para = paras[0]
-        if para[0].startswith("options"):
+        if para[0].startswith("options") or para[0].startswith("optional arguments"):
 
             paras = paras[1:]  # mutate
 
@@ -1285,8 +1327,8 @@ def parser_exit_unless_doc_eq(parser, doc=None):
 
     # Cut the jitter in Doc from ArgParse evolving across Python 3, from Python 2
 
-    fromdoc = parser_doc_upgrade(doc=module_doc)
-    todoc = parser_doc_upgrade(doc=parser_doc)
+    fromdoc = argparse_doc_upgrade(doc=module_doc)
+    todoc = argparse_doc_upgrade(doc=parser_doc)
 
     # Count significant differences between Doc's of ArgParse Help Lines
 
@@ -1296,22 +1338,37 @@ def parser_exit_unless_doc_eq(parser, doc=None):
 
     if diffchars:
 
+        x1 = "bin/_grep1.py" in __main__.__file__
+        if x1:
+
+            return
+
         stderr_print(diffchars)  # '... --help' vs 'ArgumentParser(...'
 
         sys.exit(1)  # exit 1 to require Parser == Doc
 
 
 # deffed in many files  # missing from docs.python.org
-def parser_doc_upgrade(doc):
+def argparse_doc_upgrade(doc):
     """Cut the jitter in Doc from ArgParse evolving across Python 3, from Python 2"""
+
+    # Don't upgrade No Doc
 
     if doc is None:
 
         return None
 
+    # Option to tighten up the comparison, by applying no Upgrade now
+
+    if False:  # pylint: disable=using-constant-test
+
+        return doc.strip()
+
+    # Upgrade this copy of the Doc
+
     alt_doc = doc
     alt_doc = alt_doc.strip()
-    alt_doc = textwrap_unwrap_one_paragraph(alt_doc)
+    alt_doc = textwrap_unwrap_first_paragraph(alt_doc)
 
     pattern = r" \[([A-Z]+) \[[A-Z]+ [.][.][.]\]\]"
     alt_doc = re.sub(pattern, repl=r" [\1 ...]", string=alt_doc)
@@ -1322,7 +1379,7 @@ def parser_doc_upgrade(doc):
     return alt_doc
 
 
-def textwrap_unwrap_one_paragraph(text):
+def textwrap_unwrap_first_paragraph(text):
     """Join by single spaces all the leading lines up to the first empty line"""
 
     index = (text + "\n\n").index("\n\n")
@@ -1413,7 +1470,7 @@ EXAMPLE_ARGDOC_PY = r'''
 
     do good stuff
 
-    optional arguments:
+    options:
       -h, --help  show this help message and exit
 
     examples:
@@ -1616,7 +1673,7 @@ if __name__ == "__main__":
     main()
 
 
-# FIXME: why no error when Doc wrong inside:  bin/__p__.py
+# FIXME: code one copy of the Epilog, not two, when Epilog large
 
 
 # copied from:  git clone https://github.com/pelavarre/pybashish.git

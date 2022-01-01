@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
 r"""
-usage: grep.py [--help] [-h] [-v] [PATTERN [PATTERN ...]]
+usage: grep.py [--help] [-h] [-v] [PATTERN ...]
 
 search a curated Terminal input history for a paragraph or line of input to repeat now
 
 positional arguments:
   PATTERN            search key, in the syntax of a Python regular expression
 
-optional arguments:
+options:
   --help             show this help message and exit
-  -h, --no-filename  just print the hits, not the filenames they came from (default: True)
+  -h, --no-filename  print the hits without filenames (default: True)
   -v, --verbose      think more out loud
 
 usage as a ~/.bashrc (or ~/.zshrc) history-recall extension:

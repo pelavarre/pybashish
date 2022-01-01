@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: hearme.py [-h] [-x] [-p] [-f] [-i] [-q] [-v] [HINT [HINT ...]]
+usage: hearme.py [-h] [-x] [-p] [-f] [-i] [-q] [-v] [HINT ...]
 
 auto-complete the hints into a complete bash command line, trace it, and run it
 
 positional arguments:
   HINT                  code to run
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -x, --edit-clipboard  read and write the os copy-paste clipboard (default when tty)
   -p, --edit-stdio      read stdin and write stdout (default when std/in/out not tty)

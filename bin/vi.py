@@ -95,12 +95,13 @@ import traceback
 import tty
 
 
+_89_COLUMNS = 89  # the Black app for styling Python promotes 89 columns per line
 ENV_HOME = os.environ["HOME"]
 
 
 # The __main__.__doc__ of "em.py" is =>
 
-ALT_DOC = r"""
+MAIN_EM_DOC = r"""
 usage: em.py [-h] [-nw] [-Q] [--no-splash] [-q] [--script SCRIPT] [--eval COMMAND]
              [--pwnme [BRANCH]] [--version]
              [FILE ...]
@@ -110,7 +111,7 @@ read files, accept edits, write files, in the way of classical emacs
 positional arguments:
   FILE                a file to edit (default: '/dev/stdin')
 
-optional arguments:
+options:
   -h, --help          show this help message and exit
   -nw                 stay inside this terminal, don't open another terminal
   -Q, --quick         run as if --no-splash and --no-init-file (but slow after crash)
@@ -152,6 +153,8 @@ how to get Em Py:
   python3 em.py em.py  # with updates at:  python3 em.py --pwnme
   ⌃Segg
 """
+
+# FIXME: count -hh to put out alt help of keyboard, else fit into 89x50
 
 #
 # Emacs and Em Py both
@@ -199,22 +202,17 @@ def main(argv):
 def parse_main_argv(argv):
     """Convert a Vi Sys ArgV to an Args Namespace, or print some Help and quit"""
 
-    doc = ALT_DOC if wearing_em() else None
+    doc = fetch_main_doc()
 
-    # Declare the Args,
-    # and choose 'drop_help=True' to let 'parser_format_help' correct the Help Lines
+    # Declare the Args
 
-    parser = argparse_compile_argdoc(epi="quirks", drop_help=True, doc=doc)
+    parser = argparse_compile_argdoc(epi="quirks", doc=doc)
 
     parser.add_argument(
         "files",
         metavar="FILE",
         nargs="*",
         help="a file to edit (default: '/dev/stdin')",
-    )
-
-    parser.add_argument(
-        "-h", "--help", action="count", help="show this help message and exit"
     )
 
     if not wearing_em():
@@ -294,27 +292,19 @@ def parse_main_argv(argv):
 
     # Auto-correct the Args
 
-    if wearing_em():
-
-        argv_tail = argv[1:]
-
-    else:
-
-        argv_tail = list()
+    alt_argv = argv[1:]
+    if not wearing_em():
+        alt_argv = list()
         for arg in argv[1:]:
             if not arg.startswith("+"):
-                argv_tail.append(arg)
+                alt_argv.append(arg)
             else:
-                argv_tail.append("-c")
-                argv_tail.append(arg[len("+") :])
+                alt_argv.append("-c")
+                alt_argv.append(arg[len("+") :])
 
     # Parse the Args (or print Help Lines to Stdout and Exit 0)
 
-    args = parser.parse_args(argv_tail)
-    if args.help:
-        sys.stdout.write(parser_format_help(parser))
-
-        sys.exit(0)  # return an explicit 0, same as Parser Add Help Parse Args would
+    args = parser.parse_args(alt_argv)
 
     return args
 
@@ -328,10 +318,15 @@ def wearing_em():
     return em_in_verb
 
 
-def parser_format_help(parser):
-    """Patch around bugs in Python ArgParse formatting Help Lines inflexibly"""
+def fetch_main_doc():
+    """Adapt the Main Doc to speak of Vi Py, Em Py, etc"""
 
-    doc = parser.format_help()
+    # Find the Main Doc
+
+    f = inspect.currentframe()
+    module = inspect.getmodule(f.f_back)
+
+    doc = MAIN_EM_DOC if wearing_em() else module.__doc__
 
     # Diff the Vi Py we distribute vs the Em Py, Emacs Py, and Vim Py we also run
 
@@ -344,6 +339,8 @@ def parser_format_help(parser):
     got_py = got_verb + ".py"  # such as "vim.py"
     got_qpy = got_verb + "?py"  # such as "vim?py"
     got_title_py = got_verb.title() + " Py"  # such as "Vim Py"
+
+    assert got_title_py == sys_argv_0_title_py(), (got_title_py, sys_argv_0_title_py())
 
     # When the version we run isn't the version we distribute
 
@@ -376,18 +373,16 @@ def parser_format_help(parser):
 
     return doc
 
-    # TODO: stop bypassing 'argparse_exit_unless_doc_eq' here
-
 
 def do_main_arg_version():
     """Print a hash of this Code (its Md5Sum) and exit"""
 
+    title_py = sys_argv_0_title_py()  # "Vi Py", "Em Py", etc
+
     version = module_file_version_zero()
+
     str_hash = module_file_hash()
     str_short_hash = str_hash[:4]  # conveniently fewer nybbles  # good enough?
-
-    verb = os_path_corename(sys.argv[0])
-    title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
 
     print("{} {} hash {} ({})".format(title_py, version, str_short_hash, str_hash))
 
@@ -498,7 +493,17 @@ X40_CONTROL_MASK = 0x40
 X20_LOWER_MASK = 0x20
 X20_UPPER_MASK = 0x20
 
+# FIXME:  TerminalDecoding of bursts of bytes into bursts of chars at keyboard input
+# FIXME:  input <- Reader Driver, alongside output -> Painter Shadow Driver
+# FIXME:  take ⇧2 ⌥2 ⇧3 ⌥3 from UK or US keyboard
+# FIXME:  defaults read
+# FIXME:      ~/Library/Preferences/com.apple.HIToolbox.plist AppleSelectedInputSources
+# FIXME:  https://stackoverflow.com/questions/21597804/
+# FIXME:      determine-os-x-keyboard-layout-input-source-in-the-terminal-a-script
+# FIXME:  pick apart ⌥← ⌥→ ⌥B ⌥F
 # FIXME:  shuffle lots of the TerminalNudgeIn to here
+
+# FIXME:  Em Py C-h k, C-h a, but then for Vi Py too
 
 
 #
@@ -909,8 +914,9 @@ class TerminalVi:
                 chords += ended_line.encode()
 
         if not wearing_em():
-            chords += b":vi\r"  # go with XTerm Alt Screen  => do_resume_vi
-            chords += b"\x03"  # welcome with ETX, ⌃C, 3  => do_vi_c0_control_etx
+            if not chords.endswith(b":q\r"):
+                chords += b":vi\r"  # go with XTerm Alt Screen  => do_resume_vi
+                chords += b"\x03"  # welcome with ETX, ⌃C, 3  => do_vi_c0_control_etx
 
         return chords
 
@@ -1121,9 +1127,7 @@ class TerminalVi:
         if held_vi_file.touches:
             joins.append("{} bytes touched".format(held_vi_file.touches))
 
-        verb = os_path_corename(sys.argv[0])
-        title_py = verb.title() + " Py"  # "Vi Py", "Em Py", etc
-        joins.append(title_py)
+        joins.append(sys_argv_0_title_py())  # such as "Vi Py", "Em Py", etc
 
         # Join the Mentions into one Status Row
 
@@ -1199,13 +1203,11 @@ class TerminalVi:
     def suggest_quit_vi(self, how):
         """Print how to Quit Em Py or Vi Py, etc"""
 
-        version = module_file_version_zero()
-
         held_vi_file = self.held_vi_file
-        nickname = held_vi_file.pick_file_nickname() if held_vi_file else None
 
-        verb = os_path_corename(sys.argv[0])
-        title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
+        nickname = held_vi_file.pick_file_nickname() if held_vi_file else None
+        title_py = sys_argv_0_title_py()  # "Vi Py", "Em Py", etc
+        version = module_file_version_zero()
 
         self.vi_print(
             "{!r}  {} and quit {} {}".format(nickname, how, title_py, version)
@@ -1230,8 +1232,7 @@ class TerminalVi:
 
         # Begin game, or don't
 
-        verb = os_path_corename(sys.argv[0])
-        title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
+        title_py = sys_argv_0_title_py()  # "Vi Py", "Em Py", etc
 
         if chords in (b"y", b"Y"):
             self.vi_print("Ok, now try to quit {}".format(title_py))  # Qvi⌃My Egg
@@ -4122,7 +4123,7 @@ class TerminalEm:
         editor = self.vi.editor
         editor.intake_beyond = "inserting"  # as if many 'do_em_self_insert_command'
 
-    def do_em_prefix_chord(self, chord):  # TODO  # noqa C901 too complex
+    def do_em_prefix_chord(self, chord):  # TODO:  # noqa C901 too complex
         """Take ⌃U { ⌃U } [ "-" ] { "0123456789" } [ ⌃U ] as a Prefix to more Chords"""
         # Emacs ⌃U Universal-Argument
 
@@ -4313,12 +4314,10 @@ class TerminalEm:
 
         else:
 
-            verb = os_path_corename(sys.argv[0])
-            title_py = verb.title() + " Py"  # version of "Vi Py", "Em Py", etc
-
-            version = module_file_version_zero()
-
             held_vi_file = vi.held_vi_file
+
+            title_py = sys_argv_0_title_py()  # "Vi Py", "Em Py", etc
+            version = module_file_version_zero()
             nickname = held_vi_file.pick_file_nickname() if held_vi_file else None
 
             vi.vi_print(
@@ -5885,7 +5884,7 @@ class TerminalEditor:
 
         return chords_func
 
-    def editor_func_by_chords(self, chords):  # noqa C901 too complex
+    def editor_func_by_chords(self, chords):  # TODO: # noqa C901 too complex
         """Choose the Func for some Chords"""
 
         intake_taken = self.intake_taken
@@ -5942,7 +5941,7 @@ class TerminalEditor:
 
         return chords_func
 
-    def call_chords_func(self, chords_func):  # TODO  # noqa C901 too complex
+    def call_chords_func(self, chords_func):  # TODO:  # noqa C901 too complex
         """Call the Func once or more, in reply to one Terminal Nudge In"""
 
         after_func = self.after_func
@@ -6472,13 +6471,16 @@ class TerminalEditor:
     def do_raise_name_error(self):  # Vim Z⇧Z  # Emacs ⌃X⌃G  # etc
         """Reply to meaningless Keyboard Input"""
 
+        str_nudge = self.skin.nudge.to_chars()
         nudge = TerminalNudgeIn(self.skin.nudge)
         nudge.prefix = None
 
         if wearing_em():
-            raise EmPyNameError()
+            raise EmPyNameError(str_nudge)
 
-        raise ViPyNameError()
+        raise ViPyNameError(str_nudge)
+
+        # TODO:  raise NameError without Arg when visual mode has echoed it already
 
     def do_redraw(self):  # Vim ⌃L
         """Toggle between more and less Lag"""
@@ -8315,30 +8317,25 @@ class KwArgsException(Exception):
 
 
 # deffed in many files  # missing from docs.python.org
-def argparse_compile_argdoc(epi, drop_help=None, doc=None):
+def argparse_compile_argdoc(epi, doc):
     """Construct the 'argparse.ArgumentParser' with Epilog but without Arguments"""
-
-    f = inspect.currentframe()
-    (module_doc, _) = argparse_module_doc_and_file(doc=doc, f=f)
 
     # Pick the ArgParse Prog, Description, & Epilog out of the Main Arg Doc
 
-    prog = module_doc.strip().splitlines()[0].split()[1]
+    prog = doc.strip().splitlines()[0].split()[1]
 
-    headlines = list(
-        _ for _ in module_doc.strip().splitlines() if _ and not _.startswith(" ")
-    )
+    headlines = list(_ for _ in doc.strip().splitlines() if _ and not _.startswith(" "))
     description = headlines[1]
 
-    epilog_at = module_doc.index(epi)
-    epilog = module_doc[epilog_at:]
+    epilog_at = doc.index(epi)
+    epilog = doc[epilog_at:]
 
     # Start forming the ArgParse Parser
 
     parser = argparse.ArgumentParser(
         prog=prog,
         description=description,
-        add_help=(not drop_help),
+        add_help=True,
         formatter_class=argparse.RawTextHelpFormatter,
         epilog=epilog,
     )
@@ -8347,16 +8344,51 @@ def argparse_compile_argdoc(epi, drop_help=None, doc=None):
 
 
 # deffed in many files  # missing from docs.python.org
-def argparse_exit_unless_doc_eq(parser, doc=None):
-    """Exit nonzero, unless __main__.__doc__ equals 'parser.format_help()'"""
+def argparse_doc_upgrade(doc):
+    """Cut the jitter in Doc from ArgParse evolving across Python 3, from Python 2"""
 
-    f = inspect.currentframe()
-    (module_doc, module_file) = argparse_module_doc_and_file(doc=doc, f=f)
+    # Don't upgrade No Doc
 
-    # Fetch the two docs
+    if doc is None:
 
-    with_columns = os.getenv("COLUMNS")
-    os.environ["COLUMNS"] = str(89)  # Black promotes 89 columns per line
+        return None
+
+    # Option to tighten up the comparison, by applying no Upgrade now
+
+    if False:  # pylint: disable=using-constant-test
+
+        return doc.strip()
+
+    # Upgrade this copy of the Doc
+
+    alt_doc = doc
+    alt_doc = alt_doc.strip()
+    alt_doc = argparse_textwrap_unwrap_first_paragraph(alt_doc)
+
+    pattern = r" \[([A-Z]+) \[[A-Z]+ [.][.][.]\]\]"
+    alt_doc = re.sub(pattern, repl=r" [\1 ...]", string=alt_doc)
+    # TODO: think deeper into mixed case metavars, and into '.group(1) != .group(2)'
+
+    alt_doc = alt_doc.replace("\noptional arguments:", "\noptions:")
+
+    return alt_doc
+
+
+# deffed in many files  # missing from docs.python.org
+def argparse_exit_unless_doc_eq(parser, doc):
+    """{rint diff and exit, if the Doc doesn't match the Parser it sketches"""
+
+    # Sketch where the Doc's came from
+
+    verb = os.path.basename(__main__.__file__)  # such as "vim.py"
+    fromfile = "{} --help".format(verb)
+
+    tofile = "ArgumentParser(..."
+
+    # Fetch the Parser Doc with Lines wrapped by a virtual Terminal of a fixed width
+
+    with_columns = os.getenv("COLUMNS")  # often '!= os.get_terminal_size().columns'
+    os.environ["COLUMNS"] = str(_89_COLUMNS)
     try:
         parser_doc = parser.format_help()
     finally:
@@ -8365,120 +8397,30 @@ def argparse_exit_unless_doc_eq(parser, doc=None):
         else:
             os.environ["COLUMNS"] = with_columns
 
-    # Cut the worthless jitter we wish away
+    # Cut the jitter in Doc from ArgParse evolving across Python 3, from Python 2
 
-    alt_module_doc = module_doc.strip()
-    alt_parser_doc = parser_doc
+    fromdoc = argparse_doc_upgrade(doc=doc)
+    todoc = argparse_doc_upgrade(doc=parser_doc)
 
-    if sys.version_info[:3] < (3, 9, 6):
+    # Count  differences
 
-        alt_module_doc = argparse_textwrap_unwrap_one_paragraph(alt_module_doc)
-        alt_parser_doc = argparse_textwrap_unwrap_one_paragraph(alt_parser_doc)
-
-        if "[FILE ...]" in module_doc:
-            alt_parser_doc = alt_parser_doc.replace("[FILE [FILE ...]]", "[FILE ...]")
-            # older Python needed this accomodation, such as Feb/2015 Python 3.4.3
-
-        if "\noptions:" in module_doc:
-            alt_parser_doc = alt_parser_doc.replace(
-                "\noptional arguments:", "\noptions:"
-            )
-            # older Python needed this accomodation, such as Jun/2021 Python 3.9.6
-
-    # Sketch where the Doc's came from
-
-    alt_module_file = module_file
-    alt_module_file = os.path.split(alt_module_file)[-1]
-    alt_module_file = "{} --help".format(alt_module_file)
-
-    alt_parser_file = "argparse.ArgumentParser(..."
-
-    # Count significant differences
-
-    got_diffs = argparse_stderr_print_diffs(
-        alt_module_doc,
-        alt_parser_doc=alt_parser_doc,
-        alt_module_file=alt_module_file,
-        alt_parser_file=alt_parser_file,
+    difflines = list(
+        difflib.unified_diff(
+            a=fromdoc.splitlines(),
+            b=todoc.splitlines(),
+            fromfile=fromfile,
+            tofile=tofile,
+        )
     )
+    diffchars = "\n".join(_.splitlines()[0] for _ in difflines)
 
-    if got_diffs:
+    if diffchars:
+        stderr_print(diffchars)
 
         sys.exit(1)  # trust caller to log SystemExit exceptions well
 
 
-# deffed in many files  # missing from docs.python.org
-def argparse_module_doc_and_file(doc, f):
-    """Take the Doc as from Main File, else pick the Doc out of the Calling Module"""
-
-    module_doc = doc
-    module_file = __main__.__file__
-
-    if doc is None:
-        module = inspect.getmodule(f.f_back)
-
-        module_doc = module.__doc__
-        module_file = f.f_back.f_code.co_filename
-
-    return (module_doc, module_file)
-
-
-# deffed in many files  # missing from docs.python.org
-def argparse_stderr_print_diffs(
-    alt_module_doc, alt_parser_doc, alt_module_file, alt_parser_file
-):
-    """True after Printing Diffs, False when no Diffs found"""
-
-    # pylint: disable=too-many-locals
-
-    for diff_precision in range(2):
-
-        a_lines = alt_module_doc.splitlines()
-        b_lines = alt_parser_doc.splitlines()
-
-        # First count differences ignoring blank space between Words,
-        # but end by counting even the smallest differences in Chars
-
-        if not diff_precision:
-
-            a_words_by_index = list()
-            for (index, a_line) in enumerate(a_lines):
-                a_words = " ".join(a_line.split())
-                a_words_by_index.append(a_words)
-
-            for (index, b_line) in enumerate(b_lines):
-                b_words = " ".join(b_line.split())
-                if b_words in a_words_by_index:
-                    a_index = a_words_by_index.index(b_words)
-                    a_line = a_lines[a_index]
-
-                    b_lines[index] = a_line
-
-        diff_lines = list(
-            difflib.unified_diff(
-                a=a_lines,
-                b=b_lines,
-                fromfile=alt_module_file,
-                tofile=alt_parser_file,
-            )
-        )
-
-        # Return True if differences found, but first print these differents to Stderr
-
-        if diff_lines:  # TODO: ugly contingent '.rstrip()'
-
-            lines = list((_.rstrip() if _.endswith("\n") else _) for _ in diff_lines)
-            stderr_print("\n".join(lines))
-
-            return True
-
-    # Return False if no differences found
-
-    return False
-
-
-# deffed in many files  # missing from docs.python.org
-def argparse_textwrap_unwrap_one_paragraph(doc):
+def argparse_textwrap_unwrap_first_paragraph(doc):
     """Join by single spaces all the leading lines up to the first empty line"""
 
     index = (doc + "\n\n").index("\n\n")
@@ -8509,7 +8451,7 @@ def module_file_hash():
 
 # deffed in many files  # missing from docs.python.org
 def module_file_path():
-    """Find the Doc of caller, even when not Main, and when:  __main__ is None"""
+    """Find the Doc of caller, even when caller not Main or ' __main__ is None'"""
 
     f = inspect.currentframe()
     module_file = f.f_back.f_code.co_filename  # more available than 'module.__file__'
@@ -8697,6 +8639,17 @@ def subprocess_run(args, **kwargs):
     return run
 
 
+# deffed in many files  # missing from docs.python.org
+def sys_argv_0_title_py():
+    """Name the Main File"""
+
+    sys_argv_0 = sys.argv[0]  # kin to '__main__.__file__'
+    title = os_path_corename(sys_argv_0).title()  # such as "vi", or "em", etc
+    title_py = title + " Py"  # "Vi Py", or "Em Py", etc
+
+    return title_py
+
+
 # Cite some Terminal Doc's and Git-track experience of Terminal Output magic
 #
 #       https://en.wikipedia.org/wiki/ANSI_escape_code
@@ -8806,6 +8759,8 @@ def subprocess_run(args, **kwargs):
 
 
 # -- future features --
+
+# TODO: Emacs lacks ~/.viminfo history
 
 # TODO: show just the leading screen of hits and land on the first for g? :g?
 # TODO: recover :g/ Status when ⌃L has given us :set _lag_ of >1 Screen of Hits

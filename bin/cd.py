@@ -8,7 +8,7 @@ dry run injecting a change of working dir
 positional arguments:
   DIR         the directory to work in next (default: $HOME)
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

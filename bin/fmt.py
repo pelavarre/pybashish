@@ -5,7 +5,7 @@ usage: fmt.py [-h] [-w WIDTH] [--ruler]
 
 join lines of the same indentation, and split at width or before it
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
   -w WIDTH    width to split at or before (default: don't print into last column of terminal)
   --ruler     show a ruler to count off the columns

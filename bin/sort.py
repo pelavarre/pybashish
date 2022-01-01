@@ -5,7 +5,7 @@ usage: sort.py [-h]
 
 sort lines
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

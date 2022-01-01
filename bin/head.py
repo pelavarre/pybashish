@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: head.py [-h] [-n COUNT] [FILE [FILE ...]]
+usage: head.py [-h] [-n COUNT] [FILE ...]
 
 show just the leading lines of a file
 
 positional arguments:
   FILE                  the file to drop trailing lines from (default: stdin)
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -n COUNT, --lines COUNT
                         how many leading lines to show (default: 10)

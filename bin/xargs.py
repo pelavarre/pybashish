@@ -5,7 +5,7 @@ usage: xargs.py [-h] [-n MAX_ARGS]
 
 split and rejoin the words of all lines of input into one line of output
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -n MAX_ARGS, --max-args MAX_ARGS
                         words per line
@@ -31,7 +31,7 @@ def main():
 
     words = stdin.split()
     len_words = len(words)
-    words_per_line = len_words if (args.n is None) else int(args.n)
+    words_per_line = len_words if (args.max_args is None) else int(args.max_args)
 
     if len_words:
         for index in range(0, len_words, words_per_line):

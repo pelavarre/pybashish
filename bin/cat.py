@@ -1,43 +1,43 @@
 #!/usr/bin/env python3
 
 r"""
-usage: cat.py [-h] [-E] [-e] [-n] [-T] [-t] [-v] [FILE [FILE ...]]
+usage: cat.py [-h] [-E] [-e] [-n] [-T] [-t] [-v] [FILE ...]
 
 copy each line of input bytes (or chars) to output (as if "cat"enating them slowly)
 
 positional arguments:
   FILE                  a file to copy out (default: stdin)
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
-  -E, --show-ends       print each "\n" lf as "$\n"
+  -E, --show-ends       print each \n lf as $ lf
   -e                    call for -E and -v
-  -n, --number          number each line of output
-  -T, --show-tabs       show each "\t" tab as r"\t" backslash tee
+  -n, --number          number each line of output, up from 1
+  -T, --show-tabs       show each \t tab as \ t backslash tee
   -t                    call for -T and -v
   -v, --show-nonprinting
-                        convert all but \n and \t and printable ascii r"[ -~]" to \ escapes
+                        keep \n, \t, & us-ascii r"[ -~]", convert the rest to \ escapes
 
 quirks:
   shows \t as \t, not as classic ^I
   shows \n as \n, not as classic $
-  does show all but printable ascii as nonprinting, unlike Mac "cat" at \u00A0 &nbsp; etc
-  does stop copying at first ⌃D of stdin, even when last line not completed by "\n"
-  does print hard b"\x09" tab after each line number, via "{:6}\t", same as bash "cat"
+  does show all US-Ascii as nonprinting, unlike Mac Cat at \u00A0 &nbsp; etc
+  does stop copying at first ⌃D of Stdin, even when last line not completed by \n
+  does print one hard \x09 tab after each line number, via "{:6}\t", same as Bash Cat
   doesn't yet accept 'cat.py -n=0' to mean count up from zero
 
 unsurprising quirks:
-  prompts for stdin, like mac bash "grep -R .", unlike bash "cat -" and "cat"
-  accepts the "stty -a" line-editing c0-control's, not also the "bind -p" c0-control's
+  prompts Tty Stdin, like Mac 'grep -R .', unlike Bash 'cat -' and 'cat'
+  takes 'stty -a' line-editing C0-Control's, not also 'bind -p' C0-Control's
+  takes '--help' as an option like Linux, unlike Mac:  cat --help
 
 examples:
   cat -  # copy out each line of input
   cat - >/dev/null  # echo and discard each line of input
-  cat - |grep . |cat.py -etv  # collect and echo some input, then echo it escaped
-  echo a b c |tr ' ' '\n' |bin/cat.py -  # pass stdin through to stdout
+  echo a b c |tr ' ' '\n' |bin/cat.py -  # copy across each line of piped Stdin
   (echo a; echo b; echo c) |cat -n |cat.py -etv  # show \t as \t and \n as \n
   pbpaste |cat.py -etv  # show nonprinting in paste buffer
-  echo $'\x5A\xC2\xA0' |cat -tv  # Linux ok, but Mac shows &nbsp; Non-Break Space as space :-(
+  echo $'\x5A\xC2\xA0' |cat -tv  # Mac Cat shows &nbsp; Non-Break Space as Space : -(
   echo $'\x5A\xC2\xA0' |cat.py -tv  # do show even &nbsp; Non-Break Space as nonprinting
 """
 # FIXME: let cat -n=0 mean count up from zero

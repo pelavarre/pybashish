@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 r"""
-usage: subsh.py [-h] [WORD [WORD ...]]
+usage: subsh.py [-h] [WORD ...]
 
 pass a command line through to a subshell
 
 positional arguments:
   WORD        a word of command
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 usage as a python import:

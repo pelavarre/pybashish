@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: ssh.py [-h] [-- [WORD [WORD ...]]]
+usage: ssh.py [-h] [-- [WORD ...]]
 
 shell out to a host
 
 positional arguments:
   WORD        an arg to pass on to "ssh"
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 dreams:

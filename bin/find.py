@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: find.py [-h] [TOP] [HOW [HOW ...]]
+usage: find.py [-h] [TOP] [HOW ...]
 
 print some words
 
@@ -9,7 +9,7 @@ positional arguments:
   TOP         the dir to walk (default: .)
   HOW         a hint of how to walk
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

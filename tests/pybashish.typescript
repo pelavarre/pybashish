@@ -701,7 +701,7 @@ Show the ruler
 ## 2.20 ) Head
 
     $ bin/head.py
-    Namespace(files=[], n=None)
+    Namespace(files=[], lines=None)
     usage: head.py [-h] [-n COUNT] [FILE ...
     head.py: error: not implemented
     + exit 2
@@ -1091,7 +1091,7 @@ Clean up
 ## 2.34 ) Tail
 
     $ bin/tail.py
-    Namespace(files=[], F=False, follow=False, retry=False, n=None)
+    Namespace(files=[], F=False, follow=False, retry=False, lines=None)
     usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE ...
     tail.py: error: not implemented
     + exit 2
@@ -1174,7 +1174,7 @@ Clean up
 ## 2.38 ) Watch
 
     $ bin/watch.py
-    Namespace(words=[], n=None)
+    Namespace(words=[], interval=None)
     usage: watch.py [-h] [-n SECS] [WORD ...
     watch.py: error: not implemented
     + exit 2
@@ -1184,8 +1184,8 @@ Clean up
 ## 2.39 ) Wc
 
     $ bin/wc.py
-    Namespace(files=[], max_line_length=False, lines=False, chars=False, bytes=False)
-    usage: wc.py [-h] [-L] [-l] [-m] [-c] [FILE ...
+    Namespace(files=[], lines=False, words=False, chars=False, bytes=False, max_line_length=False)
+    usage: wc.py [-h] [-l] [-w] [-m] [-c] [-L] [FILE ...
     wc.py: error: not implemented
     + exit 2
     $
@@ -1298,7 +1298,7 @@ else exit status 2 to stub out
     $ bin/xargs.py </dev/null >/dev/null 2>&1
     $
 
-Test an optional argument spelled differently than:  -h, --help
+Test an option spelled differently than:  -h, --help
 that still calls for automagic "show this help message and exit"
 
     $ rm -fr bin/p.py

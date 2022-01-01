@@ -5,7 +5,7 @@ usage: column.py [-h] [-t]
 
 align words of lines into columns
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
   -t          print words, but separate columns by two spaces
 

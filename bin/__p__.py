@@ -5,7 +5,7 @@ usage: __p__.py [-h]
 
 stub out the next bash verb you'll define
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

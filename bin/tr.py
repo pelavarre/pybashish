@@ -8,7 +8,7 @@ count lines and words and characters and bytes
 positional arguments:
   CHARSET            set of characters
 
-optional arguments:
+options:
   -h, --help         show this help message and exit
   -d, --delete       delete the characters
   --sort             sort the characters

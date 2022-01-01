@@ -2,14 +2,14 @@
 
 r"""
 usage: hexdump.py [-h] [-C] [--bytes [BYTES]] [--charset [CHARSET]] [--dump-byteset]
-                  [FILE [FILE ...]]
+                  [FILE ...]
 
 show bytes as nybbles and more
 
 positional arguments:
   FILE                 a file to copy out (default: stdin)
 
-optional arguments:
+options:
   -h, --help           show this help message and exit
   -C                   show bytes as eight-bit chars:  distinct monospaced glyphs
   --bytes [BYTES]      group bytes as single bytes, or pairs of 2, or quads of 4, etc

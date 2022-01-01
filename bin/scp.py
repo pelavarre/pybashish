@@ -8,7 +8,7 @@ copy files between hosts
 positional arguments:
   FROM        a local path, else HOSTNAME:PATH, else USER@HOSTNAME:PATH
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 dreams:

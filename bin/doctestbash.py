@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: doctestbash.py [-h] [-b] [-q] [-v] [FILE [FILE ...]]
+usage: doctestbash.py [-h] [-b] [-q] [-v] [FILE ...]
 
 test if bash behaves as the transcripts say it should
 
 positional arguments:
   FILE                  folders or files of '.typescript' files (default: cwd)
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   -b, --rip-bash-paste  copy the bash input lines out of the transcript, but don't run them
   -q, --quiet           say less

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: mkdir.py [-h] [-p] [DIR [DIR ...]]
+usage: mkdir.py [-h] [-p] [DIR ...]
 
 create a dir
 
 positional arguments:
   DIR            a dir to create (or to mention as already existing)
 
-optional arguments:
+options:
   -h, --help     show this help message and exit
   -p, --parents  create the dir, its parent dir, and ancestors, if need be
 

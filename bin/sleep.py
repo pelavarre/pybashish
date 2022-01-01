@@ -8,7 +8,7 @@ delay what happens next
 positional arguments:
   SECS        decimal number of how many seconds to wait before exiting
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

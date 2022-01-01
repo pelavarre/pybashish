@@ -5,7 +5,7 @@ usage: bash.py [-h] [-i]
 
 chat with people: prompt, then listen, then speak, and repeat
 
-optional arguments:
+options:
   -h, --help      show this help message and exit
   -i, --interact  ask more questions
 
@@ -238,7 +238,7 @@ def builtin_history(argv):
 
     review command line input history
 
-    optional arguments:
+    options:
       -h, --help  show this help message and exit
 
     examples:

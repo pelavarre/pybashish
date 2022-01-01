@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 """
-usage: strings.py [-h] [FILE [FILE ...]]
+usage: strings.py [-h] [FILE ...]
 
 pick out bits from files
 
 positional arguments:
   FILE        a file to pick over (default: stdin)
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

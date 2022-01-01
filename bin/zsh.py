@@ -5,7 +5,7 @@ usage: zsh.py [-h]
 
 tweak up your experience of Zsh
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
 
 quirks:

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 
 r"""
-usage: shbutton.py [-h] [HINT [HINT ...]]
+usage: shbutton.py [-h] [HINT ...]
 
 auto-complete the hints, trace the completion, and run it
 
 positional arguments:
   HINT        code to run
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
 
 quirks:

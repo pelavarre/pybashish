@@ -8,7 +8,7 @@ duplicate a file (make it found twice)
 positional arguments:
   FILE        the file to duplicate (default: last modified in cwd, else '/dev/null')
 
-optional arguments:
+options:
   -h, --help  show this help message and exit
   -i          ask before replacing some other file
   -p          copy the permissions of the file too, not just its bytes

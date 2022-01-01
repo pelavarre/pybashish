@@ -5,7 +5,7 @@ usage: hostname.py [-h] [-s] [-f] [-v]
 
 print name of host
 
-optional arguments:
+options:
   -h, --help     show this help message and exit
   -s, --short    print the hostname without its domain (default: True)
   -f, --fqdn     print the hostname and its domain
