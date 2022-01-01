@@ -680,7 +680,7 @@ def plural_en(word):
     elif re.match(r"^.*ix$", string=word):
         plural = word[: -len("ix")] + "ices"  # appendix, appendices
     elif re.match(r"^.*o$", string=word):
-        plural = word + "es"  # diagnosis, diagnoses
+        plural = word + "es"  # tomato, tomatoes
     elif re.match(r"^.*on$", string=word):
         plural = word[: -len("on")] + "a"  # criterion, criteria
     else:
@@ -692,6 +692,8 @@ def plural_en(word):
         else:
             plural = word + "s"  # word, words
 
+            # don't try to solve:  nucleus, nuclei
+
     return plural
 
     # TODO: make the Plural_En choice of Dest easy for ArgDoc clients to override
@@ -699,17 +701,27 @@ def plural_en(word):
 
 def _plural_en_test():
 
-    singulars = "vortex leaf basis appendix diagnosis criterion lorry lutz word".split()
-    plurals = "vortices leaves bases appendices diagnoses criteria lorries lutzes words"
+    # Test correct plurals
+
+    singulars = "vortex leaf basis appendix tomato criterion lorry lutz".split()
+    plurals = "vortices leaves bases appendices tomatoes criteria lorries lutzes"
+
+    singulars.extend("cafe diagnosis safe word".split())
+    plurals += " cafes diagnoses safes words"
 
     guesses = " ".join(plural_en(_) for _ in singulars)
     assert guesses == plurals
 
-    joke_singulars = "deer sheep".split()
-    joke_plurals = "deers sheeps"
+    # Test incorrect plurals
 
-    joke_guesses = " ".join(plural_en(_) for _ in joke_singulars)
-    assert joke_guesses == joke_plurals
+    incorrect_singulars = "bacterium child locus knife nucleus ox roof cello".split()
+    incorrect_plurals = "bacteriums childs locuses knifes nucleuses oxes rooves celloes"
+
+    incorrect_singulars.extend("deer mouse sheep".split())
+    incorrect_plurals += " deers mouses sheeps"
+
+    incorrect_guesses = " ".join(plural_en(_) for _ in incorrect_singulars)
+    assert incorrect_guesses == incorrect_plurals
 
 
 # deffed in many files  # missing from docs.python.org
