@@ -483,14 +483,29 @@ def parser_add_option_line(parser, usage, line):
     """Rip one Add_Argument Call of an Option or two from one Doc Line"""
 
     dests = list()
-    alt_metavar = None  # cut from Help here, but picked up or not by elsewhere
+    alt_metavar = None  # cut from Help here, then picked up or not from Usage
     help_tail = line.strip()
 
+    # Visit each Word
+
     words = line.split()
-    index = 0
-    while index < len(words):
-        word = words[index]
+    matched_index = -1
+    for (index, word) in enumerate(words):
         next_word = words[index + 1] if words[(index + 1) :] else None
+
+        # Pull each Dashed Option out of the Help, and
+        # let earlier Words pull subsequent Words out of the Help too
+
+        if word.startswith("-") or (index <= matched_index):
+
+            after_word = help_tail.index(word) + len(word)
+            help_tail = help_tail[after_word:].strip()  # mutate
+
+            if index <= matched_index:
+
+                continue
+
+        # Break after the last Dashed Option
 
         if not word.startswith("-"):
 
@@ -498,31 +513,24 @@ def parser_add_option_line(parser, usage, line):
 
         dests.append(word.split(",")[0])
 
-        after_word = help_tail.index(word) + len(word)
-        help_tail = help_tail[after_word:].strip()  # mutate
+        # Loop again to pick up a Metavar for each Dashed Option
 
         if not word.endswith(","):
-            if not next_word.endswith(","):
+            if alt_metavar or next_word.endswith(","):
+                alt_metavar = next_word.split(",")[0]
+                matched_index = index + 1
 
-                break
+                continue
 
-            alt_metavar = next_word.split(",")[0]
+            # Break if the Option doesn't call for another Option
 
-        if alt_metavar is not None:
+            break
 
-            index += 1
-            word = next_word
-            # TODO: ugly
-
-            after_word = help_tail.index(word) + len(word)
-            help_tail = help_tail[after_word:].strip()  # mutate
-            # TODO: ugly
+        # Break after the 2nd Dashed Option
 
         if len(dests) >= 2:
 
             break
-
-        index += 1
 
     if len(dests) in (1, 2):
 
