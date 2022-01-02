@@ -263,7 +263,7 @@ When you pass Options past Arg Doc Py itself, you get help on how to write those
          ),
      )
 
-    +parser.add_argument("-ijk", action="count", default=False, help="Ijk")
+    +parser.add_argument("-ijk", action="count", default=0, help="Ijk")
     +
      args = parser.parse_args()
      sys.stderr.write("{}\n".format(args))
@@ -446,21 +446,21 @@ Give help for the keystrokes of the "bin/read.py" command line editor
     $
 
     $ bin/chmod.py -rw /dev/null
-    Namespace(mode='-rw', tops=['/dev/null'], recursive=False)
+    Namespace(mode='-rw', tops=['/dev/null'], recursive=0)
     usage: chmod.py [-h] [-R] MODE [TOP ...
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py +rw /dev/null
-    Namespace(mode='+rw', tops=['/dev/null'], recursive=False)
+    Namespace(mode='+rw', tops=['/dev/null'], recursive=0)
     usage: chmod.py [-h] [-R] MODE [TOP ...
     chmod.py: error: not implemented
     + exit 2
     $
 
     $ bin/chmod.py =rw /dev/null
-    Namespace(mode='=rw', tops=['/dev/null'], recursive=False)
+    Namespace(mode='=rw', tops=['/dev/null'], recursive=0)
     usage: chmod.py [-h] [-R] MODE [TOP ...
     chmod.py: error: not implemented
     + exit 2
@@ -1031,14 +1031,14 @@ Clean up
 ## 2.28 ) Mv
 
     $ bin/mv.py
-    Namespace(file=None, i=False)
+    Namespace(file=None, i=0)
     usage: mv.py [-h] [-i] [FILE]
     mv.py: error: not implemented
     + exit 2
     $
 
     $ bin/mv.py f.file
-    Namespace(file='f.file', i=False)
+    Namespace(file='f.file', i=0)
     usage: mv.py [-h] [-i] [FILE]
     mv.py: error: not implemented
     + exit 2
@@ -1132,7 +1132,7 @@ Clean up
 ## 2.34 ) Tail
 
     $ bin/tail.py
-    Namespace(files=[], F=False, follow=False, retry=False, lines=None)
+    Namespace(files=[], F=0, follow=0, retry=0, lines=None)
     usage: tail.py [-h] [-F] [-f] [--retry] [-n COUNT] [FILE ...
     tail.py: error: not implemented
     + exit 2
@@ -1225,7 +1225,7 @@ Clean up
 ## 2.39 ) Wc
 
     $ bin/wc.py
-    Namespace(files=[], lines=False, words=False, chars=False, bytes=False, max_line_length=False)
+    Namespace(files=[], lines=0, words=0, chars=0, bytes=0, max_line_length=0)
     usage: wc.py [-h] [-l] [-w] [-m] [-c] [-L] [FILE ...
     wc.py: error: not implemented
     + exit 2
@@ -1356,7 +1356,7 @@ that still calls for automagic "show this help message and exit"
 
     $ bin/argdoc.py --rip argparse bin/cal.py >bin/p.py
     $ python3 bin/p.py
-    Namespace(ymd=None, help=False, h=False)
+    Namespace(ymd=None, help=0, h=0)
     usage: cal.py [--help] [-h] [YMD]
     cal.py: error: not implemented
     + exit 2
@@ -1364,7 +1364,7 @@ that still calls for automagic "show this help message and exit"
 
     $ bin/argdoc.py --rip argdoc bin/cal.py >bin/p.py
     $ python3 bin/p.py
-    Namespace(ymd=None, help=False, h=False)
+    Namespace(ymd=None, help=0, h=0)
     usage: cal.py [--help] [-h] [YMD]
     cal.py: error: not implemented
     + exit 2
@@ -1522,11 +1522,18 @@ Add an Optional Arg
 
      examples:
        Oh no! No examples disclosed!! 💥 💔 💥
-    @@ -30,6 +32,8 @@
+    @@ -30,6 +32,15 @@
          ),
      )
 
-    +parser.add_argument("-o", "--option", metavar="OPT", nargs="?", help="opt metavar")
+    +parser.add_argument(
+    +    "-o",
+    +    "--option",
+    +    metavar="OPT",
+    +    nargs="?",
+    +    default=False,
+    +    help="opt metavar",
+    +)
     +
      args = parser.parse_args()
      sys.stderr.write("{}\n".format(args))

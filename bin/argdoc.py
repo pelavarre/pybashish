@@ -286,9 +286,6 @@ def rip_chars(args):
 
     return chars
 
-    # FIXME: oi surely default for action="count" should be 0, not False
-    # FIXME: despite default for Option nargs="?" being False absent vs present None
-
     # TODO: amp up the '# : boom : broken_heart : boom :' to survive instantiation
 
     # TODO: test Prog's other than Py File names, such as no Ext
@@ -572,13 +569,10 @@ def parser_add_option_dests(parser, usage, dests, help_tail):
     # Take mentions of Action or Metavar from first such Usage of any Option Name
 
     metavar = None
-    nargs = None
-    action = None
 
     for opt in dests:
 
         if "[{}]".format(opt) in usage:
-            action = "count"
 
             break
 
@@ -596,27 +590,28 @@ def parser_add_option_dests(parser, usage, dests, help_tail):
 
     # Cut the Metavar out from leading the Help, if present
 
+    nargs = None
+
+    action = "count"  # especially when missing Usage '[-o]' or '[--option]'
+    alt_help_tail = help_tail
     if metavar is not None:
+        action = None
+
         maybe_metavar = "[{}]".format(metavar)
         if help_tail:
             help_word = help_tail.split()[0]
             if help_word in (metavar, maybe_metavar):
 
                 nargs = "?" if (help_word == maybe_metavar) else None
-                help_tail = help_tail[len(help_word) :].strip()  # mutate
+                alt_help_tail = help_tail[len(help_word) :].strip()  # mutate
 
     # Tell the Parser to add this Option
-
-    if metavar is None:
-        if action is None:
-
-            action = "count"  # patch up missing Usage '[-o]' or '[--option]'
 
     option = argparse.Namespace(
         dests=dests, metavar=metavar, nargs=nargs, action=action
     )
 
-    parser_add_option_call(parser, option=option, help_tail=help_tail)
+    parser_add_option_call(parser, option=option, help_tail=alt_help_tail)
 
 
 def parser_add_option_call(parser, option, help_tail):
@@ -631,10 +626,16 @@ def parser_add_option_call(parser, option, help_tail):
 
     assert len(dests) in (1, 2)
 
-    # Default to Arg False when NArgs "?", so that no Arg is distinct from Arg None
-    # Default to Count up from False, so that the Int of Count is Int, not TypeError
+    # Default to Arg False when Option NArgs "?", to set apart No Option from None Arg
+    # Default to Count up from Zero, so that the Int of Count is Int, not TypeError
 
-    default = False if ((nargs == "?") or (action == "count")) else None
+    default = None
+    if nargs == "?":
+        assert action is None
+        default = False
+    elif action == "count":
+        assert nargs is None
+        default = 0
 
     # Call victory when Parser Add_Help already did add this Option
 
@@ -999,13 +1000,15 @@ def rip_py_option_action(parser, action):
         pylines.append("    metavar={},".format(black_repr(action.metavar)))
 
     if type(action).__name__ == "_CountAction":
+        assert action.default == 0
         assert action.nargs == 0
         pylines.append("    action={},".format(black_repr("count")))
     elif action.nargs is not None:
+        assert action.default in (None, False)
         pylines.append("    nargs={},".format(black_repr(action.nargs)))
 
     if action.default is not None:
-        assert action.default is False, repr(action.default)
+        assert action.default in (False, 0), repr(action.default)
         pylines.append("    default={},".format(action.default))
     if action.help is not None:
         pylines.append("    help={},".format(black_repr(action.help)))
@@ -1103,7 +1106,7 @@ def _patcher_from_words(words):
 
     # Pick Help
 
-    help_else_none = _parser_choose_help(alt_words, index=index)
+    help_else = _parser_choose_help(alt_words, index=index)
 
     # Succeed
 
@@ -1111,7 +1114,7 @@ def _patcher_from_words(words):
         dests=dests,
         metavar=metavar,
         nargs=nargs,
-        help_else_none=help_else_none,
+        help_else=help_else,
     )
 
     return patcher
@@ -1195,9 +1198,9 @@ def _parser_choose_help(alt_words, index):
         help_tail = help_tail.replace("[", "").replace("]", "")
         help_tail = help_tail.title()
 
-    help_else_none = help_tail if help_tail else None
+    help_else = help_tail if help_tail else None
 
-    return help_else_none
+    return help_else
 
 
 def _patcher_patch_parser(patcher, parser):
@@ -1206,43 +1209,48 @@ def _patcher_patch_parser(patcher, parser):
     dests = patcher.dests
     metavar = patcher.metavar
     nargs = patcher.nargs
-    help_else_none = patcher.help_else_none
+    help_else = patcher.help_else
 
     # Add the Arg or Option to the Parser, with/ without Metavar and Help
 
     if not dests:
 
         parser.add_argument(
-            metavar.lower(), metavar=metavar, nargs=nargs, help=help_else_none
+            metavar.lower(), metavar=metavar, nargs=nargs, help=help_else
         )
 
     elif len(dests) == 1:
+        assert dests[0].startswith("-")
 
         if metavar is None:
             assert nargs is None, nargs
-            parser.add_argument(
-                dests[0], action="count", default=False, help=help_else_none
-            )
+            parser.add_argument(dests[0], action="count", default=0, help=help_else)
         else:
+            default = False if (nargs == "?") else None
             parser.add_argument(
-                dests[0], metavar=metavar, nargs=nargs, help=help_else_none
+                dests[0], metavar=metavar, nargs=nargs, default=default, help=help_else
             )
 
     else:
         assert len(dests) == 2, dests
 
+        assert dests[0].startswith("-")
+        assert dests[-1].startswith("-")
+
         if metavar is None:
             assert nargs is None, nargs
             parser.add_argument(
-                dests[0], dests[1], action="count", default=False, help=help_else_none
+                dests[0], dests[1], action="count", default=0, help=help_else
             )
         else:
+            default = False if (nargs == "?") else None
             parser.add_argument(
                 dests[0],
                 dests[1],
                 metavar=metavar,
                 nargs=nargs,
-                help=help_else_none,
+                default=default,
+                help=help_else,
             )
 
     # Diff the Parser before the Add, vs after the Add
