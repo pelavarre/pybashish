@@ -263,7 +263,7 @@ When you pass Options past Arg Doc Py itself, you get help on how to write those
          ),
      )
 
-    +parser.add_argument("-ijk", action="count", help="Ijk")
+    +parser.add_argument("-ijk", action="count", default=False, help="Ijk")
     +
      args = parser.parse_args()
      sys.stderr.write("{}\n".format(args))

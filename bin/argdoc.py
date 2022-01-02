@@ -43,6 +43,14 @@ examples:
   argdoc.py --  POS  thing              # show patch to add a positional arg
 """
 
+# TODO:  --rip .txt, .py3, .py for doc, argdoc, argparse
+# TODO:  save to path, not stdout, if more path provided, not just the .ext or ext
+
+# TODO:  take a whole file without """ and without ''' as a whole argdoc
+
+# FIXME:  reject dropped args such as the "-- hello" of
+# FIXME:    bin/argdoc.py --rip argparse bin/tar.py -- hello >/dev/null
+
 
 from __future__ import print_function
 
@@ -163,7 +171,12 @@ def argdoc_py_parser_from_doc():
         "--rip", metavar="SHRED", help="rip one of doc|argparse|argdoc|args|patch"
     )
 
-    parser_exit_unless_doc_eq(parser)  # Constrain the Doc of ArgDoc Py
+    try:
+        parser_exit_unless_doc_eq(parser)  # Constrain the Doc of ArgDoc Py
+    except SystemExit:
+        stderr_print("argdoc.py: error: want Doc, got Parser, and they don't match")
+
+        raise
 
     return parser
 
@@ -195,7 +208,7 @@ def _argdoc_test():
     file2 = "ArgumentParser"
 
     parser2 = ArgumentParser()
-    parser_exit_unless_doc_eq(parser2)
+    parser_exit_unless_doc_eq(parser2)  # Pass or fail as part of Self Test
 
     args2 = parser2.parse_args([])
     assert vars(args2) == args0_dict
@@ -278,6 +291,22 @@ def rip_chars(args):
 
     return chars
 
+    # FIXME: speak of NArgs * + ? as .ZERO_OR_MORE .ONE_OR_MORE .OPTIONAL
+    # FIXME: reject redundant input more gracefully, especially colliding Dest's
+
+    # FIXME: oi surely default for action="count" should be 0, not False
+    # FIXME: despite default for Option nargs="?" being False absent vs present None
+
+    # TODO: amp up the '# : boom : broken_heart : boom :' to survive instantiation
+
+    # TODO: think deeper into "*" argparse.ZERO_OR_MORE vs "..." argparse.REMAINDER
+    # TODO: test Prog's other than Py File names, such as no Ext
+    # TODO: think into PyLint's 7 loud complaints
+
+    # TODO: parsed dest startswith '_' skid shouldn't print, via argparse.SUPPRESS
+
+    # TODO: instantiated template should raise separate NotImplementedError per Option
+
 
 # deffed in many files  # missing from docs.python.org
 def ast_literal_eval_py_doc(path):
@@ -311,6 +340,8 @@ def ast_literal_eval_py_doc(path):
     doc = eval_doc_from_pychars(chars)
 
     return doc
+
+    # TODO: read what's needed, not whole file
 
 
 def eval_doc_from_pychars(chars):
@@ -600,6 +631,8 @@ def parser_add_option_call(parser, option, help_tail):
     nargs = option.nargs
     action = option.action
 
+    assert len(dests) in (1, 2)
+
     # Default to Arg False when NArgs "?", so that no Arg is distinct from Arg None
     # Default to Count up from False, so that the Int of Count is Int, not TypeError
 
@@ -615,22 +648,14 @@ def parser_add_option_call(parser, option, help_tail):
 
                     return
 
-    # Solve just a few cases
-
-    assert len(dests) in (1, 2)
-    if metavar is None:
-        assert nargs is None
-        assert action == "count"
-    else:
-        assert nargs in (None, "?")
-        assert action is None
-
     # Call Add Argument once, to add one or two Option Strings
 
     alt_help_tail = help_tail if help_tail else None
     alt_help_tail = alt_help_tail.replace("%", "%%") if alt_help_tail else None
 
     if not metavar:
+        assert nargs is None
+        assert action == "count"
 
         if len(dests) == 1:
             parser.add_argument(
@@ -643,7 +668,8 @@ def parser_add_option_call(parser, option, help_tail):
             )
 
     else:
-        assert not action
+        assert action is None
+        assert nargs in (None, "?")
 
         if len(dests) == 1:
             parser.add_argument(
@@ -696,10 +722,11 @@ def plural_en(word):
 
     return plural
 
-    # TODO: make the Plural_En choice of Dest easy for ArgDoc clients to override
-    # TODO: accept ArgumentParser(plural="mice")
-    # TODO: accept parse_args(plural=dict(mouse="mice"))
+    # TODO: override the Plural_En choice of Dest
     # TODO: parse 'usage: MICE ...' as last to match with any Arg, thus match 'MOUSE'
+    # TODO: accept ArgumentParser(dests="mice")
+    # TODO: accept parse_args(dests=dict(mouse="mice"))
+    # TODO: override Dest such as '.n' at '-n COUNT, --lines COUNT'
 
 
 def _plural_en_test():
@@ -769,6 +796,8 @@ def rip_py_on_argdoc(parser):
 
     return chars
 
+    # TODO: test how Black our Python on ArgDoc style is
+
 
 def rip_py_on_argparse(parser):
     """Rip a whole Py Prog that runs on ArgParse to form and run the Parser"""
@@ -781,6 +810,8 @@ def rip_py_on_argparse(parser):
     pychars = pychars_fabricate(doc, prog=parser.prog, lines=pylines)
 
     return pychars
+
+    # TODO: test how Black our Python on ArgParse style is
 
 
 def rip_pylines_on_argparse(parser):
@@ -988,6 +1019,8 @@ def rip_py_add_patch(parser, path, words, pychars):
 
     return diffchars
 
+    # FIXME: does compiling the patched Doc produce a Parser that prints same Doc
+
 
 def _patcher_from_words(words):
     """Take the Words after "--" from an ArgDoc Py Command Line, to choose a Patch"""
@@ -1151,7 +1184,6 @@ def _patcher_patch_parser(patcher, parser):
     help_else_none = patcher.help_else_none
 
     # Add the Arg or Option to the Parser, with/ without Metavar and Help
-    # Add the Arg or Option to the Parser, with/ without Metavar and Help
 
     if not dests:
 
@@ -1163,7 +1195,9 @@ def _patcher_patch_parser(patcher, parser):
 
         if metavar is None:
             assert nargs is None, nargs
-            parser.add_argument(dests[0], action="count", help=help_else_none)
+            parser.add_argument(
+                dests[0], action="count", default=False, help=help_else_none
+            )
         else:
             parser.add_argument(
                 dests[0], metavar=metavar, nargs=nargs, help=help_else_none
@@ -1174,7 +1208,9 @@ def _patcher_patch_parser(patcher, parser):
 
         if metavar is None:
             assert nargs is None, nargs
-            parser.add_argument(dests[0], dests[1], action="count", help=help_else_none)
+            parser.add_argument(
+                dests[0], dests[1], action="count", default=False, help=help_else_none
+            )
         else:
             parser.add_argument(
                 dests[0],
@@ -1258,7 +1294,14 @@ def parse_args(args=None, namespace=None, doc=None):
     f = inspect.currentframe()
     (chosen_doc, _) = module_find_doc_and_file(doc=doc, f=f)
     parser = ArgumentParser(doc=chosen_doc)
-    parser_exit_unless_doc_eq(parser, doc=chosen_doc)  # Constrain the Parse Args Doc
+    try:
+        parser_exit_unless_doc_eq(parser, doc=chosen_doc)  # Constrain Parse Args Doc
+    except SystemExit:
+        stderr_print("argdoc.py: error: want Doc, got Parser, and they don't match")
+        # FIXME: more clarity in message at:  want Doc, got Parser, don't match
+        # FIXME: like say it came from module file, not 'argdoc.py'?
+
+        raise
 
     alt_namespace = parser.parse_args(alt_argv, namespace=namespace)
     assert (not namespace) or (alt_namespace is namespace)
@@ -1481,7 +1524,7 @@ def parser_exit_unless_doc_eq(parser, doc=None):
 
     if diffchars:
 
-        x1 = "bin/_grep1.py" in __main__.__file__
+        x1 = "bin/_grep1.py" in __main__.__file__  # FIXME
         if x1:
 
             return
@@ -1729,12 +1772,15 @@ def parser_require_eq(parser, alt_parser):
     )
     diffchars = "\n".join(_.splitlines()[0] for _ in difflines)
 
-    if sys.version_info >= (3, 6):
+    if sys.version_info >= (3, 6):  # TODO: diff Python 2 sources
 
         if diffchars:
             stderr_print(diffchars)  # 'ripped' vs 'formed'
 
         assert pylines == alt_pylines
+
+    # FIXME: add test that Py from Parser from Doc also agrees
+    # FIXME: expect to fail for 'nargs="+"' and work out why if not
 
 
 # deffed in many files  # missing from docs.python.org
