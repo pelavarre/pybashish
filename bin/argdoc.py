@@ -12,11 +12,12 @@ positional arguments:
 
 options:
   -h, --help   show this help message and exit
-  --rip SHRED  rip one of doc|argparse|argdoc|args|patch
+  --rip SHRED  rip one of doc|argparse|argdoc|args|patch (default:argparse|patch)
 
 quirks:
-  plural args go to an english plural key, such as '[top ...]' to '.tops'
-  you lose your '-h' and '--help' options if you drop all your 'options:'
+  sends plural args to an english plural key, such as '[TOP ...]' to '.tops'
+  drops your '-h' and '--help' options if you mention no 'options:' in your DocString
+  defaults to '--rip argparse', except defaults to '--rip patch' when you supply Words
 
 unsurprising quirks:
   takes file '-' as meaning '/dev/stdin', rips args as json
@@ -26,30 +27,27 @@ unsurprising quirks:
 examples:
 
   argdoc.py -h                          # show this help message and exit
-  argdoc.py                             # same as:  argdoc.py --rip argparse
 
-  argdoc.py --rip argparse              # show an argparse prog, don't run it
+  argdoc.py                             # show an argparse prog, don't run it
   argdoc.py --rip argdoc                # show an argdoc prog, don't run it
-  argdoc.py --rip argparse >p.py        # form and name an argparse prog
 
+  argdoc.py >p.py                       # form and name an argparse prog
+  argdoc.py --rip argparse >p.py        # same as:  argdoc.py >p.py
   argdoc.py --rip doc p.py              # eval the doc from top of file
-  argdoc.py p.py                        # same as:  --rip argparse p.py
+
   argdoc.py --rip args p.py --          # run the file doc to parse no args
   argdoc.py --rip args p.py --  --help  # run the file doc to parse:  --help
   argdoc.py --rip args p.py --  hi you  # run the file doc to parse:  hi you
 
-  argdoc.py --  -x, --extra  do more    # show patch to add a counted option
-  argdoc.py --  -a OPT, --also OPT  ya  # show patch to add an option with arg
-  argdoc.py --  POS  thing              # show patch to add a positional arg
+  argdoc.py p.py -- -x, --extra  more   # show patch to add a counted option
+  argdoc.py p.py -- -a, --also OPT  ya  # show patch to add an option with arg
+  argdoc.py p.py -- POS  thing          # show patch to add a positional arg
 """
 
 # TODO:  --rip .txt, .py3, .py for doc, argdoc, argparse
 # TODO:  save to path, not stdout, if more path provided, not just the .ext or ext
 
 # TODO:  take a whole file without """ and without ''' as a whole argdoc
-
-# FIXME:  reject dropped args such as the "-- hello" of
-# FIXME:    bin/argdoc.py --rip argparse bin/tar.py -- hello >/dev/null
 
 
 from __future__ import print_function
@@ -96,6 +94,7 @@ def run_self_tests():
     """Run some Self Tests, as part of every Launch"""
 
     _plural_en_test()
+
     _argdoc_test()
 
 
@@ -133,9 +132,17 @@ def parse_argdoc_args():
 
         sys.exit(2)  # exit 2 to reject usage
 
+    if shred not in ("args", "patch"):
+        if args.words:
+            stderr_print(
+                "error: argdoc.py: '--rip {}' needs no WORD args".format(shred)
+            )
+
+            sys.exit(2)  # exit 2 to reject usage
+
     if shred == "patch":
         if not args.words:
-            stderr_print("error: argdoc.py: '--rip patch' requires the argument WORD")
+            stderr_print("error: argdoc.py: '--rip patch' needs WORD args")
 
             sys.exit(2)  # exit 2 to reject usage
 
@@ -168,7 +175,9 @@ def argdoc_py_parser_from_doc():
     )
 
     parser.add_argument(
-        "--rip", metavar="SHRED", help="rip one of doc|argparse|argdoc|args|patch"
+        "--rip",
+        metavar="SHRED",
+        help="rip one of doc|argparse|argdoc|args|patch (default:argparse|patch)",
     )
 
     try:
