@@ -254,12 +254,7 @@ def rip_chars(args):
 
     # Compile an ArgumentParser out of the Doc
 
-    drop_help = not parser_add_help_from_doc(doc=doc)
-    epi = parser_epi_from_doc(doc)
-
-    parser = parser_from_doc(doc, drop_help=drop_help, epi=epi)
-    parser_adds_from_doc(parser, doc=doc)
-
+    parser = rip_whole_parser_from_doc(doc, path=args.file)
     pychars = rip_py_on_argparse(parser)
 
     # Rip out a Python Prog to call on ArgParse to form the ArgumentParser
@@ -291,8 +286,6 @@ def rip_chars(args):
 
     return chars
 
-    # FIXME: reject redundant input more gracefully, especially colliding Dest's
-
     # FIXME: oi surely default for action="count" should be 0, not False
     # FIXME: despite default for Option nargs="?" being False absent vs present None
 
@@ -310,30 +303,37 @@ def rip_chars(args):
 def ast_literal_eval_py_doc(path):
     """Fetch the DocString from a Python Source File"""
 
-    # Default to the EXAMPLE_ARGDOC_PY
+    pychars = pychars_fabricate()
+    doc1 = eval_doc_from_pychars(pychars)
 
-    chars = pychars_fabricate()
+    doc2 = eval_doc_from_path(path)
 
-    if path is not None:
+    if doc2 is not None:
 
-        # Read the chosen File
+        return doc2
 
-        alt_path = "/dev/stdin" if (path == "-") else path
-        try:
-            with open(alt_path, "r") as reading:
-                if reading.isatty():
-                    stderr_print("Press ⌃D EOF to quit")  # or ⌃C SIGINT or ⌃\ SIGQUIT
-                path_chars = reading.read()
-        except OSError as exc:
-            stderr_print("{}: {}".format(type(exc).__name__, exc))
+    return doc1
 
-            sys.exit(1)  # exit 1 to require input file found
 
-        # Step away from our main example only when chosen File not empty
+def eval_doc_from_path(path):
+    """Pick the DocString out from top of a File, else None"""
 
-        if path_chars:
+    if path is None:
 
-            chars = path_chars  # mutate
+        return None
+
+    # Read the chosen File
+
+    alt_path = "/dev/stdin" if (path == "-") else path
+    try:
+        with open(alt_path, "r") as reading:
+            if reading.isatty():
+                stderr_print("Press ⌃D EOF to quit")  # or ⌃C SIGINT or ⌃\ SIGQUIT
+            chars = reading.read()
+    except OSError as exc:
+        stderr_print("{}: {}".format(type(exc).__name__, exc))
+
+        sys.exit(1)  # exit 1 to require input file found
 
     doc = eval_doc_from_pychars(chars)
 
@@ -342,14 +342,14 @@ def ast_literal_eval_py_doc(path):
     # TODO: read what's needed, not whole file
 
 
-def eval_doc_from_pychars(chars):
-    """Pick the DocString out from the top of a File of Python Source Chars"""
+def eval_doc_from_pychars(pychars):
+    """Pick the DocString out from top of a File of Python Source Chars, else None"""
 
     marks = ['"""', '"', "'''", "'", 'r"""', 'r"', "r'''", "r'"]
 
     # Skip over comments and blank lines
 
-    pylines = chars.splitlines()
+    pylines = pychars.splitlines()
     for (index, pyline) in enumerate(pylines):
         stripped = pyline.strip()
         if stripped and not stripped.startswith("#"):
@@ -375,8 +375,8 @@ def eval_doc_from_pychars(chars):
 
             # Else pick out the DocString between matching Mark's
 
-            pychars = mark1 + tail[start:end] + mark2
-            evalled = ast.literal_eval(pychars)
+            evallable = mark1 + tail[start:end] + mark2
+            evalled = ast.literal_eval(evallable)
 
             return evalled
 
@@ -797,6 +797,26 @@ def rip_py_on_argdoc(parser):
     # TODO: test how Black our Python on ArgDoc style is
 
 
+def rip_whole_parser_from_doc(doc, path):
+    """Compile an ArgumentParser out of the Doc"""
+
+    paras = textwrap_split_paras(doc)
+
+    alt_doc = doc
+    if len(paras) < 2:  # 1 paragraph of Usage, 1 paragraph of Desc
+        alt_doc = "usage: null\n\ndo stuff"
+        if path is not None:
+            alt_doc = "usage: {}\n\ndo stuff".format(os.path.basename(path))
+
+    drop_help = not parser_add_help_from_doc(doc=alt_doc)
+    epi = parser_epi_from_doc(alt_doc)
+
+    parser = parser_from_doc(doc=alt_doc, drop_help=drop_help, epi=epi)
+    parser_adds_from_doc(parser, doc=alt_doc)
+
+    return parser
+
+
 def rip_py_on_argparse(parser):
     """Rip a whole Py Prog that runs on ArgParse to form and run the Parser"""
 
@@ -1011,9 +1031,16 @@ def rip_py_option_action(parser, action):
 def rip_py_add_patch(parser, path, words, pychars):
     """Rip a Py Patch to add one Arg or Option, to Python that runs on ArgParse"""
 
-    patcher = _patcher_from_words(words)
-    alt_pychars = _patcher_patch_parser(patcher, parser=parser)
-    diffchars = _patcher_diff_patch(path, pychars=pychars, alt_pychars=alt_pychars)
+    try:
+
+        patcher = _patcher_from_words(words)
+        alt_pychars = _patcher_patch_parser(patcher, parser=parser)
+        diffchars = _patcher_diff_patch(path, pychars=pychars, alt_pychars=alt_pychars)
+
+    except argparse.ArgumentError as exc:
+        stderr_print("{}: {}".format(type(exc).__name__, exc))
+
+        sys.exit(1)  # exit 1 to require compatible patch
 
     return diffchars
 
@@ -1396,11 +1423,12 @@ def parser_add_help_from_doc(doc):
     lines = doc.splitlines()
     for (index, line) in enumerate(lines):
         next_line = lines[index + 1] if lines[(index + 1) :] else ""
+        next_rejoined = " ".join(next_line.split())
 
-        stripped = line.strip()
-        if stripped.startswith("-h, --help"):
+        rejoined = " ".join(line.split())
+        if rejoined.startswith("-h, --help"):
             help_tail = "show this help message and exit"
-            if stripped.endswith(help_tail) or (next_line.strip() == help_tail):
+            if rejoined.endswith(help_tail) or (next_rejoined == help_tail):
 
                 return True
 
@@ -1460,7 +1488,7 @@ def parser_from_doc(doc=None, drop_help=None, epi=None):
     headlines = list(
         _ for _ in module_doc.strip().splitlines() if _ and not _.startswith(" ")
     )
-    description = headlines[1]
+    description = headlines[1]  # TODO: cope if ArgParse ever did wrap Desc Lines
 
     epilog = None
     if epi:
