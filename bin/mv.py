@@ -6,29 +6,27 @@ usage: mv.py [-h] [-i] [FILE]
 rename a file (make it not found)
 
 positional arguments:
-  FILE        the file to rename (default: last modified in cwd)
+  FILE        the file to duplicate (default: last modified in cwd, else '/dev/null')
 
 options:
   -h, --help  show this help message and exit
   -i          ask before replacing some other file
 
 quirks:
-  chooses a new name for you, when none provided, unlike bash "mv"
-  increments the name, such as:  touch it~41~ && touch it && mv.py  # it~41~ it~42~
-  requires two args to rename files that aren't files or dirs inside the current dir
+  chooses new file names like Emacs would:  'null', 'null~', 'null~2~', ...
+  moves without changing the name, when the Cwd doesn't already contain the name
+  moves from Remote hostname:path on request, not only from LocalHost
+  defaults '-i' to True, and gives you no way to turn it off
 
 examples:
   mv.py  # renames the last modified file of cwd (makes it not found)
-  mv.py -  # waits for stdin, then does nothing (a la cat >/dev/null)
-  mv.py itself  # renames the file to "itself~1~", etc
-  mv.py /dev/null  # fails because insufficient privilege
-  mv.py /  # fails because insufficient privilege
+  mv.py -  # captures a copy of Stdin (same as 'cp.py -')
+  mv.py /dev/null  # fails for insufficient privilege
+  mv.py /  # fails for insufficient privilege
 """
 
 # FIXME: add mv -u, --update for move if new or fresher
-# FIXME: except mv.py from outside this dir should mean mv -i to this dir
-# FIXME: coordinate well across chmod.py cp.py mv.py rm.py touch.py ...
-
+# FIXME: synch help and code across chmod.py cp.py mv.py rm.py touch.py ...
 # FIXME: spec & test the two arg case of 'overwrite ...? (y/n [n]) ' moving same file
 
 

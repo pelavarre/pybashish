@@ -469,9 +469,9 @@ Give help for the keystrokes of the "bin/read.py" command line editor
 
 ## 2.8 ) Cp
 
-    $ rm -f f.file*
+    $ rm -fr f.file* f.a* f.z*
     $
-    $ touch f.file
+    $ touch f.a f.a~ f.file f.z f.z~
     $
 
     $ bin/cp.py f.file  # call once
@@ -483,7 +483,7 @@ Give help for the keystrokes of the "bin/read.py" command line editor
     + touch f.file~2~
     $
 
-    $ rm f.file f.file~ f.file~2~
+    $ rm -fr f.file* f.a* f.z*
     $
 
 

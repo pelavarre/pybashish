@@ -12,18 +12,18 @@ options:
   -h, --help  show this help message and exit
   -i          ask before replacing some other file
   -p          copy the permissions of the file too, not just its bytes
-  -R          copy dirs (and the dirs and files inside the dirs)
+  -R          copy the dirs and dirs and files inside
 
 quirks:
   chooses new file names like Emacs would:  'null', 'null~', 'null~2~', ...
-  copies without changing the name, when the Cwd doesn't contain the name
-  copies from hostname:path on request, but defaults to copy from Localhost
-  copies always in the way of 'cp -ipR'
+  copies without changing the name, when the Cwd doesn't already contain the name
+  copies from Remote hostname:path on request, not only from LocalHost
+  defaults '-ipR' to True, and gives you no way to turn them off
 
 examples:
-  cp.py  # backs up last modified file of cwd (makes it found twice)
-  cp.py -  # creates copy of Stdin named "stdin~", then "stdin~2~", etc
-  cp.py localhost:/etc/passwd  # backs up a file from a remote host on request
+  cp.py  # backs up last modified file of Cwd (makes it found twice)
+  cp.py -  # captures a copy of Stdin
+  cp.py localhost:/etc/passwd  # backs up a remote file
 """
 
 
@@ -43,21 +43,35 @@ def main():
     args = argdoc.parse_args()
 
     # Pick a FromPath to copy from
+
     frompath = os_path_choose() if (args.file is None) else args.file
+    if args.file == "-":
+        frompath = "/dev/stdin"
 
     # Pick a ToName to copy to
 
     (_, basename) = os.path.split(frompath)
-    (base, _, _) = os_path_partition(basename)
-    toname = os_path_nextname(basename=base)
+    (base, ext, _) = os_path_partition(basename)
+    toname = os_path_nextname(basename=(base + ext))
 
     # Copy and touch
 
+    isatty = False
+    if ":" not in frompath:
+        with open(frompath) as reading:
+            isatty = reading.isatty()
+
     cp_shline = "cp -ipR {} {}".format(frompath, toname)
-    if frompath == "/dev/null":
+    if isatty:
+        sys.stderr.write("cp.py: Press ⌃D EOF to quit\n")  # or ⌃C SIGINT or ⌃\ SIGQUIT
         cp_shline = "cp -i {} {}".format(frompath, toname)
+    elif frompath in ("/dev/null", "/dev/stdin"):
+        cp_shline = "cp -i {} {}".format(frompath, toname)
+        # TODO: weak, 'cp -ipR' must choke over more Files?
     elif ":" in frompath:
         cp_shline = "scp -pqr {} {}".format(frompath, toname)
+    else:
+        cp_shline = "cp -ipR {} {}".format(frompath, toname)
 
     touch_shline = "touch {}".format(toname)
 
@@ -65,7 +79,12 @@ def main():
 
         shargv = shlex.split(shline)
         sys.stderr.write("+ {}\n".format(shline))
-        subprocess_run(shargv, stdin=subprocess.PIPE, check=True)
+        subprocess_run(shargv, stdin=None, check=True)
+
+
+#
+# Call on Python
+#
 
 
 # deffed in many files  # missing from docs.python.org
