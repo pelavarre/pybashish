@@ -274,7 +274,7 @@ def rip_chars(args):
 
     # Rip out a Patch to add yet another Arg, or yet another Option
 
-    chars = rip_py_add_patch(parser, words=args.words, pychars=pychars)
+    chars = rip_py_add_patch(parser, path=args.file, words=args.words, pychars=pychars)
 
     return chars
 
@@ -697,6 +697,9 @@ def plural_en(word):
     return plural
 
     # TODO: make the Plural_En choice of Dest easy for ArgDoc clients to override
+    # TODO: accept ArgumentParser(plural="mice")
+    # TODO: accept parse_args(plural=dict(mouse="mice"))
+    # TODO: parse 'usage: MICE ...' as last to match with any Arg, thus match 'MOUSE'
 
 
 def _plural_en_test():
@@ -976,16 +979,17 @@ def rip_py_option_action(parser, action):
 #
 
 
-def rip_py_add_patch(parser, words, pychars):
+def rip_py_add_patch(parser, path, words, pychars):
     """Rip a Py Patch to add one Arg or Option, to Python that runs on ArgParse"""
 
-    patcher = _parser_patch_words(words)
-    diffchars = _parser_diff_patch(parser, patcher=patcher, pychars=pychars)
+    patcher = _patcher_from_words(words)
+    alt_pychars = _patcher_patch_parser(patcher, parser=parser)
+    diffchars = _patcher_diff_patch(path, pychars=pychars, alt_pychars=alt_pychars)
 
     return diffchars
 
 
-def _parser_patch_words(words):
+def _patcher_from_words(words):
     """Take the Words after "--" from an ArgDoc Py Command Line, to choose a Patch"""
 
     assert words
@@ -994,16 +998,16 @@ def _parser_patch_words(words):
     # Look to add one or two Dests
 
     dests = list()
-    metavar = None
+    alt_metavar = None  # cut roughly from Words here, then cut well apart from NArgs
 
-    index = 0
+    alt_index = 0
     for looks in range(2):
 
-        if not alt_words[index:]:
+        if not alt_words[alt_index:]:
 
             break
 
-        word = alt_words[index]
+        word = alt_words[alt_index]
         dest = word.split(",")[0]
         if looks and not dest.startswith("-"):
 
@@ -1011,10 +1015,10 @@ def _parser_patch_words(words):
 
         # Pick out the positional ARG, or the first Option, or the second Option
 
-        index += 1
+        alt_index += 1
 
         if not dest.startswith("-"):
-            metavar = word.upper()
+            alt_metavar = word
 
             break
 
@@ -1023,20 +1027,20 @@ def _parser_patch_words(words):
         # Pick out a MetaVar from the first Option, from the second, or from both
         # Gloss over whether the MetaVar is spelled twice, and forget the first spelling
 
-        if index < len(alt_words):
-            next_word = alt_words[index]
+        if alt_index < len(alt_words):
+            next_word = alt_words[alt_index]
             if next_word.endswith(","):
-                metavar = next_word.split(",")[0]  # mutate
-                index += 1
+                alt_metavar = next_word.split(",")[0]
+                alt_index += 1
             elif len(next_word) >= 2:
                 if next_word[:2] == next_word[:2].upper() != next_word[:2].lower():
-                    metavar = next_word  # mutate
-                    index += 1
+                    alt_metavar = next_word
+                    alt_index += 1
 
     # Pick NArgs out of Metavar
 
     (metavar, nargs, index) = _parser_choose_metavar_nargs_index(
-        alt_words, index=index, metavar=metavar
+        alt_words, alt_metavar=alt_metavar, alt_index=alt_index
     )
 
     # Pick Help
@@ -1046,7 +1050,6 @@ def _parser_patch_words(words):
     # Succeed
 
     patcher = argparse.Namespace(
-        alt_words=alt_words,
         dests=dests,
         metavar=metavar,
         nargs=nargs,
@@ -1056,28 +1059,71 @@ def _parser_patch_words(words):
     return patcher
 
 
-def _parser_choose_metavar_nargs_index(alt_words, index, metavar):
+def _parser_choose_metavar_nargs_index(alt_words, alt_metavar, alt_index):
     """Pick NArgs out of Metavar"""
 
-    word0 = alt_words[index - 1]
-    word1 = alt_words[index] if alt_words[index:] else None
-    word2 = alt_words[index + 1] if alt_words[(index + 1) :] else None
+    word0 = alt_words[0]
+    word1 = alt_words[1] if alt_words[1:] else None
+    word2 = alt_words[2] if alt_words[2:] else None
 
-    nargs = None
+    # Pick Nargs out of an Arg Metavar
+
     if word0.startswith("[") and word0.endswith("]"):
-        assert metavar == word0
-        metavar = metavar[len("[") : -len("]")]
+        assert alt_metavar == word0, (alt_metavar, word0)
+
+        metavar = word0[len("[") : -len("]")]
         nargs = "?"
+        index = 1  # from usage: [ARG]
+
     elif word0.startswith("[") and word1 == "...]":
-        assert metavar == word0
-        metavar = metavar[len("[") :]
-        index += 1
+        assert alt_metavar == word0, (alt_metavar, word0)
+
+        metavar = word0[len("[") :]
         nargs = "*"
+        index = 2  # from usage: [ARG ...]
+
+    elif word1 == "...":
+        assert alt_metavar == word0, (alt_metavar, word0)
+
+        metavar = word0
+        nargs = "+"
+        index = 2  # from unconventional usage: ARG ...
+
+    elif (word1 == ("[" + word0)) and (word2 == "...]"):
+        assert alt_metavar == word0, (alt_metavar, word0)
+
+        metavar = word0
+        nargs = "+"
+        index = 3  # from usage: ARG [ARG ...]
+
     elif word0.startswith("[") and (word0 == word1) and (word2 == "...]]"):
-        assert metavar == word0
-        metavar = metavar[len("[") :]
-        index += 2
-        nargs = "*"
+        assert alt_metavar == word0, (alt_metavar, word0)
+
+        metavar = word0[len("[") :]
+        nargs = "*"  # from classical usage: [ARG [ARG ...]]
+        index = 3
+
+    # Or pick Nargs out of an Option Metavar
+
+    elif alt_metavar and alt_metavar.startswith("[") and alt_metavar.endswith("]"):
+
+        metavar = alt_metavar[len("[") : -len("]")]
+        nargs = "?"
+        index = alt_index  # from usage: -o [OPT], --option [OPT], etc
+
+    # Else take Metavar and/or Dests without NArgs
+
+    else:
+
+        metavar = alt_metavar
+        nargs = None
+        index = alt_index  # from usage: OPT, -o, --option, -o OPT, --option OPT, etc
+
+    # Force the Metavar into Uppercase
+
+    metavar = None if (metavar is None) else metavar.upper()
+
+    # Succeed
 
     return (metavar, nargs, index)
 
@@ -1087,7 +1133,7 @@ def _parser_choose_help(alt_words, index):
 
     help_tail = " ".join(alt_words[index:])
     if not alt_words[index:]:
-        help_tail = " ".join(_.lstrip("-") for _ in alt_words[:index])
+        help_tail = " ".join(_.lstrip("-") for _ in alt_words)
         help_tail = help_tail.replace("[", "").replace("]", "")
         help_tail = help_tail.title()
 
@@ -1096,10 +1142,9 @@ def _parser_choose_help(alt_words, index):
     return help_else_none
 
 
-def _parser_diff_patch(parser, patcher, pychars):
-    """Patch the Parser, rip it back as Python, and Diff vs the Rip before Patch"""
+def _patcher_patch_parser(patcher, parser):
+    """Patch the Parser, rip it back as Python"""
 
-    alt_words = patcher.alt_words
     dests = patcher.dests
     metavar = patcher.metavar
     nargs = patcher.nargs
@@ -1141,14 +1186,23 @@ def _parser_diff_patch(parser, patcher, pychars):
 
     # Diff the Parser before the Add, vs after the Add
 
-    after_pychars = rip_py_on_argparse(parser)
+    alt_pychars = rip_py_on_argparse(parser)
+
+    return alt_pychars
+
+
+def _patcher_diff_patch(path, pychars, alt_pychars):
+    """Diff the Python ripped from Parser before patching, vs after patching"""
+
+    alt_path = os.devnull if (path is None) else path
+    fromfile = "a" + os.sep + alt_path.lstrip(os.sep)
+    tofile = "b" + os.sep + alt_path.lstrip(os.sep)
 
     a_lines = pychars.splitlines()
-    b_lines = after_pychars.splitlines()
+    b_lines = alt_pychars.splitlines()
+
     difflines = list(
-        difflib.unified_diff(
-            a=a_lines, b=b_lines, fromfile="", tofile=" ".join(alt_words)
-        )
+        difflib.unified_diff(a=a_lines, b=b_lines, fromfile=fromfile, tofile=tofile)
     )
     diffchars = "\n".join(_.splitlines()[0] for _ in difflines)
 

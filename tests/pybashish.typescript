@@ -205,8 +205,8 @@ Calling Dev Null with Options and Help shows you how to write the ArgParse Pytho
 to declare those too
 
     $ bin/argdoc.py /dev/null x y z
-    ---
-    +++ x y z
+    --- a/dev/null
+    +++ b/dev/null
     @@ -2,9 +2,12 @@
      # -*- coding: utf-8 -*-
 
@@ -242,8 +242,8 @@ When you pass Options past Arg Doc Py itself, you get help on how to write those
 
     $ bin/argdoc.py -- -ijk
 
-    ---
-    +++ -ijk
+    --- a/dev/null
+    +++ b/dev/null
     @@ -2,12 +2,13 @@
      # -*- coding: utf-8 -*-
 
@@ -1379,8 +1379,8 @@ that still calls for automagic "show this help message and exit"
 Add one required Arg
 
     $ bin/argdoc.py -- ALSO require more
-    ---
-    +++ ALSO require more
+    --- a/dev/null
+    +++ b/dev/null
     @@ -2,9 +2,12 @@
      # -*- coding: utf-8 -*-
 
@@ -1410,8 +1410,8 @@ Add one required Arg
 Add a Long Option, but also a Short Option to abbreviate it
 
     $ bin/argdoc.py -- -o OPT, --option OPT allow more by dashes
-    ---
-    +++ -o OPT, --option OPT allow more by dashes
+    --- a/dev/null
+    +++ b/dev/null
     @@ -2,12 +2,13 @@
      # -*- coding: utf-8 -*-
 
@@ -1443,8 +1443,8 @@ Add a Long Option, but also a Short Option to abbreviate it
 Add an Option with required Arg, without making the caller spell out the Arg twice
 
     $ bin/argdoc.py -- -o, --option OPT more concise metavar
-    ---
-    +++ -o, --option OPT more concise metavar
+    --- a/dev/null
+    +++ b/dev/null
     @@ -2,12 +2,13 @@
      # -*- coding: utf-8 -*-
 
@@ -1476,8 +1476,8 @@ Add an Option with required Arg, without making the caller spell out the Arg twi
 Add an Optional Arg
 
     $ bin/argdoc.py -- '[ALSO]' opt arg
-    ---
-    +++ [ALSO] opt arg
+    --- a/dev/null
+    +++ b/dev/null
     @@ -2,9 +2,12 @@
      # -*- coding: utf-8 -*-
 
@@ -1503,8 +1503,8 @@ Add an Optional Arg
 
     $
     $ bin/argdoc.py -- -o, --option '[OPT]' opt metavar
-    ---
-    +++ -o, --option [OPT] opt metavar
+    --- a/dev/null
+    +++ b/dev/null
     @@ -2,12 +2,14 @@
      # -*- coding: utf-8 -*-
 
@@ -1534,11 +1534,43 @@ Add an Optional Arg
     $
 
 
+Add one or more Optional Args at the end
+
+    $ bin/argdoc.py -- 'ALSO [ALSO ...]' require one allow many
+    --- a/dev/null
+    +++ b/dev/null
+    @@ -2,9 +2,12 @@
+     # -*- coding: utf-8 -*-
+
+     """
+    -usage: null [-h]
+    +usage: null [-h] ALSO [ALSO ...]
+
+     do good stuff
+    +
+    +positional arguments:
+    +  ALSO        require one allow many
+
+     option...:
+       -h, --help  show this help message and exit
+    @@ -30,6 +33,8 @@
+         ),
+     )
+
+    +parser.add_argument("also", metavar="ALSO", nargs="+", help="require one allow many")
+    +
+     args = parser.parse_args()
+     sys.stderr.write("{}\n".format(args))
+
+    $
+
+
+
 Add zero or more Optional Args at the end
 
     $ bin/argdoc.py -- '[ALSO ...]' allow many more
-    ---
-    +++ [ALSO ...] allow many more
+    --- a/dev/null
+    +++ b/dev/null
     @@ -2,9 +2,12 @@
      # -*- coding: utf-8 -*-
 
@@ -1568,8 +1600,8 @@ Add zero or more Optional Args at the end
 Do also let the caller spell the Zero or More Args at the end in the way of Python 2
 
     $ bin/argdoc.py -- '[ALSO [ALSO ...]]' old style
-    ---
-    +++ [ALSO [ALSO ...]] old style
+    --- a/dev/null
+    +++ b/dev/null
     @@ -2,9 +2,12 @@
      # -*- coding: utf-8 -*-
 
