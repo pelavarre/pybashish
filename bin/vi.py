@@ -8598,7 +8598,7 @@ def subprocess_run(args, **kwargs):
     """
     Emulate Python 3 "subprocess.run"
 
-    Don't help the caller remember to say:  stdin=subprocess.PIPE
+    Don't help the caller remember to encode empty Stdin as:  stdin=subprocess.PIPE
     """
 
     # Trust the library, if available
@@ -8608,21 +8608,32 @@ def subprocess_run(args, **kwargs):
 
         return run
 
+    # Convert KwArgs to Python 2
+
+    kwargs2 = dict(kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
+
+    for kw in "encoding errors text universal_newlines".split():
+        if kw in kwargs:
+            raise NotImplementedError("keyword {}".format(kw))
+
+    for kw in "check input".split():
+        if kw in kwargs:
+            del kwargs2[kw]  # drop now, catch later
+
+    input2 = None
+    if "input" in kwargs:
+        input2 = kwargs["input"]
+
+        if "stdin" in kwargs:
+            raise ValueError("stdin and input arguments may not both be used.")
+
+        assert "stdin" not in kwargs2
+        kwargs2["stdin"] = subprocess.PIPE
+
     # Emulate the library roughly, because often good enough
 
-    kwargs_ = dict(**kwargs)  # args, cwd, stdin, stdout, stderr, shell, ...
-
-    if "check" in kwargs:
-        del kwargs_["check"]
-
-    if ("input" in kwargs) and ("stdin" in kwargs):
-        raise ValueError("stdin and input arguments may not both be used.")
-
-    if "input" in kwargs:
-        raise NotImplementedError("subprocess.run.input")
-
-    sub = subprocess.Popen(args, **kwargs_)  # pylint: disable=consider-using-with
-    (stdout, stderr) = sub.communicate()
+    sub = subprocess.Popen(args, **kwargs2)  # pylint: disable=consider-using-with
+    (stdout, stderr) = sub.communicate(input=input2)
     returncode = sub.poll()
 
     if "check" in kwargs:
@@ -8631,6 +8642,8 @@ def subprocess_run(args, **kwargs):
             raise subprocess.CalledProcessError(
                 returncode=returncode, cmd=args, output=stdout
             )
+
+    # Succeed
 
     run = argparse.Namespace(
         args=args, stdout=stdout, stderr=stderr, returncode=returncode
