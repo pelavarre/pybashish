@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 r"""
-usage: shbutton.py [-h] [HINT ...]
+usage: _shbutton.py [-h] [HINT ...]
 
 auto-complete the hints, trace the completion, and run it
 
@@ -32,23 +32,23 @@ download:
   cd pybashish/
   git checkout pelavarre-patch-1
   export PATH="${PATH:+$PATH:}$PWD/bin"
-  which shbutton.py
+  which _shbutton.py
 
 install into mac zsh:
-  alias -- '%'='shbutton.py %'
-  alias -- '*'='shbutton.py "*"'
-  alias -- '**'='shbutton.py "**"'
-  alias -- '+'='shbutton.py +'
-  alias -- ','='shbutton.py ,'
-  alias -- '-'='shbutton.py -'
-  alias -- '/'='shbutton.py /'
-  alias -- '0'='shbutton.py clearstack'
+  alias -- '%'='_shbutton.py %'
+  alias -- '*'='_shbutton.py "*"'
+  alias -- '**'='_shbutton.py "**"'
+  alias -- '+'='_shbutton.py +'
+  alias -- ','='_shbutton.py ,'
+  alias -- '-'='_shbutton.py -'
+  alias -- '/'='_shbutton.py /'
+  alias -- '0'='_shbutton.py clearstack'
 
 install into mac bash:
-  function / { shbutton.py / "$@"; }
+  function / { _shbutton.py / "$@"; }
   mkdir dir/
   cd dir/
-  echo 'shbutton.py '"'*'"' "$@"' >\*
+  echo '_shbutton.py '"'*'"' "$@"' >\*
   chmod +x \*
 
 contrast with:
@@ -368,7 +368,7 @@ class PbVirtualMachine:
                 worker()
             except Exception:
                 # TODO: trace last few of self.pb_lines
-                stderr_print("shbutton: error: at {!r}".format(hint))
+                stderr_print("_shbutton.py: error: at {!r}".format(hint))
                 raise
 
     def find_worker(self, hint):
@@ -452,7 +452,7 @@ class PbVirtualMachine:
                 starter = "{} ...".format(" ".join(shards[:2]))
                 handwave = chars if (len(shards) < 3) else starter
                 stderr_print(
-                    "shbutton.py: error: want decimal, got {!r}".format(handwave)
+                    "_shbutton.py: error: want decimal, got {!r}".format(handwave)
                 )
                 sys.exit(1)
 
@@ -465,7 +465,7 @@ class PbVirtualMachine:
             base_0 = 0
             arg = int(chars, base_0)
         except Exception:
-            stderr_print("shbutton.py: error: want int, got {!r}".format(chars))
+            stderr_print("_shbutton.py: error: want int, got {!r}".format(chars))
             sys.exit(1)
 
         return arg
@@ -706,14 +706,14 @@ class PbVirtualMachine:
         """Pass all the lines through a Shell Pipe"""
 
         pb_chars = strip_right_above_below("\n".join(self.pb_lines))
-        shinput = pb_chars.encode()
+        shinput_bytes = pb_chars.encode()
 
         stderr_print("+", shline)
         argv = shlex.split(shline)
         ran = subprocess_run(
             argv,
             shell=False,
-            input=shinput,
+            input=shinput_bytes,
             stdout=subprocess.PIPE,
             stderr=None,  # let my people trace their work
             check=True,
@@ -840,14 +840,14 @@ class PbVirtualMachine:
     def sed_py_rstrip(self):
         """Drop the trailing spaces from the right of each line"""
 
-        stderr_print("shbutton.py: warning: shbuttons rstrip by default")
+        stderr_print("_shbutton.py: warning: shbuttons rstrip by default")
         # self.pipe_through("""awk '//{sub("  *$", ""); print}'""")
         self.pipe_through("sed 's, *$,,'")
 
     def sed_py_strip(self):
         """Drop the leading and trailing spaces from the left and right of each line"""
 
-        stderr_print("shbutton.py: warning: shbutton lstrip is strip")
+        stderr_print("_shbutton.py: warning: shbutton lstrip is strip")
         # self.pipe_through("""awk '//{sub("^  *", "");sub("^  *", ""); print}'""")
         self.pipe_through("sed -E 's,^ *| *$,,g'")
 
@@ -950,14 +950,14 @@ def suspend_to_pb(pb_lines):
     """Just before taking a break, write text lines to the pasteboard"""
 
     pb_chars = strip_right_above_below("\n".join(pb_lines))
-    shinput = pb_chars.encode()
+    shinput_bytes = pb_chars.encode()
 
     argv = shlex.split("pbcopy")
 
     ran = subprocess_run(  # call for Stdin, without Stdout/err, with ReturnCode Zero
         argv,
         shell=False,
-        input=shinput,
+        input=shinput_bytes,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=True,
