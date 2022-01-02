@@ -156,14 +156,14 @@ def argdoc_py_parser_from_doc():
     parser.add_argument(
         "file",
         metavar="FILE",
-        nargs="?",
+        nargs="?",  # argparse.OPTIONAL
         help="some python file begun by a docstring (often your main py file)",
     )
 
     parser.add_argument(
         "words",
         metavar="WORD",
-        nargs="*",
+        nargs="*",  # argparse.ZERO_OR_MORE
         help="an arg to parse for the file, or a word of a line of docstring",
     )
 
@@ -291,7 +291,6 @@ def rip_chars(args):
 
     return chars
 
-    # FIXME: speak of NArgs * + ? as .ZERO_OR_MORE .ONE_OR_MORE .OPTIONAL
     # FIXME: reject redundant input more gracefully, especially colliding Dest's
 
     # FIXME: oi surely default for action="count" should be 0, not False
@@ -299,7 +298,6 @@ def rip_chars(args):
 
     # TODO: amp up the '# : boom : broken_heart : boom :' to survive instantiation
 
-    # TODO: think deeper into "*" argparse.ZERO_OR_MORE vs "..." argparse.REMAINDER
     # TODO: test Prog's other than Py File names, such as no Ext
     # TODO: think into PyLint's 7 loud complaints
 
@@ -498,10 +496,10 @@ def parser_add_arg_line(parser, usage, line):
 
     nargs = None
     if "[{}]".format(metavar) in usage:
-        nargs = "?"
+        nargs = "?"  # argparse.OPTIONAL
     elif "[{} ...]".format(metavar) in usage:
         dest = plural_en(metavar.lower())  # mutate
-        nargs = "*"
+        nargs = "*"  # argparse.ZERO_OR_MORE
 
     # Tell the Parser to add this Arg
 
@@ -1105,43 +1103,43 @@ def _parser_choose_metavar_nargs_index(alt_words, alt_metavar, alt_index):
         assert alt_metavar == word0, (alt_metavar, word0)
 
         metavar = word0[len("[") : -len("]")]
-        nargs = "?"
+        nargs = "?"  # argparse.OPTIONAL
         index = 1  # from usage: [ARG]
 
     elif word0.startswith("[") and word1 == "...]":
         assert alt_metavar == word0, (alt_metavar, word0)
 
         metavar = word0[len("[") :]
-        nargs = "*"
+        nargs = "*"  # argparse.ZERO_OR_MORE
         index = 2  # from usage: [ARG ...]
 
     elif word1 == "...":
         assert alt_metavar == word0, (alt_metavar, word0)
 
         metavar = word0
-        nargs = "+"
+        nargs = "+"  # argparse.ONE_OR_MORE
         index = 2  # from unconventional usage: ARG ...
 
     elif (word1 == ("[" + word0)) and (word2 == "...]"):
         assert alt_metavar == word0, (alt_metavar, word0)
 
         metavar = word0
-        nargs = "+"
+        nargs = "+"  # argparse.ONE_OR_MORE
         index = 3  # from usage: ARG [ARG ...]
 
     elif word0.startswith("[") and (word0 == word1) and (word2 == "...]]"):
         assert alt_metavar == word0, (alt_metavar, word0)
 
         metavar = word0[len("[") :]
-        nargs = "*"  # from classical usage: [ARG [ARG ...]]
-        index = 3
+        nargs = "*"  # argparse.ZERO_OR_MORE
+        index = 3  # from classical usage: [ARG [ARG ...]]
 
     # Or pick Nargs out of an Option Metavar
 
     elif alt_metavar and alt_metavar.startswith("[") and alt_metavar.endswith("]"):
 
         metavar = alt_metavar[len("[") : -len("]")]
-        nargs = "?"
+        nargs = "?"  # argparse.OPTIONAL
         index = alt_index  # from usage: -o [OPT], --option [OPT], etc
 
     # Else take Metavar and/or Dests without NArgs
