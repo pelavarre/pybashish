@@ -44,10 +44,8 @@ examples:
   argdoc.py p.py -- POS  thing          # show patch to add a positional arg
 """
 
-# TODO:  --rip .txt, .py3, .py for doc, argdoc, argparse
-# TODO:  save to path, not stdout, if more path provided, not just the .ext or ext
-
-# TODO:  take a whole file without """ and without ''' as a whole argdoc
+# TODO:  fall back to take File as DocString, when it's not Python led by DocString
+# TODO:  --rip .txt, txt, .py3, py3, .py2, py2, .py, py for doc, argdoc, argparse?
 
 
 from __future__ import print_function
@@ -209,7 +207,7 @@ def _argdoc_test():
 
     args1 = parser1.parse_args([])
     assert vars(args1) == args0_dict
-    if sys.version_info >= (3, 6):
+    if sys.version_info >= (3, 6):  # shrug off Dict Items disorder till later Python
         assert vars(args1).items() == args0_dict.items()
 
     # Compile an ArgumentParser from the top-of-file Doc here, as a client of Self
@@ -221,7 +219,7 @@ def _argdoc_test():
 
     args2 = parser2.parse_args([])
     assert vars(args2) == args0_dict
-    if sys.version_info >= (3, 6):
+    if sys.version_info >= (3, 6):  # shrug off Dict Items disorder till later Python
         assert vars(args2).items() == args0_dict.items()
 
     # Compare the two compiled ArgumentParser's
@@ -229,18 +227,16 @@ def _argdoc_test():
     py1 = rip_py_on_argparse(parser1)
     py2 = rip_py_on_argparse(parser2)
 
-    if sys.version_info >= (3, 6):
-
-        difflines = list(
-            difflib.unified_diff(
-                a=py1.splitlines(), b=py2.splitlines(), fromfile=file1, tofile=file2
-            )
+    difflines = list(
+        difflib.unified_diff(
+            a=py1.splitlines(), b=py2.splitlines(), fromfile=file1, tofile=file2
         )
-        diffchars = "\n".join(_.splitlines()[0] for _ in difflines)
-        if diffchars:
-            stderr_print(diffchars)  # 'parser_from_doc' vs 'ArgumentParser'
+    )
+    diffchars = "\n".join(_.splitlines()[0] for _ in difflines)
+    if diffchars:
+        stderr_print(diffchars)  # 'parser_from_doc' vs 'ArgumentParser'
 
-        assert py1 == py2  # TODO: pass test with OrderedDict's in CPython < 3.6
+    assert py1 == py2
 
 
 #
@@ -295,14 +291,11 @@ def rip_chars(args):
 
     return chars
 
-    # TODO: amp up the '# : boom : broken_heart : boom :' to survive instantiation
-
+    # TODO: raise separate NotImplementedError per Option when ripping Python from Doc
     # TODO: test Prog's other than Py File names, such as no Ext
-    # TODO: think into PyLint's 7 loud complaints
-
-    # TODO: parsed dest startswith '_' skid shouldn't print, via argparse.SUPPRESS
-
-    # TODO: instantiated template should raise separate NotImplementedError per Option
+    # TODO: choose argparse.SUPPRESS to empty help for parsed dest startswith '_' skid
+    # TODO: amp up the '# : boom : broken_heart : boom :' to survive instantiation
+    # TODO: think into PyLint's complaints marked as '# pylint: disable='
 
 
 # deffed in many files  # missing from docs.python.org
@@ -614,6 +607,8 @@ def parser_add_option_dests(parser, usage, dests, help_tail):
             alt_words, dests=dests, alt_metavar=alt_metavar, alt_index=alt_index
         )
 
+        # TODO: share more code between callers of '_parser_choose_metavar_nargs_index'
+
         break
 
     # Take Action Count from Help Line, when Option missing from Usage
@@ -754,11 +749,11 @@ def plural_en(word):
 
     return plural
 
+    # TODO: override Dest such as '.n' at '-n COUNT, --lines COUNT'
     # TODO: override the Plural_En choice of Dest
     # TODO: parse 'usage: MICE ...' as last to match with any Arg, thus match 'MOUSE'
     # TODO: accept ArgumentParser(dests="mice")
     # TODO: accept parse_args(dests=dict(mouse="mice"))
-    # TODO: override Dest such as '.n' at '-n COUNT, --lines COUNT'
 
 
 def _plural_en_test():
@@ -1580,7 +1575,7 @@ def parser_from_doc(doc=None, drop_help=None, epi=None):
     headlines = list(
         _ for _ in module_doc.strip().splitlines() if _ and not _.startswith(" ")
     )
-    description = headlines[1]  # TODO: cope if ArgParse ever did wrap Desc Lines
+    description = headlines[1]  # TODO: cope if ArgParse ever learns to wrap Desc Lines
 
     epilog = None
     if epi:
@@ -1838,7 +1833,7 @@ def pychars_replace_lines(chars, lines):
     repl = "\n" + "\n".join(lines) + "\n"
 
     imports = "__main__ argparse sys textwrap".split()
-    if "__main__" not in repl:  # TODO: these if's wrongly accept quoted mentions
+    if "__main__" not in repl:  # TODO: stop reacting to quoted mentions
         imports.remove("__main__")
     if "textwrap" not in repl:
         imports.remove("textwrap")
@@ -1913,12 +1908,10 @@ def parser_require_eq_rip(parser, alt_parser):
     )
     diffchars = "\n".join(_.splitlines()[0] for _ in difflines)
 
-    if sys.version_info >= (3, 6):  # TODO: diff Python 2 sources
+    if diffchars:
+        stderr_print(diffchars)  # 'ripped' vs 'formed'
 
-        if diffchars:
-            stderr_print(diffchars)  # 'ripped' vs 'formed'
-
-        assert pylines == alt_pylines
+    assert pylines == alt_pylines
 
 
 # deffed in many files  # missing from docs.python.org
