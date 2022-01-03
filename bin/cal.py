@@ -15,7 +15,7 @@ options:
 quirks:
   starts each week on Monday, a la linux "ncal -MC", as in England
   doesn't pad every line with two blanks at the end
-  doesn't fit well into a x25x80 terminal
+  doesn't fit well into a 25x80 terminal
 
 examples:
   cal.py  # show the two weeks behind and ahead of today
