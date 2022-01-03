@@ -473,6 +473,7 @@ def textwrap_para_unbreakdent_lines(para):
 
 def parser_add_arg_line(parser, usage, line):
     """Rip out one Add_Argument Call of a Positional Arg from one Doc Line"""
+    # pylint: disable=duplicate-string-formatting-argument
 
     words = line.split()
     if not words:
@@ -494,6 +495,9 @@ def parser_add_arg_line(parser, usage, line):
     nargs = None
     if "[{}]".format(metavar) in usage:
         nargs = "?"  # argparse.OPTIONAL
+    elif " {} [{} ...]".format(metavar, metavar) in usage:
+        dest = plural_en(metavar.lower())  # mutate
+        nargs = "+"  # argparse.ONE_OR_MORE
     elif "[{} ...]".format(metavar) in usage:
         dest = plural_en(metavar.lower())  # mutate
         nargs = "*"  # argparse.ZERO_OR_MORE
@@ -565,45 +569,65 @@ def parser_add_option_line(parser, usage, line):
 
 def parser_add_option_dests(parser, usage, dests, help_tail):
     """Rip one Add_Argument Call of an Option or Two from their names and help"""
+    # pylint: disable=too-many-locals  # TODO: 18/15
 
     # Take mentions of Action or Metavar from first such Usage of any Option Name
 
     metavar = None
+    nargs = None
 
     for opt in dests:
 
-        if "[{}]".format(opt) in usage:
+        opt_at = usage.find("[{}]".format(opt))
+        alt_index = 1
 
-            break
+        if opt_at < 0:
 
-        mark = "[{} ".format(opt)
-        if mark in usage:
-            metavar_usage_tail = usage[usage.index(mark) :]
+            opt_at = usage.find("[{} ".format(opt))
+            alt_index = 2
 
-            metavar_usage = metavar_usage_tail.split()[1]
-            if metavar_usage.endswith("]"):
-                metavar_usage = metavar_usage[: -len("]")]
+            if opt_at < 0:
 
-            metavar = metavar_usage.replace("[", "").replace("]", "")
+                continue
 
-            break
+        usage_tail = usage[opt_at:]
+        alt_words = usage_tail.split()
 
-    # Cut the Metavar out from leading the Help, if present
+        alt_metavar = None
+        if alt_index == 2:
+            alt_metavar = alt_words[1]
+            if (not alt_metavar.startswith("[")) and alt_metavar.endswith("]"):
+                alt_metavar = alt_metavar[: -len("]")]
+            elif alt_metavar.endswith("]]"):
+                alt_metavar = alt_metavar[: -len("]")]
 
-    nargs = None
+        (metavar, nargs, _) = _parser_choose_metavar_nargs_index(
+            alt_words, dests=dests, alt_metavar=alt_metavar, alt_index=alt_index
+        )
 
-    action = "count"  # especially when missing Usage '[-o]' or '[--option]'
+        break
+
+    # Take Action Count from Help Line, when Option missing from Usage
+
     alt_help_tail = help_tail
+
+    action = "count"
     if metavar is not None:
         action = None
+
+        # Cut the Metavar out from leading the Help, if present
 
         maybe_metavar = "[{}]".format(metavar)
         if help_tail:
             help_word = help_tail.split()[0]
             if help_word in (metavar, maybe_metavar):
-
-                nargs = "?" if (help_word == maybe_metavar) else None
                 alt_help_tail = help_tail[len(help_word) :].strip()  # mutate
+
+                # Take NArgs "?" from Help Line, when Option missing from Usage
+
+                if help_word == maybe_metavar:
+                    if nargs is None:
+                        nargs = "?"  # argparse.OPTIONAL
 
     # Tell the Parser to add this Option
 
@@ -1013,9 +1037,9 @@ def rip_py_option_action(parser, action):
         pylines.append("    metavar={},".format(black_repr(action.metavar)))
 
     if type(action).__name__ == "_CountAction":
-        assert action.default == 0
         assert action.nargs == 0
         pylines.append("    action={},".format(black_repr("count")))
+        assert str(action.default) == "0"
     elif action.nargs is not None:
         assert action.default in (None, False)
         pylines.append("    nargs={},".format(black_repr(action.nargs)))
@@ -1023,6 +1047,7 @@ def rip_py_option_action(parser, action):
     if action.default is not None:
         assert action.default in (False, 0), repr(action.default)
         pylines.append("    default={},".format(action.default))
+
     if action.help is not None:
         pylines.append("    help={},".format(black_repr(action.help)))
 
@@ -1060,14 +1085,19 @@ def rip_py_add_patch(parser, path, words, pychars):
 
     return diffchars
 
-    # FIXME: does compiling the patched Doc produce a Parser that prints same Doc
-
 
 def _patcher_from_words(words):
     """Take the Words after "--" from an ArgDoc Py Command Line, to choose a Patch"""
 
     assert words
-    alt_words = " ".join(words).split()
+
+    # Round off common variations in how Shells quote Args of ArgDoc Py
+
+    alt_joined = " ".join(words)
+    if alt_joined.startswith("[-") and alt_joined.endswith("]"):
+        alt_joined = alt_joined[len("[") : -len("]")]  # keep '-', strip 1 '[' and 1 ']'
+
+    alt_words = alt_joined.split()
 
     # Look to add one or two Dests
 
@@ -1114,7 +1144,7 @@ def _patcher_from_words(words):
     # Pick NArgs out of Metavar
 
     (metavar, nargs, index) = _parser_choose_metavar_nargs_index(
-        alt_words, alt_metavar=alt_metavar, alt_index=alt_index
+        alt_words, dests, alt_metavar=alt_metavar, alt_index=alt_index
     )
 
     # Pick Help
@@ -1133,7 +1163,7 @@ def _patcher_from_words(words):
     return patcher
 
 
-def _parser_choose_metavar_nargs_index(alt_words, alt_metavar, alt_index):
+def _parser_choose_metavar_nargs_index(alt_words, dests, alt_metavar, alt_index):
     """Pick NArgs out of Metavar"""
 
     word0 = alt_words[0]
@@ -1142,7 +1172,7 @@ def _parser_choose_metavar_nargs_index(alt_words, alt_metavar, alt_index):
 
     # Pick Nargs out of an Arg Metavar
 
-    if word0.startswith("[") and word0.endswith("]"):
+    if (not dests) and word0.startswith("[") and word0.endswith("]"):
         assert alt_metavar == word0, (alt_metavar, word0)
 
         metavar = word0[len("[") : -len("]")]
@@ -1227,10 +1257,9 @@ def _patcher_patch_parser(patcher, parser):
     # Add the Arg or Option to the Parser, with/ without Metavar and Help
 
     if not dests:
+        dest = plural_en(metavar.lower()) if (nargs in ("+", "*")) else metavar.lower()
 
-        parser.add_argument(
-            metavar.lower(), metavar=metavar, nargs=nargs, help=help_else
-        )
+        parser.add_argument(dest, metavar=metavar, nargs=nargs, help=help_else)
 
     elif len(dests) == 1:
         assert dests[0].startswith("-")
@@ -1270,7 +1299,12 @@ def _patcher_patch_parser(patcher, parser):
                 help=help_else,
             )
 
-    # Diff the Parser before the Add, vs after the Add
+    # Require that we rip an equal Parser from the Doc from the patched Parser
+
+    alt_parser = ArgumentParser(doc=parser.format_help())
+    parser_require_eq(parser, alt_parser=alt_parser)
+
+    # Rip the Parser back as Python
 
     alt_pychars = rip_py_on_argparse(parser)
 
@@ -1876,9 +1910,6 @@ def parser_require_eq_rip(parser, alt_parser):
             stderr_print(diffchars)  # 'ripped' vs 'formed'
 
         assert pylines == alt_pylines
-
-    # FIXME: add test that Py from Parser from Doc also agrees
-    # FIXME: expect to fail for 'nargs="+"' and work out why if not
 
 
 # deffed in many files  # missing from docs.python.org

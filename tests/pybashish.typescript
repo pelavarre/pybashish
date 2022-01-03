@@ -1564,7 +1564,7 @@ Add one or more Optional Args at the end
          ),
      )
 
-    +parser.add_argument("also", metavar="ALSO", nargs="+", help="require one allow many")
+    +parser.add_argument("alsoes", metavar="ALSO", nargs="+", help="require one allow many")
     +
      args = parser.parse_args()
      sys.stderr.write("{}\n".format(args))
@@ -1596,7 +1596,7 @@ Add zero or more Optional Args at the end
          ),
      )
 
-    +parser.add_argument("also", metavar="ALSO", nargs="*", help="allow many more")
+    +parser.add_argument("alsoes", metavar="ALSO", nargs="*", help="allow many more")
     +
      args = parser.parse_args()
      sys.stderr.write("{}\n".format(args))
@@ -1627,7 +1627,7 @@ Do also let the caller spell the Zero or More Args at the end in the way of Pyth
          ),
      )
 
-    +parser.add_argument("also", metavar="ALSO", nargs="*", help="old style")
+    +parser.add_argument("alsoes", metavar="ALSO", nargs="*", help="old style")
     +
      args = parser.parse_args()
      sys.stderr.write("{}\n".format(args))
