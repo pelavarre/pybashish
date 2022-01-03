@@ -1304,14 +1304,16 @@ def parse_args(args=None, namespace=None, doc=None):
     alt_argv = sys.argv[1:] if (args is None) else args
 
     f = inspect.currentframe()
-    (chosen_doc, _) = module_find_doc_and_file(doc=doc, f=f)
-    parser = ArgumentParser(doc=chosen_doc)
+    (alt_doc, alt_file) = module_find_doc_and_file(doc=doc, f=f)
+    parser = ArgumentParser(doc=alt_doc)
     try:
-        parser_exit_unless_doc_eq(parser, doc=chosen_doc)  # Constrain Parse Args Doc
+        parser_exit_unless_doc_eq(parser, doc=alt_doc)  # Constrain Parse Args Doc
     except SystemExit:
-        stderr_print("argdoc.py: error: want Doc, got Parser, and they don't match")
-        # FIXME: more clarity in message at:  want Doc, got Parser, don't match
-        # FIXME: like say it came from module file, not 'argdoc.py'?
+        stderr_print(
+            "{}: error: Doc doesn't match Parser compiled from Doc".format(
+                os.path.basename(alt_file)
+            )
+        )
 
         raise
 
@@ -1341,8 +1343,8 @@ def format_help():
     """Call 'argparse.format_help' on a Parser of the calling Module's DocString"""
 
     f = inspect.currentframe()
-    (chosen_doc, _) = module_find_doc_and_file(doc=None, f=f)
-    parser = ArgumentParser(doc=chosen_doc)
+    (alt_doc, _) = module_find_doc_and_file(doc=None, f=f)
+    parser = ArgumentParser(doc=alt_doc)
 
     chars = parser.format_help()
 
@@ -1353,8 +1355,8 @@ def print_help(file=None):
     """Call 'argparse.print_help' on a Parser of the calling Module's DocString"""
 
     f = inspect.currentframe()
-    (chosen_doc, _) = module_find_doc_and_file(doc=None, f=f)
-    parser = ArgumentParser(doc=chosen_doc)
+    (alt_doc, _) = module_find_doc_and_file(doc=None, f=f)
+    parser = ArgumentParser(doc=alt_doc)
 
     parser.print_help(file=file)
 
@@ -1363,8 +1365,8 @@ def format_usage():
     """Call 'argparse.format_usage' on a Parser of the calling Module's DocString"""
 
     f = inspect.currentframe()
-    (chosen_doc, _) = module_find_doc_and_file(doc=None, f=f)
-    parser = ArgumentParser(doc=chosen_doc)
+    (alt_doc, _) = module_find_doc_and_file(doc=None, f=f)
+    parser = ArgumentParser(doc=alt_doc)
 
     chars = parser.format_usage()
 
@@ -1375,8 +1377,8 @@ def print_usage(file=None):
     """Call 'argparse.print_usage' on a Parser of the calling Module's DocString"""
 
     f = inspect.currentframe()
-    (chosen_doc, _) = module_find_doc_and_file(doc=None, f=f)
-    parser = ArgumentParser(doc=chosen_doc)
+    (alt_doc, _) = module_find_doc_and_file(doc=None, f=f)
+    parser = ArgumentParser(doc=alt_doc)
 
     parser.print_usage(file=file)
 
@@ -1392,13 +1394,13 @@ class ArgumentParser(argparse.ArgumentParser):
         # Pick the Doc to compile into an ArgumentParser
 
         f = inspect.currentframe()
-        (chosen_doc, _) = module_find_doc_and_file(doc=doc, f=f)
+        (alt_doc, _) = module_find_doc_and_file(doc=doc, f=f)
 
         # Form Self
 
         super_func = super(ArgumentParser, self).__init__
         untested_argument_parser_init(
-            self, super_func=super_func, doc=chosen_doc, drop_help=drop_help
+            self, super_func=super_func, doc=alt_doc, drop_help=drop_help
         )
 
         # Require that Self is a Parser from which we can rip Source
