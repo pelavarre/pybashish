@@ -122,8 +122,8 @@ def main(argv):
 
     main.args = args
 
-    if args.no_filename:  # print help because "-h" is short for "--filename"
-        argdoc.print_help()
+    if args.help or args.no_filename:
+        argdoc.print_help()  # including help when "-h" as short for "--no-filename"
         sys.exit(0)  # exit zero from printing help
 
     if main.args.verbose >= 2:
