@@ -632,10 +632,10 @@ def parser_add_option_call(parser, option, help_tail):
     default = None
     if nargs == "?":
         assert action is None
-        default = False
+        default = False  # for 'nargs="?'"
     elif action == "count":
         assert nargs is None
-        default = 0
+        default = 0  # for 'action="count"'
 
     # Call victory when Parser Add_Help already did add this Option
 
@@ -824,7 +824,13 @@ def rip_py_on_argparse(parser):
     doc = parser.format_help().rstrip()
 
     pylines = rip_pylines_on_argparse(parser)
-    parser_exit_unless_exec_eq(parser, pychars="\n".join(pylines))
+
+    with_main_doc = __main__.__doc__
+    __main__.__doc__ = doc  # only needed at 'epilog = doc[epi_at:]'
+    try:
+        parser_exit_unless_exec_eq(parser, pychars="\n".join(pylines))
+    finally:
+        __main__.__doc__ = with_main_doc
 
     pychars = pychars_fabricate(doc, prog=parser.prog, lines=pylines)
 
@@ -1231,7 +1237,10 @@ def _patcher_patch_parser(patcher, parser):
 
         if metavar is None:
             assert nargs is None, nargs
-            parser.add_argument(dests[0], action="count", default=0, help=help_else)
+            default = 0  # for 'action="count"'
+            parser.add_argument(
+                dests[0], action="count", default=default, help=help_else
+            )
         else:
             default = False if (nargs == "?") else None
             parser.add_argument(
@@ -1246,8 +1255,9 @@ def _patcher_patch_parser(patcher, parser):
 
         if metavar is None:
             assert nargs is None, nargs
+            default = 0  # for 'action="count"'
             parser.add_argument(
-                dests[0], dests[1], action="count", default=0, help=help_else
+                dests[0], dests[1], action="count", default=default, help=help_else
             )
         else:
             default = False if (nargs == "?") else None
@@ -1784,9 +1794,11 @@ def pychars_replace_lines(chars, lines):
 
     repl = "\n" + "\n".join(lines) + "\n"
 
-    imports = "argparse sys textwrap".split()
-    if "__main__" in repl:
-        imports = "__main__ argparse sys textwrap".split()
+    imports = "__main__ argparse sys textwrap".split()
+    if "__main__" not in repl:  # TODO: these if's wrongly accept quoted mentions
+        imports.remove("__main__")
+    if "textwrap" not in repl:
+        imports.remove("textwrap")
 
     py_imports = "\nimport " + "\nimport ".join(imports) + "\n"
 
@@ -1821,6 +1833,32 @@ def parser_exit_unless_exec_eq(parser, pychars):
 
 def parser_require_eq(parser, alt_parser):
     """Require that two Parser's look the same to us"""
+
+    parser_require_eq_doc(parser, alt_parser=alt_parser)
+    parser_require_eq_rip(parser, alt_parser=alt_parser)
+
+
+def parser_require_eq_doc(parser, alt_parser):
+    """Require that two Parser's both print the same Doc"""
+
+    doc_lines = parser.format_help().splitlines()
+    alt_doc_lines = alt_parser.format_help().splitlines()
+
+    difflines = list(
+        difflib.unified_diff(
+            a=doc_lines, b=alt_doc_lines, fromfile="ripped-doc", tofile="formed-doc"
+        )
+    )
+    diffchars = "\n".join(_.splitlines()[0] for _ in difflines)
+
+    if diffchars:
+        stderr_print(diffchars)  # 'ripped-doc' vs 'formed-doc'
+
+    assert doc_lines == alt_doc_lines
+
+
+def parser_require_eq_rip(parser, alt_parser):
+    """Require that we rip the same Python from Both"""
 
     pylines = rip_pylines_on_argparse(parser)
     alt_pylines = rip_pylines_on_argparse(alt_parser)
