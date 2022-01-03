@@ -1587,11 +1587,6 @@ def parser_exit_unless_doc_eq(parser, doc=None):
 
     if diffchars:
 
-        x1 = "bin/_grep1.py" in __main__.__file__  # FIXME
-        if x1:
-
-            return
-
         stderr_print(diffchars)  # '... --help' vs 'ArgumentParser(...'
 
         sys.exit(1)  # exit 1 to require Parser == Doc
@@ -1651,7 +1646,7 @@ def diff_fuzzed_else_complete(fromdoc, todoc, fromfile, tofile):
         fromlines = fromdoc.splitlines()
         tolines = todoc.splitlines()
 
-        if not diff_precision:
+        if (fromlines != tolines) and not diff_precision:
 
             # Compare from lists of words, ignoring leading/ trailing/ multiple Space's
 
