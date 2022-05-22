@@ -30,256 +30,160 @@ import time
 
 DEFAULT_NONE = None
 
-g = __main__  # choose where to collect global variables
-
 
 #
-# Run once
+# Run once, from the Command Line
 #
 
 
 def main():
-    """Run from the Command Line"""
+    """Run once, from the Command Line"""
 
-    if not sys.argv[1:]:
-        g.stdin = sys.stdin
+    argv = sys.argv[1:]
+    wt = WordTerminal(argv, prompt="csp> ")
+    assert wt
+
+    vm = CspShVirtualMachine()
+
+    main.vm = vm
+    main.wt = wt
+    main.pycharnames = make_pycharnames()
+
+    run_till_exit(wt)
+
+
+def run_till_exit(wt):
+    """Run till raise of KeyboardInterrupt or SystemExit"""
 
     while True:
         try:
-            run_once()
+            run_till_exception(wt)
         except KeyboardInterrupt:
-            if g.stdin:
+            if wt.stdin:
                 print()
 
             print("KeyboardInterrupt")
-            if g.stdin:
+            if wt.stdin:
 
                 continue
 
             raise
 
         except SystemExit:
-            if g.stdin:
+            if wt.stdin:
 
                 continue  # todo: stop hiding nonzero SystemExit payloads
 
             raise
 
 
-def run_once():
-    """Prompt, Listen, Speak, Repeat, ... till they say Bye"""
+def run_till_exception(wt):
+    """Run till raise of Exception"""
+
+    vm = main.vm
+    wt = main.wt
 
     while True:
-        do_prompt()
-        try:
-            do_listen()
-            if g.word:
-                do_speak()
-        except CspSh_Exception as exc:
-            if g.stdin:
+
+        word = wt.pullword()  # send prompt, and hang till reply
+        if word is None:
+            if not wt:
+
+                vm.BYE()
+
+        if word:
+            try:
+                vm_step(vm, word=word)
+            except CspSh_Exception as exc:
                 exc_type = type(exc)
+
                 exc_module = exc_type.__module__
-                exc_module = "" if (exc_module == "__main__") else (exc_module + ".")
-                print("{}{}: {}".format(exc_module, exc_type.__name__, exc))
-                drop_bye_lines()
+                exc_module_prefix = "{}.".format(exc_module)
+                if exc_module != "__main__":
+                    exc_module_prefix = ""
 
-                continue
+                if wt.stdin:
+                    print("{}{}: {}".format(exc_module_prefix, exc_type.__name__, exc))
 
-            raise
+                    wt.drop_line_drop_argv()
 
+                    continue
 
-def do_dash_i():
-    """Start a conversation later, after interpreting the Command Line"""
-
-    g.stdin = sys.stdin
-
-
-do_dash = do_dash_i
-
-
-def do_dash_dash():
-    """Undefine the '-' and '--' words, such as '-h' and '--help' and '-i'"""
-
-    keys = dir(__main__)
-    for key in keys:
-        if (key == "do_dash") or key.startswith("do_dash_"):
-            delattr(__main__, key)
-        elif (key == "do_dash_dash") or key.startswith("do_dash_dash_"):
-            delattr(__main__, key)
-
-
-def print_cspsh_help():
-    """Print the Command Line Help Lines from the top of the Main Python Sourcefile"""
-
-    print()
-
-    doc = textwrap.dedent(__main__.__doc__)
-    doc = doc.strip()
-    print(doc)
-
-    print()  # todo:  less verbose tracing of dash options:  -, -h, -i, --h, etc
-
-
-do_dash_h = print_cspsh_help  # '-h'
-do_dash_dash_h = print_cspsh_help  # '--h'
-do_dash_dash_he = print_cspsh_help  # '--he'
-do_dash_dash_hel = print_cspsh_help  # '--hel'
-do_dash_dash_help = print_cspsh_help  # '--help'
+                raise
 
 
 #
-# Prompt, Listen, Speak, Repeat, ... till they say Bye
+# Make sense of their words
 #
 
 
-def do_bye():
-    """Stop talking and go away"""
+def vm_step(vm, word):
+    """Make sense of one word"""
 
-    drop_bye_lines()
-
-    if g.chatting:
-        g.stdin = None
-
-    print("BYE")
-
-    sys.exit()  # raise SystemExit
-
-
-def drop_bye_lines():
-    """Shrug off what else you've heard, but do mention you shrugging it off"""
-
-    bye_lines = list(g.argv)
-    if g.sourceline.lstrip():
-        bye_lines.append(g.sourceline)
-    if bye_lines:
-        print("disregarding {} input lines".format(len(bye_lines)))
-
-    g.argv.clear()
-    g.sourceline = ""
-
-
-def do_prompt():
-    """Keep on inviting them to speak, till they do speak"""
-
-    # When taking End-Of-Input from the Command Line
-
-    if not g.argv:
-        if not g.chatting:
-
-            # Always echo it
-
-            if sys.argv[1:]:
-                print("csp> ", end="")
-                print("EOI")
-
-            # Default to quit now
-
-            if not g.stdin:
-
-                do_bye()
-
-            # Else open up a chat
-
-            if sys.argv[1:]:
-                print()
-
-            print("Press ⌃D EOF to quit")
-            g.chatting = True
-
-    # Prompt for the next Input Line
-
-    if not g.sourceline:
-        print("csp> ", end="")
-
-        # Take the next Input Line, and echo it
-
-        assert not g.sourceline, repr(g.sourceline)
-        do_refill()
-        assert g.sourceline
-
-
-def do_refill():
-    """Take the next Input Line, and echo it"""
-
-    # Take all the remaining Args, or one Arg, or End-Of-Input, from the Command Line
-
-    if g.argv:
-
-        popline = g.argv[0]
-        if popline.lstrip().startswith("#"):
-            argline = "  ".join(g.argv)
-            g.argv.clear()
-        else:
-            argline = g.argv.pop(0)
-
-        print(argline)
-        g.sourceline = argline
-
-        return
-
-    # Else take one Input Line, or End-Of-Input, from Stdin
-
-    sys.stdout.flush()
-    sys.stderr.flush()
-
-    iline = g.stdin.readline()  # todo: add Input Line Editor
-    if g.stdin.isatty():
-        if not iline:
-            print()
-    else:
-        if not iline:
-            print("EOI")
-        elif iline.endswith("\n"):
-            print(iline[: -len("\n")])
-        else:
-            print(iline)
-
-    if not iline:
-        g.stdin = None  # stop listening after first End-Of-Input
-
-        do_bye()  # todo: stop hiding all unfetched Stdin
-
-    g.sourceline = iline
-
-
-def do_listen():
-    """Wait for their words, then make sense of their words"""
-
-    # Pull the next line
-
-    sline = g.sourceline
-    g.sourceline = ""
-
-    line = sline.lstrip()
-
-    # Pull just the next word, and pushback the rest of the line
-
-    word = None
-    if line and not line.startswith("#"):
-        word = line.split()[0]
-        g.sourceline = line[len(word) :]
-
-    g.word = word
-
-
-def do_speak():
-    """Make sense of their words"""
-
-    func_name = "do_" + pyname(g.word).lower()
-    func = getattr(__main__, func_name, DEFAULT_NONE)
+    func_name = pyname(word)
+    func = getattr(vm, func_name, DEFAULT_NONE)
     if not func:
 
         raise CspSh_NameError(
-            "name {!r} is not defined as:  def {}".format(g.word, func_name)
+            "name {!r} is not defined in Vm as:  def {}".format(word, func_name)
         )
 
     func()
 
 
-def do_sleep():
-    """Stop running for a short while"""
+class CspShVirtualMachine:
+    """Do stuff"""
 
-    time.sleep(1)
+    def BYE(self):
+        """Stop talking and go away"""
+
+        wt = main.wt
+
+        wt.close_argv_else_stdin()
+        print("BYE")
+
+        sys.exit()  # raise SystemExit
+
+    def SLEEP(self):
+        """Stop running for a short while"""
+
+        time.sleep(1)
+
+    def dash_i(self):
+        """Start a conversation later, after interpreting the Command Line"""
+
+        wt = main.wt
+
+        wt.stdin = sys.stdin
+
+    dash = dash_i
+
+    def dash_dash(self):
+        """Undefine the '-' and '--' words, such as '-h' and '--help' and '-i'"""
+
+        keys = dir(self)
+        for key in keys:
+            if (key == "dash") or key.startswith("dash_"):
+                delattr(self, key)
+            elif (key == "dash_dash") or key.startswith("dash_dash_"):
+                delattr(self, key)
+
+    def print_cspsh_help(self):
+        """Print the Command Line Help Lines from the top of the Main Python Sourcefile"""
+
+        print()
+
+        doc = textwrap.dedent(__main__.__doc__)
+        doc = doc.strip()
+        print(doc)
+
+        print()  # todo:  less verbose tracing of dash options:  -, -h, -i, --h, etc
+
+    dash_h = print_cspsh_help  # '-h'
+    dash_dash_h = print_cspsh_help  # '--h'
+    dash_dash_he = print_cspsh_help  # '--he'
+    dash_dash_hel = print_cspsh_help  # '--hel'
+    dash_dash_help = print_cspsh_help  # '--help'
 
 
 #
@@ -290,9 +194,11 @@ def do_sleep():
 def pyname(word):
     """Convert enough Chars to make meaningful Words into Python Names"""
 
+    pycharnames = main.pycharnames
+
     chars = list()
     for (i, ch) in enumerate(word):
-        chname = g.pycharnames.get(ch, DEFAULT_NONE)
+        chname = pycharnames.get(ch, DEFAULT_NONE)
 
         repl = ch
         if chname:
@@ -362,7 +268,163 @@ def make_pycharnames():
 
 
 #
-# RaiseExceptions
+# Take Input Words from the Command Line, then Stdin, then Empty Words forever
+#
+
+
+class WordTerminal:
+    """Take Input Words from the Command Line, then Stdin, then Empty Words forever"""
+
+    def __init__(self, argv, prompt):
+
+        self.argv = list(argv) if argv else None
+        self.prompt = prompt
+
+        self.stdin = None if argv else sys.stdin
+
+        self.welcome = "\n" + "Press ⌃D EOF to quit"
+        self.eoi = "^D"  # "^D" as Control+D in the sense of Linux End-Of-Input (EOI)
+        self.line = None
+        self.word = None
+
+    def __bool__(self):
+        """Truthy while Input Words incoming"""
+
+        falsy = all((_ is None) for _ in (self.argv, self.stdin, self.line))
+        truthy = not falsy
+
+        return truthy
+
+    def close_argv_else_stdin(self):
+        """Stop taking from the Command Line, else stop taking from Stdin"""
+
+        if not self.argv:
+            self.stdin = None
+
+        self.drop_line_drop_argv()
+
+    def drop_line_drop_argv(self):
+        """Drop the Next Words of the Line, and drop the rest of the Command Line too"""
+
+        argv = self.argv
+        prompt = self.prompt
+        line = self.line
+
+        bye_lines = list()
+        if argv:
+            bye_lines.extend(argv)
+        if line and line.lstrip():
+            bye_lines.append(line)
+
+        if bye_lines:
+            print(prompt, end="")
+            print("... {} input lines dropped ..".format(len(bye_lines)))
+
+        self.argv = None
+        self.line = None
+
+    def pullword(self):
+        """Pull the next Word, else raise SystemExit"""
+
+        line = self.line
+        word = None
+
+        # Pull the Next Line when needed
+
+        if not line:
+            line = self.readline()
+
+        # Split the Next Word out of the Pulled Line
+
+        if line is not None:
+            line = self.line.lstrip()
+            if not line:
+                line = None
+            elif line.startswith("#"):
+                line = ""
+            else:
+                word = line.split()[0]
+                line = line[len(word) :]
+
+        # Remember success, and succeed
+
+        self.line = line
+        self.word = word
+
+        return word
+
+    def readline(self):
+        """Read & echo the next Line, from the Command Line, else Stdin, else EOI"""
+
+        argv = self.argv
+        eoi = self.eoi
+        prompt = self.prompt
+        stdin = self.stdin
+        welcome = self.welcome
+
+        print(prompt, end="")
+
+        # Take the Next Arg from the Command Line
+
+        if argv:
+
+            line = argv.pop(0)
+            print(line)
+
+        # Else take EOI from the Command Line
+
+        elif stdin:
+            if argv is not None:
+                line = ""
+                print(eoi)
+
+                self.argv = None
+
+                print(welcome)
+
+            # Else take EOI from the Pipe at Stdin
+
+            elif not stdin.isatty():
+                line = stdin.readline()
+                if not line:
+                    print(eoi)
+
+                    self.stdin = None
+
+                # Else take the next Line from the Pipe at Stdin
+
+                else:
+                    echo = line[: -len("\n")] if line.endswith("\n") else line
+                    print(echo)
+
+            # Else take EOI or the Next Line from the Terminal at Stdin
+
+            else:
+                sys.stdout.flush()
+                sys.stderr.flush()
+
+                line = self.stdin.readline()  # todo: add Input Line Editor
+                if not line:
+                    print()  # close the line into which Terminal wrote EOI
+
+                    self.stdin = None
+
+        # Else take another copy of EOI from nowhere
+
+        else:
+
+            line = None
+            print(eoi)
+
+        # Remember success, and succeed
+
+        self.line = line
+
+        return line
+
+
+#
+# Raise exceptions
 #
 
 
@@ -377,13 +439,6 @@ class CspSh_NameError(CspSh_Exception):
 #
 # Run once if loaded as the Main Process, not as an Imported Module
 #
-
-
-g.chatting = False  # True while taking Input from Stdin
-g.argv = sys.argv[1:]  # Args to take from the Command Line
-g.pycharnames = make_pycharnames()  # Names for Chars that Python Names reject
-g.sourceline = ""  # Terminal Input Buffer, a la the Forth Word Source
-g.stdin = None  # Alt Input Source after Command Line, if any
 
 
 if __name__ == "__main__":
