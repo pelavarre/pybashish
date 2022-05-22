@@ -924,22 +924,22 @@ class Arg(
 
 _grammar_ = r"""
 
-    transcript = '⟨' { event ',' } [ event ] '⟩'
-    event_set = '{' { event ',' } [ event ] '}'
+    transcript = '⟨' { event_name ',' } [ event_name ] '⟩'
+    menu_set = '{' { event_name ',' } [ event_name ] '}'
 
     proc = proc_with_args | proc_with_one | proc_name
     proc_with_one = proc '*' arg
     proc_with_args = proc_name arg_list
     arg_list = '(' { arg ',' } [ arg ]
 
-    argot = 'α' proc_body
-    argot_names = argot { '=' argot }
-    argot_def = argot_names '=' event_set
+    proc_menu = 'α' proc_body
+    menu_names = proc_menu { '=' proc_menu }
+    menu_def = menu_names '=' menu_set
 
-    world = event_set | argot | alphabet
-    argot_event =  event ':' world
+    menu = menu_set | proc_menu | menu_name
+    menu_event =  event_name ':' menu
 
-    step = argot_event | event
+    step = menu_event | event_name
     prolog = step { '→' step }
     epilog = proc | pocket
     prong = prolog '→' epilog
@@ -947,14 +947,14 @@ _grammar_ = r"""
 
     proc_def = proc '=' proc_body
     proc_body = sharp_body | fuzzy_body | fork | basic_body
-    sharp_body = 'μ' proc ':' world '•' basic_body
+    sharp_body = 'μ' proc ':' menu '•' basic_body
     fuzzy_body = 'μ' proc '•' basic_body
     basic_body = proc | pocket
 
     pocketable = fork | proc_body
     pocket = '(' pocketable ')'
 
-    term = transcript | event_set | proc_def | argot_def | pocketable | step | argot
+    term = transcript | menu_set | proc_def | menu_def | pocketable | step | proc_menu
 
     sentence = term { '=' term }
     csp = sentence
