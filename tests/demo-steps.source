@@ -24,7 +24,7 @@ function demo-b () { rm -fr ~/Desktop/pybashish; (set -xe; git clone https://git
 function demo-c () { local x="cd pybashish/"; echo "+ $x" >&2; $x; }
 function demo-d () { (set -xe; cat README.md); }
 function demo-e () { (set -xe; git branch -a); }
-function demo-f () { (set -xe; git checkout pelavarre-patch-1); }
+function demo-f () { (set -xe; git checkout main); }  # unneeded if new clone
 function demo-g () { (set -xe; git ls-files |column); }
 function demo-h () { (set -xe; less bin/hostname.py); }
 function demo-i () { (set -xe; bin/argdoc.py --rip argdoc bin/hostname.py); }

@@ -30,7 +30,7 @@ see also:
 download:
   git clone https://github.com/pelavarre/pybashish.git
   cd pybashish/
-  git checkout pelavarre-patch-1
+  git checkout main  # unneeded if new clone
   export PATH="${PATH:+$PATH:}$PWD/bin"
   which _shbutton.py
 

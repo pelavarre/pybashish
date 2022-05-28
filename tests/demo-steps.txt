@@ -14,7 +14,7 @@
 
 [d]  cat README.md
 [e]  git branch -a
-[f]  git checkout pelavarre-patch-1
+[f]  git checkout main  # unneeded if new clone
 [g]  git ls-files |column
 
 # Want to know how we print hostnames? Fully qualified and not? Take a look

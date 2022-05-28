@@ -7,7 +7,7 @@ Try it out, inside Linux or Mac OS, any time since Jun/2018 Python 3.7
 
     cd pybashish/
     git branch -a
-    git checkout pelavarre-patch-1
+    git checkout main  # unneeded if new clone
 
     cat README.md
     python3 bin/hostname.py --fqdn

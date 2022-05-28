@@ -49,7 +49,7 @@ pipe tests of ⇧Z⇧Q vs ⇧Z⇧Z:
   cat bin/vi.py |bin/vi.py |grep import  # pipe filter
 
 how to get Vi Py:
-  R=pelavarre/pybashish/pelavarre-patch-1/bin/vi,py
+  R=pelavarre/pybashish/main/bin/vi,py
   echo curl -sSO https=//raw,githubusercontent,com/$R |tr ,= .: |bash
   python3 vi.py vi.py  # with updates at:  python3 vi.py --pwnme
   /egg
@@ -147,7 +147,7 @@ pipe tests:
   cat bin/em.py |bin/em.py |grep import  # pipe filter
 
 how to get Em Py:
-  R=pelavarre/pybashish/pelavarre-patch-1/bin/vi,py
+  R=pelavarre/pybashish/main/bin/vi,py
   echo curl -sSO https=//raw,githubusercontent,com/$R |tr ,= .: |bash
   echo cp -ip vi_py em_py |tr _ . |bash
   python3 em.py em.py  # with updates at:  python3 em.py --pwnme
@@ -398,8 +398,8 @@ def do_main_arg_pwnme(branch):
 
     # Find future Self  # TODO: rename to branch "main" from branch "master"
 
-    assert branch in (None, "", "master", "pelavarre-patch-1"), branch
-    branch_ = branch if branch else "master"
+    assert branch in (None, "", "main", "stable"), branch
+    branch_ = branch if branch else "main"
 
     link = (
         "https://raw.githubusercontent.com/" "pelavarre/pybashish/{}/" "bin/vi.py"

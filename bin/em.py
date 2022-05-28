@@ -9,7 +9,7 @@ options:
   -h, --help  show this help message and exit
 
 how to get Em Py:
-  R=pelavarre/pybashish/pelavarre-patch-1/bin/vi,py
+  R=pelavarre/pybashish/main/bin/vi,py
   echo curl -sSO https=//raw,githubusercontent,com/$R |tr ,= .: |bash
   echo cp -ip vi_py em_py |tr _ . |bash
   python3 em.py em.py  # with updates at:  python3 em.py --pwnme
