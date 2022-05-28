@@ -443,6 +443,7 @@ def make_pycharnames():
 
 class WordTerminal:
     """Take Input Words from the Command Line, then Stdin, then Empty Words forever"""
+
     # FIXME: change WordTerminal, while Truthy, to return Empty String '', not None
 
     def __init__(self, argv, prompt):

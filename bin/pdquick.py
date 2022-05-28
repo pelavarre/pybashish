@@ -8,6 +8,7 @@ work with Rows of Columns a la 'import pandas as pd', but start up in 10 ms, not
 
 -- example input --
 
+rm -fr pybashish/
 git clone https://github.com/pelavarre/pybashish.git
 PYTHONPATH=$PWD/.. python3 -i -c ''
 
