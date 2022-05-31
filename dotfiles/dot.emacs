@@ -22,6 +22,7 @@
 
 (global-set-key (kbd "C-c %") 'query-replace-regexp)  ; for when C-M-% unavailable
 (global-set-key (kbd "C-c -") 'undo)  ; for when C-- alias of C-_ unavailable
+(global-set-key (kbd "C-c F") 'isearch-toggle-regexp)
 (global-set-key (kbd "C-c O") 'overwrite-mode)  ; aka toggle Insert
 (global-set-key (kbd "C-c b") 'ibuffer)  ; for ? m Q I O multi-buffer replace
 (global-set-key (kbd "C-c m") 'xterm-mouse-mode)  ; toggle between move and select

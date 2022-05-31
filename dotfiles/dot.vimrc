@@ -7,8 +7,8 @@
 
 
 :set softtabstop=4 shiftwidth=4 expandtab
-autocmd FileType c,cpp   set softtabstop=8 shiftwidth=8 expandtab
-autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
+:autocmd FileType c,cpp   set softtabstop=8 shiftwidth=8 expandtab
+:autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 
 
 "
@@ -51,6 +51,8 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 
 " \ e  => reload, if no changes not-saved
 :nnoremap <BSlash>e :e<return>
+" \ E  => discard changes and reload
+:nnoremap <BSlash>E :e!<return>
 
 " \ i  => toggle ignoring case in searches, but depends on :set nosmartcase
 :nnoremap <BSlash>i :set invignorecase<return>
@@ -65,23 +67,15 @@ autocmd FileType python  set softtabstop=4 shiftwidth=4 expandtab
 
 " \ w  => delete the trailing whitespace from each line (not yet from file)
 :nnoremap <BSlash>w :call RStripEachLine()<return>
-function! RStripEachLine()
+:function! RStripEachLine()
     let with_line = line(".")
     let with_col = col(".")
     %s/\s\+$//e
     call cursor(with_line, with_col)
 endfun
 
-""" commented out for now
-"" accept Option+3 from US Keyboards as meaning '#' \u0023 Hash Sign
-"
-":cmap <Esc>3 #
-":imap <Esc>3 #
-":nmap <Esc>3 #
-":omap <Esc>3 #
-":smap <Esc>3 #
-":vmap <Esc>3 #
-":xmap <Esc>3 #
+" \ W  => save changes
+:nnoremap <BSlash>W :w<return>
 
 
 "

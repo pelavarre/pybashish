@@ -211,21 +211,37 @@ function a () {
     eval $shline
 }
 
+function e () {
+    --exec-echo-xe emacs -nw --no-splash --eval "'(menu-bar-mode -1)'" "$@"
+}
+
+function o () {
+    if [ $# = 0 ]; then
+        o ~/Desktop
+    else
+        --exec-echo-xe open "$@"
+        --exec-echo-xe cd "$@"
+        --exec-echo-xe pwd
+    fi
+}
+
 function c () { --exec-echo-xe pbcopy "$@"; }
-function e () { --exec-echo-xe expand "$@"; }
+function d () { --exec-echo-xe diff -burp "$@"; }  # FIXME: default to:  d a b
 function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
 function h () { --exec-echo-xe head "$@"; }
 function hi () { local arg1=$1; shift; (--more-history; --history) | g "$arg1$@"; }
-function l () { --exec-echo-xe less -FIXR "$@"; }
+function l () { --exec-echo-xe less -FIRX "$@"; }
+function le () { --exec-echo-xe less -FIRX "$@"; }
 function m () { --exec-echo-xe make "$@"; }
 function n () { --exec-echo-xe cat -tvn "$@" "|expand"; }
 function p () { --exec-echo-xe popd >/dev/null && --dir-p-tac; }
 function s () { --exec-echo-xe sort "$@"; }
 function t () { --exec-echo-xe tail "$@"; }
-function u () { --exec-echo-xe uniq "$@" "|expand"; }
+function u () { --exec-echo-xe uniq -c "$@" |--exec-echo-xe expand; }
 function v () { --exec-echo-xe pbpaste "$@"; }
 function w () { --exec-echo-xe wc -l "$@"; }
 function x () { --exec-echo-xe hexdump -C"$@"; }
+function xp () { --exec-echo-xe expand "$@"; }
 
 # FIXME:  explain Terminal hung by:  h |l
 
@@ -537,6 +553,21 @@ alias -- --ls='(set -xe; ls -alF -rt)'
 
 
 #
+# Work with Ssh
+#
+
+function --while-ssh () {
+    while :; do
+        echo
+        date
+        ssh "$@"
+        echo Press Ctrl+C to exit, else we try again in 3 seconds
+        sleep 3
+    done
+}
+
+
+#
 # Work with Git
 #
 
@@ -722,7 +753,7 @@ function --git-diff-head () {  # -gdh
 }
 
 function --git-fetch-rebase () {  # -gfr
-    echo + git fetch >&2
+    echo + git fetch "$@" >&2
     git fetch
     echo + git rebase >&2
     git rebase
@@ -853,14 +884,16 @@ function --pylint2 () {
         "$@"
 }
 
+    #
     # (fixme)
     # W0511: FIXME, TODO
-
+    #
     # (too-many-arguments)
     # R0913: Too many arguments
-
+    #
     # (too-many-statements)
     # R0915: Too many statementss
+    #
 
 
 #
@@ -874,15 +907,15 @@ alias -- -v='--exec-echo-xe vim'
 function -eg () {
     local opts="-nw --no-splash"
     local arg='(menu-bar-mode -1)'
-    local paths=$(set -xe; git show --name-only --pretty=)
-    echo "emacs -nw --no-splash --eval '(menu-bar-mode -1)'" $paths "$@"
-    emacs       -nw --no-splash --eval '(menu-bar-mode -1)' $paths "$@"
+    local paths=$(echo $(set -xe; git show --name-only --pretty=))
+    echo "emacs -nw --no-splash --eval '(menu-bar-mode -1)'" ${=paths} "$@" >&2
+    emacs -nw --no-splash --eval '(menu-bar-mode -1)' ${=paths} "$@"
 }
 
 function -vg () {
     local paths=$(set -xe; git show --name-only --pretty=)
-    echo vim $paths "$@" >&2
-    vim $paths "$@" >&2
+    echo vim ${=paths} "$@" >&2
+    vim ${=paths} "$@" >&2
 }
 
 
@@ -897,13 +930,16 @@ function -p () {
         (
             set -xe
 
-            echo |python3 -m pdb $F  # explain SyntaxError's better than Black does
+            echo |python3 -m pdb $F >&2  # explain SyntaxError's better than Black does
 
             ~/.venvs/pips/bin/black $F
 
-            ~/.venvs/pips/bin/flake8 --max-line-length=999 --max-complexity 10 --ignore=E203,W503 $F
+            local WIDE='--max-line-length=999'
+            ~/.venvs/pips/bin/flake8 $WIDE --max-complexity 10 --ignore=E203,W503 $F
             # --ignore=E203  # Black '[ : ]' rules over E203 whitespace before ':'
             # --ignore=W503  # 2017 Pep 8 and Black over W503 line break before bin op
+
+            echo
 
             python3 "$@"
         )
@@ -1003,7 +1039,7 @@ function --edit-shifted-slash () {
 #
 
 
-export PATH="${PATH:+$PATH:}$HOME/bin"
+: export PATH="${PATH:+$PATH:}$HOME/bin"
 
 # TODO: more trace in how these do what they do
 
