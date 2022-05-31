@@ -78,4 +78,13 @@ endfun
 :nnoremap <BSlash>W :w<return>
 
 
+"
+" Call out to run Vim mostly in Insert Mode, by redefining many mostly unused keys
+"   and
+"
+
+:source ~/.insert.vimrc  " redefine obscure Option/Alt keys to stay in Insert Mode
+:startinsert  " start in Insert Mode, vs default of start in Normal (View) Mode
+
+
 " copied from:  git clone https://github.com/pelavarre/pybashish.git

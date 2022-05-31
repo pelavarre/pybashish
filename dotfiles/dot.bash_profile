@@ -136,6 +136,7 @@ function --dotfiles-find () {
     echo .bash_profile
     echo .bashrc
     echo .emacs
+    echo .insert.vimrc
     echo .pipe.luck
     echo .python.py
     echo .python.lazy.py
