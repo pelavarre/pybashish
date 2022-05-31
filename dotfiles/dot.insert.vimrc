@@ -9,9 +9,10 @@
 " Save this file as your own
 "
 "  rm -fr ~/.insert.vimrc
-"  F=pelavarre/pybashish/dotfiles/dotfiles/dot.insert.vimrc
+"  F=pelavarre/pybashish/main/dotfiles/dot.insert.vimrc
 "  curl -sSO https://raw.githubusercontent.com/$F
-"  mv -i ~/.insert.vimrc
+"  wc -l dot.insert.vimrc  &&: hundreds of lines, as you see here
+"  mv -i dot.insert.vimrc ~/.insert.vimrc
 "
 " Run it like so
 "
