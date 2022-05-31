@@ -272,7 +272,7 @@
 :inoremap <C-[>7 <C-o>7
 :inoremap <C-[>8 <C-o>8
 :inoremap <C-[>9 <C-o>9
-:inoremap <C-[>: <C-o>o>:
+:inoremap <C-[>: <C-o>:
 :inoremap <C-[>; <C-o>;
 :inoremap <C-[>< <C-o><
 " =
