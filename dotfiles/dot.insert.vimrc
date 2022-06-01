@@ -1,46 +1,44 @@
 " ~/.insert.vimrc
 
-" ==== A Demo In Eight Steps of keeping Vim in Insert Mode Always ===
+" usage =>  :source ~/.insert.vimrc
+"
+" redefine the Option/Alt keys to mean stay in Insert Mode
+"
 
-
 "
-" == 1 ==
+" == 1 of 8 ==
 "
-" Save this file as your own
+" Save this file as your own:  ~/.insert.vimrc
 "
-"  rm -fr ~/.insert.vimrc
-"  F=pelavarre/pybashish/main/dotfiles/dot.insert.vimrc
-"  curl -sSO https://raw.githubusercontent.com/$F
-"  wc -l dot.insert.vimrc  &&: hundreds of lines, as you see here
-"  mv -i dot.insert.vimrc ~/.insert.vimrc
+"       https://raw.githubusercontent.com/pelavarre/pybashish/main/dotfiles/dot.insert.vimrc
 "
 " Run it like so
 "
-"   vim +'source ~/.insert.vimrc' ~/.insert.vimrc
+"       vim +'source ~/.insert.vimrc' ~/.insert.vimrc
 "
-" Or as often as you feel you trust it, you can keep it added into your own:  ~/.vimrc
+" Or keep it added into your own:  ~/.vimrc
 "
-"   :source ~/.insert.vimrc  " redefine obscure Option/Alt keys to stay in Insert Mode
-"   :startinsert  " start in Insert Mode, vs default of start in Normal (View) Mode
-"
-" If you do that, then you'll default to start Vim in Insert Mode,
-" or you can leave out the ':startinsert' piece to start in Normal (View) Mode
+"       :source ~/.insert.vimrc
 "
 
 
 "
-" == 2 ==
+" == 2 of 8 ==
 "
-" You can tell Vim to start in Insert Mode, and to tell you how long you remained
+" Tell Vim to start in Insert Mode, and to tell you how long you remained
 "
 
 
-:set noshowmode  " don't
-:set showmode  " do say '-- INSERT --' in lower left while you remain in Insert Mode
+:set showmode  " say '-- INSERT --' in bottom line while you remain in Insert Mode
+:set showcmd  " show the Option/Alt key pressed, while waiting for next Key pressed
+:set ruler  " show the Line & Column Numbers of the Cursor
+:set number  " show the Line Number of each Line
+
+:startinsert  " start in Insert Mode, not in Normal View Mode
 
 
 "
-" == 3 ==
+" == 3 of 8 ==
 "
 " You can run Vim and never leave Insert Mode,
 "   so that you stop getting confused over whether you left or not
@@ -64,7 +62,7 @@
 
 
 "
-" == 4 ==
+" == 4 of 8 ==
 "
 " You can see what your macOS Option/Alt key can mean outside of Basic Latin Unicode
 "
@@ -82,14 +80,14 @@
 
 
 "
-" == 5 ==
+" == 5 of 8 ==
 "
 " Your Option/Alt + Left Click already means move the cursor there
 "
 
 
 "
-" == 6 ==
+" == 6 of 8 ==
 "
 " You can define your macOS Option/Alt key to mean ⌃O in Insert Mode
 "
@@ -112,6 +110,7 @@
 " ⇧⌥Q escape to Ex Mode, till you press v i Return
 :inoremap Ú <C-o>:
 :inoremap Œ <C-o>Q
+" Windows folk may still have to press ⌃O: to mean ⌥:
 
 " leap to column
 " " ⌥$ jumps to insert past the last Character, same as ⌥A
@@ -236,7 +235,7 @@
 
 
 "
-" == 7 ==
+" == 7 of 8 ==
 "
 " second of three, here are the definitions for
 "   > Use Option as Meta Key = Yes
@@ -353,11 +352,11 @@
 
 
 "
-" == 8 ==
+" == 8 of 8 ==
 "
 " third of three, here are the definitions
 "
-" for Normal (View) mode, so that
+" for Normal View mode, so that
 " accidentally unknowingly falling out of Insert Mode
 " doesn't immediately much trip you up, and
 " often puts you back into Insert Mode
