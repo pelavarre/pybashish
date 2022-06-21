@@ -13,22 +13,39 @@
 
 "
 " Configure Vim
+" Don't trust ':set ttyfast' to imply ':set showcmd' and ':set ruler'
 "
 
 
+:set background=dark
 :set background=light
+:syntax off
 :syntax on
 
+:set noshowmode
+:set showmode  " say '-- INSERT --' in bottom line while you remain in Insert Mode
+:set noshowcmd
+:set showcmd  " show the Key pressed with Option/Alt, while waiting for next Key
+:set noruler
+:set ruler  " show the Line & Column Numbers of the Cursor
+:set nonumber
+:set invnumber
+:set number  " show the Line Number of each Line  "
+
+:set noignorecase
+:set invignorecase
 :set ignorecase
+:set wrap
 :set nowrap
 
+:set nohlsearch
 :set hlsearch
 
 :highlight RedLight ctermbg=red
 :call matchadd('RedLight', '\s\+$')
 
-:set ruler  " quirkily not inferred from :set ttyfast at Mac
-:set showcmd  " quirkily not inferred from :set ttyfast at Linux or Mac
+:startinsert  " start in Insert Mode, vs default of start in Normal (View) Mode
+:stopinsert  " start in Normal View Mode, not in Insert Mode
 
 
 "
@@ -38,13 +55,14 @@
 "
 
 
-" Esc b  => macOS ⌥← Option Left-Arrow  => take as alias of ⇧B
-" Esc f  => macOS ⌥→ Option Right-Arrow  => take as alias of ⇧W
+" macOS ⌥← Option Left-Arrow  => Esc B = take as alias of ⇧B
+" macOS ⌥→ Option Right-Arrow  => Esc F = take as alias of ⇧W
 :nnoremap <Esc>b B
 :nnoremap <Esc>f W
 
-" \ Delay  => gracefully do nothing
-:nnoremap <BSlash> :<return>
+
+" \ \  => gracefully do nothing
+:nnoremap <BSlash><BSlash> :<return>
 
 " \ Esc  => cancel the :set hlsearch highlighting of all search hits on screen
 :nnoremap <BSlash><Esc> :noh<return>
@@ -84,7 +102,6 @@ endfun
 "
 
 :source ~/.insert.vimrc  " redefine obscure Option/Alt keys to stay in Insert Mode
-:startinsert  " start in Insert Mode, vs default of start in Normal (View) Mode
 
 
 " copied from:  git clone https://github.com/pelavarre/pybashish.git
