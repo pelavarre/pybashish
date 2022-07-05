@@ -67,23 +67,18 @@
 " \ Esc  => cancel the :set hlsearch highlighting of all search hits on screen
 :nnoremap <BSlash><Esc> :noh<return>
 
-" \ e  => reload, if no changes not-saved
-:nnoremap <BSlash>e :e<return>
-" \ E  => discard changes and reload
-:nnoremap <BSlash>E :e!<return>
-
-" \ i  => toggle ignoring case in searches, but depends on :set nosmartcase
+" \ ⇧I  => toggle ignoring case in searches, but depends on :set nosmartcase
 :nnoremap <BSlash>i :set invignorecase<return>
 
-" \ m  => mouse moves cursor
-" \ M  => mouse selects zigzags of chars to copy-paste
+" \ M  => mouse moves cursor
+" \ ⇧M  => mouse selects zigzags of chars to copy-paste
 :nnoremap <BSlash>m :set mouse=a<return>
 :nnoremap <BSlash>M :set mouse=<return>
 
-" \ n  => toggle line numbers
+" \ N  => toggle line numbers
 :nnoremap <BSlash>n :set invnumber<return>
 
-" \ w  => delete the trailing whitespace from each line (not yet from file)
+" \ W  => delete the trailing whitespace from each line (not yet from file)
 :nnoremap <BSlash>w :call RStripEachLine()<return>
 :function! RStripEachLine()
     let with_line = line(".")
@@ -92,8 +87,14 @@
     call cursor(with_line, with_col)
 endfun
 
-" \ W  => save changes
-:nnoremap <BSlash>W :w<return>
+" ⇧Z E  => reload, if no changes not-saved
+:nnoremap Ze :e<return>
+" ⇧Z ⇧E  => discard changes and reload
+:nnoremap ZE :e!<return>
+" ⇧Z ⇧Q => Quit Without Saving, by default
+" ⇧Z ⇧W  => save changes
+:nnoremap ZW :w<return>
+" ⇧Z ⇧Z => Save Then Quit, by default
 
 
 "
@@ -102,6 +103,7 @@ endfun
 "
 
 :source ~/.insert.vimrc  " redefine obscure Option/Alt keys to stay in Insert Mode
+:set nonumber
 
 
 " copied from:  git clone https://github.com/pelavarre/pybashish.git

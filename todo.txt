@@ -1,0 +1,27 @@
+# todo.txt
+
+
+fix however it is that i broke the ` backtick in Vim Insert Mode
+
+
+get farther with "bin/shbutton.py"
+
+
+test pasting commands that edit the pasteboard (such as "pbcopy")
+
+
+raise exceptions, first deployed imprecisely as asserts
++ TypeError
++ ValueError
++ NameError
++ SyntaxError
+
+
+comment asserts as
++ "give me" preconditions
++ "because X" invariants
++ "write once" enforcements of single assignment style
+
+
+# posted to: FIXME
+# copied from:  git clone https://github.com/pelavarre/pybashish.git

@@ -226,7 +226,7 @@ function o () {
     fi
 }
 
-function c () { --exec-echo-xe pbcopy "$@"; }
+#function c () { --exec-echo-xe pbcopy "$@"; }
 function d () { --exec-echo-xe diff -burp "$@"; }  # FIXME: default to:  d a b
 function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
 function h () { --exec-echo-xe head "$@"; }
@@ -239,7 +239,7 @@ function p () { --exec-echo-xe popd >/dev/null && --dir-p-tac; }
 function s () { --exec-echo-xe sort "$@"; }
 function t () { --exec-echo-xe tail "$@"; }
 function u () { --exec-echo-xe uniq -c "$@" |--exec-echo-xe expand; }
-function v () { --exec-echo-xe pbpaste "$@"; }
+#function v () { --exec-echo-xe pbpaste "$@"; }
 function w () { --exec-echo-xe wc -l "$@"; }
 function x () { --exec-echo-xe hexdump -C"$@"; }
 function xp () { --exec-echo-xe expand "$@"; }
@@ -569,264 +569,6 @@ function --while-ssh () {
 
 
 #
-# Work with Git
-#
-
-
-alias -- -g=--git
-
-alias -- -ga='--exec-echo-xe git add'
-alias -- -gb='--exec-echo-xe git branch'
-alias -- -gc=--git-commit
-alias -- -gf='--exec-echo-xe git fetch'
-alias -- -gd='--exec-echo-xe git diff'
-alias -- -gg='--exec-echo-xe git grep'
-alias -- -gl='--exec-echo-xe git log'
-alias -- -gp='--exec-echo-xe git prune'
-alias -- -gr='--exec-echo-xe git rebase'
-alias -- -gs='--exec-echo-xe git show'
-alias -- -gsp='--exec-echo-xe git show --pretty='
-
-alias -- -gap='--exec-echo-xe git add --patch'
-alias -- -gba='--exec-echo-xe git branch --all'
-# alias -- -gbq='--exec-echo-xe git rev-parse --abbrev-ref HEAD'
-alias -- -gbq='--exec-echo-xe "git branch |grep '\''[*]'\''"'
-alias -- -gca='--exec-echo-xe git commit --amend'
-alias -- -gcd=--git-chdir
-alias -- -gcf=--git-commit-fixup
-alias -- -gcl='pwd && --exec-echo-xe-maybe git clean -ffxdq'
-alias -- -gco='--exec-echo-xe git checkout'  # especially:  gco -
-alias -- -gcp='--exec-echo-xe git cherry-pick'
-alias -- -gdh=--git-diff-head
-alias -- -gfp='--exec-echo-xe git fetch --prune'
-alias -- -gfr=--git-fetch-rebase
-alias -- -ggc='--exec-echo-xe git gc'
-alias -- -ggl='--exec-echo-xe git grep -l'  # --files-with-matches
-alias -- -gl1='--exec-echo-xe git log -1 --decorate'
-alias -- -glf=--git-ls-files
-alias -- -glg='--exec-echo-xe git log --no-decorate --oneline --grep'
-alias -- -glq=--git-log-oneline-nodecorate
-alias -- -gls='--exec-echo-xe git log --stat'
-alias -- -grh='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard'
-alias -- -gri=--git-rebase-interactive
-alias -- -grl='--exec-echo-xe git reflog'
-alias -- -grv='--exec-echo-xe git remote -v'
-alias -- -gs1='--git-show-conflict :1'
-alias -- -gs2='--git-show-conflict :2'
-alias -- -gs3='--git-show-conflict :3'
-
-alias -- -gbdd='--exec-echo-xe-maybe git branch -D'
-alias -- -gcaa='--exec-echo-xe git commit --all --amend'
-alias -- -gcaf=--git-commit-all-fixup
-alias -- -gcam='--exec-echo-xe git commit --all -m WIP-$(basename $(pwd))'
-alias -- -gcls='pwd && --exec-echo-xe-maybe sudo git clean -ffxdq'
-alias -- -gcpc='--exec-echo-xe git cherry-pick --continue'
-alias -- -gdno='--exec-echo-xe git diff --name-only'
-alias -- -glq0='--exec-echo-xe git log --no-decorate --oneline'
-alias -- -glq1='--exec-echo-xe git log -1 --no-decorate --oneline'
-alias -- -glqv=--git-log-oneline-decorate
-alias -- -gpod='--exec-echo-xe-maybe git push origin --delete'
-alias -- -gpoh=--git-push-origin-head-maybe
-alias -- -grhu='dirs -p |head -1 && --exec-echo-xe-maybe git reset --hard @{upstream}'
-alias -- -gsno='--exec-echo-xe git show --name-only --pretty='
-alias -- -gssi='--exec-echo-xe git status --short --ignored'
-alias -- -gssn='--exec-echo-xe git shortlog --summary --numbered'
-alias -- -gsun='--exec-echo-xe git status --untracked-files=no'
-
-alias -- -gdno1='--exec-echo-xe git diff --name-only HEAD~1'
-alias -- -gcofr='--git-checkout-fetch-rebase'
-alias -- -glqv0='--exec-echo-xe git log --decorate --oneline'
-alias -- -gpfwl=--git-push-force-with-lease
-
-alias -- -gcofrlqv='--git-checkout-fetch-rebase-log-quiet-verbose'
-
-
-# TODO: solve dry run of -gco -  => git log -1 --oneline --decorate @{-1}
-# TODO: version test results by:  git describe --always --dirty
-
-# TODO: solve -gg -ggl etc with quoted args
-# TODO: give us -gg as -i and -ggi as not -i
-
-# TODO: git log -G regex file.ext # grep the changes
-# TODO: git log -S regex file.ext # grep the changes for an odd number (PickAxe)
-# TODO: --pretty=format:'%h %aE %s'  |cat - <(echo) |sed "s,@$DOMAIN,,"
-# TODO: git blame/log --abbrev=3
-
-# TODO: help with
-# git push origin HEAD:people/jqdoe/project/1234
-# git checkout -b people/jqdoe/project/1234 origin/people/jqdoe/project/1234
-# git push origin --delete people/jqdoe/project/12345
-# git branch -D people/jqdoe/project/12345
-#
-
-
-function --git () {  # -g
-    : :: 'Git Status for huge Git Repos - as in hulking, large, and slow'
-
-    echo + >&2
-    if --exec-echo-xe git status --untracked-files=no "$@"; then
-
-        echo + >&2
-        if --exec-echo-xe git status "$@"; then
-
-            if [ $# = 0 ]; then
-                echo + >&2
-                echo '+ git status --short --ignored |...' >&2
-                git status --short --ignored |awk '{print $1}' |sort |uniq -c| expand
-            else
-                echo + >&2
-                --exec-echo-xe git status --short --ignored "$@"
-                : # available as:  --git --
-            fi
-
-        fi
-    fi
-}
-
-function --git-chdir () {  # -gcd
-    : :: 'ChDir to root of Git Clone'
-    --exec-echo-xe 'cd $(git rev-parse --show-toplevel) && cd ./'$@' && dirs -p |head -1'
-}
-
-function --git-checkout-fetch-rebase () {  # -gcofr
-    : :: 'Pull a fresh View of a chosen Branch'
-    if [ $# = 0 ]; then
-        echo -gbq "$@" >&2
-        -gbq "$@" >&2
-    else
-        echo -gco "$@" >&2
-        -gco "$@" >&2
-    fi
-    echo -gfr >&2
-    -gfr >&2
-}
-
-function --git-checkout-fetch-rebase-log-quiet-verbose () {  # -gcofrlqv
-    : :: 'Pull a fresh View of a chosen Branch and glance over the Head of it'
-    if [ $# = 0 ]; then
-        echo -gbq "$@" >&2
-        -gbq "$@" >&2
-    else
-        echo -gco "$@" >&2
-        -gco "$@" >&2
-    fi
-    echo -gfr >&2
-    -gfr >&2
-    echo -glqv >&2
-    -glqv >&2
-}
-
-function --git-commit () {  # -gc
-    if [ $# = 0 ]; then
-        --exec-echo-xe git commit --all -m WIP
-    else
-        --exec-echo-xe git commit "$@"
-    fi
-}
-
-function --git-commit-all-fixup () {  # -gcaf
-    : :: 'Add all tracked and commit fixup to Head, else to some Commit'
-    if [ $# = 0 ]; then
-        --exec-echo-xe git commit --all --fixup HEAD
-    else
-        --exec-echo-xe git commit --all --fixup "$@"
-    fi
-}
-
-function --git-commit-fixup () {  # -gcf
-    : :: 'Commit fixup to Head, else to some Commit'
-    if [ $# = 0 ]; then
-        --exec-echo-xe git commit --fixup HEAD
-    else
-        --exec-echo-xe git commit --fixup "$@"
-    fi
-}
-
-function --git-diff-head () {  # -gdh
-    : :: 'Commit Diff since before Head, else since some Commit'
-    if [ $# = 0 ]; then
-        --exec-echo-xe git diff HEAD~1
-    elif [[ "$1" =~ ^[0-9_]+$ ]]; then
-        --exec-echo-xe git diff HEAD~"$@"
-    else
-        --exec-echo-xe git diff HEAD~1 "$@"
-    fi
-}
-
-function --git-fetch-rebase () {  # -gfr
-    echo + git fetch "$@" >&2
-    git fetch
-    echo + git rebase >&2
-    git rebase
-}
-
-function --git-log-oneline-decorate () {  # -glqv
-    if [ $# = 0 ]; then
-        --exec-echo-xe git log --oneline --decorate -19
-    else
-        --exec-echo-xe git log --oneline --decorate "$@"
-    fi
-}
-
-function --git-log-oneline-nodecorate () {  # -glq
-    if [ $# = 0 ]; then
-        --exec-echo-xe git log --oneline --no-decorate -19
-    else
-        --exec-echo-xe git log --oneline --no-decorate "$@"
-    fi
-}
-
-function --git-ls-files () {  # -glf
-    : :: 'Find tracked files at and beneath root of Git Clone, else below some Dir'
-    if [ $# = 0 ]; then
-        local abs=$(git rev-parse --show-toplevel)
-        local rel=$(python3 -c "import os; print(os.path.relpath('$abs'))")
-        --exec-echo-xe git ls-files "$rel" "$@"
-    else
-        --exec-echo-xe git ls-files "$@"
-    fi
-}
-
-function --git-push-force-with-lease () {  # -gpfwl
-    : :: 'Git Push Force With Lease'
-
-    echo '+ dirs -p |head -1' >&2
-    dirs -p |head -1
-
-    echo "+ git branch |grep '[*]'" >&2
-    git branch |grep '[*]'
-
-    --exec-echo-xe-maybe git push --force-with-lease "$@"
-}
-
-function --git-push-origin-head-maybe () {  # -gpoh
-    : :: 'Push Origin to Head Colon'
-    --exec-echo-xe-maybe git push origin HEAD:"$@"
-}
-
-function --git-rebase-interactive () {  # gri
-    : :: 'Rebase Interactive with Auto Squash of the last 19, else of the last N'
-    if [ $# = 0 ]; then
-        --exec-echo-xe git rebase -i --autosquash @{upstream}
-    elif [[ "$1" =~ ^[0-9_]+$ ]]; then
-        --exec-echo-xe git rebase -i --autosquash "HEAD~$@"
-    else
-        --exec-echo-xe git rebase -i --autosquash "$@"
-    fi
-}
-
-function --git-show-conflict () {  # -gs1, -gs2, -gs3
-    : :: 'Show Conflict Base of all Files, else whichever of one File, else Help'
-    if [ $# = 2 ]; then
-        --exec-echo-xe git show "$1:$2"
-    else
-        echo 'usage: -gs1|-gs2|-gs3 FILENAME |less  # base | theirs | ours'
-        return 2
-    fi
-}
-
-
-#
 # Shut up PyLint enough, so it can begin to speak clearly with us
 #
 
@@ -1054,7 +796,16 @@ alias -- --flake8='~/.venvs/pips/bin/flake8 --max-line-length=999 --max-complexi
 : --ignore=E203  # Black '[ : ]' rules over Flake8 E203 whitespace before ':'
 : --ignore=W503  # 2017 Pep 8 and Black over Flake8 W503 line break before binary op
 
+export PATH="${PATH:+$PATH:}$HOME/bin"
+
 source ~/.zprofilesecrets
+
+export PATH="${PATH:+$PATH:}$HOME/Public/byobash/bin"
+export PATH="${PATH:+$PATH:}$HOME/Public/byobash/qbin"
+export PATH="${PATH:+$PATH:}$HOME/Public/byobash/qb"
+export PATH="${PATH:+$PATH:}$HOME/Public/shell2py/bin"
+export PATH="${PATH:+$PATH:}$HOME/Public/pybashish/bin"
+
 
 #
 # Fall through more configuration script lines, & override some of them, or not
