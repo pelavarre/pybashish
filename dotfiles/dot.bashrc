@@ -23,6 +23,21 @@ fi
 shopt -s histverify  # a la Zsh:  setopt histverify
 
 
+function = {
+  : : 'Show Stack, else else do other Stack Work' : :
+  if [ "$#" = 0 ]; then
+      ~/Public/byobash/bin/byopyvm.py ls
+  else
+      ~/Public/byobash/bin/byopyvm.py "$@"
+  fi
+}
+
+
+function - () { echo + cd - && cd - >/dev/null && (dirs -p |head -1); }
+# Bash will say 'bash: cd: OLDPWD not set' and fail, till after Cd
+
+function .. () { echo + cd .. && cd .. && (dirs -p |head -1); }
+
 function cd.py () {
   : : 'Print some kind of Help, else change the Sh Working Dir' : :
   if [ "$#" = 0 ]; then

@@ -1,34 +1,58 @@
 # pybashish/Makefile:  Run the self-test's
 
 
-default: style test
-	:
-	git status |grep -v '^$$'
-	:
+default:
+	@echo ''
+	@echo 'ls'
+	@echo ''
+	@echo 'open https://github.com/pelavarre/pybashish#readme'
+	@echo ''
+	@echo 'make help'
+	@echo 'make push'
+	@echo ''
+	@echo 'open https://twitter.com/intent/tweet?text=@PELaVarre'
+
+
+push: style test
+	git log --oneline --no-decorate -1
+	git status --short --ignored
 	git describe --always --dirty
 	:
-	: make: passed
-	:
+	: did you mean:  git push
+	: press ⌃D to execute, or ⌃C to quit
+	cat -
+	git push
 
 
 help:
-	: # usage: make {default|blacken-here|help|test-here}
+	: # usage: make {black,default,flake8,me,pylint,style,test,tgz}
 	: #
-	: # help develop this code
+	: # work to add Code into GitHub PyBashIsh
 	: #
 	: # make verbs:
-	: #     black           edit the Python sources here and below into the Black Style
-	: #     flake8          review the Python sources here against most Flake8 Styles
-	: #     pylint          review some Python sources against many PyLint Styles
-	: #     default         style and test
-	: #     me              run:  python3 ../pybashish/
-	: #     style           make black, make flake8, and make pylint
-	: #     test            run the tests here, just once
-	: #     tgz             replace ../pybashish.tgz, but exclude '.*' from each Dir
 	: #
-	: # bugs:
+	: #     black    edit the Python sources here and below into the Black Style
+	: #     default  style and test
+	: #     flake8   review the Python sources here against most Flake8 Styles
+	: #     me       run:  python3 ../pybashish/
+	: #     pylint   review some Python sources against many PyLint Styles
+	: #     style    make black, make flake8, and make pylint
+	: #     test     run the tests here, just once
+	: #     tgz      replace ../pybashish.tgz, but exclude '.*' from each Dir
+	: #
+	: # quirks:
+	: #
 	: #     prompts with "? ", unlike the "" of Bash "read" with no -p PROMPT
 	: #
+	: # examples:
+	: #
+	: #   open https://github.com/pelavarre/pybashish#readme
+	: #
+	: #   make  # show these examples and exit
+	: #   make help  # show this help message and exit
+	: #   make push  # restyle the Source, review it, and ask to push it
+	: #
+	: #   open https://twitter.com/intent/tweet?text=@PELaVarre
 
 
 style: black flake8 pylint
@@ -69,10 +93,6 @@ test:
 	rm -fr ../pybashish/bin/__pycache__
 	git status --short --ignored
 	:
-
-
-grep-fixme:
-	echo && echo && echo && git grep 'F'IXME |awk -F: '{ n=$$1; if (n != o) {o=n; print ""; print $$1":"}; $$1=""; print substr($$0, 2)}' |less -FRX
 
 
 tgz:

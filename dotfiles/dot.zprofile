@@ -206,16 +206,6 @@ function --dotfiles-restore () {
 #
 
 
-function a () {
-    local shline=$(--awk $@)
-    echo "+ $shline" >&2
-    eval $shline
-}
-
-function e () {
-    --exec-echo-xe emacs -nw --no-splash --eval "'(menu-bar-mode -1)'" "$@"
-}
-
 function o () {
     if [ $# = 0 ]; then
         o ~/Desktop
@@ -226,25 +216,9 @@ function o () {
     fi
 }
 
-#function c () { --exec-echo-xe pbcopy "$@"; }
-function d () { --exec-echo-xe diff -burp "$@"; }  # FIXME: default to:  d a b
-function g () { if [ $# = 0 ]; then --grep .; else --grep "$@"; fi; }
-function h () { --exec-echo-xe head "$@"; }
 function hi () { local arg1=$1; shift; (--more-history; --history) | g "$arg1$@"; }
-function l () { --exec-echo-xe less -FIRX "$@"; }
-function le () { --exec-echo-xe less -FIRX "$@"; }
-function m () { --exec-echo-xe make "$@"; }
-function n () { --exec-echo-xe cat -tvn "$@" "|expand"; }
 function p () { --exec-echo-xe popd >/dev/null && --dir-p-tac; }
-function s () { --exec-echo-xe sort "$@"; }
-function t () { --exec-echo-xe tail "$@"; }
-function u () { --exec-echo-xe uniq -c "$@" |--exec-echo-xe expand; }
-#function v () { --exec-echo-xe pbpaste "$@"; }
-function w () { --exec-echo-xe wc -l "$@"; }
-function x () { --exec-echo-xe hexdump -C"$@"; }
-function xp () { --exec-echo-xe expand "$@"; }
-
-# FIXME:  explain Terminal hung by:  h |l
+# todo:  explain Terminal hung by:  h |l
 
 function --dir-p-tac () {
     if [[ "$(uname)" == "Darwin" ]]; then
@@ -518,9 +492,6 @@ function --search-dotluck () {
 # Work with dirs of files, and supply MM DD JQL HH MM SS date/time stamps
 #
 
-
-# alias -- '-'='cd -'
-alias -- '..'='cd .. && (dirs -p |head -1)'
 
 alias -- '?'="echo -n '? '>/dev/tty && cat -"  # press ⌃D for Yes, ⌃C for No
 
@@ -800,7 +771,9 @@ export PATH="${PATH:+$PATH:}$HOME/bin"
 
 source ~/.zprofilesecrets
 
+export PATH="${PATH:+$PATH:}$HOME/Public/byobash/bash"
 export PATH="${PATH:+$PATH:}$HOME/Public/byobash/bin"
+export PATH="${PATH:+$PATH:}$HOME/Public/byobash/py"
 export PATH="${PATH:+$PATH:}$HOME/Public/byobash/qbin"
 export PATH="${PATH:+$PATH:}$HOME/Public/byobash/qb"
 export PATH="${PATH:+$PATH:}$HOME/Public/shell2py/bin"

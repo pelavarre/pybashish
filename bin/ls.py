@@ -60,6 +60,8 @@ examples:
   ls.py -C |tee as-wide-as-tty.txt
   (mkdir foo && cd foo/ && echo hi>x && rm -fr ../foo/ && ls.py .)
 """
+# FIXME:   -m      show as comma separated names
+
 # FIXME: add Linux -U like classic -f but without implying -a
 
 # FIXME: -ll print header line "Mode Links Owner Group Bytes m d H:M Name\n"

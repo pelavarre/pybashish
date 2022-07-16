@@ -461,37 +461,30 @@
 " == 9 of 9 ==
 "
 " fourth of four, grab a hold of some Control Keys inside Insert Mode
+
+" i push the classic Insert ⌃O out to ⌃V⌃O, so that Insert ⌃O can mean Normal View ⌃O
 "
-" ⌃O⌃G works when you test it by hand, but doesn't work here, i dunno why
-" i settle for defining Insert Mode ⌃G as Esc ⌃G, and Insert Mode ⌃L as Esc ⌃L
+" i leave the classic Insert Tab, aka Insert ⌃I in place,
+" so to reach Normal View ⌃I i have to crawl through ⌃V⌃O⌃I
 "
-" you must choose to give up the usual ⌃O or not
-" if you give it up, then you can press ⌃O to mean Esc ⌃O I
-" and you can press ⌃O ⌃O to mean ⌃O
-"
-" if you give up the usual ⌃I, then you can press ⌃I (or Tab) to mean Esc ⌃O ⌃I
-" and you can press ⌃I ⌃I (or Tab Tab) to mean ⌃I
-"
-" if you give up the usual ⌃V, then you can press ⌃V to mean Esc ⌃O ⌃V
-" and you can press ⌃V ⌃V to mean ⌃V
+" ⌃O⌃G works when you test it by hand, but doesn't work here, i dunno why,
+" so i settle for defining Insert Mode ⌃G as Esc ⌃G, and Insert Mode ⌃L as Esc ⌃L
 "
 
+
+:inoremap <C-o> <C-o><C-o>
+
+:inoremap <C-v> <C-o><C-v>
+:inoremap <C-v><C-o> <C-o>
+:inoremap <C-v><C-v> <C-v>
+
+:inoremap <C-g> <Esc><C-g>
+:inoremap <C-l> <Esc><C-l>
 
 :inoremap <C-f> <C-o><C-f>
 :inoremap <C-b> <C-o><C-b>
 :inoremap <C-e> <C-o><C-e>
 :inoremap <C-y> <C-o><C-y>
-
-:inoremap <C-g> <Esc><C-g>
-:inoremap <C-l> <Esc><C-l>
-
-:inoremap <C-o> <C-o><C-o>
-:inoremap <C-i> <C-o><C-i>
-:inoremap <C-v> <C-o><C-v>
-
-:inoremap <C-i><C-i> <C-i>
-:inoremap <C-o><C-o> <C-o>
-:inoremap <C-v><C-v> <C-v>
 
 
 " copied from:  git clone https://github.com/pelavarre/pybashish.git
