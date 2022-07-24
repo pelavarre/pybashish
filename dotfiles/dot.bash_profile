@@ -1,10 +1,11 @@
 # ~/.bash_profile  # called before "~/.bashrc" or not called
 
+# todo: contrast with Ubuntu ~/.bash_aliases
+
+
 _DOT_BASH_PROFILE_=~/.bash_profile  # don't export, to say if this file has been sourced
 
 # date
-
-# TODO: contrast with Ubuntu ~/.bash_aliases
 
 
 #
@@ -64,8 +65,9 @@ function ps1 () {
 
 function --exec-echo-xe () {
     : :: 'unquote and execute the args, but unquote and trace them first'
-    echo "+ $@" >&2
-    source <(echo "$@")
+    local F=$(mktemp)  # FIXME often leaks
+    echo "+ $@" >&2 && echo "$@" >$F && source $F && rm $F
+    : :: 'Zsh technique of source <(echo chokes in my Mac Bash'
 }
 
 function --authorize () {
@@ -96,6 +98,7 @@ function --do-loudly () {
 
 #
 # Configure Bash (with "shopt" and so on)
+# but beware Mac Bash lacks:  shopt autocd
 #
 
 
@@ -106,6 +109,11 @@ if shopt -p |grep autocd  >/dev/null; then shopt -s autocd; fi
 # Capture every input line (no drops a la Bash HISTCONTROL=ignorespace)
 #
 
+export HISTCONTROL=ignoreboth
+export HISTCONTROL=ignoredups
+export HISTCONTROL=ignorespace
+unset HISTCONTROL  # last choice wins
+
 _LOGME_='echo "$$ $(whoami)@$(hostname):$(pwd)$(history 1)" >>~/.bash_command.log'
 PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND ; }$_LOGME_"
 unset _LOGME_
@@ -115,7 +123,6 @@ function --history () {
     --exec-echo-xe "history"  # a la Zsh:  history -t '%b %d %H:%M:%S' 0"
 }
 alias -- --more-history="--exec-echo-xe 'cat ~/.*command*log*'"
-alias -- --null="--exec-echo-xe 'cat - >/dev/null'"
 
 
 #
@@ -172,16 +179,6 @@ function --dotfiles-restore () {
 #
 
 
-function a () {
-    local shline=$(--awk $@)
-    echo "+ $shline" >&2
-    eval $shline
-}
-
-function e () {
-    --exec-echo-xe emacs -nw --no-splash --eval "'(menu-bar-mode -1)'" "$@"
-}
-
 function o () {
     if [ $# = 0 ]; then
         o ~/Desktop
@@ -192,9 +189,18 @@ function o () {
     fi
 }
 
-function hi () { local arg1=$1; shift; (--more-history; --history) | g "$arg1$@"; }
+
+# FIXME:  explain legacy Terminal hung by code inside:  h |l
+
+
+function hi () {
+    local arg1=$1
+    shift
+    (--more-history; --history) | --exec-echo-xe grep "$arg1$@"
+}
+
+
 function p () { --exec-echo-xe popd >/dev/null && --dir-p-tac; }
-# FIXME:  explain Terminal hung by:  h |l
 
 function --dir-p-tac () {
     if [[ "$(uname)" == "Darwin" ]]; then
@@ -204,264 +210,6 @@ function --dir-p-tac () {
         dirs -p |cat -n |sort -nr |cut -d$'\t' -f2-
     fi
 }
-
-
-#
-# Abbreviate command lines down to:  --*
-#
-
-
-function --awk () {
-    if [ $# = 0 ]; then
-        echo "awk '{print \$NF}'"
-    elif [[ "$1" =~ ^[A-Za-z0-9_]+$ ]]; then
-        echo "awk '{print \$$1}'"
-    elif [ $# = 1 ]; then
-        echo "awk -F'$1' '{print \$NF}'"
-    elif [[ "$2" =~ ^[A-Za-z0-9_]+$ ]]; then
-        echo "awk -F'$1' '{print \$$2}'"
-    else
-        local sep="$1"
-        shift
-        echo "awk -F'$sep' '{print $@}'"
-    fi
-}
-
-function --cd () {
-    if [ $# != 0 ]; then
-        cd "$@"
-    fi
-    echo "+ cd $(dirs -p |head -1)/"
-}
-
-function --grep () {
-    : :: 'search for patterns, but ignore case & order, and let "-" dash start patterns'
-    if [ $# = 0 ]; then
-        echo + grep . >&2
-        grep .
-    else
-        local pipe="grep -i -- $1"
-        shift
-        while [ $# != 0 ]; do
-            pipe="$pipe |grep -i -- $1"
-            shift
-        done
-        echo + "$pipe" >&2
-        eval "$pipe"
-    fi
-}
-
-function --grepq () {
-    : :: 'like --grep but without trace of the pipe'
-    if [ $# = 0 ]; then
-        grep .
-    else
-        local pipe="grep -i -- $1"
-        shift
-        while [ $# != 0 ]; do
-            pipe="$pipe |grep -i -- $1"
-            shift
-        done
-        eval "$pipe"
-    fi
-}
-
-function --pwd () {
-    echo "+ cd $(dirs -p |head -1)/"
-}
-
-
-#
-# Work with input and output history
-#
-
-alias -- '--'='(set -xe; cat - >/dev/null;)'
-
-alias -- ','="--take-pbpipe-from --search-dotluck 'expand.py | tee /dev/tty'"
-alias -- ',,'="--pbpaste-dotluck 'cat.py -entv'"
-alias -- ',,,'="--take-input-from --search-dotluck 'cd -'"
-alias -- ',,,,'="--search-dotluck 'cd -'"
-alias -- '@'="--pbpipe 'expand.py |tee /dev/tty'"
-alias -- '@@'="--pbpaste 'cat.py -entv'"
-
-function --pbpaste () {
-    : :: 'capture and pipe out through tail args, else pipe out through head arg'
-
-    if [ $# = 1 ]; then
-        echo + "pbpaste |tee ~/.pbpaste |$1" >&2
-        pbpaste |tee ~/.pbpaste |eval "$1"
-        return $?
-    fi
-
-    shift
-
-    echo + "pbpaste |tee ~/.pbpaste |$@" >&2
-    pbpaste |tee ~/.pbpaste |$@
-}
-
-function --pbpipe () {
-    : :: 'capture and pipe through tail args, else pipe through head arg'
-
-    if [ $# = 1 ]; then
-        echo + "pbpaste |tee ~/.pbpaste |$1 |tee ~/.pbcopy |pbcopy" >&2
-        pbpaste |tee ~/.pbpaste |eval "$1" |tee ~/.pbcopy |pbcopy
-        return $?
-    fi
-
-    shift
-
-    echo + "pbpaste |tee ~/.pbpaste |$@ |tee ~/.pbcopy |pbcopy" >&2
-    pbpaste |tee ~/.pbpaste |$@ |tee ~/.pbcopy |pbcopy
-}
-
-function --pbpaste-dotluck () {
-    : :: 'capture and pipe out through tail args, else pipe out through head arg'
-
-    if [ $# = 1 ]; then
-        --pbpaste "$@"
-        return $?
-    fi
-
-    local else_hit="$1"
-    shift
-
-    echo + "pbpaste |tee ~/.pbpaste |- $@" >&2
-    pbpaste |tee ~/.pbpaste |--take-input-from --search-dotluck "$else_hit" "$@"
-}
-
-function --take-pbpipe-from () {
-    : :: 'trace and source a strong hit as pb filter, else trace the weak hits'
-
-    : 'search'
-
-    local sourceable=$(mktemp)
-    "$@" >"$sourceable"
-    local xs=$?
-
-    : 'quit now if search failed'
-
-    if [ $xs != 0 ]; then
-        cat "$sourceable" >&2
-    else
-
-        : 'forward usage with zeroed exit status, if usage'
-
-        local usage=''
-        cat "$sourceable" |head -1 |grep '^usage: ' |read usage
-        if [ "$usage" ]; then
-            cat "$sourceable" >&2
-        else
-
-            : 'forward strong hit as pb filter'
-
-            echo '+ inside (pbpaste |tee ~/.pbpaste |... |tee ~/.pbcopy |pbcopy) do' >&2
-            cat "$sourceable" |sed 's,^,+     ,' >&2
-            pbpaste |tee ~/.pbpaste |source "$sourceable" |tee ~/.pbcopy |pbcopy
-
-        fi
-    fi
-
-    rm "$sourceable"
-    return $xs
-}
-
-function --take-input-from () {
-    : :: 'trace and source a strong hit as input, else trace the weak hits'
-
-    : 'search'
-
-    local sourceable=$(mktemp)
-    "$@" >"$sourceable"
-    local xs=$?
-
-    : 'quit now if search failed'
-
-    if [ $xs != 0 ]; then
-        cat "$sourceable" >&2
-    else
-
-        : 'forward usage with zeroed exit status, if usage'
-
-        local usage=''
-        cat "$sourceable" |head -1 |grep '^usage: ' |read usage
-        if [ "$usage" ]; then
-            cat "$sourceable" >&2
-        else
-
-            : 'forward strong hit as input'
-
-            cat "$sourceable" |sed 's,^,+ ,' >&2
-            source "$sourceable"
-
-        fi
-    fi
-
-    rm "$sourceable"
-    return $xs
-}
-
-function --take-input-twice-from () {
-    : :: 'trace and eval a strong hit as input, else trace the weak hits'
-
-    : 'search once to capture hits, search again to capture exit status'
-
-    local input=$($@)
-    $@
-    local xs=$?
-
-    : 'quit now if search failed'
-
-    if [ $xs != 0 ]; then
-        echo "$input" >&2
-    else
-
-        : 'forward usage with zeroed exit status, if usage'
-
-        local usage=''
-        echo "$input" |head -1 |grep '^usage: ' |read usage
-        if [ "$usage" ]; then
-            echo "$input" >&2
-        else
-
-            : 'forward strong hit as input'
-
-            echo "$input" |sed 's,^,+ ,' >&2
-            eval "$input"
-
-        fi
-    fi
-
-    return $xs
-}
-
-function --search-dotluck () {
-    : :: 'search the curated input luck saved at "~/.*.luck"'
-
-    : 'find first arg when given no search key'
-
-    if [ $# = 1 ]; then
-        echo "$1"
-        return
-    fi
-
-    shift
-
-    : 'exit nonzero when multiple hits found, or zero hits found'
-
-    local hits=$(mktemp)
-    cat /dev/null ~/.*.luck |--grepq "$@" >"$hits"
-    local wcl=$(($(cat "$hits" |wc -l)))
-    if [ "$wcl" != "1" ]; then
-        echo "$wcl hits found by:  --grep $@ ~/.*.luck" >&2
-        cat "$hits" >&2
-        return 1
-    fi
-
-    : 'forward to stdout and exit zero when exactly one hit found'
-
-    cat "$hits"
-}
-# TODO: solve 'search-dotluck' with 'eval', without 'mktemp'
 
 
 #
@@ -591,24 +339,6 @@ function --pylint2 () {
 #
 
 
-alias -- -e="--exec-echo-xe \"emacs -nw --no-splash --eval '(menu-bar-mode -1)'\""
-alias -- -v='--exec-echo-xe vim'
-
-function -eg () {
-    local opts="-nw --no-splash"
-    local arg='(menu-bar-mode -1)'
-    local paths=$(set -xe; git show --name-only --pretty=)
-    echo "emacs -nw --no-splash --eval '(menu-bar-mode -1)'" $paths "$@"
-    emacs       -nw --no-splash --eval '(menu-bar-mode -1)' $paths "$@"
-}
-
-function -vg () {
-    local paths=$(set -xe; git show --name-only --pretty=)
-    echo vim $paths "$@" >&2
-    vim $paths "$@" >&2
-}
-
-
 function -p () {
     if [ $# = 0 ]; then
         ( set -xe; python3 -i "$@" ~/.python.py; )
@@ -628,6 +358,8 @@ function -p () {
             ~/.venvs/pips/bin/flake8 $WIDE --max-complexity 10 --ignore=E203,W503 $F
             # --ignore=E203  # Black '[ : ]' rules over E203 whitespace before ':'
             # --ignore=W503  # 2017 Pep 8 and Black over W503 line break before bin op
+
+            echo
 
             python3 "$@"
         )
@@ -691,30 +423,6 @@ done
 #   pip --version  # call once to activate
 #   pip --version  # call again to work while activated
 #
-
-
-#
-# Alias first words for pasting back printed lines as input
-#
-
-
-alias -- 'A'=vim  # such as git status:  A  dotfiles/dot.zprofile
-alias -- 'M'=vim  # such as git status:  M dotfiles/dot.zprofile
-
-alias -- both=--edit-shifted
-function --edit-shifted () {
-    : :: 'edit a file mentioned as Conflicted in the style of Git Status'
-    shift
-    (set -xe; vim $@)
-}  # such as:  both modified:   dotfiles/dot.zprofile
-
-alias -- '+++'=--edit-shifted-slash
-function --edit-shifted-slash () {
-    : :: 'edit a file mentioned as Changed in the style of Git Diff'
-    local filename=$(echo $1 |cut -d/ -f2-)
-    shift
-    (set -xe; vim $filename $@)
-}  # such as:  +++ b/dotfiles/dot.zprofile +711
 
 
 #
