@@ -26,7 +26,7 @@ setopt histverify  # a la Bash:  shopt -s histverify
 function aliases () { echo + alias >&2 && alias; }
 
 function funcs () {
-  local L="functions |grep \$'^[^ \\t=]* ('"  # not Bash 'set |grep'
+  local L="functions |grep \$'^[^ \\\\t=]* ('"  # not Bash 'set |grep'
   echo + $L >&2
   echo
   functions |grep $'^[^ \t=]* ('
@@ -35,23 +35,9 @@ function funcs () {
 }
 
 
-# for 'byobash/bin/bash.py', distinct from 'byobash/bin/zsh.py'
-
-function aliases () { echo + alias >&2 && alias; }
-
-function funcs () {
-  local L="set |grep '^[^ =]* ('"  # not Zsh 'set |grep'
-  echo + $L >&2
-  echo
-  set |grep '^[^ =]* ('
-  echo
-  echo ': # you might next like:  declare -f funcs'
-}
-
-
 # for 'byobash/bin/byopyvm.py'
 
-alias @='~/Public/byobash/bin/byopyvm.py buttonfile'
+function @ { ~/Public/byobash/bin/byopyvm.py buttonfile "$@"; }
 
 function = {
   : : 'Show Stack, else else do other Stack Work' : :
@@ -61,6 +47,11 @@ function = {
       ~/Public/byobash/bin/byopyvm.py "$@"
   fi
 }
+
+
+# for 'byobash/bin/cat.py', but temporary
+
+function cat.py () { ~/Public/pybashish/bin/cat.py "@"; }
 
 
 # for 'byobash/bin/cd.py'
@@ -116,6 +107,14 @@ function git.py () {
 
 function qcd () {
   'cd' "$(command git.py --for-chdir cd $@)" && (dirs -p |head -1)
+}
+
+function --- () {
+  command git.py -- --for-shproc --- "$@"
+}
+
+function +++ () {
+  command git.py -- --for-shproc --- "$@"
 }
 
 

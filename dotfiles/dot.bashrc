@@ -10,14 +10,20 @@ if [ "$(uname)" = Darwin ]; then
 fi
 # TODO: work up better answer for ~/.bash_profile skipped by macOS Zsh
 
+
 export OLDPS1="$PS1"  &&: # back up the default prompt here, as if it's screaming loud
+
 export PS1="$(echo $PS1 |sed 's,\\\[\\033\[[^\\]*\\\],,g') "  # no color for no glare
-if (( $SHLVL <= 1 )); then  # only to start with, in the top Shell per Terminal
+if (( SHLVL <= 1 )); then  # only to start with, in the top Shell per Terminal
     export PS1='\$ '  # no hostname, no pwd, etc etc
 else
     export PS1='\[\e]0;\u@\h: \w\a\]\[\033[00;32m\]\u@\h\[\033[00m\]:\[\033[00;34m\]\w\[\033[00m\]\$ '
 fi
-# TODO: settle all my hosts on SHLVL <= 1, not macOS at SHLVL <= 2
+if [[ $(uname) == "Darwin" ]]; then  # macOS defaults to Zsh, so ShLvl 2 Bash is Top Lvl
+    if (( SHLVL == 2 )); then
+        export PS1='\$ '
+    fi
+fi
 
 
 shopt -s histverify  # a la Zsh:  setopt histverify
@@ -34,29 +40,15 @@ unset HISTCONTROL  # last choice wins  # last choice often comes from some other
 #
 
 
-# for 'byobash/bin/zsh.py', in place of 'byobash/bin/bash.py'
-
-function aliases () { echo + alias >&2 && alias; }
-
-function funcs () {
-  local L="functions |grep \$'^[^ \\t=]* ('"  # not Bash 'set |grep'
-  echo + $L >&2
-  echo
-  functions |grep $'^[^ \t=]* ('
-  echo
-  echo ': # you might next like:  declare -f funcs'
-}
-
-
 # for 'byobash/bin/bash.py', distinct from 'byobash/bin/zsh.py'
 
 function aliases () { echo + alias >&2 && alias; }
 
 function funcs () {
-  local L="set |grep '^[^ =]* ('"  # not Zsh 'set |grep'
+  local L="set |grep '^[^ =]* (' | sort"  # not Zsh 'set |grep'
   echo + $L >&2
   echo
-  set |grep '^[^ =]* ('
+  set |grep '^[^ =]* (' |sort
   echo
   echo ': # you might next like:  declare -f funcs'
 }
@@ -64,7 +56,7 @@ function funcs () {
 
 # for 'byobash/bin/byopyvm.py'
 
-alias @='~/Public/byobash/bin/byopyvm.py buttonfile'
+function @ { ~/Public/byobash/bin/byopyvm.py buttonfile "$@"; }
 
 function = {
   : : 'Show Stack, else else do other Stack Work' : :
@@ -74,6 +66,11 @@ function = {
       ~/Public/byobash/bin/byopyvm.py "$@"
   fi
 }
+
+
+# for 'byobash/bin/cat.py', but temporary
+
+function cat.py () { ~/Public/pybashish/bin/cat.py "@"; }
 
 
 # for 'byobash/bin/cd.py'
@@ -129,6 +126,14 @@ function git.py () {
 
 function qcd () {
   'cd' "$(command git.py --for-chdir cd $@)" && (dirs -p |head -1)
+}
+
+function --- () {
+  command git.py -- --for-shproc --- "$@"
+}
+
+function +++ () {
+  command git.py -- --for-shproc --- "$@"
 }
 
 

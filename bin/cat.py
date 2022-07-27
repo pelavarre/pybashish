@@ -133,11 +133,11 @@ def cat_repr_byte(fd_byte, args):
     if fd_byte:
 
         if fd_byte == b"\n":
-            rep = (br"\n" + b"\n") if args.show_ends else fd_byte
+            rep = (rb"\n" + b"\n") if args.show_ends else fd_byte
             return rep
 
         if fd_byte == b"\t":
-            rep = br"\t" if args.show_tabs else fd_byte
+            rep = rb"\t" if args.show_tabs else fd_byte
             return rep
 
         if args.show_nonprinting:

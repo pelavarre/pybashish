@@ -255,8 +255,8 @@ class PbVirtualMachine:
             if code != ".":
                 multipliers_by_code[code] = 10 ** (-3 * index)
 
-        multipliers_by_code["K"] = 10 ** 3
-        multipliers_by_code["µ"] = 10 ** -6  # \u00B5 micro-sign
+        multipliers_by_code["K"] = 10**3
+        multipliers_by_code["µ"] = 10**-6  # \u00B5 micro-sign
 
         return multipliers_by_code
 
@@ -809,7 +809,7 @@ class PbVirtualMachine:
         """Replace the last two lines with the second to last raised to the first"""
 
         (y, x) = self.pop_some_decimals(2)
-        w = y ** x
+        w = y**x
         self.push_one_decimal(w)
 
     def py_right_shift(self):
